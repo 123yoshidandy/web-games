@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#3a2216">
+    <title>センチュリー：スパイスロード</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="スパイスロード">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Century</h1>
+            <p class="subtitle">センチュリー：スパイスロード</p>
+            <div class="setup">
+                <div class="setup-row">人数
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="2">2人</button>
+                        <button type="button" role="radio" data-count="3">3人</button>
+                        <button type="button" role="radio" data-count="4">4人</button>
+                        <button type="button" role="radio" data-count="5">5人</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="turn-info" class="turn-info"></span>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h11v16H7zM4 7v13M10 8.5h5M10 12h5M10 15.5h3"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="players" class="players"></div>
+            <div class="board-label"><span>得点カード</span><span id="point-deck" class="deck-count"></span></div>
+            <div id="point-row" class="point-row"></div>
+            <div class="board-label"><span>商人カード</span><span id="merchant-deck" class="deck-count"></span></div>
+            <div id="market" class="market"></div>
+            <div id="mine" class="mine" data-player="me"></div>
+            <div id="hand" class="hand"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <ol id="result-list" class="result-list"></ol>
+        <p class="muted note">得点カード＋金貨3点・銀貨1点＋黄以外の香辛料1個1点。同点なら手番の順が後の人の勝ち</p>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>香辛料を集めて<strong>得点カード</strong>を買い、点数を競います。香辛料は <span id="help-cubes" class="help-cubes"></span> の順に価値が上がります。</p>
+            <h3>手番（どれか1つ）</h3>
+            <ul class="help-list">
+                <li><strong>出す</strong>：手札の商人カードを1枚使う。使ったカードは「使用済み」になる
+                    <div class="help-pic" id="help-cards"></div>
+                    香辛料のカードは描かれた香辛料をもらう。<strong>交換</strong>は、香辛料がある限り何回でも続けて使える（＋−で回数を選ぶ）。<strong>格上げ</strong>は、香辛料を1段ずつ上げる（同じ香辛料を続けて上げてもよい。回数より少なくてもよい）</li>
+                <li><strong>取る</strong>：商人カードを1枚手札に加える。それより<strong>左のカードに香辛料を1個ずつ</strong>置いていく。取ったカードの上の香辛料ももらえる</li>
+                <li><strong>休む</strong>：使用済みのカードを全部手札に戻す</li>
+                <li><strong>買う</strong>：得点カードに描かれた香辛料を払って取る。左端なら<strong>金貨</strong>（3点）、2番目なら<strong>銀貨</strong>（1点）ももらえる。金貨が尽きたら、銀貨が左端に移る</li>
+            </ul>
+            <h3>キャラバン</h3>
+            <p>香辛料は<strong>10個</strong>まで。手番の終わりに超えていたら、選んで戻します。</p>
+            <h3>終わり方</h3>
+            <p>だれかが得点カードを<strong>2〜3人なら6枚、4〜5人なら5枚</strong>取ったら、その巡の終わり（最初の人の前）で終わりです。</p>
+            <h3>得点</h3>
+            <p>得点カードの点＋金貨3点・銀貨1点＋<strong>黄以外</strong>の香辛料1個1点。同点なら、手番の順が後の人の勝ちです。</p>
+            <h3>画面</h3>
+            <p>カードを押して選ぶと、下に操作が出ます。格上げと、香辛料を戻すときは、自分の香辛料（下の色の数）を押します。取るときに置く香辛料は、ふつうは安い色から自動で選びます。自分で選ぶときは、香辛料を押します。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
