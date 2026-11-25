@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#3a1f17">
+    <title>アルハンブラ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="アルハンブラ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">ALHAMBRA</h1>
+            <p class="subtitle">アルハンブラ</p>
+            <div class="setup">
+                <div class="row">人数
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="2">2</button>
+                        <button type="button" role="radio" data-count="3">3</button>
+                        <button type="button" role="radio" data-count="4">4</button>
+                        <button type="button" role="radio" data-count="5">5</button>
+                        <button type="button" role="radio" data-count="6">6</button>
+                    </div>
+                </div>
+                <div class="row">CPU
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="players" class="players"></div>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div class="markets">
+                <div id="market" class="market" aria-label="建物の市場"></div>
+                <div id="money-market" class="money-market" aria-label="お金の市場"></div>
+            </div>
+            <div class="alhambra-area" id="alhambra-area">
+                <div id="alhambra" class="alhambra" aria-label="あなたのアルハンブラ"></div>
+                <button id="score-button" class="score-button" aria-label="得点の見込み"></button>
+            </div>
+            <div class="mine">
+                <div id="hand" class="hand" aria-label="手持ちのお金"></div>
+                <div id="reserve" class="reserve" aria-label="予備の建物"></div>
+            </div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 得点の見込み・得点・結果 -->
+    <dialog id="scores" class="sheet">
+        <h2 id="scores-title" tabindex="-1" autofocus></h2>
+        <div id="scores-body" class="scores-body"></div>
+        <div class="buttons" id="scores-buttons"></div>
+    </dialog>
+
+    <!-- 相手のアルハンブラ -->
+    <dialog id="player-detail" class="sheet">
+        <h2 id="player-detail-name" tabindex="-1" autofocus></h2>
+        <div id="player-detail-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>お金で建物を買い、自分のアルハンブラを広げます。3回の得点で、建物の種類ごとに<strong>枚数の多い人</strong>が点を得ます。外側の<strong>最も長い城壁</strong>も1区画1点です。</p>
+            <h3>手番（どれか1つ）</h3>
+            <ul class="help-list">
+                <li><strong>お金を取る</strong>：市場の1枚か、合計5までの何枚か</li>
+                <li><strong>建物を買う</strong>：その場所の通貨で、値段以上を払う。おつりはありません。<strong>ちょうどの額</strong>なら、もう一度行動できます</li>
+                <li><strong>作り直す</strong>：予備の建物を足す・建物を予備へ戻す・同じ場所で入れ替える</li>
+            </ul>
+            <p>手番の終わりに、買った建物をアルハンブラか予備に置きます。</p>
+            <h3>置く決まり</h3>
+            <ul class="help-list">
+                <li>向きは変えない。接する辺は、両方に城壁があるか、両方にない</li>
+                <li>噴水から、城壁を越えずに歩いて行ける</li>
+                <li>辺で接する（角だけはだめ）。四方を囲まれた空きを作らない</li>
+            </ul>
+            <h3>得点</h3>
+            <p>お金の山から得点のカードが出たとき（1回目・2回目）と、終わり（3回目）。1回目は1位だけ、2回目は2位まで、3回目は3位まで。同じ枚数なら点を等分します（切り捨て）。予備の建物は数えません。</p>
+            <h3>終わり</h3>
+            <p>建物の袋で市場を4枚にできなくなったら終わりです。市場に残った建物は、その通貨を最も多く持つ人が受け取ります。</p>
+            <h3>2人のとき</h3>
+            <p>架空の3人目「ダーク」が建物を受け取り、多数の得点だけを競います。買った建物をダークに渡すこともできます。</p>
+            <h3>操作</h3>
+            <p>市場の建物を押すと、その通貨の手札が光り、払い方を選べます。「ちょうど」なら、もう一度行動できます。置くときは、置ける場所が金の点線で出ます。予備の建物を押すと、作り直しができます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
