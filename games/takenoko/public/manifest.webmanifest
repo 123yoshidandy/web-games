@@ -1,0 +1,18 @@
+{
+    "name": "タケノコ",
+    "short_name": "タケノコ",
+    "description": "CPU と遊べる、竹を育ててパンダに食べさせるボードゲーム「タケノコ」",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#2f4a32",
+    "theme_color": "#2f4a32",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

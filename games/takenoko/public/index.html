@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2f4a32">
+    <title>タケノコ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="タケノコ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Marcellus&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- 地形の質感・天気・行動の絵（自作） -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+            <pattern id="tex-green" width="14" height="14" patternUnits="userSpaceOnUse"><path d="M3 10 l1.5 -4 M9 6 l1.5 -4" stroke="#4f8f3a" stroke-opacity="0.45" stroke-width="1.4" stroke-linecap="round"/></pattern>
+            <pattern id="tex-yellow" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M0 9 Q3 6 6 9 T12 9" fill="none" stroke="#b8961f" stroke-opacity="0.4" stroke-width="1.2"/></pattern>
+            <pattern id="tex-pink" width="12" height="12" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="1.3" fill="#fff" fill-opacity="0.45"/><circle cx="10" cy="9" r="1" fill="#fff" fill-opacity="0.35"/></pattern>
+            <pattern id="tex-pond" width="8" height="8" patternUnits="userSpaceOnUse"><rect width="8" height="8" fill="none"/></pattern>
+            <symbol id="w-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.5" fill="#f2b632"/><g stroke="#f2b632" stroke-width="2" stroke-linecap="round"><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></g></symbol>
+            <symbol id="w-rain" viewBox="0 0 24 24"><path d="M7 14a4 4 0 0 1 .5-8 5 5 0 0 1 9.5 1.5 3.3 3.3 0 0 1-.5 6.5z" fill="#c9d6e2"/><g stroke="#3b8fd6" stroke-width="2" stroke-linecap="round"><path d="M8 17l-1 3M12 17l-1 3M16 17l-1 3"/></g></symbol>
+            <symbol id="w-wind" viewBox="0 0 24 24"><g fill="none" stroke="#7fc2b6" stroke-width="2.2" stroke-linecap="round"><path d="M3 9h11a3 3 0 1 0-3-3"/><path d="M3 14h15a3 3 0 1 1-3 3"/></g></symbol>
+            <symbol id="w-storm" viewBox="0 0 24 24"><path d="M7 13a4 4 0 0 1 .5-8 5 5 0 0 1 9.5 1.5 3.3 3.3 0 0 1-.5 6.5z" fill="#8a96a8"/><path d="M12 12l-3 5h3l-2 5 5-7h-3l2-3z" fill="#f2c94c"/></symbol>
+            <symbol id="w-clouds" viewBox="0 0 24 24"><path d="M6 18a4.5 4.5 0 0 1 .6-9 5.5 5.5 0 0 1 10.6 1.7A3.7 3.7 0 0 1 17 18z" fill="#d7dde4" stroke="#8a96a8" stroke-width="1.2"/></symbol>
+            <symbol id="w-choice" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5" fill="#efe7d6" stroke="#8a7a5a" stroke-width="1.4"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6" fill="none" stroke="#5b4c2f" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.3" r="1" fill="#5b4c2f"/></symbol>
+            <symbol id="a-plot" viewBox="0 0 24 24"><path d="M12 3 19.8 7.5v9L12 21 4.2 16.5v-9z" fill="#7cb860" stroke="#3d6b2c" stroke-width="1.5"/></symbol>
+            <symbol id="a-irrigation" viewBox="0 0 24 24"><path d="M4 18 L20 6" stroke="#3b8fd6" stroke-width="4" stroke-linecap="round"/><path d="M12 4c2 3 3 4.5 3 6a3 3 0 0 1-6 0c0-1.5 1-3 3-6z" fill="#7cc0ef"/></symbol>
+            <symbol id="a-gardener" viewBox="0 0 24 24"><path d="M2 14 Q12 9 22 14 Q12 16 2 14 Z" fill="#d9b55f" stroke="#6b4f24" stroke-width="1.2"/><path d="M7 13 Q12 3 17 13 Z" fill="#e6c776" stroke="#6b4f24" stroke-width="1.2"/></symbol>
+            <symbol id="a-panda" viewBox="0 0 24 24"><circle cx="6" cy="6" r="3.2" fill="#222"/><circle cx="18" cy="6" r="3.2" fill="#222"/><circle cx="12" cy="13" r="8.5" fill="#fff" stroke="#222" stroke-width="1.5"/><ellipse cx="8.8" cy="12" rx="2" ry="2.7" fill="#222"/><ellipse cx="15.2" cy="12" rx="2" ry="2.7" fill="#222"/><circle cx="12" cy="16" r="1.3" fill="#222"/></symbol>
+            <symbol id="a-objective" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2" fill="#f6efdd" stroke="#7a6640" stroke-width="1.5"/><path d="M8.5 8h7M8.5 11.5h7M8.5 15h4" stroke="#7a6640" stroke-width="1.5" stroke-linecap="round"/></symbol>
+        </defs>
+    </svg>
+
+    <!-- タイトル -->
+    <section id="title-screen" class="screen">
+        <div class="title-inner">
+            <h1 class="logo">Takenoko</h1>
+            <p class="logo-sub">タケノコ</p>
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <div class="settings">
+                <div class="setting">
+                    <span class="setting-label">人数</span>
+                    <div class="segment" id="count-select">
+                        <button type="button" data-value="2">2人</button>
+                        <button type="button" data-value="3">3人</button>
+                        <button type="button" data-value="4">4人</button>
+                    </div>
+                </div>
+                <div class="setting">
+                    <span class="setting-label">CPU</span>
+                    <div class="segment" id="level-select">
+                        <button type="button" data-value="easy">やさしい</button>
+                        <button type="button" data-value="normal">ふつう</button>
+                    </div>
+                </div>
+            </div>
+            <div class="title-buttons">
+                <button type="button" id="start-button" class="btn btn-primary">はじめる</button>
+                <button type="button" id="resume-button" class="btn btn-secondary" hidden>続きから</button>
+            </div>
+            <button type="button" class="icon-btn title-help" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </div>
+    </section>
+
+    <!-- プレイ中 -->
+    <section id="game-screen" class="screen" hidden>
+        <header id="topbar">
+            <button type="button" class="icon-btn" data-action="home" aria-label="ホーム" title="ホーム">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+            </button>
+            <div id="turn-info" class="turn-info"></div>
+            <button type="button" class="icon-btn" data-action="log" aria-label="記録" title="記録">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 8.5h6M9 12h6M9 15.5h4"/></svg>
+            </button>
+            <button type="button" class="icon-btn" data-action="result" id="result-button" aria-label="結果" title="結果" hidden>
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5a3 3 0 0 0 3 4M16.5 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/></svg>
+            </button>
+            <button type="button" class="icon-btn" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </header>
+        <main id="play">
+            <div id="opponents"></div>
+            <div id="board-wrap">
+                <svg id="board" xmlns="http://www.w3.org/2000/svg"></svg>
+                <div class="zoom">
+                    <button type="button" class="icon-btn zbtn" data-action="zoom-in" aria-label="拡大" title="拡大"><svg class="line-icon" viewBox="0 0 24 24"><path d="M12 6v12M6 12h12"/></svg></button>
+                    <button type="button" class="icon-btn zbtn" data-action="zoom-out" aria-label="縮小" title="縮小"><svg class="line-icon" viewBox="0 0 24 24"><path d="M6 12h12"/></svg></button>
+                    <button type="button" class="icon-btn zbtn" data-action="zoom-fit" aria-label="全体" title="全体"><svg class="line-icon" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+                </div>
+                <div id="hint" class="hint" hidden></div>
+            </div>
+            <div id="me"></div>
+            <div id="actionbar"></div>
+        </main>
+    </section>
+
+    <!-- 相手・記録 -->
+    <dialog id="info-dialog" class="sheet">
+        <div class="sheet-body" id="info-body" tabindex="-1" autofocus></div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="result-title" class="sheet-title"></h2>
+            <div id="result-body"></div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-secondary" data-action="close-result">盤面を見る</button>
+                <button type="button" class="btn btn-primary" data-action="rematch">もう1回</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="sheet help">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">遊び方</h2>
+            <section>
+                <h3>目的</h3>
+                <p>区画を並べて竹を育て、パンダに食べさせて、手札の目標を達成します。達成した目標の点の合計がいちばん高い人の勝ちです。</p>
+            </section>
+            <section>
+                <h3>手番</h3>
+                <ol>
+                    <li><b>天気</b>（2巡目から）：ダイスの目の効果を使います
+                        <ul>
+                            <li>晴れ：行動が3つ（すべて違うもの）</li>
+                            <li>雨：灌漑された区画の竹を1つ伸ばす</li>
+                            <li>風：同じ行動を2回してもよい</li>
+                            <li>嵐：パンダを好きな区画へ動かし、竹を1つ食べる</li>
+                            <li>雲：改良のチップを1つ取り、改良のない区画に置く（なければ置いたチップを動かせる）</li>
+                            <li>？：上の5つから選ぶ</li>
+                        </ul>
+                    </li>
+                    <li><b>行動</b>：次の中から<b>違うものを2つ</b>
+                        <ul>
+                            <li>区画：3枚引いて1枚を置く（池の隣か、置いた2枚の隣）</li>
+                            <li>灌漑：水路を2つの区画の境目に置く（池か水路につながる場所）</li>
+                            <li>庭師：まっすぐ進み、止まった区画と隣の同じ色の区画の竹が1つ伸びる</li>
+                            <li>パンダ：まっすぐ進み、止まった区画の竹を1つ食べる</li>
+                            <li>目標：目標カードを1枚引く（手札は5枚まで）</li>
+                        </ul>
+                    </li>
+                    <li>手番の中ならいつでも、条件を満たした目標を達成できます</li>
+                </ol>
+            </section>
+            <section>
+                <h3>竹と灌漑</h3>
+                <p>竹は灌漑された区画（池の隣・水路に面する・池の改良）でだけ伸び、最大4本です。初めて灌漑された区画には竹が1つ生えます。青い縁が灌漑された区画です。</p>
+                <p>改良：池（水路なしで灌漑される）、囲い（パンダが食べられない）、肥料（伸びるときに2つ伸びる）。</p>
+            </section>
+            <section>
+                <h3>目標</h3>
+                <ul>
+                    <li>区画：色の区画をその形に並べる（すべて灌漑されていること。回してよい）</li>
+                    <li>庭師：決まった色・高さの竹をそろえ、その区画に庭師がいること</li>
+                    <li>パンダ：パンダに食べさせた竹を使う</li>
+                </ul>
+            </section>
+            <section>
+                <h3>終わり</h3>
+                <p>2人なら9枚、3人なら8枚、4人なら7枚の目標を最初に達成した人が皇帝のカード（2点）をもらい、ほかの人があと1回ずつ手番をして終わります。同点なら、パンダの目標の点が多い人の勝ちです。</p>
+            </section>
+            <section>
+                <h3>盤面の操作</h3>
+                <p>盤面は指でずらし、2本の指で拡大できます。右上のボタンで拡大・縮小・全体表示。光っているところが、今置ける場所・動ける先です。</p>
+            </section>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-help">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
