@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2a1a12">
+    <title>バックギャモン</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="バックギャモン">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Backgammon</h1>
+            <p class="subtitle">バックギャモン</p>
+            <div class="setup">
+                <div class="setup-row"><span class="setup-label">CPU</span>
+                    <div id="level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="setup-row"><span class="setup-label">マッチ</span>
+                    <div id="match" class="segmented four" role="radiogroup" aria-label="何点先取か">
+                        <button type="button" role="radio" data-match="1">1点</button>
+                        <button type="button" role="radio" data-match="3">3点</button>
+                        <button type="button" role="radio" data-match="5">5点</button>
+                        <button type="button" role="radio" data-match="7">7点</button>
+                    </div>
+                </div>
+                <div class="setup-row" id="cube-row"><span class="setup-label">キューブ</span>
+                    <div id="cube" class="segmented" role="radiogroup" aria-label="ダブリングキューブ">
+                        <button type="button" role="radio" data-cube="on">あり</button>
+                        <button type="button" role="radio" data-cube="off">なし</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="match-info" class="match-info"></span>
+                <span id="turn-info" class="turn-info"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="rival" class="panel"></div>
+            <div id="board-wrap" class="board-wrap">
+                <svg id="board" class="board"></svg>
+            </div>
+            <div id="me" class="panel"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 1ゲームとマッチの結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-detail" class="result-detail"></p>
+        <p id="result-score" class="result-score"></p>
+        <div class="buttons">
+            <button id="look" class="btn ghost">盤を見る</button>
+            <button id="result-next" class="btn primary">次のゲーム</button>
+            <button id="again" class="btn primary">もう一度</button>
+        </div>
+        <div class="buttons"><button id="result-home" class="link">ホーム</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>15個の駒をすべて自分の<strong>インナーボード</strong>（右下の 1〜6）に集め、先に盤の外へ出し切った（ベアオフした）人がゲームに勝ちます。あなたは白で、24 から 1 へ向かって進みます。</p>
+            <h3>動かし方</h3>
+            <ul class="help-list">
+                <li>ダイスを2つ振り、出た目の数だけ駒を進めます。1個の駒で2つの目を続けて使っても、2個の駒に分けてもかまいません。<strong>ゾロ目は4回</strong>動かせます</li>
+                <li>相手の駒が<strong>2個以上</strong>あるポイントには止まれません</li>
+                <li>使える目は<strong>できるだけ多く使います</strong>。片方の目しか使えず、どちらでも使えるときは<strong>大きい目</strong>を使います。動かせなければ相手の番です</li>
+                <li>最初は1個ずつ振り、大きい目を出した人がその2つの目で動かします</li>
+            </ul>
+            <h3>ヒットとバー</h3>
+            <p>駒が1個だけのポイント（<strong>ブロット</strong>）に止まると、相手の駒を打って<strong>バー</strong>（真ん中の帯）に送れます。バーに駒がある人は、先にそれを相手のインナーボードへ入れないと、ほかの駒を動かせません。</p>
+            <h3>ベアオフ</h3>
+            <p>15個すべてがインナーボードに入ったら、目の数のポイントから駒を外へ出せます。目より大きい数のポイントに駒がなければ、いちばん高いポイントの駒を出せます。</p>
+            <h3>勝ちの点数</h3>
+            <p>ふつうの勝ちは1点。負けた人が1個もベアオフしていなければ<strong>ギャモン</strong>で2点、さらにバーか勝った人のインナーボードに駒が残っていれば<strong>バックギャモン</strong>で3点です。</p>
+            <h3>ダブリングキューブとマッチ</h3>
+            <p>決めた点数を先に取った人がマッチの勝ちです。自分の番のダイスを振る前に<strong>ダブル</strong>を提案できます。相手は<strong>受ける</strong>（ゲームの点が2倍になり、次にダブルできるのは受けた人）か、<strong>降りる</strong>（今の点で負け）を選びます。どちらかが初めてマッチの1点前になった次のゲームは、ダブルできません（クロフォード・ルール）。</p>
+            <h3>画面</h3>
+            <p>動かせる駒の上の輪が光ります。駒を押すと、行き先に<strong>使う目の数</strong>が出るので、押して動かします。「取り消し」でその番の動きを1つずつ戻し、「決定」で番を終えます。下の数字は<strong>ピップ数</strong>（ベアオフまでに要る目の合計）です。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
