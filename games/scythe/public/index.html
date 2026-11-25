@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2a251e">
+    <title>サイズ -大鎌戦役-</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="サイズ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" aria-hidden="true">
+                <svg viewBox="0 0 120 60"><path d="M10 50 Q60 -6 110 34" stroke="#d9c79f" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M60 22 L64 58" stroke="#8a6a3e" stroke-width="4" stroke-linecap="round"/></svg>
+            </div>
+            <h1 class="logo">サイズ</h1>
+            <p class="subtitle">大鎌戦役</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="stepper">
+                        <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="count-value" class="count-value"></span>
+                        <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <div class="row"><span class="row-label">強さ</span><div id="level" class="segment"></div></div>
+                <div class="row col"><span class="row-label">勢力</span><div id="faction" class="segment wrap"></div></div>
+                <div class="row col"><span class="row-label">マット</span><div id="mat" class="segment wrap"></div></div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <button id="last-log" class="last-log" aria-label="記録"></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="players" class="players"></div>
+            <div id="board" class="board">
+                <div class="zoom">
+                    <button id="zoom-in" class="zoom-btn" aria-label="拡大">＋</button>
+                    <button id="zoom-out" class="zoom-btn" aria-label="縮小">−</button>
+                    <button id="zoom-fit" class="zoom-btn" aria-label="全体">⤢</button>
+                </div>
+            </div>
+            <div id="me" class="me"></div>
+            <div id="mat-row" class="mat-row"></div>
+            <div id="panel" class="panel">
+                <p id="prompt" class="prompt"></p>
+                <div id="choices" class="choices"></div>
+                <div id="actions" class="actions"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 戦闘 -->
+    <dialog id="combat" class="sheet">
+        <h2 tabindex="-1" autofocus>戦闘</h2>
+        <p id="combat-info" class="note"></p>
+        <div class="dial">
+            <span class="row-label">力</span>
+            <div class="stepper">
+                <button id="dial-down" class="step-btn" aria-label="減らす">−</button>
+                <span id="dial-value" class="count-value"></span>
+                <button id="dial-up" class="step-btn" aria-label="増やす">＋</button>
+            </div>
+        </div>
+        <p id="combat-cards-label" class="note"></p>
+        <div id="combat-cards" class="cards"></div>
+        <p id="combat-total" class="total"></p>
+        <div class="buttons"><button id="combat-ok" class="btn primary">決める</button></div>
+    </dialog>
+
+    <!-- 戦闘の結果 -->
+    <dialog id="combat-result" class="sheet">
+        <h2 id="combat-result-title" tabindex="-1" autofocus></h2>
+        <div id="combat-result-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遭遇・工場 -->
+    <dialog id="pick" class="sheet">
+        <h2 id="pick-title" tabindex="-1" autofocus></h2>
+        <p id="pick-note" class="note"></p>
+        <div id="pick-list" class="pick-list"></div>
+        <div class="buttons"><button id="pick-ok" class="btn primary">決める</button></div>
+    </dialog>
+
+    <!-- プレイヤーの詳しい様子 -->
+    <dialog id="detail" class="sheet">
+        <div id="detail-body" class="detail-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-reason" class="note"></p>
+        <div id="result-table" class="result-table"></div>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>だれかが<strong>星を6つ</strong>置いたら、その場で終わります。最後に<strong>金がいちばん多い人の勝ち</strong>。星・領地・資源は、人気の段に応じて金に換えて数えます。</p>
+            <h3>手番</h3>
+            <p>マットの<strong>区画を1つ</strong>選び、その区画の<strong>上段と下段</strong>を順に行います（どちらも省けます）。<strong>前の手番と同じ区画は選べません</strong>。</p>
+            <p><strong>上段</strong>：移動（2体を1マス。代わりに金1も可）／生産（労働者のいる2か所。労働者1人につき1つ）／交易（金1で資源2つか人気1）／支持（金1で力2かカード1）</p>
+            <p><strong>下段</strong>：資源を払って行います。アップグレード（石油）／展開（金属でメック）／建設（木材で建物）／募集（食料で新兵）。行うと、マットに書かれた金ももらえます。</p>
+            <h3>地図</h3>
+            <p>山は金属、森は木材、農場は食料、ツンドラは石油、村は労働者を生みます。<strong>川</strong>（青い線）は渡れず、<strong>湖</strong>には入れません（メックの能力で渡れるようになります）。<strong>トンネル</strong>（黒いアーチ）どうしは隣り合っています。</p>
+            <p>資源は、自分が<strong>支配する領地</strong>（自分のユニットがいる、または自分の建物がある領地）にあれば、どこからでも使えます。最後に動かすユニットは、その領地の資源を持って行きます。</p>
+            <h3>指導者とメック</h3>
+            <p>指導者が<strong>遭遇の印</strong>に止まると、3つの中から1つを選んでもらえます。<strong>工場</strong>に初めて着くと、工場カード（5つ目の区画）がもらえます。メックは労働者を運べ、出すたびに勢力の能力が1つ使えるようになります。</p>
+            <h3>戦闘</h3>
+            <p>指導者かメックが、ほかの人の指導者かメックのいる領地に入ると戦闘です。お互いに<strong>力（0〜7）</strong>と、その領地の指導者とメックの数までの<strong>戦闘カード</strong>を伏せて選び、合計が大きい方の勝ち（同じなら仕掛けた方）。負けた方のユニットは本拠地へ退きます。勝つと星（2つまで）。労働者だけの領地に入ると労働者は退き、入った人は1人につき人気が1下がります。</p>
+            <h3>星</h3>
+            <p>アップグレード6回／メック4体／建物4つ／新兵4人／労働者8人／目標の達成／戦闘の勝利（2つまで）／人気18／力16 で、1つずつ置きます。</p>
+            <h3>得点（人気の段）</h3>
+            <p>人気0〜6：星3・領地2・資源2つで1。7〜12：星4・領地3・資源2つで2。13〜18：星5・領地4・資源2つで3。工場は領地3つ分。ほかに建物の得点のタイル（ゲームごとに1つ）。</p>
+            <h3>操作</h3>
+            <p>地図は2本指かホイールで拡大、ドラッグで移動できます。上の勢力の札をタップすると、その人の詳しい様子が見られます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
