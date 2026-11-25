@@ -1,0 +1,46 @@
+name: テスト
+
+# ゲームをまたいだ確認は毎回流し、ゲームのテストは変わったものだけ流す（scripts/changed-games.mjs）
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: ゲームをまたいだ確認
+        run: node scripts/check-games.mjs
+      - name: 変わったゲームのテスト
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          # 初めてのプッシュなど、比べる元がないときは全部流す
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            targets=$(ls -d packages/*/ games/*/ | sed 's|/$||')
+          else
+            targets=$(node scripts/changed-games.mjs "$BASE")
+          fi
+          if [ -z "$targets" ]; then
+            echo "テストを流すゲームはありません"
+            exit 0
+          fi
+          failed=""
+          for target in $targets; do
+            echo "::group::$target"
+            npm test --if-present -w "$target" || failed="$failed $target"
+            echo "::endgroup::"
+          done
+          if [ -n "$failed" ]; then
+            echo "失敗:$failed"
+            exit 1
+          fi
