@@ -1,0 +1,42 @@
+{
+    "name": "ウェルカム・トゥ",
+    "short_name": "ウェルカム・トゥ",
+    "description": "3本の通りに家番号を書き、家並み・公園・プール・都市計画で得点を競うゲーム。1人でも、CPU と6人までで遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": [
+        "fullscreen",
+        "standalone"
+    ],
+    "orientation": "portrait",
+    "background_color": "#12302d",
+    "theme_color": "#1f4a45",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}
