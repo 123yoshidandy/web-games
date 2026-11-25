@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#111318">
+    <title>Wordle</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Wordle">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- 字体は画面の表示を止めずに読み込む（届くまでは端末の丸ゴシックで出す） -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <h1 class="logo">Wordle</h1>
+            <div class="header-buttons">
+                <button id="new-game" type="button" class="icon-button solo-only" title="新しいゲーム" aria-label="新しいゲーム">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><polyline points="20 4 20 9 15 9"/></svg>
+                </button>
+                <button id="info-button" type="button" class="icon-button" title="遊び方" aria-label="遊び方">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.1-2.4 3.6"/><circle class="icon-dot" cx="12" cy="17" r="0.6"/></svg>
+                </button>
+                <button id="online-button" type="button" class="pill-button online-color solo-only">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18 13.8c1.8.6 3 2.4 3 5.2"/></svg>
+                    <span>対戦</span>
+                </button>
+                <button id="room-button" type="button" class="pill-button online-color online-only">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.2a3 3 0 0 1 0 5.6"/><path d="M18 13.8c1.8.6 3 2.4 3 5.2"/></svg>
+                    <span>部屋</span>
+                </button>
+            </div>
+        </header>
+
+        <div class="subbar">
+            <div class="mode-toggle solo-only" role="group" aria-label="モード">
+                <button class="mode-button" type="button" data-mode="word">ことば</button>
+                <button class="mode-button" type="button" data-mode="pokemon">ポケモン</button>
+            </div>
+            <div id="opponents" class="hidden"></div>
+        </div>
+
+        <main id="board-area">
+            <div id="board"></div>
+            <div id="message" role="status" aria-live="polite"></div>
+        </main>
+
+        <div id="keyboard"></div>
+    </div>
+
+    <div id="info-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-head">
+                <h2>遊び方</h2>
+                <button id="close-info" type="button" class="close-x" aria-label="閉じる">×</button>
+            </div>
+            <p id="rule-text">5文字のひらがなの単語を当ててください。10回まで挑戦できます。</p>
+            <div class="example">
+                <div class="example-row">
+                    <div class="example-tile correct">あ</div>
+                    <div class="example-tile">い</div>
+                    <div class="example-tile">う</div>
+                    <div class="example-tile">え</div>
+                    <div class="example-tile">お</div>
+                </div>
+                <p>「あ」は正しい位置にあります</p>
+            </div>
+            <div class="example">
+                <div class="example-row">
+                    <div class="example-tile">か</div>
+                    <div class="example-tile present">き</div>
+                    <div class="example-tile">く</div>
+                    <div class="example-tile">け</div>
+                    <div class="example-tile">こ</div>
+                </div>
+                <p>「き」は含まれますが、位置が違います</p>
+            </div>
+            <div class="example">
+                <div class="example-row">
+                    <div class="example-tile">さ</div>
+                    <div class="example-tile">し</div>
+                    <div class="example-tile absent">す</div>
+                    <div class="example-tile">せ</div>
+                    <div class="example-tile">そ</div>
+                </div>
+                <p>「す」は含まれません</p>
+            </div>
+            <div id="blank-example" class="example hidden">
+                <div class="example-row">
+                    <div class="example-tile">イ</div>
+                    <div class="example-tile">ー</div>
+                    <div class="example-tile">ブ</div>
+                    <div class="example-tile">イ</div>
+                    <div class="example-tile correct blank"></div>
+                    <div class="example-tile correct blank"></div>
+                </div>
+                <p>空白も1文字として判定します。答えは4文字以下です</p>
+            </div>
+            <p class="rule-note">濁点・半濁点・小さい字は、入れた直後に<span class="nowrap">「゛゜小」</span>で切り替えます（か→が、は→ば→ぱ、つ→っ→づ）。キーの角の点は、その字の濁点や小さい字の判定です。</p>
+            <p class="rule-note">対戦では、全員が1つずつ答えを出し、そろったらいっせいに結果を公開します。先に当てた人の勝ちです。</p>
+        </div>
+    </div>
+
+    <div id="online-modal" class="modal hidden">
+        <div class="modal-content">
+            <div class="modal-head">
+                <h2>オンライン対戦</h2>
+                <button id="online-close" type="button" class="close-x" aria-label="閉じる">×</button>
+            </div>
+            <div id="online-entry">
+                <label class="online-field">
+                    <span>名前</span>
+                    <input id="online-name" maxlength="12" autocomplete="nickname">
+                </label>
+                <button id="online-create" type="button" class="primary-button">部屋を作る</button>
+                <div class="online-join">
+                    <input id="online-code" inputmode="numeric" autocomplete="off" placeholder="部屋番号">
+                    <button id="online-join" type="button" class="primary-button">参加</button>
+                </div>
+            </div>
+            <div id="online-room" class="hidden">
+                <div class="online-code-row">
+                    <span>部屋番号</span>
+                    <strong id="online-room-code"></strong>
+                    <button id="online-invite" type="button" class="secondary-button">招待URLをコピー</button>
+                </div>
+                <p id="online-result" class="online-result hidden"></p>
+                <ul id="online-players"></ul>
+                <div class="mode-toggle online-mode">
+                    <button class="mode-button" type="button" data-online-mode="word">ことば</button>
+                    <button class="mode-button" type="button" data-online-mode="pokemon">ポケモン</button>
+                </div>
+                <div class="online-actions">
+                    <button id="online-start" type="button" class="primary-button">開始</button>
+                    <button id="online-ready" type="button" class="primary-button">もう1回</button>
+                    <button id="online-back" type="button" class="secondary-button">ロビーへ</button>
+                    <button id="online-leave" type="button" class="secondary-button">部屋を出る</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="player-modal" class="modal hidden">
+        <div class="modal-content player-content">
+            <div class="modal-head">
+                <h2 id="player-name"></h2>
+                <button id="player-close" type="button" class="close-x" aria-label="閉じる">×</button>
+            </div>
+            <div id="player-board"></div>
+        </div>
+    </div>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
