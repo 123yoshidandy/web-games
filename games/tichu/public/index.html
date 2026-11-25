@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#5a1d1d">
+    <title>ティチュー</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ティチュー">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Tichu</h1>
+            <p class="subtitle">ティチュー</p>
+            <p class="lead">4人・2対2。向かいの CPU が味方です</p>
+            <div class="setup">
+                <div class="setup-row">CPU
+                    <div id="level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="setup-row">目標
+                    <div id="target" class="segmented" role="radiogroup" aria-label="目標の点">
+                        <button type="button" role="radio" data-target="1000">1000点</button>
+                        <button type="button" role="radio" data-target="500">500点</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="scoreboard" class="scoreboard"></div>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4h11v16H7zM4 7v13M10 8.5h5M10 12h5M10 15.5h3"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="table" class="table">
+                <div class="seat top" id="seat-2" data-seat="2"></div>
+                <div class="seat left" id="seat-1" data-seat="1"></div>
+                <div class="seat right" id="seat-3" data-seat="3"></div>
+                <div id="center" class="center"></div>
+            </div>
+            <div class="seat me" id="seat-0" data-seat="0"></div>
+            <div id="hand" class="hand"></div>
+            <div id="candidates" class="candidates"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 麻雀の願い -->
+    <dialog id="wish" class="sheet">
+        <h2 tabindex="-1" autofocus>願う数を選ぶ</h2>
+        <p class="muted note">その数を持ち、出せる人は、出さなければなりません</p>
+        <div id="wish-ranks" class="wish-ranks"></div>
+        <div class="buttons"><button class="btn ghost" data-wish="none">願わない</button><button class="btn secondary close">やめる</button></div>
+    </dialog>
+
+    <!-- 竜の場を渡す -->
+    <dialog id="dragon" class="sheet">
+        <h2 tabindex="-1" autofocus>竜の場を渡す相手</h2>
+        <p id="dragon-note" class="muted note"></p>
+        <div id="dragon-choices" class="buttons"></div>
+    </dialog>
+
+    <!-- ラウンドの結果 -->
+    <dialog id="round" class="sheet">
+        <h2 id="round-title" tabindex="-1" autofocus></h2>
+        <table id="round-table" class="round-table"></table>
+        <div class="buttons"><button id="round-next" class="btn primary">次へ</button></div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-detail" class="result-detail"></p>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>向かいの人と組んだ2対2のチーム戦です。先に手札をなくし、点の札を取って、チームで<strong>目標の点</strong>（1000点）を目指します。</p>
+            <h3>カード</h3>
+            <p>4色×2〜A と、特別な4枚。<span id="help-cards" class="help-cards"></span></p>
+            <ul class="help-list">
+                <li><strong>麻雀</strong>：1として出す。持つ人が最初に出す。出すとき、数を1つ<strong>願える</strong>。その数を持ち、組にして出せる人は出さなければならない</li>
+                <li><strong>犬</strong>：最初に1枚だけで出し、<strong>味方に出す番を渡す</strong></li>
+                <li><strong>不死鳥</strong>：1枚出しなら直前の札の0.5上（竜には勝てない）。組の中では好きな数の代わり。−25点</li>
+                <li><strong>竜</strong>：1枚出しでいちばん強い。竜で取った場は<strong>相手のどちらかに渡す</strong>。25点</li>
+            </ul>
+            <h3>ラウンドの流れ</h3>
+            <ul class="help-list">
+                <li>8枚ずつ配られたら、<strong>大ティチュー</strong>（200点）を宣言するか決める。残り6枚が配られる</li>
+                <li>左・味方・右に1枚ずつ渡す（押した順に 左→味方→右）</li>
+                <li>最初の札を出す前なら、<strong>ティチュー</strong>（100点）を宣言できる。宣言した人が1番に上がれば得点、上がれなければ失点</li>
+                <li>出せる組：1枚・ペア・連続したペア・3枚組・フルハウス・5枚以上の階段。前の人と<strong>同じ形の強い組</strong>を出すか、パス。ほかの3人が続けてパスしたら、最後に出した人が場を取って次を出す</li>
+                <li><strong>爆弾</strong>（同じ数の4枚・同じ色の5枚以上の階段）は、自分の番でなくても、場にどの組があっても出せる</li>
+                <li>味方どうしが1・2番目に上がれば<strong>ダブル勝利</strong>（200点）。そうでなければ、最後の人の手札は相手のチームへ、取った札は1番目の人へ。札の点（5は5点・10とKは10点・竜25・不死鳥−25）を数える</li>
+            </ul>
+            <h3>画面</h3>
+            <p>手札は数の順に並びます。札を押して選ぶか、下の<strong>組の候補</strong>を押すと、その札がまとめて選ばれます。番でないときに爆弾が出せると「爆弾」のボタンが出ます。</p>
+            <h3>CPU の考え方</h3>
+            <p>手札を組に分け、強い札（竜・不死鳥・A・爆弾）と組の数で強さを測り、強ければ宣言します。弱い組から出し、強い札は相手の場を取るときや、相手が宣言している・上がりそうなときに使います。味方（あなた）の場には重ねず、あなたが宣言したら、相手の場を止めにいき、犬で番を回します。「やさしい」は犬と爆弾を作戦に使わず、ときどき気まぐれにパスします。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
