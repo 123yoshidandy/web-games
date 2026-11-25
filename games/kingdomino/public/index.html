@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#24365a">
+    <title>キングドミノ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="キングドミノ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Marcellus+SC&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- 地形・城・王冠の図柄（自作） -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+            <symbol id="t-wheat" viewBox="0 0 40 40">
+                <rect width="40" height="40" fill="#e6c34a"/>
+                <path d="M0 30 Q20 26 40 30 V40 H0 Z" fill="#d9af35"/>
+                <g stroke="#a97a1a" stroke-width="1.6" stroke-linecap="round" fill="#c8961f">
+                    <path d="M9 34 V16" fill="none"/><ellipse cx="9" cy="14" rx="2.2" ry="4"/>
+                    <path d="M20 33 V11" fill="none"/><ellipse cx="20" cy="9" rx="2.2" ry="4"/>
+                    <path d="M31 34 V16" fill="none"/><ellipse cx="31" cy="14" rx="2.2" ry="4"/>
+                </g>
+            </symbol>
+            <symbol id="t-forest" viewBox="0 0 40 40">
+                <rect width="40" height="40" fill="#4f8b3b"/>
+                <g fill="#6b4a2b"><rect x="9" y="27" width="3" height="7"/><rect x="27" y="27" width="3" height="7"/><rect x="18.5" y="22" width="3" height="7"/></g>
+                <g fill="#2d5e27">
+                    <path d="M10.5 9 L18 28 H3 Z"/>
+                    <path d="M28.5 9 L36 28 H21 Z"/>
+                    <path d="M20 4 L27 23 H13 Z" fill="#36702e"/>
+                </g>
+            </symbol>
+            <symbol id="t-lake" viewBox="0 0 40 40">
+                <rect width="40" height="40" fill="#3d8bd0"/>
+                <g fill="none" stroke="#c4e4ff" stroke-width="2.2" stroke-linecap="round">
+                    <path d="M6 14 q4 -4 8 0 t8 0"/>
+                    <path d="M16 25 q4 -4 8 0 t8 0"/>
+                    <path d="M5 33 q3 -3 6 0"/>
+                </g>
+            </symbol>
+            <symbol id="t-grass" viewBox="0 0 40 40">
+                <rect width="40" height="40" fill="#97c95a"/>
+                <g fill="none" stroke="#5f9631" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 16 l2 5 l2 -5"/><path d="M24 10 l2 5 l2 -5"/><path d="M14 29 l2 5 l2 -5"/><path d="M29 26 l2 5 l2 -5"/>
+                </g>
+                <circle cx="33" cy="13" r="1.8" fill="#fff6c8"/><circle cx="9" cy="32" r="1.8" fill="#fff6c8"/>
+            </symbol>
+            <symbol id="t-swamp" viewBox="0 0 40 40">
+                <rect width="40" height="40" fill="#7d8b56"/>
+                <ellipse cx="22" cy="30" rx="13" ry="5" fill="#557a7c"/>
+                <g stroke="#3c4626" stroke-width="1.8" stroke-linecap="round"><path d="M9 32 V14"/><path d="M14 30 V18"/><path d="M31 22 V8"/></g>
+                <g fill="#6a4628"><rect x="7.6" y="12" width="2.8" height="7" rx="1.4"/><rect x="12.6" y="16" width="2.8" height="6" rx="1.4"/><rect x="29.6" y="6" width="2.8" height="7" rx="1.4"/></g>
+            </symbol>
+            <symbol id="t-mine" viewBox="0 0 40 40">
+                <rect width="40" height="40" fill="#8b7765"/>
+                <path d="M2 34 L15 10 L23 22 L28 15 L38 34 Z" fill="#5f4f43"/>
+                <path d="M15 10 L19 17 L16 16 L13 18 Z" fill="#e9e1d6"/>
+                <path d="M15 34 v-6 a5 5 0 0 1 10 0 v6 Z" fill="#2c231e"/>
+            </symbol>
+            <symbol id="t-castle" viewBox="0 0 40 40">
+                <rect width="40" height="40" fill="#ddd5c3"/>
+                <path d="M9 34 V17 h4 v-4 h4 v4 h6 v-4 h4 v4 h4 V34 Z" fill="#a89c87"/>
+                <path d="M17 34 v-6 a3 3 0 0 1 6 0 v6 Z" fill="#5a4e40"/>
+                <path d="M20 13 V4" stroke="#5a4e40" stroke-width="1.6"/>
+                <path d="M20.5 4 h8 l-2.5 2.5 l2.5 2.5 h-8 Z" fill="currentColor"/>
+            </symbol>
+            <symbol id="crown" viewBox="0 0 20 15">
+                <path d="M2 13 L1 3 L6.5 7.5 L10 1 L13.5 7.5 L19 3 L18 13 Z" fill="#ffd34d" stroke="#6b4a08" stroke-width="1.4" stroke-linejoin="round"/>
+            </symbol>
+            <symbol id="crown-plain" viewBox="0 0 20 15">
+                <path d="M2 13 L1 3 L6.5 7.5 L10 1 L13.5 7.5 L19 3 L18 13 Z" fill="currentColor"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <!-- タイトル -->
+    <section id="title-screen" class="screen">
+        <div class="title-inner">
+            <h1 class="logo">Kingdomino</h1>
+            <p class="logo-sub">キングドミノ</p>
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <div class="settings">
+                <div class="setting">
+                    <span class="setting-label">人数</span>
+                    <div class="segment" id="count-select">
+                        <button type="button" data-value="2">2人</button>
+                        <button type="button" data-value="3">3人</button>
+                        <button type="button" data-value="4">4人</button>
+                    </div>
+                </div>
+                <div class="setting">
+                    <span class="setting-label">CPU</span>
+                    <div class="segment" id="level-select">
+                        <button type="button" data-value="easy">やさしい</button>
+                        <button type="button" data-value="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="setting">
+                    <span class="setting-label">追加ルール</span>
+                    <div class="toggles" id="rule-select">
+                        <button type="button" class="toggle" data-rule="middleKingdom">中王国</button>
+                        <button type="button" class="toggle" data-rule="harmony">調和</button>
+                    </div>
+                </div>
+            </div>
+            <div class="title-buttons">
+                <button type="button" id="start-button" class="btn btn-primary">はじめる</button>
+                <button type="button" id="resume-button" class="btn btn-secondary" hidden>続きから</button>
+            </div>
+            <button type="button" class="icon-btn title-help" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </div>
+    </section>
+
+    <!-- プレイ中 -->
+    <section id="game-screen" class="screen" hidden>
+        <header id="topbar">
+            <button type="button" class="icon-btn" data-action="home" aria-label="ホーム" title="ホーム">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+            </button>
+            <div id="round-label" class="round-label"></div>
+            <button type="button" class="icon-btn" data-action="result" id="result-button" aria-label="結果" title="結果" hidden>
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5a3 3 0 0 0 3 4M16.5 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/></svg>
+            </button>
+            <button type="button" class="icon-btn" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </header>
+        <main id="play">
+            <div id="side">
+                <div id="opponents"></div>
+                <div id="lines"></div>
+            </div>
+            <div id="mine">
+                <div id="my-head" class="my-head"></div>
+                <div id="kingdom-box"><div id="kingdom"></div></div>
+                <div id="controls"></div>
+            </div>
+        </main>
+    </section>
+
+    <!-- 相手の王国を大きく見る -->
+    <dialog id="board-dialog" class="sheet">
+        <div class="sheet-body" id="board-dialog-body" tabindex="-1" autofocus></div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="result-title" class="sheet-title"></h2>
+            <div id="result-body"></div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-secondary" data-action="close-result">盤面を見る</button>
+                <button type="button" class="btn btn-primary" data-action="rematch">もう1回</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="sheet help">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">遊び方</h2>
+            <section>
+                <h3>目的</h3>
+                <p>ドミノをつないで、城のまわりに 5×5 マスの王国を作ります。同じ地形がつながった領域ごとに「マスの数 × 王冠の数」が点になり、合計がいちばん高い人の勝ちです。</p>
+            </section>
+            <section>
+                <h3>並びと王様</h3>
+                <p>ドミノは番号の小さい順に左から並びます。番号が大きいほど王冠が多く、価値の高いドミノです。</p>
+                <p>2人のときは1人2つ、3・4人のときは1人1つの王様を使います。</p>
+            </section>
+            <section>
+                <h3>手番</h3>
+                <p>「今」の並びの、番号の小さいドミノに乗った王様から順に動きます。</p>
+                <ol>
+                    <li>「次」の並びから好きなドミノを選び、王様を移します</li>
+                    <li>王様が離れたドミノを、自分の王国に置きます</li>
+                </ol>
+                <p>小さい番号を選ぶと、次の回は先に選べます。大きい番号を選ぶと、良いドミノが取れる代わりに後回しになります。</p>
+            </section>
+            <section>
+                <h3>置き方</h3>
+                <div class="help-example">
+                    <div id="help-art" class="help-art"></div>
+                    <ul>
+                        <li>どちらかのマスが、城か同じ地形のマスに接していれば置けます</li>
+                        <li>城を含めて 5×5 に収まるように置きます</li>
+                        <li>どこにも置けないドミノは捨てます（点になりません）</li>
+                    </ul>
+                </div>
+                <p>王国のマスを押すと、そこに置いたときの形が出ます。回転ボタンかもう一度押すと向きが変わります。</p>
+            </section>
+            <section>
+                <h3>得点</h3>
+                <p>同じ地形がつながった領域ごとに、マスの数 × 領域の中の王冠の数。王冠のない領域は0点です。例：森が5マスつながり、王冠が2つなら 5 × 2 = 10点。</p>
+                <p>同点なら、いちばん広い領域が広い人、それも同じなら王冠が多い人が上です。</p>
+            </section>
+            <section>
+                <h3>追加ルール</h3>
+                <ul>
+                    <li>中王国：城が 5×5 の真ん中にあれば +10点</li>
+                    <li>調和：ドミノを1枚も捨てなければ +5点</li>
+                </ul>
+            </section>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-help">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
