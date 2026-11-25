@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1f2d22">
+    <title>ルート</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ルート">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Cinzel:wght@700&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">ROOT</h1>
+            <p class="subtitle">ルート</p>
+            <div class="setup">
+                <div class="faction-pick" id="faction-pick" role="radiogroup" aria-label="あなたの陣営"></div>
+                <p class="faction-note" id="faction-note"></p>
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="stepper">
+                        <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="count-value" class="count-value"></span>
+                        <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <p class="opponents" id="opponents"></p>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="scores" class="scores"></div>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8.5h6M9 12h6M9 15.5h4"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="ticker" class="ticker"></div>
+            <div id="board-wrap" class="board-wrap">
+                <div id="board" class="board-root"></div>
+                <div class="zoom">
+                    <button id="zoom-in" class="icon-btn small" aria-label="拡大" title="拡大"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg></button>
+                    <button id="zoom-out" class="icon-btn small" aria-label="縮小" title="縮小"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 12h12"/></svg></button>
+                </div>
+            </div>
+            <div id="status" class="status">
+                <span id="status-text" class="status-text"></span>
+                <button id="cancel" class="icon-btn small" aria-label="やめる" title="やめる" hidden>
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+                </button>
+            </div>
+            <button id="mine" class="mine"></button>
+            <div class="actionbar">
+                <div id="actions" class="actions"></div>
+                <button id="next" class="btn next" hidden></button>
+            </div>
+            <div id="hand" class="hand"></div>
+        </section>
+    </main>
+
+    <!-- 選択（行動・相手・数などを選ぶ） -->
+    <dialog id="choice" class="sheet">
+        <h2 id="choice-title" tabindex="-1" autofocus></h2>
+        <div id="choice-body" class="choice-body"></div>
+        <div id="choice-list" class="choice-list"></div>
+        <div class="buttons" id="choice-buttons"><button class="btn secondary close">やめる</button></div>
+    </dialog>
+
+    <!-- 陣営の盤 -->
+    <dialog id="faction" class="sheet">
+        <div id="faction-body" class="faction-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-reason" class="muted note"></p>
+        <ol id="result-list" class="result-list"></ol>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>4つの陣営が森の覇権を争います。先に<strong>30点</strong>を取った陣営の勝ちです。陣営ごとに、点の取り方も手番の進め方もまったく違います。</p>
+            <h3>地図</h3>
+            <p>12の空き地が道でつながっています。空き地には<strong>キツネ・ウサギ・ネズミ</strong>の印があり、四角い枠に建物を建てます。「遺」は遺跡（放浪者が探索します）。</p>
+            <p>空き地は、兵と建物の合計が一番多い陣営が<strong>支配</strong>します（同数なら支配なし。鷲の王朝は同数でも支配）。外側の色の輪が支配している陣営です。</p>
+            <h3>手番</h3>
+            <p>手番は<strong>鳥の歌 → 昼 → 夕方</strong>の順に進みます。夕方にカードを引き、手札が6枚以上なら5枚まで捨てます。</p>
+            <h3>移動</h3>
+            <p>兵を隣の空き地へ、好きな数だけ動かします。<strong>移動元か移動先のどちらかを支配</strong>していないと動けません。</p>
+            <h3>戦闘</h3>
+            <p>兵のいる空き地で、ほかの陣営に挑みます。4面のサイコロ（0〜3）を2つ振り、攻撃側が大きい目、守り手が小さい目の数だけ打撃を与えます（その空き地の自分の兵の数まで）。守り手に兵がいなければ、攻撃側は追加で1打撃。打撃は兵から除き、残りで建物やトークンを除きます。<strong>建物・トークンを1つ除くごとに1点</strong>。</p>
+            <p>守り手は、空き地の印に合う<strong>待ち伏せ</strong>を出すと、サイコロの前に2打撃を与えられます（攻撃側も合う待ち伏せで打ち消せます）。</p>
+            <h3>工作</h3>
+            <p>カードの左下の印の数だけ、合う印の空き地にある工作の駒（侯爵家は工房、鷲は止まり木、連合は同調者、放浪者はハンマー）を使って作ります。アイテムは点になり、効果のカードは前に置いて使い続けます。鳥のカードはどの印としても使えます。</p>
+            <h3>支配のカード</h3>
+            <p>10点以上なら昼に出せます。出すと点は増えなくなり、代わりに鳥の歌の初めにその印の空き地を<strong>3つ支配</strong>していれば勝ち（鳥は対角の隅を2つ）。</p>
+            <h3>侯爵家</h3>
+            <p>鳥の歌に製材所ごとに木材。昼に工房で工作し、行動を3回（鳥のカードで追加）：戦闘・行軍（移動2回）・徴兵（徴兵所に兵）・建設（木材を払って建物、点）・残業（製材所に木材）。本拠の空き地には、ほかの陣営は駒を置けません。兵が除かれたら、合うカードで本拠に戻せます（野戦病院）。</p>
+            <h3>鷲の王朝</h3>
+            <p>鳥の歌に手札を1〜2枚、布告の4列（徴兵・移動・戦闘・建設）に足します。昼に止まり木で工作し、布告を左から順に、カードの印に合う空き地で<strong>全部</strong>実行します。できないと混乱（鳥のカードの数だけ失点、布告を捨て、指導者が替わる）。夕方に止まり木の数で点。アイテムの工作は1点だけです（建築家を除く）。</p>
+            <h3>森林連合</h3>
+            <p>手札から支持者を集め、鳥の歌に支持者を払って<strong>同調者</strong>を広げ（点）、同じ印の支持者2枚で<strong>暴動</strong>（敵の駒を全部除き、拠点と兵を置く）。昼に工作・動員（手札を支持者に）・訓練（官吏を増やす）。夕方に官吏の数だけ作戦（移動・戦闘・徴兵・組織）。同調者を除いたり、同調している空き地に入ったりした陣営は、合うカードを支持者として渡します（憤激）。守るときは大きい目を取ります。</p>
+            <h3>放浪者</h3>
+            <p>アイテムを使って行動します：移動（ブーツ）・戦闘（剣）・探索（たいまつ。遺跡のアイテムと1点）・援助（カードを渡して関係を深め、点）・クエスト・狙撃（クロスボウ）・修理（ハンマー）・工作（ハンマー）。鳥の歌に使ったアイテムが3つ（お茶1つにつき＋2）戻ります。森で夕方を迎えると傷んだアイテムが直ります。兵を除いた陣営とは敵対します。</p>
+            <h3>操作</h3>
+            <p>下の行動のボタンか、光っている空き地・カードを押して選びます。地図は2本指かホイールで拡大、ドラッグで動かせます。上の得点を押すと、その陣営の盤を見られます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
