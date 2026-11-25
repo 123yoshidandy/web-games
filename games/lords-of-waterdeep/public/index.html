@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#142033">
+    <title>ロード・オブ・ウォーターディープ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ウォーターディープ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/></symbol>
+        <symbol id="i-log" viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 9h6M9 13h6M9 17h4"/></symbol>
+        <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.6v.6"/><path d="M12 17h.01"/></symbol>
+        <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M7 4h11a2 2 0 0 1 0 4H7"/><path d="M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"/><path d="M9 12h6M9 16h4"/></symbol>
+        <symbol id="i-tower" viewBox="0 0 24 24"><path d="M6 21V9l-1-5h3v2h2V4h4v2h2V4h3l-1 5v12z"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/><path d="M11 11h2"/></symbol>
+    </svg>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">LORDS OF<br>WATERDEEP</h1>
+            <p class="subtitle">ロード・オブ・ウォーターディープ</p>
+            <div class="setup">
+                <div class="row">CPU
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="CPU の数">
+                        <button type="button" role="radio" data-count="2">1人</button>
+                        <button type="button" role="radio" data-count="3">2人</button>
+                        <button type="button" role="radio" data-count="4">3人</button>
+                        <button type="button" role="radio" data-count="5">4人</button>
+                    </div>
+                </div>
+                <div class="row">強さ
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <header class="bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></button>
+                <span id="status" class="status"></span>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録"><svg class="ico" aria-hidden="true"><use href="#i-log"/></svg></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+            </header>
+            <div id="players" class="players"></div>
+            <div id="board" class="board"></div>
+            <div class="inn-row">
+                <div class="row-label">崖見の宿</div>
+                <div id="inn" class="qrow"></div>
+            </div>
+            <div id="me" class="me"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 決める（冒険者・クエスト・建物・陰謀カード・相手・達成） -->
+    <dialog id="decide" class="sheet">
+        <h2 id="decide-title" tabindex="-1" autofocus></h2>
+        <p id="decide-note" class="note"></p>
+        <div id="decide-body" class="decide-body"></div>
+        <div id="decide-buttons" class="buttons"></div>
+    </dialog>
+
+    <!-- 自分や相手の手元（ロード・陰謀カード・クエスト・建物） -->
+    <dialog id="detail" class="sheet">
+        <h2 id="detail-title" tabindex="-1" autofocus></h2>
+        <div id="detail-body" class="detail-body"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 終わり -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <div id="result-table" class="score-table"></div>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <h2 tabindex="-1" autofocus>遊び方</h2>
+        <div class="help-body" id="help-body"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
