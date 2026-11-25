@@ -1,0 +1,403 @@
+/* ノー・サンキュー
+ * 縦持ちのスマホ（最小 375×548）に、7人でもスクロールなしで収める。真ん中の場だけが残りの高さを使う
+ */
+
+:root {
+    --bg: #1b1530;
+    --bg2: #2e2452;
+    --panel: rgba(255, 255, 255, .07);
+    --panel-line: rgba(255, 255, 255, .14);
+    --text: #f5f0fa;
+    --muted: #b9b0cf;
+    --accent: #ff5d8f;
+    --accent-deep: #b8305c;
+    --chip: #f5c04a;
+    --chip-edge: #b8861b;
+    --good: #6fdca0;
+    --bad: #ff7b7b;
+    --t1: #17837f;
+    --t2: #c47a12;
+    --t3: #c0344a;
+    --rh: 20px;      /* 取ったカードの札の高さ */
+    --font: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', sans-serif;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html {
+    height: 100%;
+    touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    color: var(--text);
+    font-family: var(--font);
+    font-weight: 500;
+    background:
+        radial-gradient(ellipse at 50% 42%, rgba(255, 93, 143, .13), transparent 55%),
+        radial-gradient(ellipse at 100% 0%, rgba(245, 192, 74, .08), transparent 45%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 28 28'%3E%3Cpath d='M0 28L28 0' stroke='%23ffffff' stroke-opacity='.035' stroke-width='1'/%3E%3C/svg%3E") 0 0 / 28px 28px,
+        linear-gradient(170deg, var(--bg2), var(--bg));
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+
+button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+
+#app {
+    position: relative;
+    height: 100%;
+    max-width: 540px;
+    margin: 0 auto;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.screen { height: 100%; }
+
+.chip { display: block; flex: none; width: 18px; height: 18px; }
+
+/* ---- カード ---- */
+
+.card {
+    --tone: var(--t1);
+    position: relative;
+    flex: none;
+    width: var(--cw, 50px);
+    height: var(--ch, 70px);
+    container-type: inline-size;
+    overflow: hidden;
+    border-radius: 7px;
+    color: var(--tone);
+    background: #fbf7ef;
+    box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tone) 60%, transparent), 0 2px 5px rgba(0, 0, 0, .45);
+}
+.card.t2 { --tone: var(--t2); }
+.card.t3 { --tone: var(--t3); }
+.card-band {
+    position: absolute;
+    inset: 0;
+    background:
+        linear-gradient(135deg, transparent 0 28%, color-mix(in srgb, var(--tone) 16%, transparent) 28% 46%, transparent 46% 54%, color-mix(in srgb, var(--tone) 10%, transparent) 54% 64%, transparent 64%);
+}
+.card-num {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 52cqw;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -.04em;
+}
+.card-corner { position: absolute; font-size: 17cqw; font-weight: 800; line-height: 1; }
+.card-corner.tl { left: 8cqw; top: 7cqw; }
+.card-corner.br { right: 8cqw; bottom: 7cqw; transform: rotate(180deg); }
+.card.back {
+    background: linear-gradient(150deg, #4a3a86, #2a2050);
+    box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, .3), 0 1px 3px rgba(0, 0, 0, .4);
+}
+.back-mark { position: absolute; inset: 0; display: grid; place-items: center; color: rgba(255, 255, 255, .45); font-size: 50cqw; font-weight: 800; }
+.card.tiny { --cw: 14px; --ch: 19px; border-radius: 3px; }
+
+/* 取ったカード。連続した数は1つの札にまとめ、重なった札の影で枚数を見せる */
+.runs { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px 5px; min-width: 0; }
+.run {
+    --tone: var(--t1);
+    display: inline-flex;
+    align-items: baseline;
+    gap: 1px;
+    height: var(--rh);
+    padding: 0 5px;
+    border-radius: 5px;
+    color: var(--tone);
+    background: #fbf7ef;
+    font-size: 13px;
+    line-height: var(--rh);
+    white-space: nowrap;
+}
+.run.t2 { --tone: var(--t2); }
+.run.t3 { --tone: var(--t3); }
+.run b { font-weight: 800; }
+.run small { font-size: 10px; font-weight: 800; opacity: .7; }
+.run.chain { box-shadow: 2px -2px 0 -.5px #d9d2c4, 2px -2px 0 .5px rgba(0, 0, 0, .25); }
+.run.linked { outline: 2px solid var(--accent); outline-offset: 1px; animation: link 1.6s ease-in-out infinite; }
+@keyframes link { 50% { outline-color: rgba(255, 93, 143, .35); } }
+
+/* ---- ボタン ---- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 120px;
+    height: 46px;
+    padding: 0 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform .08s, box-shadow .08s;
+}
+.btn.primary { color: #fff; background: linear-gradient(#ff7aa3, var(--accent)); box-shadow: 0 4px 0 var(--accent-deep); }
+.btn.secondary { color: #fff; background: linear-gradient(#6a58b0, #4d3e8c); box-shadow: 0 4px 0 #2f2560; }
+.btn.take { color: #3a2600; background: linear-gradient(#ffd77a, var(--chip)); box-shadow: 0 4px 0 var(--chip-edge); }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .3); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn .cost { display: inline-flex; align-items: center; gap: 2px; padding: 2px 6px 2px 3px; border-radius: 8px; background: rgba(0, 0, 0, .18); font-size: 13px; }
+.btn .cost .chip { width: 16px; height: 16px; }
+
+.icon-btn {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, .08);
+    cursor: pointer;
+}
+.line-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.link { border: none; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px; }
+
+/* ---- タイトル ---- */
+
+#screen-title:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px;
+    touch-action: none;
+}
+.title-art { position: relative; width: 260px; height: 140px; }
+.title-art .card { --cw: 62px; --ch: 87px; position: absolute; left: calc(50% - 31px); top: 22px; transform-origin: 50% 170%; }
+.title-art .fan-0 { transform: translateX(-34px) rotate(-30deg); }
+.title-art .fan-1 { transform: translateX(-26px) rotate(-17deg); }
+.title-art .fan-2 { transform: translateX(-18px) rotate(-4deg); }
+.title-art .hero { --cw: 72px; --ch: 101px; left: calc(50% - 10px); top: 14px; z-index: 1; transform: rotate(9deg); }
+.title-pot { position: absolute; left: calc(50% + 38px); top: 84px; z-index: 2; }
+.logo { margin: 4px 0 0; font-size: 46px; font-weight: 800; letter-spacing: .01em; color: var(--accent); text-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+.subtitle { margin: -4px 0 10px; color: var(--muted); font-size: 14px; letter-spacing: .3em; }
+.setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.setup .row { display: flex; align-items: center; gap: 12px; font-weight: 800; }
+.row-label { width: 36px; text-align: right; }
+.setup .buttons { display: flex; gap: 12px; margin-top: 4px; }
+.stepper, .segment { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+.step-btn { width: 40px; height: 36px; border: none; border-radius: 8px; background: rgba(255, 255, 255, .1); font-size: 20px; font-weight: 800; cursor: pointer; }
+.step-btn:disabled { opacity: .3; cursor: default; }
+.count-value { min-width: 56px; text-align: center; font-size: 17px; font-weight: 800; }
+.segment button { width: 74px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+.segment button.on { color: #fff; background: rgba(255, 93, 143, .85); }
+
+/* ---- ゲーム画面 ---- */
+
+#screen-game:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 8px;
+    touch-action: none;
+}
+
+.topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; height: 36px; }
+.deck-info { display: inline-flex; align-items: center; gap: 6px; padding: 3px 12px; border-radius: 10px; background: var(--panel); font-size: 14px; color: var(--muted); }
+.deck-info b { color: var(--text); font-size: 16px; }
+
+.players { flex: none; display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 5px; }
+.player, .me {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+    padding: 5px 6px 6px;
+    border: 1px solid var(--panel-line);
+    border-radius: 9px;
+    background: var(--panel);
+    transition: border-color .2s, box-shadow .2s;
+}
+/* 札の欄の高さは、行数（--lines）× 札の高さで決める。中身で高さが変わらないように */
+.player .runs { height: calc(var(--lines, 2) * var(--rh) + (var(--lines, 2) - 1) * 4px); overflow: hidden; }
+.runs.dense { gap: 4px 3px; }
+.runs.dense .run { padding: 0 3px; font-size: 11.5px; }
+.runs.dense .run small { font-size: 10px; }
+.player.active, .me.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 0 14px rgba(255, 93, 143, .35); }
+.p-head { display: flex; align-items: center; gap: 4px; height: 18px; }
+.p-name { flex: 0 1 auto; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 800; }
+.p-pts { margin-left: auto; flex: none; font-size: 15px; font-weight: 800; }
+.p-pts small, .me-score small { font-size: 11px; color: var(--muted); font-weight: 500; }
+.thinking { display: inline-flex; gap: 2px; flex: none; }
+.thinking i { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); animation: think 1s ease-in-out infinite; }
+.thinking i:nth-child(2) { animation-delay: .15s; }
+.thinking i:nth-child(3) { animation-delay: .3s; }
+@keyframes think { 50% { opacity: .2; transform: translateY(-2px); } }
+
+/* 場：めくったカード・チップの山・取ったときの得点の動き */
+.stage {
+    flex: 1;
+    min-height: 0;
+    container-type: size;
+    position: relative;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    grid-template-rows: 1fr auto;
+    align-items: center;
+    column-gap: 14px;
+    row-gap: 4px;
+    padding: 6px 0;
+    perspective: 600px;
+}
+.stage-card { grid-column: 2; grid-row: 1; display: grid; place-items: center; }
+.stage-card .card.big {
+    --ch: min(150px, calc(100cqh - 46px));
+    --cw: calc(var(--ch) / 1.4);
+    border-radius: 11px;
+    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tone) 60%, transparent), 0 8px 22px rgba(0, 0, 0, .5);
+}
+.stage.mine .stage-card .card.big { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--tone) 60%, transparent), 0 0 0 3px var(--accent), 0 8px 22px rgba(0, 0, 0, .5); }
+.pot { grid-column: 3; grid-row: 1; justify-self: start; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.pot-pile { position: relative; width: 44px; height: 70px; }
+.pot-chip { position: absolute; left: 10px; bottom: 0; }
+.pot-chip .chip { width: 24px; height: 24px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .5)); }
+.pot-count { display: inline-flex; align-items: center; gap: 3px; font-size: 18px; color: var(--chip); }
+.pot-count b { font-weight: 800; }
+.pot-count.zero { opacity: .45; }
+.offer { grid-column: 1 / -1; grid-row: 2; display: flex; align-items: center; justify-content: center; gap: 6px; height: 26px; font-size: 14px; color: var(--muted); }
+.offer b { font-size: 19px; font-weight: 800; }
+.up { color: var(--bad); }
+.down { color: var(--good); }
+.link-tag { padding: 1px 7px; border-radius: 8px; background: rgba(255, 93, 143, .2); color: var(--accent); font-size: 12px; font-weight: 800; }
+
+.me { flex: none; height: 82px; }
+.me-head { display: flex; align-items: center; gap: 10px; height: 22px; }
+.me-name { font-size: 14px; font-weight: 800; color: var(--accent); }
+.me-chips { display: inline-flex; align-items: center; gap: 3px; font-size: 16px; color: var(--chip); }
+.me-chips b { font-weight: 800; }
+.me-score { margin-left: auto; display: inline-flex; align-items: baseline; gap: 4px; font-size: 13px; color: var(--muted); }
+.me-score b { color: var(--text); font-size: 20px; font-weight: 800; }
+.me .runs { height: calc(2 * var(--rh) + 4px); overflow: hidden; }
+.empty-runs { color: var(--muted); font-size: 12px; line-height: 20px; }
+
+.actions { flex: none; display: flex; align-items: center; justify-content: center; gap: 12px; height: 54px; }
+.act-label { font-size: 15px; font-weight: 800; }
+.act-label.muted { color: var(--muted); font-weight: 500; }
+
+/* ---- ダイアログ ---- */
+
+dialog.sheet {
+    width: min(420px, calc(100% - 24px));
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    color: var(--text);
+    background: linear-gradient(170deg, #3a2e66, #241c44);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
+}
+dialog.sheet[open] { display: flex; flex-direction: column; gap: 10px; }
+dialog::backdrop { background: rgba(10, 6, 20, .6); }
+dialog h2 { margin: 0; font-size: 19px; text-align: center; outline: none; }
+dialog h3 { margin: 8px 0 2px; font-size: 14px; color: var(--accent); }
+dialog .buttons { display: flex; justify-content: center; gap: 12px; flex: none; }
+dialog :focus-visible { outline: 2px solid rgba(255, 93, 143, .7); outline-offset: 2px; }
+dialog h2:focus-visible { outline: none; }
+.muted { color: var(--muted); }
+.note { margin: 0; font-size: 12px; text-align: center; }
+
+.result-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; }
+.result-list li { display: grid; grid-template-columns: 3.6em minmax(0, 1fr) auto auto; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 10px; background: var(--panel); }
+.result-list li.mine .r-name { color: var(--accent); }
+.result-list li.winner { box-shadow: inset 0 0 0 2px var(--chip); }
+.result-list .runs { gap: 3px 4px; }
+.result-list .run { padding: 0 4px; font-size: 12px; }
+.r-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 800; font-size: 14px; }
+.r-calc { display: inline-flex; align-items: center; gap: 2px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.r-calc .chip { width: 14px; height: 14px; }
+.r-score { min-width: 34px; text-align: right; font-size: 20px; }
+
+.help-body { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; padding-right: 4px; }
+.help-body p { margin: 2px 0 6px; font-size: 14px; line-height: 1.65; }
+.help-body strong { color: var(--accent); }
+.help-pic { margin: 6px 0; }
+.mini-stage, .mini-runs { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; background: rgba(0, 0, 0, .2); width: fit-content; }
+.mini-stage .card { --cw: 40px; --ch: 56px; }
+.mini-runs .card { --cw: 26px; --ch: 36px; margin-right: -4px; }
+.mini-pot { display: inline-flex; align-items: center; gap: 2px; color: var(--chip); }
+.mini-offer { font-size: 13px; color: var(--muted); }
+.mini-offer b { font-size: 16px; }
+.mini-runs .arrow { margin-left: 8px; color: var(--accent); font-weight: 800; }
+.mini-eq { font-weight: 800; }
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 76px;
+    z-index: 80;
+    max-width: calc(100% - 32px);
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(12, 8, 24, .92);
+    color: #fff;
+    font-size: 14px;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+}
+.toast.show { opacity: 1; }
+
+/* ---- 動き ---- */
+
+.flyer { position: fixed; z-index: 60; pointer-events: none; }
+.flyer > .card { --cw: 100%; --ch: 100%; width: 100%; height: 100%; }
+.flyer > .chip { width: 100%; height: 100%; }
+
+@media (prefers-reduced-motion: reduce) {
+    .run.linked, .thinking i { animation: none; }
+    .btn, .player, .me { transition: none; }
+}
+
+/* 高さに余裕のある画面では、自分の欄とボタンを大きく */
+@media (min-height: 700px) {
+    :root { --rh: 22px; }
+    .run { font-size: 14px; }
+    .me { height: 92px; }
+    .actions { height: 62px; }
+    .btn { height: 50px; }
+}
+
+.card.tiny .back-mark { display: none; }
+.mini-stage .card-corner { display: none; }
+
+/* 横にした低い画面：左に相手と自分、右に場とボタンを並べる。タイトルは絵を省く */
+@media (orientation: landscape) and (max-height: 500px) {
+    #app { max-width: 900px; }
+    #screen-game:not([hidden]) {
+        display: grid;
+        grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+        grid-template-rows: 36px auto minmax(0, 1fr) auto;
+        grid-template-areas: "top top" "players stage" "me stage" "me actions";
+        column-gap: 12px;
+        row-gap: 6px;
+    }
+    .topbar { grid-area: top; }
+    .players { grid-area: players; }
+    .stage { grid-area: stage; }
+    .me { grid-area: me; align-self: start; }
+    .actions { grid-area: actions; gap: 10px; }
+    .actions .btn { min-width: 0; padding: 0 14px; font-size: 15px; white-space: nowrap; }
+    .actions .btn.take { min-width: 92px; }
+    .title-art { display: none; }
+    .logo { font-size: 40px; }
+}
