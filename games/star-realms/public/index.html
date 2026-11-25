@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f1630">
+    <title>スターレルム</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="スターレルム">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">STAR REALMS</h1>
+            <p class="subtitle">スターレルム</p>
+            <div class="setup">
+                <div class="row">CPU
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <header class="bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></button>
+                <div id="opp-stats" class="stats opp"></div>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録"><svg class="ico" aria-hidden="true"><use href="#i-log"/></svg></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+            </header>
+            <div id="opp-zone" class="zone opp"></div>
+            <div id="trade-row" class="trade-row"></div>
+            <div id="ticker" class="ticker"></div>
+            <div id="my-zone" class="zone mine"></div>
+            <div id="my-stats" class="stats mine"></div>
+            <div id="hand" class="hand"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- カードの詳細 -->
+    <dialog id="detail" class="sheet detail">
+        <div id="detail-body" class="detail-body" tabindex="-1" autofocus></div>
+        <div id="detail-buttons" class="buttons"></div>
+    </dialog>
+
+    <!-- 効果で選ぶもの -->
+    <dialog id="prompt" class="sheet prompt">
+        <h2 id="prompt-title" tabindex="-1" autofocus></h2>
+        <p id="prompt-text" class="prompt-text"></p>
+        <div id="prompt-body" class="prompt-body"></div>
+        <div id="prompt-buttons" class="buttons"></div>
+    </dialog>
+
+    <!-- 捨て札 -->
+    <dialog id="pile" class="sheet">
+        <h2 id="pile-title" tabindex="-1" autofocus></h2>
+        <div id="pile-body" class="prompt-body"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 終わり -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-text" class="result-text"></p>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <h2 tabindex="-1" autofocus>遊び方</h2>
+        <div class="help-body">
+            <h3>目的</h3>
+            <p>艦隊を育てて相手を攻撃し、相手の権威（はじめは50）を0にした人の勝ち。</p>
+            <h3>手番の流れ</h3>
+            <p>手札を押して出すと、すぐに効果が出ます（<b class="fx-t">2</b>交易・<b class="fx-c">3</b>戦闘・<b class="fx-a">4</b>権威・<b class="fx-d">+1</b>引く）。</p>
+            <p>交易で、交易の列やエクスプローラーのカードを獲得します（捨て札へ）。戦闘で、相手の基地や権威を攻撃します。押せるものは金色に光ります。</p>
+            <p>手番を終えると、出した艦と残りの手札を捨て札にして5枚引きます。山札がなくなったら、捨て札を混ぜて山札にします。はじめの手番の人は3枚、もう一人は5枚で始めます。</p>
+            <h3>勢力と同盟</h3>
+            <p>カードには4つの勢力があります。同じ勢力のカードがほかに場（この手番に出した艦か、自分の基地）にあると、印<svg class="emblem" viewBox="0 0 24 24" aria-hidden="true"><use href="#e-blob"/></svg>の付いた同盟の効果も出ます（1手番に1回）。</p>
+            <h3>基地と前哨</h3>
+            <p>基地は場に残り、毎手番の始めに効果が出ます。右上の数が耐久で、それ以上の戦闘で壊せます。盾が塗りつぶしの基地は前哨で、前哨がある間は、ほかの基地も権威も攻撃できません。</p>
+            <h3>廃棄</h3>
+            <p><svg class="ico inline" aria-hidden="true"><use href="#i-scrap"/></svg>の効果は、場のそのカードを押して「廃棄して使う」で使います。カードはゲームから取り除かれます（エクスプローラーは山に戻ります）。</p>
+            <h3>操作</h3>
+            <p>手札は押すと出ます。交易の列は、交易が足りれば押すと獲得します。光っている相手の基地は、押すと攻撃します。長押しで、どのカードも説明が見られます。</p>
+            <h3>カード</h3>
+            <div id="help-cards" class="help-cards"></div>
+        </div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
