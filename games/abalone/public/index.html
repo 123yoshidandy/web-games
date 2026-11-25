@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#3b1f2e">
+    <title>アバロン</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="アバロン">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Abalone</h1>
+            <p class="subtitle">アバロン</p>
+            <div class="setup">
+                <div class="setup-row"><span class="setup-label">CPU</span>
+                    <div id="level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="setup-row"><span class="setup-label">並べ方</span>
+                    <div id="layout" class="segmented three" role="radiogroup" aria-label="最初の並べ方">
+                        <button type="button" role="radio" data-layout="standard">標準</button>
+                        <button type="button" role="radio" data-layout="belgian">ベルギー</button>
+                        <button type="button" role="radio" data-layout="german">ジャーマン</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="turn-info" class="turn-info"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="rival" class="panel"></div>
+            <div id="board-wrap" class="board-wrap">
+                <svg id="board" class="board"></svg>
+            </div>
+            <div class="bottom">
+                <div id="me" class="panel"></div>
+                <button id="clear" class="btn ghost small" hidden>選び直す</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-detail" class="result-detail"></p>
+        <div class="buttons">
+            <button id="look" class="btn ghost">盤を見る</button>
+            <button id="again" class="btn primary">もう一度</button>
+        </div>
+        <div class="buttons"><button id="result-home" class="link">ホーム</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>相手の玉を<strong>6個、盤の外へ押し出せば勝ち</strong>です。玉は14個ずつ。先手は黒です。</p>
+            <h3>手番（動かす）</h3>
+            <ul class="help-list">
+                <li>自分の玉を<strong>1〜3個</strong>選んで、1マス動かします。2個以上のときは、一列に並んだ玉です</li>
+                <li><strong>列の向き</strong>に動かす：先頭の玉の前が空いていれば進みます</li>
+                <li><strong>列の横</strong>に動かす（平行移動）：動く先がすべて空いているときだけ。横に動かして押すことはできません</li>
+            </ul>
+            <h3>押し出し</h3>
+            <p>列の向きに動かすとき、前に相手の玉が並んでいて、<strong>自分のほうが多ければ</strong>押せます（3対2・3対1・2対1）。同じ数か相手のほうが多いとき、相手の玉の後ろに自分の玉があるときは押せません。押された玉が盤の外に出たら、押し出した数に入ります。</p>
+            <h3>並べ方</h3>
+            <p>標準のほかに、7個ずつの花の形のかたまりを2つ並べた<strong>ベルギーデイジー</strong>と<strong>ジャーマンデイジー</strong>を選べます。最初から相手と向き合うので、決着しやすくなります。</p>
+            <h3>画面</h3>
+            <p>自分の玉を押すと選べます。一列に並んでいれば3個まで足せ、両端を押すと真ん中も選びます。選ぶと動かせる向きに<strong>矢印</strong>が出るので、押して動かします。<strong>赤い矢印</strong>は相手を押す手です。各人の欄の6つの丸は、押し出した数です。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
