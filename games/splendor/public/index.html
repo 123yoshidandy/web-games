@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1c1733">
+    <title>スプレンダー</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="スプレンダー">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="gem-symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">SPLENDOR</h1>
+            <p class="subtitle">スプレンダー</p>
+            <div class="setup">
+                <div class="row">人数
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="2">2人</button>
+                        <button type="button" role="radio" data-count="3">3人</button>
+                        <button type="button" role="radio" data-count="4">4人</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div id="opponents" class="opponents"></div>
+            <div class="nobles-bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="nobles" class="nobles"></div>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div class="table">
+                <div id="board" class="board"></div>
+                <div id="bank" class="bank"></div>
+            </div>
+            <div id="me" class="me"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 結果 -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <ol id="result-list" class="result-list"></ol>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 貴族を選ぶ -->
+    <dialog id="noble-choice" class="sheet">
+        <h2 tabindex="-1" autofocus>訪れる貴族を選ぶ</h2>
+        <div id="noble-options" class="noble-options"></div>
+    </dialog>
+
+    <!-- 相手の持ち物 -->
+    <dialog id="player-detail" class="sheet">
+        <h2 id="player-detail-name" tabindex="-1" autofocus></h2>
+        <div id="player-detail-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>宝石を集めてカードを買い、<strong>15点</strong>を目指します。だれかが15点に達したら、その巡の終わりまで続け、点数の多い人が勝ちです。同点なら、買ったカードの少ない人が勝ちです。</p>
+            <h3>手番にできること（どれか1つ）</h3>
+            <ul class="help-actions">
+                <li><span class="help-pic" id="help-take3"></span><span>違う色の宝石を<strong>3個</strong>取る</span></li>
+                <li><span class="help-pic" id="help-take2"></span><span>同じ色の宝石を<strong>2個</strong>取る（その色が4個以上残っているときだけ）</span></li>
+                <li><span class="help-pic" id="help-reserve"></span><span>カードを<strong>予約</strong>して、黄金を1個取る。山札の一番上を伏せたまま予約してもよい。予約は3枚まで</span></li>
+                <li><span class="help-pic" id="help-buy"></span><span>場か予約したカードを<strong>買う</strong>。黄金はどの色の代わりにもなる</span></li>
+            </ul>
+            <h3>ボーナス</h3>
+            <p>買ったカードの右上の宝石は、ずっと使える割引です。その色のコストが1つずつ安くなります。</p>
+            <h3>貴族</h3>
+            <p>手番の終わりに、ボーナス（カード）の数が条件を満たすと、貴族が訪れて<strong>3点</strong>になります。1手番に1人までです。</p>
+            <h3>宝石は10個まで</h3>
+            <p>手番の終わりに、黄金を含めて10個を超えていたら、超えた分を選んで返します。</p>
+            <h3>操作</h3>
+            <p>宝石は右の列から選んで「取る」。カードと山札は、タップして「買う」「予約」。光っているカードは、今買えるカードです。相手の行をタップすると、予約しているカードが見られます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
