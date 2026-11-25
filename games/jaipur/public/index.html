@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#3a1027">
+    <title>ジャイプル</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ジャイプル">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">JAIPUR</h1>
+            <p class="subtitle">ジャイプル</p>
+            <div class="setup">
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="round-info" class="round-info"></span>
+                <span id="seals" class="seals"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="rival" class="rival"></div>
+            <div id="stacks" class="stacks"></div>
+            <div class="market-area"><div id="market" class="market"></div></div>
+            <div id="me" class="me">
+                <button id="herd" class="herd" aria-label="ラクダ（交換で返すときに押す）"></button>
+                <span id="my-score" class="score"></span>
+                <span id="hand-count" class="hand-count"></span>
+            </div>
+            <div id="hand" class="hand"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- ラウンドの結果 -->
+    <dialog id="round-result" class="sheet">
+        <h2 id="round-title" tabindex="-1" autofocus></h2>
+        <table id="round-table" class="score-table"></table>
+        <div id="round-seals" class="seal-lines"></div>
+        <div class="buttons"><button id="next-round" class="btn primary">次のラウンドへ</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-round" class="muted note"></p>
+        <table id="result-table" class="score-table"></table>
+        <div id="result-seals" class="seal-lines"></div>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>市場で商品を集めて売り、トークンの点数を競います。ラウンドに勝つと<strong>印</strong>を1つもらい、<strong>2つ</strong>集めた方の勝ちです。</p>
+            <h3>手番にできること（どれか1つ）</h3>
+            <ul class="help-list">
+                <li><strong>1枚取る</strong>：市場の商品を1枚取る</li>
+                <li><strong>ラクダを全部取る</strong>：市場のラクダを全部、自分の群れに入れる</li>
+                <li><strong>交換</strong>：市場の商品を2枚以上取り、同じ枚数の手札かラクダを市場に返す。取った種類と同じ商品は返せない</li>
+                <li><strong>売る</strong>：手札の1種類を好きな枚数売り、その商品のトークンを上から枚数分もらう</li>
+            </ul>
+            <div class="help-pic" id="help-exchange"></div>
+            <h3>売るときの決まり</h3>
+            <p>ダイヤ・金・銀は<strong>2枚以上</strong>でないと売れません。トークンは先に売るほど高く、なくなったらもらえません。<strong>3・4・5枚以上</strong>まとめて売ると、ボーナスのトークン（伏せたまま）をもらえます。</p>
+            <div class="help-goods" id="help-goods"></div>
+            <h3>手札</h3>
+            <p>手札は<strong>7枚</strong>まで。ラクダは数えません。</p>
+            <h3>ラウンドの終わり</h3>
+            <p>商品のトークンの山が<strong>3種類</strong>なくなるか、山札が尽きて市場を補充できなくなったら終わりです。ラクダの多い方が<strong>5点</strong>をもらい、点数の多い方の勝ち。同点なら、ボーナスのトークンの多い方、それも同じなら商品のトークンの多い方が勝ちです。</p>
+            <h3>操作</h3>
+            <p>市場の商品・手札・ラクダをタップして選ぶと、下に今できる操作が出ます。交換で返すラクダは、ラクダを押した回数だけ返します。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
