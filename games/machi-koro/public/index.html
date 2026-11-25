@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1b4f78">
+    <title>街コロ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="街コロ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">MACHI KORO</h1>
+            <p class="subtitle">街コロ</p>
+            <div class="setup">
+                <div class="row">人数
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="2">2人</button>
+                        <button type="button" role="radio" data-count="3">3人</button>
+                        <button type="button" role="radio" data-count="4">4人</button>
+                    </div>
+                </div>
+                <div class="row">CPU
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <header class="bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></button>
+                <div id="opponents" class="opponents"></div>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+            </header>
+            <button id="status" class="status" aria-label="記録"></button>
+            <div id="market" class="market"></div>
+            <div id="me" class="me">
+                <div id="my-landmarks" class="landmarks"></div>
+                <div id="my-cards" class="chips"></div>
+            </div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+    <div id="fx" class="fx" aria-hidden="true"></div>
+
+    <!-- カードの説明（建てられるときは「建てる」） -->
+    <dialog id="card-detail" class="sheet card-detail">
+        <div id="card-detail-body"></div>
+        <div id="card-detail-buttons" class="buttons"></div>
+    </dialog>
+
+    <!-- ほかの人の街 -->
+    <dialog id="player-detail" class="sheet">
+        <h2 id="player-detail-name" tabindex="-1" autofocus></h2>
+        <div id="player-detail-body"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- テレビ局：取る相手 -->
+    <dialog id="tv" class="sheet">
+        <h2 tabindex="-1" autofocus>テレビ局：5コインを取る相手</h2>
+        <div id="tv-players" class="pick-list"></div>
+    </dialog>
+
+    <!-- ビジネスセンター：交換 -->
+    <dialog id="trade" class="sheet trade">
+        <h2 tabindex="-1" autofocus>ビジネスセンター</h2>
+        <p class="note">もらう施設</p>
+        <div id="trade-take" class="trade-list"></div>
+        <p class="note">出す施設</p>
+        <div id="trade-give" class="trade-list"></div>
+        <div class="buttons">
+            <button id="trade-ok" class="btn primary" disabled>交換する</button>
+            <button id="trade-skip" class="btn secondary">しない</button>
+        </div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 終わり -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <ol id="result-list" class="result-list"></ol>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <h2 tabindex="-1" autofocus>遊び方</h2>
+        <div class="help-body">
+            <h3>目的</h3>
+            <p>施設を建ててコインを稼ぎ、ランドマーク4つ（駅・ショッピングモール・遊園地・電波塔）を最初に完成させた人の勝ちです。はじめは麦畑とパン屋が1つずつと、3コイン。</p>
+            <h3>手番</h3>
+            <ol class="help-steps">
+                <li><strong>振る</strong>：サイコロを1個（駅があれば2個も選べる）</li>
+                <li><strong>受け取る</strong>：出た目の施設が働く</li>
+                <li><strong>建てる</strong>：施設1つかランドマーク1つ（建てなくてもよい）。市場のカードを押して建てる</li>
+            </ol>
+            <h3>施設の色</h3>
+            <ul class="help-colors">
+                <li><span class="dot blue"></span><strong>青</strong>　誰の番でも、銀行から</li>
+                <li><span class="dot green"></span><strong>緑</strong>　自分の番だけ、銀行から</li>
+                <li><span class="dot red"></span><strong>赤</strong>　ほかの人が出したら、その人から</li>
+                <li><span class="dot purple"></span><strong>紫</strong>　自分の番だけ、ほかの人から。同じものは1つまで</li>
+            </ul>
+            <p>同じ目で色の違う施設が働くときは、赤 → 緑と青 → 紫の順。赤が何人もいるときは、振った人から反時計回り（手番と逆の順）に払います。足りない分は払わずに済みます。</p>
+            <h3>施設</h3>
+            <ul class="help-cards" id="help-cards"></ul>
+            <h3>ランドマーク</h3>
+            <ul class="help-cards" id="help-landmarks"></ul>
+        </div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

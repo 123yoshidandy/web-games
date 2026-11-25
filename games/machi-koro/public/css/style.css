@@ -1,0 +1,516 @@
+/* 街コロ
+ * 縦持ちのスマホ（最小 375×548）に、スクロールなしで収める。市場だけが残りの高さを使う
+ */
+
+:root {
+    --bg: #133a5a;
+    --bg2: #1d5b86;
+    --panel: rgba(255, 255, 255, .08);
+    --panel-line: rgba(255, 255, 255, .16);
+    --text: #f4f1ea;
+    --muted: #a9c1d3;
+    --gold: #f5c64f;
+    --gold-deep: #b5862a;
+    --sky: #4aa3dc;
+    --sky-deep: #23679a;
+    --blue: #3b82d0;
+    --green: #3a9a57;
+    --red: #d24a3f;
+    --purple: #8656b8;
+    --landmark: #e3a02e;
+    --paper: #fbf7ee;
+    --ink: #3a3328;
+    --font: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', sans-serif;
+    --logo: 'Fredoka', 'M PLUS Rounded 1c', sans-serif;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html {
+    height: 100%;
+    touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    color: var(--text);
+    font-family: var(--font);
+    font-weight: 500;
+    background:
+        radial-gradient(ellipse at 15% -10%, rgba(150, 215, 255, .25), transparent 55%),
+        radial-gradient(ellipse at 100% 110%, rgba(110, 200, 120, .16), transparent 50%),
+        linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px) 0 0 / 22px 22px,
+        linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px) 0 0 / 22px 22px,
+        linear-gradient(175deg, var(--bg2), var(--bg) 70%);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+    position: relative;
+    height: 100%;
+    max-width: 540px;
+    margin: 0 auto;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.screen { height: 100%; }
+
+.ico { width: var(--ico, 20px); height: var(--ico, 20px); fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+
+/* ---- ボタン ---- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex: none;
+    min-width: 120px;
+    height: 46px;
+    padding: 0 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform .08s, box-shadow .08s;
+}
+.btn.primary { color: #2d1f04; background: linear-gradient(#fadb87, var(--gold)); box-shadow: 0 4px 0 var(--gold-deep); }
+.btn.secondary { color: #fff; background: linear-gradient(#63b6e8, var(--sky)); box-shadow: 0 4px 0 var(--sky-deep); }
+.btn.ghost { color: #fff; background: linear-gradient(#5e7f99, #4a6880); box-shadow: 0 4px 0 #2c4253; }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .3); }
+.btn:disabled { opacity: .4; cursor: default; }
+
+.icon-btn {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 38px;
+    height: 38px;
+    border: none;
+    border-radius: 10px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, .1);
+    cursor: pointer;
+    --ico: 22px;
+}
+
+.link { border: none; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px; }
+
+.segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+.segmented button {
+    min-width: 58px;
+    height: 36px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.segmented button[aria-checked="true"] { color: #2d1f04; background: var(--gold); }
+
+/* ---- コインとサイコロ ---- */
+
+.coin {
+    display: inline-grid;
+    place-items: center;
+    flex: none;
+    min-width: 1.7em;
+    height: 1.7em;
+    padding: 0 .3em;
+    border-radius: 999px;
+    color: #5a3c06;
+    background: radial-gradient(circle at 35% 30%, #fff1b8, #f2c443 60%, #d39b22);
+    box-shadow: inset 0 0 0 1.5px #b07c16;
+    font-weight: 800;
+    font-size: 12px;
+    line-height: 1;
+}
+.coin.big { font-size: 20px; }
+
+.die {
+    display: inline-grid;
+    grid-template: repeat(3, 1fr) / repeat(3, 1fr);
+    flex: none;
+    width: 24px;
+    height: 24px;
+    padding: 3px;
+    border-radius: 5px;
+    background: #fff;
+    box-shadow: 0 2px 0 #9bb0c0;
+}
+.die i { display: block; margin: auto; width: 4px; height: 4px; border-radius: 50%; }
+.die i.on { background: #2b2f36; }
+.die:first-child:nth-last-child(1) i.on:nth-child(5) { background: #d0392e; }
+.btn .die { width: 20px; height: 20px; padding: 2px; box-shadow: none; }
+
+/* ---- カード（市場の施設） ---- */
+
+.card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+    border-radius: 8px;
+    color: var(--ink);
+    background: var(--paper);
+    box-shadow: 0 2px 0 rgba(0, 0, 0, .3), inset 0 0 0 2px var(--cc);
+    container-type: inline-size;
+    cursor: pointer;
+    --cc: #888;
+}
+.card.blue, .chip.blue { --cc: var(--blue); }
+.card.green, .chip.green { --cc: var(--green); }
+.card.red, .chip.red { --cc: var(--red); }
+.card.purple, .chip.purple { --cc: var(--purple); }
+.card .band {
+    align-self: stretch;
+    flex: none;
+    padding: 1px 0;
+    color: #fff;
+    background: var(--cc);
+    font-family: var(--logo);
+    font-weight: 600;
+    font-size: max(11px, 16cqw);
+    line-height: 1.2;
+    text-align: center;
+}
+.card .art { flex: 1 1 0; min-height: 0; width: 66%; margin-top: 2px; }
+.card .name {
+    flex: none;
+    padding: 0 2px;
+    font-size: max(10px, 13.5cqw);
+    font-weight: 800;
+    line-height: 1.1;
+    text-align: center;
+    word-break: keep-all;
+}
+.card .foot { display: flex; align-items: center; justify-content: space-between; align-self: stretch; flex: none; padding: 1px 3px 3px; }
+.card .foot .coin { font-size: max(10px, 13cqw); }
+.card .stock { color: #7b746a; font-size: max(10px, 12cqw); font-weight: 800; }
+.card.soldout { opacity: .4; }
+.card.can { box-shadow: 0 2px 0 rgba(0, 0, 0, .3), inset 0 0 0 2px var(--cc), 0 0 0 3px var(--gold); animation: glow 1.6s ease-in-out infinite; }
+.card.big { width: 120px; height: 160px; flex: none; cursor: default; }
+
+@keyframes glow {
+    50% { box-shadow: 0 2px 0 rgba(0, 0, 0, .3), inset 0 0 0 2px var(--cc), 0 0 0 3px rgba(245, 198, 79, .35); }
+}
+
+/* ---- 街の施設（小さな札）とランドマーク ---- */
+
+.chip {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    background: var(--paper);
+    box-shadow: inset 0 0 0 2px var(--cc), 0 2px 0 rgba(0, 0, 0, .3);
+    cursor: pointer;
+    --cc: #888;
+}
+.chip .art { width: 28px; height: 28px; margin-top: 6px; }
+.chip .roll {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 12px;
+    border-radius: 8px 8px 0 0;
+    color: #fff;
+    background: var(--cc);
+    font-family: var(--logo);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 12px;
+    text-align: center;
+}
+.chip .count, .card .count {
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 9px;
+    color: #fff;
+    background: #24323e;
+    box-shadow: 0 0 0 1.5px #fff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 18px;
+    text-align: center;
+}
+.chip.hit { box-shadow: inset 0 0 0 2px var(--cc), 0 0 0 3px #fff, 0 0 10px 3px rgba(255, 255, 255, .7); }
+.landmark-chip { --cc: var(--landmark); }
+.landmark-chip .art { margin-top: 0; }
+
+.landmarks { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.landmark {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    height: 40px;
+    padding: 0 4px;
+    border-radius: 9px;
+    border: 2px dashed rgba(255, 255, 255, .3);
+    color: var(--muted);
+    background: rgba(0, 0, 0, .15);
+    cursor: pointer;
+}
+.landmark .art { width: 28px; height: 28px; flex: none; filter: grayscale(1) opacity(.45); }
+.landmark .coin { font-size: 10px; }
+.landmark.built { border: 2px solid var(--landmark); color: var(--ink); background: linear-gradient(#fff4d6, #f7dc97); }
+.landmark.built .art { filter: none; }
+.landmark.can { border: 2px solid var(--gold); color: var(--text); background: rgba(245, 198, 79, .18); animation: glow-lm 1.6s ease-in-out infinite; }
+.landmark.can .art { filter: none; }
+@keyframes glow-lm { 50% { background: rgba(245, 198, 79, .05); } }
+.landmark { justify-content: center; gap: 6px; }
+
+/* ---- タイトル ---- */
+
+#screen-title { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; }
+.title-art { position: relative; width: 260px; height: 140px; }
+.title-art .fan {
+    position: absolute;
+    left: calc(50% - 34px);
+    bottom: 0;
+    width: 68px;
+    height: 92px;
+    transform-origin: 50% 160%;
+    transform: translateX(calc(var(--i) * 14px)) rotate(calc(var(--i) * 13deg));
+}
+.title-art .fan .card { width: 100%; height: 100%; }
+.logo {
+    margin: 4px 0 0;
+    color: var(--gold);
+    font-family: var(--logo);
+    font-weight: 600;
+    font-size: 44px;
+    letter-spacing: .04em;
+    text-shadow: 0 3px 0 rgba(0, 0, 0, .3);
+}
+.subtitle { margin: -6px 0 8px; color: var(--muted); font-size: 16px; letter-spacing: .4em; }
+.setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.setup .row { display: flex; align-items: center; gap: 14px; font-weight: 800; }
+.setup .buttons { display: flex; gap: 12px; margin-top: 6px; }
+
+/* ---- ゲーム画面 ---- */
+
+#screen-game { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 8px; }
+
+.bar { display: flex; align-items: center; gap: 6px; flex: none; height: 50px; }
+.opponents { flex: 1; min-width: 0; display: flex; gap: 5px; height: 100%; }
+.opponent {
+    flex: 1 1 0;
+    min-width: 0;
+    display: grid;
+    grid-template: auto auto / 1fr auto;
+    align-content: center;
+    column-gap: 4px;
+    row-gap: 3px;
+    padding: 3px 7px;
+    border: none;
+    border-radius: 10px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--panel-line);
+    text-align: left;
+    cursor: pointer;
+}
+.opponent.current { background: rgba(245, 198, 79, .16); box-shadow: inset 0 0 0 2px var(--gold); }
+.op-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 800; }
+.op-coins .coin { font-size: 12px; }
+.op-lms { grid-column: 1 / 3; display: flex; gap: 3px; }
+.op-lms i { display: block; width: 14px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .2); }
+.op-lms i.on { background: var(--landmark); }
+
+.status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    height: 34px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 10px;
+    color: var(--text);
+    background: rgba(0, 0, 0, .2);
+    text-align: left;
+    cursor: pointer;
+    --ico: 18px;
+}
+.status .dice { display: flex; gap: 4px; flex: none; }
+.status .dice.rolled .die { animation: roll .45s ease-out; }
+@keyframes roll { 0% { transform: rotate(-90deg) scale(.6); } 70% { transform: rotate(10deg) scale(1.1); } 100% { transform: none; } }
+.status .last { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
+.status .ico { color: var(--muted); }
+
+.market {
+    flex: 1 1 0;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 5px;
+}
+.market .card { min-height: 0; }
+
+.me { flex: none; display: flex; flex-direction: column; gap: 6px; padding: 6px; border-radius: 12px; background: rgba(0, 0, 0, .16); }
+.chips { display: flex; flex-wrap: wrap; align-content: flex-start; gap: 5px 4px; height: 92px; padding: 3px 3px 0; overflow: hidden; }
+
+.actions { flex: none; display: flex; align-items: center; gap: 10px; height: 50px; }
+.my-coins { flex: none; min-width: 52px; display: grid; place-items: center; }
+.act-buttons { flex: 1; display: flex; justify-content: flex-end; gap: 8px; }
+.act-buttons .btn { min-width: 0; flex: 1; max-width: 170px; }
+.act-buttons .btn.wide { max-width: 260px; }
+.waiting { color: var(--muted); font-size: 14px; font-weight: 800; padding-right: 6px; }
+
+/* 低い画面では、札を少し小さくする */
+@media (max-height: 600px) {
+    .chip { width: 38px; height: 38px; }
+    .chip .art { width: 26px; height: 26px; }
+    .chips { height: 88px; }
+}
+
+/* ---- ダイアログ ---- */
+
+dialog.sheet {
+    width: min(440px, calc(100% - 24px));
+    max-height: calc(100dvh - 24px);
+    padding: 16px;
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    color: var(--text);
+    background: linear-gradient(170deg, #22577e, #153a58);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
+}
+dialog.sheet[open] { display: flex; flex-direction: column; gap: 10px; }
+dialog::backdrop { background: rgba(4, 14, 24, .62); }
+dialog h2 { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 0; font-size: 18px; text-align: center; outline: none; }
+dialog h3 { margin: 8px 0 2px; font-size: 14px; color: var(--gold); }
+dialog .buttons { display: flex; justify-content: center; gap: 10px; flex: none; }
+dialog :focus-visible { outline: 2px solid rgba(245, 198, 79, .7); outline-offset: 2px; }
+dialog h2:focus-visible { outline: none; }
+.note { margin: 0; color: var(--muted); font-size: 13px; }
+.meta { color: var(--muted); font-size: 13px; margin: 0; }
+
+.card-detail #card-detail-body { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.card-detail #card-detail-body p { margin: 0; font-size: 14px; line-height: 1.6; }
+.landmark-big { display: grid; place-items: center; width: 110px; height: 110px; border-radius: 18px; background: linear-gradient(#fff4d6, #f7dc97); box-shadow: inset 0 0 0 3px var(--landmark); }
+.landmark-big .art { width: 80px; height: 80px; }
+
+#player-detail-body { display: flex; flex-direction: column; gap: 10px; }
+#player-detail-body .chips { height: auto; }
+#player-detail-body .landmark { cursor: pointer; }
+
+.pick-list { display: flex; flex-direction: column; gap: 8px; }
+.pick {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 48px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 12px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px var(--panel-line);
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.pick .coin { font-size: 15px; }
+
+.trade-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; }
+.trade-row { display: flex; flex-direction: column; gap: 4px; }
+.trade-owner { font-size: 13px; font-weight: 800; }
+.trade-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pick-chip { padding: 3px; border: none; border-radius: 10px; background: none; cursor: pointer; }
+.pick-chip.picked { background: var(--gold); }
+
+.log-list { margin: 0; padding: 0 4px 0 1.6em; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; font-size: 13px; line-height: 1.6; }
+
+.result-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.result-list li { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 10px; background: var(--panel); }
+.result-list li:first-child { box-shadow: inset 0 0 0 2px var(--gold); }
+.result-list .name { flex: 1; font-weight: 800; }
+.result-list .op-lms i { width: 18px; height: 8px; }
+
+.help-body { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; padding-right: 4px; }
+.help-body p { margin: 2px 0 6px; font-size: 14px; line-height: 1.65; }
+.help-body strong { color: var(--gold); }
+.help-steps { margin: 0 0 4px; padding-left: 1.3em; font-size: 14px; line-height: 1.6; }
+.help-colors { margin: 0 0 6px; padding: 0; list-style: none; font-size: 14px; line-height: 1.8; }
+.dot { display: inline-block; width: 12px; height: 12px; margin-right: 6px; border-radius: 3px; vertical-align: -1px; }
+.dot.blue { background: var(--blue); } .dot.green { background: var(--green); } .dot.red { background: var(--red); } .dot.purple { background: var(--purple); }
+.help-cards { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.help-cards li { display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 1.5; }
+.help-cards .chip { cursor: default; }
+.help-cards .meta { margin-left: 6px; font-size: 12px; }
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 70px;
+    z-index: 80;
+    max-width: calc(100% - 32px);
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(4, 14, 24, .92);
+    color: #fff;
+    font-size: 14px;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+}
+.toast.show { opacity: 1; }
+
+/* ---- 動き ---- */
+
+.fx { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+.float {
+    position: fixed;
+    transform: translate(-50%, -50%);
+    padding: 1px 7px;
+    border-radius: 8px;
+    font-family: var(--logo);
+    font-size: 18px;
+    font-weight: 600;
+    animation: float-up 1.1s ease-out both;
+}
+.float.plus { color: #3a2a00; background: var(--gold); }
+.float.minus { color: #fff; background: var(--red); }
+@keyframes float-up {
+    0% { opacity: 0; transform: translate(-50%, -20%); }
+    15% { opacity: 1; transform: translate(-50%, -60%); }
+    80% { opacity: 1; transform: translate(-50%, -120%); }
+    100% { opacity: 0; transform: translate(-50%, -140%); }
+}
+.card.bought, .landmark.bought { animation: bought .6s ease-out; }
+@keyframes bought { 40% { transform: scale(1.12); } }
+
+@media (prefers-reduced-motion: reduce) {
+    .card.can, .landmark.can, .status .dice.rolled .die, .card.bought, .landmark.bought { animation: none; }
+    .float { animation: none; }
+}
