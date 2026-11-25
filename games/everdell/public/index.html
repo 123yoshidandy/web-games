@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1f2e24">
+    <title>エバーデール</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="エバーデール">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Everdell</h1>
+            <p class="subtitle">エバーデール</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="stepper">
+                        <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="count-value" class="count-value"></span>
+                        <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <div class="row"><span class="row-label">強さ</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="status" class="status"></div>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8.5h6M9 12h6M9 15.5h4"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="opponents" class="opponents"></div>
+            <div class="tabs" role="tablist">
+                <button class="tab" data-tab="meadow" role="tab">草原</button>
+                <button class="tab" data-tab="places" role="tab">場所</button>
+                <button class="tab" data-tab="events" role="tab">行事</button>
+                <button class="tab" data-tab="city" role="tab">街</button>
+            </div>
+            <div id="panel" class="panel"></div>
+            <div id="ticker" class="ticker"></div>
+            <div id="mybar" class="mybar"></div>
+            <div id="hand" class="hand"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- カードや場所の説明と操作 -->
+    <dialog id="detail" class="sheet">
+        <i class="focus-sink" tabindex="-1" autofocus></i>
+        <div id="detail-body" class="detail-body"></div>
+        <div id="detail-actions" class="detail-actions"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 効果の選択 -->
+    <dialog id="prompt" class="sheet prompt">
+        <h2 id="prompt-title" class="prompt-title" tabindex="-1" autofocus></h2>
+        <div id="prompt-shown" class="prompt-shown"></div>
+        <div id="prompt-options" class="prompt-options"></div>
+        <div class="buttons">
+            <button id="prompt-ok" class="btn primary">決定</button>
+            <button id="prompt-look" class="btn secondary">盤面を見る</button>
+        </div>
+    </dialog>
+
+    <!-- ほかの人の街 -->
+    <dialog id="city" class="sheet">
+        <i class="focus-sink" tabindex="-1" autofocus></i>
+        <div id="city-body" class="detail-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <table class="result-table">
+            <thead><tr><th></th><th>カード</th><th>加点</th><th>トークン</th><th>行事</th><th>旅</th><th>計</th></tr></thead>
+            <tbody id="result-list"></tbody>
+        </table>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-board" class="btn secondary">盤面を見る</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>森の動物たちの街を、カードで作ります。冬から秋までの1年が終わったとき、<strong>点がいちばん多い人の勝ち</strong>です。</p>
+            <h3>手番</h3>
+            <p>手番では、次のどれか1つを行います。</p>
+            <p><strong>ワーカーを置く</strong>：場所に置いて、資源やカードを得ます。丸が1つの場所は1人だけ、それ以外は何人でも置けます。</p>
+            <p><strong>カードを出す</strong>：手札か草原（8枚の共有のカード）から1枚を、費用を払って街に出します。</p>
+            <p><strong>季節の準備</strong>：ワーカーを全部置いたら、ワーカーを戻して次の季節へ進みます。</p>
+            <h3>資源</h3>
+            <div class="help-pic" id="help-res"></div>
+            <p>建造物は小枝・樹脂・小石で、住民はベリーで出します。</p>
+            <h3>建造物と住民</h3>
+            <p>建造物を持っていれば、対応する住民を<strong>無料で</strong>出せます（建造物1枚につき1回）。たとえば農場があれば、夫か妻を1人無料で迎えられます。</p>
+            <h3>カードの色</h3>
+            <div class="help-pic" id="help-types"></div>
+            <p><strong>緑の生産</strong>は、出したときと、春と秋の準備のときに効果が出ます。<strong>赤の目的地</strong>にはワーカーを置けます（宿屋と郵便局は、ほかの人も使えます）。<strong>青の統治</strong>は、ずっと効く効果です。<strong>茶の旅人</strong>は、出したときに1回だけ効きます。<strong>紫の繁栄</strong>は、終わりに点が増えます。</p>
+            <h3>街</h3>
+            <p>街に置けるのは15枚まで、手札は8枚までです。<strong>ユニーク</strong>なカードは、同じものを1枚しか置けません。</p>
+            <h3>季節</h3>
+            <p>ワーカーは冬に2人。春の準備で1人増えて緑のカードが動き、夏の準備で1人増えて草原から2枚まで取れ、秋の準備で2人増えて緑のカードがまた動きます。季節は人ごとに進みます。</p>
+            <h3>行事・港・旅</h3>
+            <p><strong>行事</strong>は、条件のカードが街にそろったらワーカーを置いて達成します。基本の行事は3点です。<strong>港</strong>では、手札2枚を好きな資源1つにかえられます。<strong>旅</strong>は秋だけ使え、手札を捨てた数だけ点になります。</p>
+            <h3>終わり</h3>
+            <p>秋に、もう何もしないときは「終える」を押します。全員が終えたら終わりです。カードの点・紫の加点・点数トークン・行事・旅の合計で比べ、同点なら行事の多い人、次に残った資源の多い人の勝ちです。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
