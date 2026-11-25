@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2b2418">
+    <title>カートグラファー</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="カートグラファー">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">CARTOGRAPHERS</h1>
+            <p class="subtitle">カートグラファー</p>
+            <div class="setup">
+                <div class="row">人数
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="1">ソロ</button>
+                        <button type="button" role="radio" data-count="2">2人</button>
+                        <button type="button" role="radio" data-count="3">3人</button>
+                        <button type="button" role="radio" data-count="4">4人</button>
+                    </div>
+                </div>
+                <div class="row" id="level-row">CPU
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <button id="seasons" class="seasons" aria-label="季節と得点"></button>
+                <div id="players" class="players"></div>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <button id="edicts" class="edicts" aria-label="王の勅令"></button>
+            <div id="card" class="card-panel"></div>
+            <div class="map-area">
+                <div id="map" class="map" role="grid" aria-label="地図"></div>
+            </div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 季節の得点・結果 -->
+    <dialog id="scores" class="sheet">
+        <h2 id="scores-title" tabindex="-1" autofocus></h2>
+        <div id="scores-body"></div>
+        <div class="buttons" id="scores-buttons"></div>
+    </dialog>
+
+    <!-- 王の勅令 -->
+    <dialog id="edict-detail" class="sheet">
+        <h2 tabindex="-1" autofocus>王の勅令</h2>
+        <div id="edict-body" class="edict-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 相手の地図 -->
+    <dialog id="player-map" class="sheet">
+        <h2 id="player-map-name" tabindex="-1" autofocus></h2>
+        <div id="player-map-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>王の命を受けた地図職人として、4つの季節のあいだ地図を描き、王の勅令（得点カード）でできるだけ多くの点を集めます。全員が同じカードを、それぞれの地図に描きます。</p>
+            <h3>探索カード</h3>
+            <p>カードに描かれた<strong>形と地形の組</strong>を1つ選び、回転・裏返しして、地図の空いたマスに描きます。山のマスや、描いたマスには重ねられません。<span class="coin-inline" id="help-coin"></span>のついた形を描くと、コインを1枚得ます。どの形も描けないときは、1×1 を好きな地形で描きます。</p>
+            <h3>廃墟</h3>
+            <p>廃墟のカードが出たら、次の形は<strong>廃墟のマス</strong>にかけて描きます。かけられないときは、1×1 を好きな地形で描きます。</p>
+            <h3>季節</h3>
+            <p>カードの時間（<span id="help-clock"></span>）の合計が季節の長さに達したら、季節の得点を数えます。春は勅令 A と B、夏は B と C、秋は C と D、冬は D と A。これにコインの数を足し、<strong>異形に接する空きマス</strong>1つにつき1点を引きます。</p>
+            <h3>襲撃</h3>
+            <p>襲撃のカードが出たら、隣の人の地図に異形の形を描きます（矢印の向きで、だれの地図に描くかが決まります）。ソロでは、カードに示された角から自動で描かれます。</p>
+            <h3>山</h3>
+            <p>山の上下左右の4マスがすべて埋まると、コインを1枚得ます。コインは、そのあとの季節のたびに1点になります。</p>
+            <h3>操作</h3>
+            <p>形を選び、地図のマスを押すと、そのマスを中心に置いたときの姿が出ます。回転・裏返しのボタンで向きを変え、「描く」で描きます。上の勅令を押すと、得点の数え方と今の点が見られます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
