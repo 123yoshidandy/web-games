@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#123a33">
+    <title>ヤッツィー</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ヤッツィー">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">YAHTZEE</h1>
+            <p class="subtitle">ヤッツィー</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">相手</span>
+                    <div class="stepper">
+                        <button id="cpus-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="cpus-value" class="count-value"></span>
+                        <button id="cpus-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <div class="row" id="level-row"><span class="row-label">CPU</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <div class="title-links">
+                    <button id="open-records" class="link">記録<span id="best-line" class="best-line"></span></button>
+                    <button id="open-help-title" class="link">遊び方</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="round-info" class="round-info"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="sheet" class="sheet-table" role="grid" aria-label="得点表"></div>
+            <div class="tray">
+                <div id="dice" class="dice"></div>
+                <div id="actions" class="actions"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-record" class="result-record"></p>
+        <ol id="result-list" class="result-list"></ol>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="records" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <p id="records-summary" class="muted note"></p>
+        <ol id="records-list" class="records-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>5個のサイコロで役を作り、得点表の13の欄を埋めます。13回の合計点が高いほどよく、CPU と遊ぶときは一番高い人の勝ちです。</p>
+            <h3>手番</h3>
+            <p>サイコロは<strong>3回まで</strong>振れます。2回目と3回目は、<strong>残したいサイコロをタップ</strong>してから、ほかを振り直します。</p>
+            <p>振り終えたら（途中でもよい）、得点表の空いている欄に記入します。欄をタップして選び、もう一度タップするか「記入」のボタンで決めます。欄には、書いたら何点になるかが薄く出ます。条件に合わない欄に書くと0点です。</p>
+            <h3>上段</h3>
+            <p>1〜6の目の欄には、その目の合計を書きます。上段の合計が<strong>63点以上</strong>なら、ボーナス<strong>35点</strong>。どの目も3個ずつそろえると、ちょうど63点です。</p>
+            <h3>下段</h3>
+            <table class="help-table">
+                <tr><th>スリーカード</th><td>同じ目が3個以上</td><td>5個の合計</td></tr>
+                <tr><th>フォーカード</th><td>同じ目が4個以上</td><td>5個の合計</td></tr>
+                <tr><th>フルハウス</th><td>3個と2個の組</td><td>25点</td></tr>
+                <tr><th>S・ストレート</th><td>4つ続いた目</td><td>30点</td></tr>
+                <tr><th>L・ストレート</th><td>5つ続いた目</td><td>40点</td></tr>
+                <tr><th>ヤッツィー</th><td>5個とも同じ目</td><td>50点</td></tr>
+                <tr><th>チャンス</th><td>なんでも</td><td>5個の合計</td></tr>
+            </table>
+            <h3>ヤッツィーボーナスとジョーカー</h3>
+            <p>ヤッツィーの欄に50点を書いたあと、またヤッツィーを出したら、<strong>100点</strong>のボーナス。</p>
+            <p>ヤッツィーの欄が埋まっているときのヤッツィーは、ジョーカーになります。その目の上段が空いていればそこへ。埋まっていれば下段のどこでもよく、フルハウスやストレートも満点です。下段も埋まっていれば、空いている上段に0点を書きます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="banner" class="banner" aria-live="polite"></div>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

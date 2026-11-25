@@ -1,0 +1,19 @@
+{
+    "name": "ヤッツィー",
+    "short_name": "ヤッツィー",
+    "description": "5個のサイコロで役を作り、13の欄を埋めて点数を競うダイスゲーム。ひとりでハイスコアを目指すほか、CPU と最大4人で遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "orientation": "portrait",
+    "background_color": "#0d2723",
+    "theme_color": "#123a33",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
