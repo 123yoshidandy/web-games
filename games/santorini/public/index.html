@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#123e66">
+    <title>サントリーニ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="サントリーニ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Santorini</h1>
+            <p class="subtitle">サントリーニ</p>
+            <div class="setup">
+                <div class="setup-row"><span class="setup-label">人数</span>
+                    <div id="count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="2">2人</button>
+                        <button type="button" role="radio" data-count="3">3人</button>
+                    </div>
+                </div>
+                <div class="setup-row"><span class="setup-label">CPU</span>
+                    <div id="level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="setup-row" id="gods-row"><span class="setup-label">神</span>
+                    <div id="gods" class="segmented" role="radiogroup" aria-label="神の力">
+                        <button type="button" role="radio" data-gods="off">なし</button>
+                        <button type="button" role="radio" data-gods="on">あり</button>
+                    </div>
+                </div>
+                <div class="setup-row" id="my-god-row"><span class="setup-label"></span>
+                    <button type="button" id="my-god" class="pick">あなたの神：<b id="my-god-name"></b></button>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="turn-info" class="turn-info"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="rivals" class="rivals"></div>
+            <div id="board-wrap" class="board-wrap">
+                <svg id="board" class="board"></svg>
+            </div>
+            <div class="bottom">
+                <div id="me" class="panel me"></div>
+                <div id="actions" class="actions"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-detail" class="result-detail"></p>
+        <div class="buttons">
+            <button id="look" class="btn ghost">盤を見る</button>
+            <button id="again" class="btn primary">もう一度</button>
+        </div>
+        <div class="buttons"><button id="result-home" class="link">ホーム</button></div>
+    </dialog>
+
+    <!-- 神を選ぶ -->
+    <dialog id="god-picker" class="sheet">
+        <h2 tabindex="-1" autofocus>あなたの神</h2>
+        <div id="god-list" class="god-list"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 神の力 -->
+    <dialog id="god-info" class="sheet">
+        <h2 id="god-info-name" tabindex="-1" autofocus></h2>
+        <p id="god-info-text" class="god-info-text"></p>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>自分の職人を、<strong>3段目の建物の上に上らせれば勝ち</strong>です。相手が動けなくなっても勝ちです。</p>
+            <h3>準備</h3>
+            <p>最初の手番の人から順に、職人を2人ずつ、空いたマスに置きます。</p>
+            <h3>手番（動いて、建てる）</h3>
+            <ul class="help-list">
+                <li><strong>動く</strong>：職人を1人選び、まわり8マスのどこかへ1マス動かす。上れるのは<strong>1段まで</strong>、下りるのは何段でもよい。職人やドームのマスへは動けません</li>
+                <li><strong>建てる</strong>：動いた職人のまわり8マスのどこかに、1段建てる。3段の上にはドームを建てます。ドームの上には何も建てられません</li>
+            </ul>
+            <div class="help-figs">
+                <figure><div id="fig-move"></div><figcaption>上れるのは1段まで</figcaption></figure>
+                <figure><div id="fig-win"></div><figcaption>3段目に上れば勝ち</figcaption></figure>
+            </div>
+            <h3>負け</h3>
+            <p>番の初めに動ける職人がいないか、動いたあとに建てられなければ負けです。3人では、負けた人の職人を盤から取り除いて続け、最後に残った人が勝ちます。</p>
+            <p>ブロックは 1段22・2段18・3段14・ドーム18 個までで、尽きた段は建てられません。</p>
+            <h3>神の力（2人のとき）</h3>
+            <p>設定で「あり」にすると、それぞれが神の力を1つ持ちます。決まりを変えるのは、書かれたところだけです。押し出された（入れ替わった）職人は「動いた」とはみなさず、3段目に移っても勝ちになりません。</p>
+            <div id="help-gods" class="help-gods"></div>
+            <h3>画面</h3>
+            <p>職人を押して選ぶと、動ける先に<strong>点</strong>が出ます。動いたあとは、建てられる先に<strong>四角</strong>が出ます。神の力で「動く」と「建てる」のどちらもできるときは、下のボタンで切り替えます。名前を押すと、その人の神の力が見られます。自分の欄の「残り」は、1段・2段・3段・ドームのブロックの残りです。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
