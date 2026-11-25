@@ -1,0 +1,311 @@
+import { describe, it, expect } from 'vitest';
+import { createTestServer } from 'netplay-kit/server/testing.js';
+import game from '../server/src/game-definition.js';
+
+// 手番の人の接続
+const currentOf = (clients) => clients[clients[0].last('state').view.currentPlayerId];
+
+// 初期配置を、各自の候補の先頭に置いて済ませる（リアルタイムモードでは、置くものが残っている人から）
+async function finishSetup(clients) {
+    for (let i = 0; i < clients.length * 4; i++) {
+        const view = clients[0].last('state').view;
+        if (view.phase !== 'setup') break;
+        const current = view.mode === 'realtime' ? clients.find(c => c.last('state').view.setup.step) : currentOf(clients);
+        const { options, setup } = current.last('state').view;
+        const piece = setup.step;
+        const at = piece === 'settlement' ? options.settlementSpots[0] : options.roadSpots[0];
+        await current.send('command', { command: { type: 'build', piece, at } });
+    }
+}
+
+describe('オンライン対戦（ゲームの定義）', () => {
+    it('部屋を作ると部屋番号が届き、参加者はロビーで互いを見られる', async () => {
+        const server = createTestServer(game);
+        const [a, b] = await server.createRoom(['あき', 'はる']);
+        expect(a.last('joined').roomCode).toMatch(/^\d{4}$/);
+        expect(b.last('joined').seat).toBe(1);
+        expect(a.last('lobby').players.map(p => p.name)).toEqual(['あき', 'はる']);
+    });
+
+    it('ホストがリアルタイムモードを選ぶと、そのモードで始まり、全員が同時に動ける', async () => {
+        const server = createTestServer(game);
+        const clients = await server.createRoom(['あき', 'はる']);
+        expect(clients[0].last('lobby').settings.mode).toBe('classic');
+        await clients[1].send('setSettings', { settings: { mode: 'realtime' } });
+        expect(clients[1].last('error')).toBeTruthy();
+        await clients[0].send('setSettings', { settings: { mode: 'realtime' } });
+        expect(clients[1].last('lobby').settings.mode).toBe('realtime');
+        await clients[0].send('start');
+        await finishSetup(clients);
+        const view = clients[0].last('state').view;
+        expect(view.mode).toBe('realtime');
+        expect(view.phase).toBe('play');
+        expect(view.rolls.every(Boolean)).toBe(true);
+        // 7 で片付ける処理がない人は、相手を待たずに完了できる。全員が完了すると次の巡に進む
+        const free = clients.filter(c => !c.last('state').view.pending);
+        for (const client of free) await client.send('command', { command: { type: 'endTurn' } });
+        const after = clients[0].last('state').view;
+        if (free.length === clients.length) expect(after.turnNumber).toBe(2);
+        else expect(after.done).toEqual(clients.map(c => free.includes(c)));
+    });
+
+    it('1人では始められず、CPU を足せばホストが始められる', async () => {
+        const server = createTestServer(game);
+        const [a] = await server.createRoom(['あき']);
+        await a.send('start');
+        expect(a.last('error').code).toBe('not_enough_players');
+        await a.send('addCpu');
+        await a.send('start');
+        expect(a.last('lobby').status).toBe('playing');
+        expect(a.last('state').view.viewerId).toBe(0);
+    });
+
+    it('それぞれに自分から見た状態が届き、他人の手札と発展カードの山の並びは送られない', async () => {
+        const server = createTestServer(game);
+        const clients = await server.createRoom(['あき', 'はる', 'なつ']);
+        await clients[0].send('start');
+        await finishSetup(clients);
+        const view = clients[0].last('state').view;
+        expect(view.phase).toBe('play');
+        expect(view.players[0].hand).not.toBeNull();
+        expect(view.players[1].hand).toBeNull();
+        expect(view.players[1].cardCount).toBe(clients[1].last('state').view.players[1].cardCount);
+        expect(view.devDeckCount).toBe(25);
+        expect(JSON.stringify(view)).not.toContain('devDeck"');
+    });
+
+    it('手番でない人の操作と代行の操作は断られ、手番の人の操作は全員に届く', async () => {
+        const server = createTestServer(game);
+        const clients = await server.createRoom(['あき', 'はる']);
+        await clients[0].send('start');
+        await finishSetup(clients);
+        const current = currentOf(clients);
+        const other = clients.find(c => c !== current);
+
+        await other.send('command', { command: { type: 'roll' } });
+        expect(other.last('error').message).toBe('あなたの番ではありません');
+        await current.send('command', { command: { type: 'proxy' } });
+        expect(current.last('error').code).toBe('rejected');
+
+        await current.send('command', { command: { type: 'roll' } });
+        expect(other.last('state').view.dice).toHaveLength(2);
+    });
+
+    it('交渉は手番でない人も答えられ、手番の人が相手を選ぶと成立する', async () => {
+        const server = createTestServer(game);
+        const clients = await server.createRoom(['あき', 'はる']);
+        await clients[0].send('start');
+        await finishSetup(clients);
+        const current = currentOf(clients);
+        const other = clients.find(c => c !== current);
+        await current.send('command', { command: { type: 'roll' } });
+        // 7 が出たら片付けてから交渉する
+        for (let i = 0; i < 3 && current.last('state').view.pending; i++) {
+            const { pending } = current.last('state').view;
+            expect(pending.type).toBe('robber'); // 初期配置の直後に8枚以上持つ人はいない
+            if (pending.type === 'robber') {
+                const view = current.last('state').view;
+                const hex = view.board.hexes.findIndex((_, id) => id !== view.robber);
+                await current.send('command', { command: { type: 'moveRobber', hex, victim: null } });
+                if (current.last('error')?.message === '奪う相手を選んでください') {
+                    await current.send('command', { command: { type: 'moveRobber', hex, victim: clients.indexOf(other) } });
+                }
+            }
+        }
+        const mine = current.last('state').view.me ?? current.last('state').view.players[clients.indexOf(current)];
+        const giveResource = Object.keys(mine.hand).find(r => mine.hand[r] > 0);
+        const theirs = other.last('state').view.players[clients.indexOf(other)].hand;
+        const getResource = Object.keys(theirs).find(r => theirs[r] > 0 && r !== giveResource);
+        expect(giveResource && getResource).toBeTruthy();
+
+        await current.send('command', { command: { type: 'offerTrade', give: { [giveResource]: 1 }, get: { [getResource]: 1 } } });
+        expect(other.last('state').view.trade.from).toBe(clients.indexOf(current));
+        const tradeId = other.last('state').view.trade.id;
+        await other.send('command', { command: { type: 'respondTrade', id: tradeId, accept: true } });
+        expect(current.last('state').view.trade).toBeNull();
+        expect(other.last('state').view.trade).toBeNull();
+        expect(other.last('state').view.players[clients.indexOf(other)].hand[giveResource]).toBe(theirs[giveResource] + 1);
+    });
+
+    it('CPU の手はサーバーが進め、cpu: true で1手ずつ届く', async () => {
+        const server = createTestServer(game);
+        const [a] = await server.createRoom(['あき']);
+        await a.send('addCpu');
+        await a.send('start');
+        // 人間の番で止まっている（CPU が先手なら、開始時に CPU の初期配置が済んでいる）
+        expect(a.last('state').view.currentPlayerId).toBe(0);
+        const view = a.last('state').view;
+        const cpuFirst = view.buildings.some(b => b?.owner === 1);
+        await a.send('command', { command: { type: 'build', piece: 'settlement', at: view.options.settlementSpots[0] } });
+        const roadSpots = a.last('state').view.options.roadSpots;
+        a.clear();
+        await a.send('command', { command: { type: 'build', piece: 'road', at: roadSpots[0] } });
+        const states = a.all('state');
+        // CPU が先手なら、自分は折り返しで続けて置くので CPU の手は挟まらない
+        // 自分が先手なら、CPU が開拓地と道を2組置いて、自分の番に戻る
+        expect(states.filter(m => m.cpu)).toHaveLength(cpuFirst ? 0 : 4);
+        expect(states.at(-1).view.currentPlayerId).toBe(0);
+    });
+
+    it('接続が切れても、トークンで同じ席に戻って続きが届く', async () => {
+        const server = createTestServer(game);
+        const [a, b] = await server.createRoom(['あき', 'はる']);
+        await a.send('start');
+        const b2 = await server.reconnect(b);
+        expect(b2.last('joined').seat).toBe(1);
+        expect(b2.last('state').view.viewerId).toBe(1);
+    });
+
+    it('対戦中に部屋を出た人の手番は、CPU が代わりに打つ', async () => {
+        const server = createTestServer(game);
+        const clients = await server.createRoom(['あき', 'はる']);
+        await clients[0].send('start');
+        const current = currentOf(clients);
+        const other = clients.find(c => c !== current);
+        await current.send('leave');
+        const view = other.last('state').view;
+        expect(view.players[clients.indexOf(current)].proxy).toBe(true);
+        expect(view.currentPlayerId).toBe(clients.indexOf(other));
+    });
+
+    it('リアルタイムモードの初期配置では、CPU は間を置いて1つずつ置く（届いたメッセージのたびに時刻を確かめる）', async () => {
+        const server = createTestServer(game);
+        const [a] = await server.createRoom(['あき']);
+        await a.send('setSettings', { settings: { mode: 'realtime' } });
+        await a.send('addCpu');
+        await a.send('addCpu');
+        await a.send('start');
+        const view = () => a.last('state').view;
+        const placedBy = (seat) => view().buildings.filter(b => b?.owner === seat).length + view().roads.filter(o => o === seat).length;
+        const ping = () => a.send('ping', { clientTime: 0 });
+        // 始めてすぐは、CPU は置かない。人間は順番を待たずに置ける
+        expect(placedBy(1) + placedBy(2)).toBe(0);
+        await a.send('command', { command: { type: 'build', piece: 'settlement', at: view().options.settlementSpots[0] } });
+        expect(placedBy(0)).toBe(1);
+        expect(placedBy(1) + placedBy(2)).toBe(0);
+        server.clock.now += 3900;
+        await ping();
+        expect(placedBy(1) + placedBy(2)).toBe(0);
+        // 開拓地は 4〜7秒で置く。置いたら、次の道まで間を置く
+        server.clock.now += 3200;
+        await ping();
+        expect([placedBy(1), placedBy(2)]).toEqual([1, 1]);
+        await ping();
+        expect([placedBy(1), placedBy(2)]).toEqual([1, 1]);
+        // 時刻が進めば CPU は置き終わる。人間が置き終わるまでは初期配置のまま
+        for (let i = 0; i < 40; i++) {
+            server.clock.now += 1000;
+            await ping();
+        }
+        expect([placedBy(1), placedBy(2)]).toEqual([4, 4]);
+        expect(view().phase).toBe('setup');
+        expect(view().setup.placing).toEqual([0]);
+        await finishSetup([a]);
+        expect(view().phase).toBe('play');
+    });
+
+    it('公開の部屋は、モードと人数つきで一覧に出て、始まると消える。非公開の部屋は出ない', async () => {
+        const server = createTestServer(game);
+        const host = server.connect();
+        await host.send('create', { name: 'あき', public: true });
+        await host.send('setSettings', { settings: { mode: 'realtime' } });
+        const secret = server.connect();
+        await secret.send('create', { name: 'はる' });
+        const finder = server.connect();
+        await finder.send('listRooms');
+        expect(finder.last('rooms').rooms).toEqual([expect.objectContaining({
+            roomCode: host.last('joined').roomCode, hostName: 'あき', players: 1, maxPlayers: 4, settings: { mode: 'realtime' }
+        })]);
+        await host.send('addCpu');
+        await host.send('start');
+        await finder.send('listRooms');
+        expect(finder.last('rooms').rooms).toEqual([]);
+    });
+
+    it('対戦後は、ホストが同じ顔ぶれで再戦できる', async () => {
+        const server = createTestServer(game);
+        const [a] = await server.createRoom(['あき']);
+        await a.send('addCpu');
+        await a.send('start');
+        // 自分の番は最小限の手（初期配置・サイコロ・7の処理・手番を終える）だけで進め、CPU に勝たせる
+        for (let i = 0; i < 3000 && a.last('lobby').status === 'playing'; i++) {
+            const view = a.last('state').view;
+            let command;
+            if (view.pending?.type === 'discard' && view.pending.remaining[0]) {
+                const hand = { ...view.players[0].hand };
+                const cards = {};
+                for (let n = 0; n < view.pending.remaining[0]; n++) {
+                    const r = Object.keys(hand).find(k => hand[k] > 0);
+                    hand[r]--;
+                    cards[r] = (cards[r] ?? 0) + 1;
+                }
+                command = { type: 'discard', cards };
+            } else if (view.phase === 'setup') {
+                command = { type: 'build', piece: view.setup.step, at: view.setup.step === 'settlement' ? view.options.settlementSpots[0] : view.options.roadSpots[0] };
+            } else if (view.pending?.type === 'robber') {
+                const hex = view.board.hexes.findIndex((_, id) => id !== view.robber);
+                command = { type: 'moveRobber', hex, victim: null };
+                await a.send('command', { command });
+                if (a.last('error') && a.last('state').view.pending?.type === 'robber') {
+                    command = { type: 'moveRobber', hex, victim: 1 };
+                } else continue;
+            } else if (view.trade) {
+                command = { type: 'cancelTrade' };
+            } else {
+                command = { type: view.rolled ? 'endTurn' : 'roll' };
+            }
+            await a.send('command', { command });
+        }
+        expect(a.last('lobby').status).toBe('ended');
+        expect(a.last('state').view.result.winnerId).toBe(1);
+
+        const matchId = a.last('lobby').matchId;
+        await a.send('start');
+        expect(a.last('lobby').status).toBe('playing');
+        expect(a.last('lobby').matchId).not.toBe(matchId);
+        expect(a.last('state').view.result).toBeNull();
+    });
+
+    describe('人間が複数いるときの交渉では、CPU は人間がみな答えてから答える', () => {
+        // 人間2人と CPU で始め、手番の人間がサイコロを振って盗賊を片付け、手番でない人間に交渉を持ちかける
+        async function offerWithCpu() {
+            const server = createTestServer(game);
+            const clients = await server.createRoom(['あき', 'はる']);
+            await clients[0].send('addCpu');
+            await clients[0].send('start');
+            await finishSetup(clients);
+            const current = currentOf(clients);
+            const other = clients.find(c => c !== current);
+            await current.send('command', { command: { type: 'roll' } });
+            for (let i = 0; i < 3 && current.last('state').view.pending?.type === 'robber'; i++) {
+                const view = current.last('state').view;
+                const hex = view.board.hexes.findIndex((_, id) => id !== view.robber);
+                await current.send('command', { command: { type: 'moveRobber', hex, victim: null } });
+                if (current.last('error')?.message === '奪う相手を選んでください') {
+                    await current.send('command', { command: { type: 'moveRobber', hex, victim: clients.indexOf(other) } });
+                }
+            }
+            const mine = current.last('state').view.players[clients.indexOf(current)].hand;
+            const give = Object.keys(mine).find(r => mine[r] > 0);
+            const get = Object.keys(mine).find(r => r !== give);
+            await current.send('command', { command: { type: 'offerTrade', give: { [give]: 1 }, get: { [get]: 1 } } });
+            const trade = other.last('state').view.trade;
+            expect(trade.responses[2]).toBeUndefined();
+            return { server, other, trade };
+        }
+
+        it('人間が答えるまでは、時間がたっても CPU は答えない', async () => {
+            const { server, other } = await offerWithCpu();
+            server.clock.now += 60 * 60 * 1000;
+            await other.send('ping', { clientTime: 0 });
+            expect(other.last('state').view.trade.responses[2]).toBeUndefined();
+        });
+
+        it('ほかの人間がみな答えたら、CPU が答える', async () => {
+            const { other, trade } = await offerWithCpu();
+            await other.send('command', { command: { type: 'respondTrade', id: trade.id, accept: false } });
+            const after = other.last('state').view.trade;
+            expect(after === null || Boolean(after.responses[2])).toBe(true);
+        });
+    });
+});

@@ -1,0 +1,97 @@
+/* ===== 作戦：今の状況を短い文章で説明する（アシストが ON の間は、案内の行の代わりに出す） ===== */
+
+/* 高さは中身によらず固定する（下の手札とボタンが上下に揺れないように） */
+.coach {
+    flex: none;
+    height: 66px;
+    padding: 4px 9px;
+    display: flex;
+    align-items: center;
+    background: var(--panel);
+    color: var(--ink);
+    border-radius: 8px;
+    font-size: 0.76rem;
+    line-height: 19px;
+    overflow: hidden;
+}
+
+.coach-text {
+    margin: 0;
+}
+
+/* 今すること（最後の文）は、太字と色で分ける */
+.coach-act {
+    font-weight: 800;
+    color: var(--sea-deep);
+}
+
+.coach-text .mini-icon {
+    width: 14px;
+    height: 14px;
+    vertical-align: -2px;
+}
+
+.coach-text .mini-icon.lack {
+    opacity: 0.3;
+}
+
+.coach-star {
+    margin-left: 2px;
+    color: var(--gold);
+    text-shadow: 0 0 2px #6b4a00, 0 0 2px #6b4a00;
+}
+
+/* 数字の札：盤面の札と同じ、クリーム色の丸に数字*/
+.coach-num {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    margin: 0 1px;
+    vertical-align: -3px;
+    border-radius: 50%;
+    background: #fbf3dc;
+    border: 1px solid #b9a77a;
+    font-size: 0.64rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+/* 盗賊がいるタイルの数字は、斜線で消す */
+.coach-num.blocked {
+    color: var(--muted);
+    background: #e4dccb;
+}
+
+.coach-num.blocked::after {
+    content: "";
+    position: absolute;
+    left: -1px;
+    right: -1px;
+    top: 50%;
+    height: 2px;
+    background: var(--ink);
+    transform: rotate(-45deg);
+}
+
+/* 低い縦画面は、3行のまま行を詰めて、下のログに高さを残す */
+@media (orientation: portrait) and (max-height: 600px) {
+    .coach {
+        height: 57px;
+        padding: 3px 9px;
+        font-size: 0.72rem;
+        line-height: 17px;
+    }
+}
+
+/* 横の小さい画面は列が狭いので、4行まで入るようにする */
+@media (orientation: landscape) and (max-height: 500px) {
+    .coach {
+        height: 74px;
+        padding: 3px 8px;
+        font-size: 0.72rem;
+        line-height: 17px;
+    }
+}
