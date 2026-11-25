@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#251a2e">
+    <title>クアックサルバー</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="クアックサルバー">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art"></div>
+            <h1 class="logo">Quacks</h1>
+            <p class="subtitle">クアックサルバー</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">人数</span>
+                    <div class="stepper">
+                        <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="count-value" class="count-value"></span>
+                        <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"></button>
+                <span id="round-info" class="round-info"></span>
+                <button id="open-fortune" class="fortune-btn" aria-label="占いカード"></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"></button>
+            </div>
+            <div id="players" class="players"></div>
+            <div id="me-bar" class="me-bar"></div>
+            <div id="pot-area" class="pot-area">
+                <div id="pot" class="pot"></div>
+                <div id="pot-label" class="pot-label" hidden></div>
+            </div>
+            <div id="gauge" class="gauge"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 占い・選択・結果・買い物などを出す共通のシート -->
+    <dialog id="sheet" class="sheet">
+        <div id="sheet-body" class="sheet-body"></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>あやしい薬売りになって、9回の調合で<strong>いちばん点を集めた人の勝ち</strong>です。</p>
+            <h3>調合</h3>
+            <p>袋から材料を1つずつ引き、鍋の渦にそって、材料の値の数だけ先のマスに置きます。好きなときに<strong>止め</strong>られます。全員が同時に引きます。</p>
+            <p><strong>白（かんしゃく玉）</strong>の合計が<strong>7を超えると爆発</strong>。爆発したら、点か買い物のどちらか一方しかもらえません。</p>
+            <p><strong>フラスコ</strong>が満ちていれば、引いた白を袋に戻せます（爆発させた白は戻せません）。</p>
+            <h3>評価</h3>
+            <p>最後に置いた材料の<strong>次のマス</strong>を見ます。</p>
+            <ul>
+                <li>爆発せずにいちばん先まで進んだ人は、ボーナスのサイコロを振ります</li>
+                <li>クモ・ゴースト・ドクロガの効果</li>
+                <li>マスにルビーの印があればルビー1つ</li>
+                <li>マスの点をもらう</li>
+                <li>マスのお金で材料を買う（違う色を2つまで）</li>
+                <li>ルビー2つで、しずくを1マス進める（次からその先に置き始めます）か、フラスコを満たす</li>
+            </ul>
+            <h3>ネズミ</h3>
+            <p>回の始めに、いちばん点の多い人との差にあるネズミのしっぽの数だけ、しずくの先にネズミが置かれ、そこから置き始めます。</p>
+            <h3>占い</h3>
+            <p>毎回、占いカードを1枚めくります。その回だけのルールや、すぐもらえるものがあります。</p>
+            <h3>材料</h3>
+            <div id="help-ingredients" class="help-ingredients"></div>
+            <h3>移り変わり</h3>
+            <p>マンドラゴラは2回目から、ゴーストは3回目から買えます。6回目に、全員の袋に白1が1つ入ります。</p>
+            <p>9回目は買い物をせず、お金5につき1点、ルビー2つにつき1点に替えます。同点なら、最後の回に先まで進んだ人の勝ちです。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
