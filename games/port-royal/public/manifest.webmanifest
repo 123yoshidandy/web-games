@@ -1,0 +1,19 @@
+{
+    "name": "ポートロイヤル",
+    "short_name": "ポートロイヤル",
+    "description": "港にカードをめくり、船で稼いで人物を雇い、12点を目指すカードゲーム。CPU と2〜5人で遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "orientation": "portrait",
+    "background_color": "#0f2e3b",
+    "theme_color": "#123a4a",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
