@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-10 -10 20 20">
+<polygon points="8.66,-5 0,-10 -8.66,-5 -8.66,5" fill="#8fb385"/>
+<polygon points="-8.66,5 0,10 8.66,5 8.66,-5" fill="#9cc6e4"/>
+<g transform="scale(.62)">
+<circle r="9.4" fill="#f9e0c6" stroke="#e58a37" stroke-width="1.1"/>
+<path d="M-6.4 -7.4 L-2.4 -3 L-6.6 -1.4Z M6.4 -7.4 L2.4 -3 L6.6 -1.4Z" fill="#e58a37"/>
+<path d="M-7.2 -1.8 Q0 -6.2 7.2 -1.8 Q5.6 4 0 6.4 Q-5.6 4 -7.2 -1.8Z" fill="#e58a37"/>
+<path d="M-6.6 -0.6 Q-3 1 0 6.3 Q-4.4 4.4 -6.6 -0.6Z M6.6 -0.6 Q3 1 0 6.3 Q4.4 4.4 6.6 -0.6Z" fill="#fff6ea"/>
+<ellipse cx="0" cy="4.4" rx="1.1" ry=".8" fill="#2b2420"/>
+<circle cx="-2.5" cy="-0.9" r="1.2" fill="#2b2420"/><circle cx="2.5" cy="-0.9" r="1.2" fill="#2b2420"/>
+</g>
+</svg>

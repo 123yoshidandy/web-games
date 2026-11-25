@@ -1,0 +1,68 @@
+/**
+ * CPU 同士を多数回対戦させて、勝率と点を数える
+ * 使い方: node scripts/cpu-match.mjs [試合数] [人数] [席ごとの強さ（easy,normal）] [得点カード（A・random・例 ABCDA）]
+ *   例: node scripts/cpu-match.mjs 100 2 easy,normal
+ * 席の並びによる有利・不利をならすため、最初の人は試合ごとに入れ替える。同点で勝ちを分け合ったら、勝ちを人数で割って数える
+ * random は試合ごとにカードを選び直す（シードから決める）
+ */
+
+import Game from '../public/js/game.js';
+import { runCpuStep } from '../public/js/cpu-player.js';
+import { createRandom } from '../public/js/random.js';
+import { ANIMALS } from '../public/js/tiles.js';
+import { CARD_IDS } from '../public/js/scoring.js';
+
+export const MAX_STEPS = 200; // 1人20手番×4人。流し直しを入れても、これより多くはならない
+
+export function cardsFor(spec, seed) {
+    if (!spec || spec === 'A') return undefined;
+    if (spec === 'random') {
+        const rand = createRandom(seed ^ 0x5bd1e995);
+        return Object.fromEntries(ANIMALS.map(a => [a, CARD_IDS[Math.floor(rand() * 4)]]));
+    }
+    return Object.fromEntries(ANIMALS.map((a, i) => [a, spec[i]]));
+}
+
+export function playMatch({ count, levels, seed, cards }) {
+    const game = new Game(levels.map((level, i) => ({ name: `${level}${i}`, isCPU: true, cpuLevel: level })), { seed, startPlayer: seed % count, cards });
+    let steps = 0;
+    while (!game.isOver() && steps < MAX_STEPS) {
+        if (!runCpuStep(game)) break; // 進まなかった
+        steps++;
+    }
+    return game;
+}
+
+export function runMatches({ games, count, levels, cards = 'A', seedBase = 1 }) {
+    const result = { finished: 0, stuck: 0, wins: Array(count).fill(0), totals: Array(count).fill(0), ties: 0, steps: [] };
+    for (let i = 0; i < games; i++) {
+        const seed = seedBase + i;
+        const game = playMatch({ count, levels, seed, cards: cardsFor(cards, seed) });
+        if (!game.isOver()) {
+            result.stuck++;
+            continue;
+        }
+        result.finished++;
+        result.steps.push(game.commands.length);
+        if (game.winners.length > 1) result.ties++;
+        game.winners.forEach(w => { result.wins[w] += 1 / game.winners.length; });
+        game.result.players.forEach((s, j) => { result.totals[j] += s.total; });
+    }
+    return result;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+    const games = Number(process.argv[2] ?? 50);
+    const count = Number(process.argv[3] ?? 2);
+    const levels = (process.argv[4] ?? Array(count).fill('normal').join(',')).split(',');
+    const cards = process.argv[5] ?? 'A';
+    if (levels.length !== count) throw new Error('席の数と強さの数が合いません');
+    const started = Date.now();
+    const r = runMatches({ games, count, levels, cards });
+    const per = (v) => (v / Math.max(1, r.finished)).toFixed(1);
+    console.log(`${games}試合（${count}人・カード ${cards}：${levels.join(' / ')}）${Date.now() - started}ms`);
+    console.log(`終わった ${r.finished}・進まなくなった ${r.stuck}・同点 ${r.ties}`);
+    r.wins.forEach((w, j) => {
+        console.log(`席${j}（${levels[j]}）の勝率 ${(w / Math.max(1, r.finished) * 100).toFixed(1)}%・点の平均 ${per(r.totals[j])}`);
+    });
+}
