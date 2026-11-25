@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#eae3d2">
+    <title>ウイングスパン</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ウイングスパン">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Cinzel:wght@700&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen title-screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Wingspan</h1>
+            <p class="subtitle">ウイングスパン</p>
+            <div class="setup-panel">
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="segment" id="cpu-count" role="radiogroup" aria-label="CPU の数"></div>
+                </div>
+                <div class="row"><span class="row-label">強さ</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen game-screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="round-info" class="round-info"></span>
+                <button id="goal-chip" class="goal-chip" aria-label="ラウンドの目標"></button>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h12M7 12h12M7 19h12M3.5 5h.1M3.5 12h.1M3.5 19h.1"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="opponents" class="opponents"></div>
+            <div class="shared">
+                <div id="feeder" class="feeder" aria-label="餌箱"></div>
+                <div id="tray" class="tray" aria-label="場のカード"></div>
+                <button id="deck" class="deck" aria-label="山札"></button>
+            </div>
+            <div id="board" class="board"></div>
+            <div id="mine" class="mine"></div>
+            <div id="hand" class="hand"></div>
+            <div id="prompt" class="prompt">
+                <div id="prompt-text" class="prompt-text"></div>
+                <div id="prompt-buttons" class="prompt-buttons"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 中身を入れ替えて使うシート（カードの詳細・鳥を出す・準備・ボーナス・相手の場・目標・記録） -->
+    <dialog id="sheet" class="sheet">
+        <div id="sheet-body" class="sheet-body" tabindex="-1" autofocus></div>
+        <div id="sheet-buttons" class="buttons"></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <div class="sheet-body">
+            <h2 id="result-title" tabindex="-1" autofocus></h2>
+            <div id="result-table"></div>
+        </div>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-board" class="btn secondary">盤面</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="sheet-body help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>鳥を集めて、自分の生息地（森林・草原・湿地）に出していきます。4ラウンドの終わりに<strong>得点がいちばん多い人の勝ち</strong>です。</p>
+            <h3>手番</h3>
+            <p>手番は第1ラウンドから 8・7・6・5 回。手番ごとに次のどれか1つを行います。</p>
+            <ul>
+                <li><strong>鳥を出す</strong>：手札の鳥を、住める生息地の左から置きます。カードの左上の餌を払い、2羽目からは卵も払います（2・3羽目は1個、4・5羽目は2個）。餌は<strong>どれでも2つで、好きな1つの代わり</strong>にできます。</li>
+                <li><span class="hab-tag forest">森林</span><strong>餌を取る</strong>：餌箱のサイコロから取ります。サイコロがすべて同じ面なら振り直せます。</li>
+                <li><span class="hab-tag grassland">草原</span><strong>卵を産む</strong>：場の鳥に卵を置きます。鳥ごとに上限があります。</li>
+                <li><span class="hab-tag wetland">湿地</span><strong>カードを引く</strong>：場の3枚か山札から引きます。場は手番の終わりに補充します。</li>
+            </ul>
+            <p>森林・草原・湿地の行動は、その列の鳥が多いほど量が増えます。列の2・4・6番目の位置では、ボーナスの交換（森林はカード→餌、草原は餌→卵、湿地は卵→カード）を1回できます。</p>
+            <h3>能力</h3>
+            <p><span class="pc-tag brown">茶</span>森林・草原・湿地の行動のあと、その列の鳥の能力を<strong>右から順に</strong>使えます。<span class="pc-tag white">白</span>は出したときに1回だけ働きます。</p>
+            <h3>ラウンドの目標</h3>
+            <p>ラウンドの終わりに、そのラウンドの目標の数を比べ、1〜3位に点が入ります（同じ数なら点を分け合います。0の人は点なし）。場の3枚は入れ替わり、先手が次の人に移ります。</p>
+            <h3>得点</h3>
+            <p>鳥の点・ボーナスカード・ラウンドの目標・卵・貯えた餌・差し込んだカード（1つ1点）。同点なら、残った餌の多い人の勝ちです。</p>
+            <h3>操作</h3>
+            <p>手札の鳥を押すと、詳しい中身と出す場所が出ます。列の左の札を押すと、その生息地の行動をします。場の鳥や相手の名前を押すと、中身を見られます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
