@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2a1a2e">
+    <title>宝石の煌き デュエル</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="煌き デュエル">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">SPLENDOR<span>DUEL</span></h1>
+            <p class="subtitle">宝石の煌き デュエル</p>
+            <div class="setup">
+                <div class="row">CPU
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <button id="opponent" class="opp" aria-label="相手の持ち物"></button>
+            <div class="pyramid-area">
+                <div id="pyramid" class="pyramid"></div>
+            </div>
+            <div class="lower">
+                <div id="board" class="board" role="grid" aria-label="盤"></div>
+                <div id="me" class="me"></div>
+            </div>
+            <div class="actions-bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="actions" class="actions"></div>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 結果 -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-reason" class="result-reason"></p>
+        <ol id="result-list" class="result-list"></ol>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 能力の選択（色を写す・盗む・王族のカード） -->
+    <dialog id="choice" class="sheet choice">
+        <h2 id="choice-title" tabindex="-1" autofocus></h2>
+        <p id="choice-text" class="choice-text"></p>
+        <div id="choice-options" class="choice-options"></div>
+        <div class="buttons"><button class="btn ghost small close">盤を見る</button></div>
+    </dialog>
+
+    <!-- 相手と自分の持ち物 -->
+    <dialog id="player-detail" class="sheet">
+        <h2 id="player-detail-name" tabindex="-1" autofocus></h2>
+        <div id="player-detail-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>勝ち方</h3>
+            <p>手番の終わりに、次のどれかに達したら勝ちです。</p>
+            <ul class="help-list">
+                <li><strong>20点</strong></li>
+                <li>王冠が<strong>10個</strong></li>
+                <li>同じ色のカードで<strong>10点</strong></li>
+            </ul>
+            <h3>手番の流れ</h3>
+            <p>してもしなくてもよい行動（この順）のあと、必ず行う行動を1つ行います。</p>
+            <ul class="help-actions">
+                <li><span class="help-pic" id="help-privilege"></span><span><strong>特権を使う</strong>：巻物1枚につき、盤の宝石かパールを1個取る</span></li>
+                <li><span class="help-pic" id="help-replenish"></span><span><strong>盤を補充する</strong>：袋のトークンを盤に戻す。相手が特権を1枚得る</span></li>
+            </ul>
+            <p>必ず行う行動（どれか1つ）：</p>
+            <ul class="help-actions">
+                <li><span class="help-pic help-line" id="help-take"></span><span><strong>トークンを取る</strong>：縦・横・斜めにすき間なく並んだ1〜3個。黄金は取れない。同じ色3個かパール2個なら、相手が特権を得る</span></li>
+                <li><span class="help-pic" id="help-reserve"></span><span><strong>予約する</strong>：黄金を1個取り、カードか山札の一番上を手元に置く（3枚まで）</span></li>
+                <li><span class="help-pic" id="help-buy"></span><span><strong>買う</strong>：場か予約したカード。ボーナスの分だけ安くなる（パールは安くならない）。黄金はどの色の代わりにもなる</span></li>
+            </ul>
+            <h3>カードの能力</h3>
+            <ul class="help-abilities" id="help-abilities"></ul>
+            <h3>王冠と王族のカード</h3>
+            <p>王冠が<strong>3個</strong>と<strong>6個</strong>になったとき、王族のカードを1枚取ります。</p>
+            <h3>トークンは10個まで</h3>
+            <p>手番の終わりに10個を超えていたら、超えた分を選んで袋に返します。</p>
+            <h3>操作</h3>
+            <p>盤のトークンを押すと、続けて取れるトークンが光ります。カードと山札は押して「買う」「予約」。光っているカードは、今買えるカードです。相手の欄を押すと、持ち物が見られます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
