@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2a1f17">
+    <title>カルカソンヌ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="カルカソンヌ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- タイルとコマの絵（symbol）。ほかの SVG から use で使う -->
+    <svg id="sprite" width="0" height="0" aria-hidden="true" style="position:absolute"></svg>
+
+    <main>
+        <!-- タイトル -->
+        <section id="screen-title" class="screen title-screen">
+            <div class="title-art" aria-hidden="true"><svg id="title-art" viewBox="-5 -5 410 310"></svg></div>
+            <div class="title-side">
+                <h1 class="logo">Carcassonne</h1>
+                <p class="logo-sub">カルカソンヌ</p>
+                <div class="panel">
+                    <div class="row"><span class="row-label">人数</span>
+                        <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                            <button type="button" role="radio" data-count="2">2人</button>
+                            <button type="button" role="radio" data-count="3">3人</button>
+                            <button type="button" role="radio" data-count="4">4人</button>
+                            <button type="button" role="radio" data-count="5">5人</button>
+                        </div>
+                    </div>
+                    <div class="row"><span class="row-label">CPU</span>
+                        <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                            <button type="button" role="radio" data-level="easy">やさしい</button>
+                            <button type="button" role="radio" data-level="normal">ふつう</button>
+                        </div>
+                    </div>
+                    <div class="buttons">
+                        <button id="start" class="primary">ゲーム開始</button>
+                        <button id="resume" class="secondary" hidden>続きから</button>
+                    </div>
+                    <button id="open-help-title" class="link">遊び方</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ゲーム -->
+        <section id="screen-game" class="screen game-screen" hidden>
+            <header class="topbar">
+                <button id="home" class="icon-button" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="players" class="players"></div>
+            </header>
+
+            <div id="board" class="board">
+                <div class="board-tools">
+                    <button id="open-help" class="icon-button small" aria-label="遊び方" title="遊び方">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 3.8"/><path d="M12 17.2v.1"/></svg>
+                    </button>
+                    <button id="fit" class="icon-button small" aria-label="全体を見る" title="全体を見る">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+                    </button>
+                </div>
+                <div id="toast" class="toast" aria-live="polite"></div>
+            </div>
+
+            <footer class="action-panel">
+                <button id="tile-preview" class="tile-preview" aria-label="タイルを回す">
+                    <svg viewBox="0 0 100 100" aria-hidden="true"><g id="preview-tile"></g></svg>
+                </button>
+                <div class="status">
+                    <div id="status-line" class="status-line"></div>
+                    <button id="open-remaining" class="bag-count link"></button>
+                </div>
+                <div class="actions">
+                    <button id="rotate" class="icon-button" aria-label="回す" title="回す">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12a7 7 0 1 1-2.1-5"/><path d="M19 4.5V9h-4.5"/></svg>
+                    </button>
+                    <button id="back" class="icon-button" aria-label="戻る" title="戻る" hidden>
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6 4 11l5 5"/><path d="M4.5 11H14a5.5 5.5 0 0 1 0 11h-3"/></svg>
+                    </button>
+                    <button id="confirm" class="primary confirm">置く</button>
+                    <button id="show-result" class="primary" hidden>結果</button>
+                </div>
+            </footer>
+        </section>
+    </main>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2>遊び方</h2><button class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <div id="help-content" class="help"></div>
+        </div>
+    </dialog>
+
+    <!-- 残りのタイル -->
+    <dialog id="remaining-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2 id="remaining-title">残りのタイル</h2><button class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <div id="remaining-list" class="remaining-list"></div>
+        </div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2 id="result-title">結果</h2><button class="icon-button close" aria-label="盤面を見る" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <table class="result-table">
+                <thead><tr><th></th><th class="name-col"></th><th>都市</th><th>道</th><th>修道院</th><th>草原</th><th>合計</th></tr></thead>
+                <tbody id="result-body"></tbody>
+            </table>
+            <div class="buttons">
+                <button id="again" class="primary">もう一度</button>
+                <button id="result-home" class="secondary">ホーム</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
