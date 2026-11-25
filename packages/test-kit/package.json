@@ -1,0 +1,8 @@
+{
+  "name": "test-kit",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./pwa.js": "./pwa.js"
+  }
+}
