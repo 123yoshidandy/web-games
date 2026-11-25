@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#18202b">
+    <title>ロストシティ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ロストシティ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">LOST CITIES</h1>
+            <p class="subtitle">ロストシティ</p>
+            <div class="setup">
+                <div id="rounds-select" class="segmented" role="radiogroup" aria-label="ラウンドの数">
+                    <button type="button" role="radio" data-rounds="1">1ラウンド</button>
+                    <button type="button" role="radio" data-rounds="3">3ラウンド</button>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="round-info" class="round-info"></span>
+                <span id="totals" class="totals"></span>
+                <span id="deck" class="deck" title="山札"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="rival" class="rival"></div>
+            <div id="rival-expeditions" class="expeditions rival-side"></div>
+            <div id="discards" class="discards"></div>
+            <div id="my-expeditions" class="expeditions my-side"></div>
+            <div class="me-row"><span id="me-label" class="me-label">あなた</span><span id="my-round" class="round-score" title="このラウンドの得点"></span></div>
+            <div id="hand" class="hand"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- ラウンドの結果 -->
+    <dialog id="round-result" class="sheet">
+        <h2 id="round-title" tabindex="-1" autofocus></h2>
+        <table id="round-table" class="score-table"></table>
+        <div class="buttons"><button id="next-round" class="btn primary">次のラウンドへ</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <table id="result-table" class="score-table"></table>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>5つの探検（黄・青・白・緑・赤）にカードを並べて、得点を競います。決めた数のラウンドの合計が多い方の勝ちです。</p>
+            <h3>手番</h3>
+            <p>手札から1枚を<strong>出し</strong>、1枚を<strong>引き</strong>ます。手札はいつも8枚です。</p>
+            <ul class="help-list">
+                <li><strong>出す</strong>：自分の探検に置くか、その色の捨て場に捨てる</li>
+                <li><strong>引く</strong>：山札か、どれかの捨て場の一番上から。今捨てたカードは引けない</li>
+            </ul>
+            <h3>探検の決まり</h3>
+            <p>同じ色のカードを<strong>小さい順</strong>にしか置けません（間を飛ばしてもよい）。<strong>握手</strong>のカードは、その色の数字より前にだけ置けます。</p>
+            <h3>得点</h3>
+            <div class="help-pic" id="help-expedition"></div>
+            <p>始めた探検ごとに、（数字の合計 − <strong>20</strong>）×（握手の枚数 + 1）。8枚以上なら、さらに <strong>+20</strong>。始めていない色は0点です。少ない数字で始めると、マイナスになります。</p>
+            <h3>ラウンドの終わり</h3>
+            <p>山札の最後の1枚を引いたら、すぐに終わります。</p>
+            <h3>操作</h3>
+            <p>手札を押すと、出せる探検と捨て場が光ります。光った場所を押すか、下のボタンで決めます。ボタンには、出したあとの得点が出ます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
