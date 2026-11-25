@@ -1,0 +1,19 @@
+{
+    "name": "コリドール",
+    "short_name": "コリドール",
+    "description": "壁で道をふさぎながら、向かいの辺を目指す 2人・4人のボードゲーム。CPU と遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "orientation": "portrait",
+    "background_color": "#1d130c",
+    "theme_color": "#3a2618",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

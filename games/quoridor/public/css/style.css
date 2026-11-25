@@ -1,0 +1,215 @@
+/* コリドール
+ * 縦持ちのスマホ（最小 375×548）で、盤が残りの高さを使う。盤は正方形の SVG で、幅と高さの小さい方に合わせる
+ */
+
+:root {
+    --bg: #1d130c;
+    --bg2: #3a2618;
+    --panel: rgba(255, 240, 215, .07);
+    --panel-line: rgba(255, 240, 215, .16);
+    --text: #f8efe0;
+    --muted: #cdb99c;
+    --accent: #f2b632;
+    --accent-deep: #a8730f;
+    --plate: #2a1a10;
+    --cell: #8a5a33;
+    --cell-line: #a8734a;
+    --wall: #f1ddb3;
+    --wall-edge: #b8925c;
+    --ok: #ffd45c;
+    --ng: #ff6f5e;
+    --font: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', sans-serif;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html { height: 100%; touch-action: pan-x pan-y; overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
+
+body {
+    margin: 0;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    color: var(--text);
+    font-family: var(--font);
+    font-weight: 500;
+    background:
+        radial-gradient(ellipse at 15% 0%, rgba(242, 182, 50, .13), transparent 55%),
+        radial-gradient(ellipse at 100% 100%, rgba(228, 85, 63, .10), transparent 50%),
+        linear-gradient(170deg, var(--bg2), var(--bg));
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+
+button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+
+#app {
+    position: relative;
+    height: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.screen { height: 100%; }
+
+/* ---- 盤の絵 ---- */
+
+.board-svg { display: block; overflow: visible; }
+.plate { fill: var(--plate); }
+.cell { fill: var(--cell); stroke: var(--cell-line); stroke-width: 1; }
+.wall { fill: var(--wall); stroke: var(--wall-edge); stroke-width: 1; filter: drop-shadow(0 1.5px 1px rgba(0, 0, 0, .55)); }
+.wall.last { stroke-width: 3; }
+.wall.drop { animation: wall-drop .28s ease-out backwards; transform-box: fill-box; transform-origin: center; }
+@keyframes wall-drop { from { opacity: 0; transform: scale(1.25); } }
+.pawn { transition: transform .26s ease-out; }
+.pawn.still { transition: none; }
+.pawn-shadow { fill: rgba(0, 0, 0, .45); }
+.pawn-body { stroke: rgba(0, 0, 0, .55); stroke-width: 1.5; }
+.pawn-top { fill: rgba(255, 255, 255, .28); }
+.pawn.active .pawn-body { stroke: #fff; stroke-width: 2.5; }
+.goal { opacity: .95; }
+.from-mark { fill: none; stroke-width: 2.5; stroke-dasharray: 4 4; opacity: .8; }
+.target-dot { fill: var(--accent); stroke: rgba(0, 0, 0, .35); stroke-width: 1; }
+.target-cell { fill: rgba(255, 212, 92, .18); }
+.preview { stroke-width: 2; filter: drop-shadow(0 0 4px rgba(0, 0, 0, .6)); }
+.preview.ok { fill: var(--ok); stroke: #fff; }
+.preview.ng { fill: rgba(255, 111, 94, .75); stroke: #fff; stroke-dasharray: 4 3; }
+
+/* ---- ボタン ---- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 120px;
+    height: 46px;
+    padding: 0 22px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: transform .08s, box-shadow .08s;
+}
+.btn.primary { color: #3d2900; background: linear-gradient(#fbd77e, var(--accent)); box-shadow: 0 4px 0 var(--accent-deep); }
+.btn.secondary { color: #fff; background: linear-gradient(#a8693c, #7d4a26); box-shadow: 0 4px 0 #4e2c14; }
+.btn.ghost { color: var(--muted); background: rgba(255, 255, 255, .1); box-shadow: 0 3px 0 rgba(0, 0, 0, .3); }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .3); }
+.btn:disabled { opacity: .4; cursor: default; }
+.btn.small { min-width: 0; height: 42px; padding: 0 14px; font-size: 15px; }
+.btn.square { min-width: 0; width: 42px; height: 42px; padding: 0; }
+
+.icon-btn { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border: none; border-radius: 10px; color: var(--muted); background: rgba(255, 255, 255, .08); cursor: pointer; }
+.line-icon { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.link { border: none; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px; }
+
+.segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+.segmented button { min-width: 84px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+.segmented button[aria-checked="true"] { color: #3d2900; background: var(--accent); }
+
+/* ---- タイトル ---- */
+
+#screen-title:not([hidden]) { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 16px; touch-action: none; }
+.title-art { width: 170px; height: 170px; }
+.title-art svg { width: 100%; height: 100%; filter: drop-shadow(0 6px 10px rgba(0, 0, 0, .45)); }
+.logo { margin: 10px 0 0; font-size: 44px; font-weight: 800; letter-spacing: .04em; color: var(--accent); text-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+.subtitle { margin: -6px 0 10px; color: var(--muted); font-size: 14px; letter-spacing: .4em; }
+.setup { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 360px; }
+.setup .setup-row { display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; }
+.setup-label { width: 3em; text-align: right; color: var(--muted); }
+.setup .buttons { display: flex; gap: 12px; margin-top: 4px; }
+
+/* ---- ゲーム画面 ---- */
+
+#screen-game:not([hidden]) { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px; touch-action: none; }
+
+.topbar { display: flex; align-items: center; gap: 6px; flex: none; height: 34px; }
+.turn-info { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; text-align: center; font-size: 15px; font-weight: 800; }
+
+/* 人の欄（名前・残りの壁・ゴールまでの歩数） */
+.rivals { flex: none; display: flex; gap: 6px; height: 44px; }
+.panel { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 0 8px; border: 1px solid var(--panel-line); border-radius: 10px; background: var(--panel); }
+.panel.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.panel.won { border-color: #fff; }
+.rivals .panel { flex: 1; }
+.dot { flex: none; width: 14px; height: 14px; border-radius: 50%; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, .5), inset 0 -2px 0 rgba(0, 0, 0, .2); }
+.who { display: flex; flex-direction: column; justify-content: center; min-width: 0; flex: 1; gap: 1px; }
+.name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; font-weight: 800; }
+.stats { display: flex; gap: 8px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.stats b { color: var(--text); font-size: 14px; }
+.stats .walls::before { content: ''; display: inline-block; width: 10px; height: 4px; margin: 0 3px 2px 0; border-radius: 1px; background: var(--wall); vertical-align: middle; }
+/* 4人のときは、相手の欄を詰める */
+.rivals.four .panel { padding: 0 6px; gap: 5px; }
+.rivals.four .stats { gap: 6px; }
+
+/* 盤 */
+.board-wrap { position: relative; flex: 1; min-height: 0; container-type: size; display: grid; place-items: center; }
+.board { width: min(100cqw, 100cqh); height: min(100cqw, 100cqh); touch-action: none; cursor: pointer; }
+
+/* 下の欄（自分の欄と操作） */
+.bottom { flex: none; display: flex; align-items: center; gap: 6px; height: 54px; }
+.bottom .me { flex: 1; align-self: stretch; }
+.wall-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; align-self: stretch; padding: 0 4px; font-size: 13px; line-height: 1.35; }
+.wall-info .line { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.wall-info .ng { color: var(--ng); font-weight: 800; }
+.wall-info .up { color: var(--ok); font-weight: 800; }
+.wall-info .muted { color: var(--muted); }
+.actions { flex: none; display: flex; align-items: center; gap: 6px; }
+.btn .count { font-size: 13px; opacity: .85; }
+
+/* ---- ダイアログ ---- */
+
+dialog.sheet {
+    width: min(440px, calc(100% - 20px));
+    max-height: calc(100dvh - 24px);
+    padding: 16px 12px;
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    color: var(--text);
+    background: linear-gradient(170deg, #4b3221, #2a1b10);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
+}
+dialog.sheet[open] { display: flex; flex-direction: column; gap: 10px; }
+dialog::backdrop { background: rgba(8, 4, 2, .55); }
+dialog h2 { margin: 0; font-size: 20px; text-align: center; outline: none; }
+dialog h3 { margin: 8px 0 2px; font-size: 14px; color: var(--accent); }
+dialog .buttons { display: flex; justify-content: center; gap: 12px; flex: none; }
+dialog :focus-visible { outline: 2px solid rgba(242, 182, 50, .7); outline-offset: 2px; }
+dialog h2:focus-visible { outline: none; }
+.result-detail { margin: 0; text-align: center; font-size: 14px; color: var(--muted); }
+
+.help-body { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; padding-right: 4px; }
+.help-body p, .help-list { margin: 2px 0 6px; font-size: 14px; line-height: 1.65; }
+.help-list { padding-left: 1.2em; }
+.help-body strong { color: var(--accent); }
+.help-figs { display: flex; gap: 10px; justify-content: center; }
+.help-figs figure { margin: 4px 0; width: 140px; text-align: center; }
+.help-figs svg { width: 112px; height: 112px; }
+.help-figs figcaption { font-size: 12px; line-height: 1.5; color: var(--muted); }
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 90px;
+    z-index: 80;
+    max-width: calc(100% - 32px);
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(12, 6, 2, .92);
+    color: #fff;
+    font-size: 14px;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+}
+.toast.show { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+    .btn, .pawn { transition: none; }
+    .wall.drop { animation: none; }
+}
