@@ -1,0 +1,18 @@
+{
+    "name": "プエルトリコ",
+    "short_name": "プエルトリコ",
+    "description": "島に農園と建物を広げ、品を船で送って勝利点を競うゲーム。CPU と遊べる",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#1d5878",
+    "theme_color": "#1d5878",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
