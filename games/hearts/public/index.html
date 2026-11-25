@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1e3a5c">
+    <title>ハーツ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ハーツ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Hearts</h1>
+            <p class="subtitle">ハーツ</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="round-info" class="round-info"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="table" class="table">
+                <div class="seat seat-top" data-pos="top"></div>
+                <div class="seat seat-left" data-pos="left"></div>
+                <div class="seat seat-right" data-pos="right"></div>
+                <div id="trick" class="trick"></div>
+            </div>
+            <div id="me" class="me"></div>
+            <div id="hand" class="hand"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- ラウンドの結果 -->
+    <dialog id="round-result" class="sheet">
+        <h2 id="round-title" tabindex="-1" autofocus></h2>
+        <p id="round-moon" class="moon" hidden></p>
+        <ol id="round-list" class="result-list"></ol>
+        <p class="muted note">だれかが100点に達したら終わりです</p>
+        <div class="buttons"><button id="next-round" class="btn primary">次へ</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <ol id="result-list" class="result-list"></ol>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p><strong>ハート</strong>は1枚1点、<strong>スペードのクイーン</strong>は13点の失点です。取らないように札を出し、だれかが100点に達したとき、失点が一番少ない人の勝ちです。</p>
+            <div class="help-pic" id="help-points"></div>
+            <h3>渡す</h3>
+            <p>配られたら、3枚を選んで渡します。ラウンドごとに、左 → 右 → 向かい → 渡さない、をくり返します。</p>
+            <h3>出す</h3>
+            <p>クラブの2を持つ人から始め、時計回りに1枚ずつ出します。最初に出されたスートを持っていれば、それを出します。なければ何を出してもかまいません。</p>
+            <p>最初のスートの一番高い札（A が最強）を出した人が4枚を取り、次を始めます。</p>
+            <h3>決まり</h3>
+            <p>最初のトリックでは、ハートとスペードのクイーンは出せません。ハートが一度出されるまで、ハートで始めることはできません。</p>
+            <h3>シュート・ザ・ムーン</h3>
+            <p>ハート13枚とスペードのクイーンを1人で全部取ったら、その人は0点、ほかの全員が26点になります。</p>
+            <h3>操作</h3>
+            <p>札を押して選び、もう一度押すか「出す」で出します。出せない札は暗くなります。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
