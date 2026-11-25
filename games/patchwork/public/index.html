@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#24403d">
+    <title>パッチワーク</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="パッチワーク">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Marcellus&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- 布の模様とボタン（自作） -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+            <pattern id="pat-0" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M0 6 L6 0" stroke="#fff" stroke-opacity="0.22" stroke-width="1.4"/></pattern>
+            <pattern id="pat-1" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.1" fill="#fff" fill-opacity="0.28"/></pattern>
+            <pattern id="pat-2" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 4 H8 M4 0 V8" stroke="#000" stroke-opacity="0.12" stroke-width="2"/></pattern>
+            <pattern id="pat-3" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M4 1 L7 4 L4 7 L1 4 Z" fill="#fff" fill-opacity="0.18"/></pattern>
+            <symbol id="button-icon" viewBox="0 0 20 20">
+                <circle cx="10" cy="10" r="8.5" fill="#4a7fc4" stroke="#20406e" stroke-width="1.5"/>
+                <g fill="#20406e"><circle cx="7.6" cy="7.6" r="1.4"/><circle cx="12.4" cy="7.6" r="1.4"/><circle cx="7.6" cy="12.4" r="1.4"/><circle cx="12.4" cy="12.4" r="1.4"/></g>
+            </symbol>
+            <symbol id="time-icon" viewBox="0 0 20 20">
+                <path d="M5 2.5 H15 M5 17.5 H15 M6 2.5 C6 8 14 8 14 10 C14 12 6 12 6 17.5 M14 2.5 C14 8 6 8 6 10 C6 12 14 12 14 17.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <!-- タイトル -->
+    <section id="title-screen" class="screen">
+        <div class="title-inner">
+            <h1 class="logo">Patchwork</h1>
+            <p class="logo-sub">パッチワーク</p>
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <div class="settings">
+                <div class="setting">
+                    <span class="setting-label">CPU</span>
+                    <div class="segment" id="level-select">
+                        <button type="button" data-value="easy">やさしい</button>
+                        <button type="button" data-value="normal">ふつう</button>
+                    </div>
+                </div>
+            </div>
+            <div class="title-buttons">
+                <button type="button" id="start-button" class="btn btn-primary">はじめる</button>
+                <button type="button" id="resume-button" class="btn btn-secondary" hidden>続きから</button>
+            </div>
+            <button type="button" class="icon-btn title-help" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </div>
+    </section>
+
+    <!-- プレイ中 -->
+    <section id="game-screen" class="screen" hidden>
+        <header id="topbar">
+            <button type="button" class="icon-btn" data-action="home" aria-label="ホーム" title="ホーム">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+            </button>
+            <div id="status" class="status"></div>
+            <button type="button" class="icon-btn" data-action="result" id="result-button" aria-label="結果" title="結果" hidden>
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5a3 3 0 0 0 3 4M16.5 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/></svg>
+            </button>
+            <button type="button" class="icon-btn" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </header>
+        <main id="play">
+            <div id="left">
+                <div id="top-row">
+                    <div id="time-board"></div>
+                    <div id="opponent"></div>
+                </div>
+                <div id="market"></div>
+            </div>
+            <div id="right">
+                <div id="me-head" class="me-head"></div>
+                <div id="quilt"></div>
+                <div id="controls"></div>
+            </div>
+        </main>
+    </section>
+
+    <!-- 相手のキルト・パッチの環 -->
+    <dialog id="info-dialog" class="sheet">
+        <div class="sheet-body" id="info-body" tabindex="-1" autofocus></div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="result-title" class="sheet-title"></h2>
+            <div id="result-body"></div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-secondary" data-action="close-result">盤面を見る</button>
+                <button type="button" class="btn btn-primary" data-action="rematch">もう1回</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="sheet help">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">遊び方</h2>
+            <section>
+                <h3>目的</h3>
+                <p>パッチを買って自分の 9×9 のキルトに縫いつけ、ボタンを集めます。最後に「ボタン − 空きマス×2」が多い人の勝ちです。</p>
+            </section>
+            <section>
+                <h3>手番</h3>
+                <p>時間の盤で<b>後ろにいる人</b>が手番です（同じマスなら、あとから来た人）。続けて何回か手番になることもあります。</p>
+                <ul>
+                    <li><b>買う</b>：中立の駒の先の3枚から1枚選び、ボタンを払ってキルトに置きます。パッチに書かれた時間だけ駒が進みます。回転・裏返しもできます</li>
+                    <li><b>進む</b>：相手の1マス先まで進み、進んだマスの数だけボタンをもらいます</li>
+                </ul>
+            </section>
+            <section>
+                <h3>時間の盤</h3>
+                <ul>
+                    <li><b>ボタンのマス</b>を通ると、キルトのパッチに付いたボタンの数だけ収入があります</li>
+                    <li><b>革のパッチ</b>のマスを最初に通った人は、1×1 のパッチをもらい、すぐ置きます</li>
+                    <li>2人ともゴールに着いたら終わりです</li>
+                </ul>
+            </section>
+            <section>
+                <h3>得点</h3>
+                <p>ボタン − 空きマス×2。7×7 の正方形を最初に埋めた人は +7。同点なら先にゴールした人の勝ちです。</p>
+            </section>
+            <section>
+                <h3>置き方</h3>
+                <p>パッチを押すと、キルトに置き場所の候補が出ます。マスを押すとそこへ動き、回転・裏返しのボタンで向きを変えて「置く」で決めます。点の付いたマスが、今の向きで覆えるマスです。</p>
+            </section>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-help">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
