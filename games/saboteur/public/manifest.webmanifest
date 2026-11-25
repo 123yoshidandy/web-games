@@ -1,0 +1,19 @@
+{
+    "name": "お邪魔者",
+    "short_name": "お邪魔者",
+    "description": "金鉱掘りとお邪魔者に分かれて坑道を掘る、正体隠しのカードゲーム。CPU と3〜10人で遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "orientation": "portrait",
+    "background_color": "#1d140e",
+    "theme_color": "#2a1d14",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

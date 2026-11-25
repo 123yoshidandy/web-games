@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2a1d14">
+    <title>お邪魔者</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="お邪魔者">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">お邪魔者</h1>
+            <p class="subtitle">SABOTEUR</p>
+            <div class="setup">
+                <div class="setup-row">人数
+                    <div class="stepper">
+                        <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="count-value" class="count-value"></span>
+                        <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="round-info" class="round-info"></span>
+                <span id="role" class="role"></span>
+                <span class="deck" title="山札"><span class="deck-back"></span><b id="deck-count"></b></span>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="players" class="players"></div>
+            <div id="board" class="board" aria-label="盤面">
+                <div id="world" class="world"></div>
+                <div class="zoom">
+                    <button id="zoom-in" class="icon-btn" aria-label="拡大">＋</button>
+                    <button id="zoom-out" class="icon-btn" aria-label="縮小">−</button>
+                    <button id="zoom-fit" class="icon-btn" aria-label="全体を見る" title="全体を見る">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div id="me" class="me"></div>
+            <div id="hand" class="hand"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 記録 -->
+    <dialog id="log-dialog" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- ラウンドの結果 -->
+    <dialog id="round-result" class="sheet">
+        <h2 id="round-title" tabindex="-1" autofocus></h2>
+        <p id="round-sub" class="muted note"></p>
+        <table id="round-table" class="score-table"></table>
+        <div class="buttons"><button id="next-round" class="btn primary">次のラウンドへ</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-sub" class="muted note"></p>
+        <table id="result-table" class="score-table"></table>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>役割</h3>
+            <p>ラウンドの始めに、だれにも見せずに役割が配られます。<strong>金鉱掘り</strong>はスタートから金のゴールまで道をつなげたい。<strong>お邪魔者</strong>はそれを止めたい。ほかの人の役割は、ラウンドの終わりまで分かりません。</p>
+            <h3>手番（どれか1つ）</h3>
+            <ul class="help-list">
+                <li><strong>道を置く</strong>：隣のカードと道がすべて合い、スタートからつながる場所に置く。180度回してもよい</li>
+                <li><strong>壊す</strong>：ほかの人の道具（つるはし・ランプ・トロッコ）を壊す。1つでも壊れていると道を置けない</li>
+                <li><strong>直す</strong>：自分かほかの人の、壊れた道具を直す</li>
+                <li><strong>地図</strong>：伏せたゴールを1枚、自分だけ見る</li>
+                <li><strong>落盤</strong>：道のカードを1枚取り除く（スタートとゴールは取り除けない）</li>
+                <li><strong>捨てる</strong>：何もできないときや、したくないときは、1枚を伏せて捨てる</li>
+            </ul>
+            <p>そのあと、山札があれば1枚引きます。</p>
+            <h3>ラウンドの終わり</h3>
+            <p>道が金のゴールに届いたら金鉱掘りの勝ち。山札と全員の手札がなくなったら、お邪魔者の勝ちです。</p>
+            <h3>金塊</h3>
+            <p>金鉱掘りの勝ちなら、人数ぶんの金塊を、金にたどり着いた人から順に金鉱掘りが1枚ずつ取ります。お邪魔者の勝ちなら、お邪魔者がそれぞれ金塊をもらいます（1人なら4、2〜3人なら3、4人なら2）。3ラウンドの合計がいちばん多い人の勝ちです。</p>
+            <h3>画面</h3>
+            <p>盤面は指で動かし、2本指で拡大できます（＋・−・全体のボタンもあります）。手札を押すと、出せる場所が光ります。道は、押した場所にそのまま置けます。地図で見たゴールには印が残ります。上の記録のボタンで、だれが何をしたかを見られます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
