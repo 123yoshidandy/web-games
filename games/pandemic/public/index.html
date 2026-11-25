@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0c1a2c">
+    <title>パンデミック</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="パンデミック">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Oswald:wght@600&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen title">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <div class="title-body">
+                <h1 class="logo">PANDEMIC</h1>
+                <p class="subtitle">パンデミック</p>
+                <div class="setup">
+                    <div class="setup-row"><span>人数</span>
+                        <div class="segment" id="count">
+                            <button data-count="2">2人</button>
+                            <button data-count="3">3人</button>
+                            <button data-count="4">4人</button>
+                        </div>
+                    </div>
+                    <div class="setup-row"><span>難易度</span>
+                        <div class="segment" id="level">
+                            <button data-level="intro">入門</button>
+                            <button data-level="standard">標準</button>
+                            <button data-level="heroic">英雄</button>
+                        </div>
+                    </div>
+                    <div class="setup-row"><span>仲間</span>
+                        <div class="segment" id="mode">
+                            <button data-mode="all">全員を操作</button>
+                            <button data-mode="team">CPU に任せる</button>
+                        </div>
+                    </div>
+                    <div class="buttons">
+                        <button id="start" class="btn primary">ゲーム開始</button>
+                        <button id="resume" class="btn secondary" hidden>続きから</button>
+                    </div>
+                    <button id="open-help-title" class="link">遊び方</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen game" hidden>
+            <div class="board" id="board">
+                <div class="map" id="map"></div>
+                <div class="hud hud-tl">
+                    <div class="meter" id="outbreaks" title="アウトブレイク"></div>
+                    <div class="meter" id="rate" title="感染率"></div>
+                    <div class="cures" id="cures" title="治療薬と、残りの病原体の駒"></div>
+                    <button class="deck-btn" id="player-deck" title="プレイヤーカード"></button>
+                    <button class="deck-btn" id="infection-deck" title="感染カード"></button>
+                </div>
+                <div class="hud hud-tr">
+                    <button id="open-log" class="icon-btn" aria-label="記録" title="記録"></button>
+                    <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"></button>
+                    <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"></button>
+                </div>
+                <div class="hud hud-bl team" id="team"></div>
+                <div class="news" id="news" aria-live="polite"></div>
+                <div class="pick-banner" id="pick-banner" hidden>
+                    <span id="pick-text"></span>
+                    <button id="pick-cancel" class="btn secondary tiny">やめる</button>
+                </div>
+            </div>
+            <div class="dock">
+                <div class="who" id="who"></div>
+                <div class="hand" id="hand"></div>
+                <div class="actions" id="actions">
+                    <button class="act" data-act="treat"><span class="ai" data-icon="treat"></span>治療</button>
+                    <button class="act" data-act="build"><span class="ai" data-icon="build"></span>研究所</button>
+                    <button class="act" data-act="share"><span class="ai" data-icon="share"></span>共有</button>
+                    <button class="act" data-act="cure"><span class="ai" data-icon="cure"></span>治療薬</button>
+                    <button class="act" data-act="special"><span class="ai" data-icon="special"></span>特殊</button>
+                    <button class="act" data-act="pass"><span class="ai" data-icon="pass"></span>終える</button>
+                </div>
+                <div class="step" id="step" hidden>
+                    <button id="step-btn" class="btn primary"></button>
+                </div>
+                <button id="assist" class="assist" title="CPU に1手任せる" aria-label="CPU に1手任せる"></button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 選択・情報のシート（body の回転を受けるよう、dialog ではなく div で作る） -->
+    <div class="overlay" id="overlay" hidden>
+        <div class="sheet" id="sheet" role="dialog" aria-modal="true">
+            <h2 id="sheet-title"></h2>
+            <div class="sheet-body" id="sheet-body"></div>
+            <div class="buttons" id="sheet-buttons"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
