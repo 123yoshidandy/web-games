@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f2a52">
+    <title>アズール</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="アズール">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Marcellus&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- タイルの図柄（自作）。色ごとに模様を変え、色だけに頼らず見分けられるようにする -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+            <symbol id="tile-0" viewBox="0 0 40 40">
+                <rect x="1" y="1" width="38" height="38" rx="6" fill="#2b62b5"/>
+                <rect x="4" y="4" width="32" height="32" rx="4" fill="none" stroke="#5d8fd6" stroke-width="1.5"/>
+                <circle cx="20" cy="11.5" r="5" fill="#e3edfa"/>
+                <circle cx="28.5" cy="20" r="5" fill="#e3edfa"/>
+                <circle cx="20" cy="28.5" r="5" fill="#e3edfa"/>
+                <circle cx="11.5" cy="20" r="5" fill="#e3edfa"/>
+                <circle cx="20" cy="20" r="3.2" fill="#f2c94c"/>
+            </symbol>
+            <symbol id="tile-1" viewBox="0 0 40 40">
+                <rect x="1" y="1" width="38" height="38" rx="6" fill="#efc23f"/>
+                <rect x="4" y="4" width="32" height="32" rx="4" fill="none" stroke="#f8dc86" stroke-width="1.5"/>
+                <circle cx="20" cy="20" r="9.5" fill="none" stroke="#c46f17" stroke-width="3.2"/>
+                <circle cx="20" cy="20" r="3.4" fill="#c46f17"/>
+            </symbol>
+            <symbol id="tile-2" viewBox="0 0 40 40">
+                <rect x="1" y="1" width="38" height="38" rx="6" fill="#cc4a35"/>
+                <rect x="4" y="4" width="32" height="32" rx="4" fill="none" stroke="#e27d68" stroke-width="1.5"/>
+                <path d="M20 7 L33 20 L20 33 L7 20 Z" fill="none" stroke="#f8d8cc" stroke-width="3"/>
+                <path d="M20 15 L25 20 L20 25 L15 20 Z" fill="#f8d8cc"/>
+            </symbol>
+            <symbol id="tile-3" viewBox="0 0 40 40">
+                <rect x="1" y="1" width="38" height="38" rx="6" fill="#2a2c33"/>
+                <rect x="4" y="4" width="32" height="32" rx="4" fill="none" stroke="#4a4e59" stroke-width="1.5"/>
+                <g stroke="#83d4c9" stroke-width="2.6" stroke-linecap="round">
+                    <path d="M20 9 V31 M9 20 H31"/>
+                    <path d="M13 13 L27 27 M27 13 L13 27" stroke-width="2"/>
+                </g>
+                <circle cx="20" cy="20" r="3" fill="#2a2c33" stroke="#83d4c9" stroke-width="2"/>
+            </symbol>
+            <symbol id="tile-4" viewBox="0 0 40 40">
+                <rect x="1" y="1" width="38" height="38" rx="6" fill="#d7eef0"/>
+                <rect x="4" y="4" width="32" height="32" rx="4" fill="none" stroke="#a5d0d6" stroke-width="1.5"/>
+                <g fill="#3a79b8">
+                    <circle cx="10.5" cy="10.5" r="3"/>
+                    <circle cx="29.5" cy="10.5" r="3"/>
+                    <circle cx="10.5" cy="29.5" r="3"/>
+                    <circle cx="29.5" cy="29.5" r="3"/>
+                </g>
+                <path d="M20 12 L28 20 L20 28 L12 20 Z" fill="none" stroke="#3a79b8" stroke-width="2.6"/>
+            </symbol>
+            <symbol id="tile-first" viewBox="0 0 40 40">
+                <rect x="1" y="1" width="38" height="38" rx="6" fill="#f5ecd7"/>
+                <rect x="4" y="4" width="32" height="32" rx="4" fill="none" stroke="#c9a96b" stroke-width="1.5"/>
+                <path d="M17 13.5 L22 10.5 V30 M16 30 H28" fill="none" stroke="#1f3d6e" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <!-- タイトル -->
+    <section id="title-screen" class="screen">
+        <div class="title-inner">
+            <h1 class="logo">AZUL</h1>
+            <p class="logo-sub">アズール</p>
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <div class="settings">
+                <div class="setting">
+                    <span class="setting-label">人数</span>
+                    <div class="segment" id="count-select">
+                        <button type="button" data-value="2">2人</button>
+                        <button type="button" data-value="3">3人</button>
+                        <button type="button" data-value="4">4人</button>
+                    </div>
+                </div>
+                <div class="setting">
+                    <span class="setting-label">CPU</span>
+                    <div class="segment" id="level-select">
+                        <button type="button" data-value="easy">やさしい</button>
+                        <button type="button" data-value="normal">ふつう</button>
+                    </div>
+                </div>
+            </div>
+            <div class="title-buttons">
+                <button type="button" id="start-button" class="btn btn-primary">はじめる</button>
+                <button type="button" id="resume-button" class="btn btn-secondary" hidden>続きから</button>
+            </div>
+            <button type="button" class="icon-btn title-help" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </div>
+    </section>
+
+    <!-- プレイ中 -->
+    <section id="game-screen" class="screen" hidden>
+        <header id="topbar">
+            <button type="button" class="icon-btn" data-action="home" aria-label="ホーム" title="ホーム">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+            </button>
+            <div id="round-label" class="round-label"></div>
+            <button type="button" class="icon-btn" data-action="result" id="result-button" aria-label="結果" title="結果" hidden>
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5a3 3 0 0 0 3 4M16.5 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/></svg>
+            </button>
+            <button type="button" class="icon-btn" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </header>
+        <main id="play">
+            <div id="opponents"></div>
+            <div id="table">
+                <div id="factories"></div>
+                <div id="center"></div>
+            </div>
+            <div id="my-board"></div>
+        </main>
+        <div id="round-toast" class="round-toast" hidden></div>
+    </section>
+
+    <!-- 相手の盤面を大きく見る -->
+    <dialog id="board-dialog" class="sheet">
+        <div class="sheet-body" id="board-dialog-body" tabindex="-1" autofocus></div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="result-title" class="sheet-title"></h2>
+            <div id="result-body"></div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-secondary" data-action="close-result">盤面を見る</button>
+                <button type="button" class="btn btn-primary" data-action="rematch">もう1回</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="sheet help">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">遊び方</h2>
+            <section>
+                <h3>目的</h3>
+                <p>工房からタイルを集めて自分の壁に並べ、点を稼ぎます。ゲームの終わりにいちばん点の高い人の勝ちです。</p>
+            </section>
+            <section>
+                <h3>手番</h3>
+                <p>工房か中央から、<b>1色を全部</b>取ります。工房の残りのタイルは中央へ移ります。</p>
+                <p>その回で中央から最初に取った人は、先手マーカー <svg class="inline-tile"><use href="#tile-first"/></svg> も受け取って床に置きます。次のラウンドはその人から始めます。</p>
+            </section>
+            <section>
+                <h3>置き方</h3>
+                <p>取ったタイルは、左のパターンラインの1段に置きます（1段目は1枚、5段目は5枚まで）。</p>
+                <ul>
+                    <li>1つの段には同じ色だけ</li>
+                    <li>壁の同じ段にもうある色は、その段に置けない</li>
+                    <li>入りきらない分は床へ。床は1枚ごとに失点（−1 −1 −2 −2 −2 −3 −3）</li>
+                </ul>
+            </section>
+            <section>
+                <h3>ラウンドの終わり</h3>
+                <p>工房と中央が空になったら、埋まった段から1枚ずつ、壁の同じ色の場所へ移します。残りは箱へ戻ります。埋まっていない段は、そのまま次のラウンドへ持ち越します。</p>
+                <div class="help-example">
+                    <div id="help-wall" class="help-wall"></div>
+                    <p>置いたタイルから縦横につながった数が点になります。つながりがなければ1点。例：横に3枚、縦に4枚なら <b>3 + 4 = 7点</b>。</p>
+                </div>
+                <p>最後に床の失点を引きます（0点より下にはなりません）。</p>
+            </section>
+            <section>
+                <h3>ゲームの終わり</h3>
+                <p>誰かの壁で横1列がそろったラウンドで終わります。ボーナスを足して順位を決めます。</p>
+                <ul>
+                    <li>横1列：+2点</li>
+                    <li>縦1列：+7点</li>
+                    <li>同じ色5枚：+10点</li>
+                </ul>
+                <p>同点なら、横の列が多い方が上です。</p>
+            </section>
+            <section>
+                <h3>コツ</h3>
+                <p>壁の中央寄りにまとめて置くと、つながりで点が伸びます。取りすぎて床に落とすと失点がかさむので、相手が欲しい色を残さない取り方も考えてみてください。</p>
+            </section>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-help">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
