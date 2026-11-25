@@ -1,0 +1,114 @@
+/**
+ * ゲーム状態管理モジュール
+ * ゲームの状態を保持し、各種状態更新関数を提供します
+ */
+
+// ゲームの状態を管理するオブジェクト
+const gameState = {
+    clearedCount: 0, // クリア回数
+    board: [],
+    blocks: [],
+    selectedBlockIndex: -1,
+    boardSize: 7, // パズル生成に使う範囲のサイズ
+    boardRows: 7, // 遊ぶ盤面の行数（想定解が収まる最小の長方形に切り落とした後）
+    boardCols: 7, // 遊ぶ盤面の列数
+    notPlaceableCells: [], // 配置不可能なセル
+    solution: null, // 想定解
+    seed: null, // パズル生成に使ったシード
+    startTime: null // 問題を出した時刻（エンドレスのクリア時間は、クリアした時刻との差で出す）
+};
+
+// DOM要素の参照
+const elements = {
+    gameBoard: document.getElementById('gameBoard'),
+    blocksContainer: document.getElementById('blocksContainer'),
+    clearCountResultDisplay: document.getElementById('clearCountResult'),
+    clearTimeDisplay: document.getElementById('clearTime'),
+    surrenderButton: document.getElementById('surrender'),
+    surrenderModal: document.getElementById('surrenderModal'),
+    solutionBoard: document.getElementById('solutionBoard'),
+    surrenderNextButton: document.getElementById('surrenderNext'),
+    surrenderHomeButton: document.getElementById('surrenderHome'),
+    hintButton: document.getElementById('hint'),
+    shareButton: document.getElementById('share'),
+    challengeStats: document.getElementById('challengeStats'),
+    remainingStat: document.getElementById('remainingStat'),
+    challengeSolved: document.getElementById('challengeSolved'),
+    challengeTime: document.getElementById('challengeTime'),
+    challengeBonus: document.getElementById('challengeBonus'),
+    challengeModal: document.getElementById('challengeModal'),
+    challengeResult: document.getElementById('challengeResult'),
+    challengeSolutionBoard: document.getElementById('challengeSolutionBoard'),
+    challengeRetryButton: document.getElementById('challengeRetry'),
+    challengeExitButton: document.getElementById('challengeExit'),
+    hintModal: document.getElementById('hintModal'),
+    hintClose: document.getElementById('hintClose'),
+    hintPrev: document.getElementById('hintPrev'),
+    hintNext: document.getElementById('hintNext'),
+    hintDots: document.getElementById('hintDots'),
+    homeButton: document.getElementById('homeButton'),
+    onlineModal: document.getElementById('onlineModal'),
+    onlineClose: document.getElementById('onlineClose'),
+    onlineEntry: document.getElementById('onlineEntry'),
+    onlineName: document.getElementById('onlineName'),
+    onlineCreate: document.getElementById('onlineCreate'),
+    onlineCode: document.getElementById('onlineCode'),
+    onlineJoin: document.getElementById('onlineJoin'),
+    onlineLobby: document.getElementById('onlineLobby'),
+    onlineRoomCode: document.getElementById('onlineRoomCode'),
+    onlineInvite: document.getElementById('onlineInvite'),
+    onlinePlayers: document.getElementById('onlinePlayers'),
+    onlineWins: document.getElementById('onlineWins'),
+    onlineStart: document.getElementById('onlineStart'),
+    onlineWaiting: document.getElementById('onlineWaiting'),
+    onlineLeave: document.getElementById('onlineLeave'),
+    onlineError: document.getElementById('onlineError'),
+    onlineResultModal: document.getElementById('onlineResultModal'),
+    onlineResultTitle: document.getElementById('onlineResultTitle'),
+    onlineResultDetail: document.getElementById('onlineResultDetail'),
+    onlineStandings: document.getElementById('onlineStandings'),
+    onlineSolutionBoard: document.getElementById('onlineSolutionBoard'),
+    onlineNext: document.getElementById('onlineNext'),
+    onlineNextCountdown: document.getElementById('onlineNextCountdown'),
+    onlineNextRound: document.getElementById('onlineNextRound'),
+    onlineNextNumber: document.getElementById('onlineNextNumber'),
+    onlineResultLeave: document.getElementById('onlineResultLeave'),
+    onlineCountdown: document.getElementById('onlineCountdown'),
+    onlineCountdownRound: document.getElementById('onlineCountdownRound'),
+    onlineCountdownNumber: document.getElementById('onlineCountdownNumber'),
+    onlineBar: document.getElementById('onlineBar'),
+    toast: document.getElementById('toast'),
+    topScreen: document.getElementById('topScreen'),
+    topHero: document.getElementById('topHero'),
+    topEndless: document.getElementById('topEndless'),
+    topEndlessNote: document.getElementById('topEndlessNote'),
+    topChallenge: document.getElementById('topChallenge'),
+    topOnline: document.getElementById('topOnline'),
+    topHint: document.getElementById('topHint'),
+    logoButton: document.getElementById('logoButton'),
+    clearModal: document.getElementById('clearModal'),
+    nextGameButton: document.getElementById('nextGame'),
+    clearHomeButton: document.getElementById('clearHome'),
+    soundButton: document.getElementById('soundButton'),
+    topBgm: document.getElementById('topBgm'),
+    topEffects: document.getElementById('topEffects'),
+    feedbackButton: document.getElementById('feedbackButton'),
+    topFeedback: document.getElementById('topFeedback'),
+    feedbackModal: document.getElementById('feedbackModal'),
+    feedbackClose: document.getElementById('feedbackClose'),
+    feedbackForm: document.getElementById('feedbackForm'),
+    feedbackTitle: document.getElementById('feedbackTitle'),
+    feedbackBody: document.getElementById('feedbackBody'),
+    feedbackAttach: document.getElementById('feedbackAttach'),
+    feedbackContext: document.getElementById('feedbackContext')
+};
+
+// ボードとブロックコンテナをクリア
+function clearBoard() {
+    elements.gameBoard.innerHTML = '';
+    pieceOverlays.clear(); // 盤面に重ねたピースの絵も一緒に消える
+    elements.blocksContainer.innerHTML = '';
+    gameState.board = [];
+    gameState.blocks = [];
+    gameState.selectedBlockIndex = -1;
+}

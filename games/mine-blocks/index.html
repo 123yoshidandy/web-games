@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+    <meta name="theme-color" content="#232a66">
+    <!-- ブラウザのタブのアイコン（SVG に対応しないブラウザは PNG）と、スマホのホーム画面に追加したときのアイコン -->
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <!-- safe-area の余白を取っていないので、画面をステータスバーの下に潜らせない -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="MINE BLOCKS">
+    <title>MINE BLOCKS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- トップ画面：開いたときに出る。遊び方（エンドレス・チャレンジ・オンライン対戦）を選ぶ -->
+    <section class="top-screen" id="topScreen" hidden>
+        <div class="top-inner">
+            <div class="top-hero" id="topHero" aria-hidden="true">
+                <!-- 盤面を模した絵（JavaScriptで生成） -->
+            </div>
+            <h1 class="top-title">MINE BLOCKS</h1>
+            <p class="top-catch">数字と地雷を手がかりに、<br>ピースで盤面を埋めるパズル</p>
+
+            <div class="top-menu">
+                <button id="topEndless" class="top-button top-endless">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12c0-2 1.6-3.5 3.5-3.5 3.5 0 3.5 7 7 7 1.9 0 3.5-1.5 3.5-3.5s-1.6-3.5-3.5-3.5c-3.5 0-3.5 7-7 7C6.6 15.5 5 14 5 12z"/></svg>
+                    <span class="top-button-label">エンドレス<small id="topEndlessNote">1問ずつ、自分のペースで</small></span>
+                </button>
+                <button id="topChallenge" class="top-button top-challenge">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><polyline points="12 10 12 13.5 14.5 15.5"/><line x1="9.5" y1="2.5" x2="14.5" y2="2.5"/><line x1="12" y1="2.5" x2="12" y2="6"/></svg>
+                    <span class="top-button-label">チャレンジ<small>60秒で何問解ける？</small></span>
+                </button>
+                <button id="topOnline" class="top-button top-online">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><path d="M16 4.8a3.5 3.5 0 0 1 0 6.4"/><path d="M18 13.8c2.1.9 3.5 3 3.5 5.7"/></svg>
+                    <span class="top-button-label">オンライン対戦<small>2〜4人で早解き</small></span>
+                </button>
+            </div>
+
+            <div class="top-links">
+                <button id="topHint" class="top-link">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><circle class="icon-dot" cx="12" cy="17" r="0.6"/></svg>
+                    遊び方
+                </button>
+                <!-- 共有：ゲームのページのURLを送って友達を誘う。コピーしたらチェックマークに変わる -->
+                <button id="share" class="top-link top-share" title="MINE BLOCKS を共有" aria-label="MINE BLOCKS を共有">
+                    <svg class="icon-default" viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><line x1="8.2" y1="10.8" x2="15.8" y2="6.2"/><line x1="8.2" y1="13.2" x2="15.8" y2="17.8"/></svg>
+                    <svg class="icon-done" viewBox="0 0 24 24" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"/></svg>
+                    <span class="top-share-label">共有する</span>
+                </button>
+            </div>
+            <!-- 音の切り替え（設定はこの端末に保存する）と、ご意見・不具合の報告。1画面に収めるため1行に並べる -->
+            <div class="top-sound">
+                <button id="topBgm" class="top-sound-toggle" aria-pressed="true">BGM</button>
+                <button id="topEffects" class="top-sound-toggle" aria-pressed="true">効果音</button>
+                <button id="topFeedback" class="top-feedback">ご意見・不具合の報告</button>
+            </div>
+        </div>
+    </section>
+
+    <div class="container">
+        <header class="app-header">
+            <h1 class="logo">
+                <!-- ロゴを押すとトップ画面に戻る -->
+                <button class="logo-button" id="logoButton" title="トップに戻る" aria-label="トップに戻る">
+                <svg class="logo-mark" viewBox="0 0 20 20" aria-hidden="true">
+                    <rect x="1" y="1" width="8.5" height="8.5" rx="1.5" fill="#3498db"/>
+                    <rect x="10.5" y="1" width="8.5" height="8.5" rx="1.5" fill="#e5484d"/>
+                    <g stroke="#2b1d1d" stroke-width="0.9" stroke-linecap="round">
+                        <path d="M14.75 2.6v5.3M12.1 5.25h5.3M12.9 3.4l3.7 3.7M16.6 3.4l-3.7 3.7"/>
+                    </g>
+                    <circle cx="14.75" cy="5.25" r="1.7" fill="#2b1d1d"/>
+                    <rect x="1" y="10.5" width="8.5" height="8.5" rx="1.5" fill="#27ae60"/>
+                    <rect x="10.5" y="10.5" width="8.5" height="8.5" rx="1.5" fill="#f39c12"/>
+                </svg>
+                <span class="logo-text">MINE BLOCKS</span>
+                </button>
+            </h1>
+            <div class="buttons">
+                <!-- ホームに戻る（ロゴと同じ。チャレンジや対戦の最中は確認してからやめる） -->
+                <button id="homeButton" class="icon-button" title="ホームに戻る" aria-label="ホームに戻る">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3.5 11 12 4l8.5 7"/>
+                        <path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/>
+                    </svg>
+                </button>
+                <button id="surrender" class="icon-button" title="降参して想定解を見る" aria-label="降参">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                        <line x1="4" y1="22" x2="4" y2="15"/>
+                    </svg>
+                </button>
+                <!-- 音（BGM と効果音）をまとめて消す・出す。個別の切り替えはトップ画面で -->
+                <button id="soundButton" class="icon-button sound-button" title="音を消す" aria-label="音を消す" aria-pressed="true">
+                    <svg class="icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/>
+                        <path d="M15.5 9a4 4 0 0 1 0 6"/>
+                        <path d="M18 6.5a7.5 7.5 0 0 1 0 11"/>
+                    </svg>
+                    <svg class="icon-sound-off" viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/>
+                        <line x1="15.5" y1="9.5" x2="20.5" y2="14.5"/>
+                        <line x1="20.5" y1="9.5" x2="15.5" y2="14.5"/>
+                    </svg>
+                </button>
+                <button id="feedbackButton" class="icon-button" title="ご意見・不具合の報告" aria-label="ご意見・不具合の報告">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.5 4v-4h0A1.5 1.5 0 0 1 4 14.5z"/>
+                        <line x1="12" y1="6.5" x2="12" y2="10"/>
+                        <circle class="icon-dot" cx="12" cy="13" r="0.6"/>
+                    </svg>
+                </button>
+                <button id="hint" class="icon-button" title="ヒント" aria-label="ヒント">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <circle cx="12" cy="12" r="9"/>
+                        <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/>
+                        <circle class="icon-dot" cx="12" cy="17" r="0.6"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="game-container">
+            <!-- チャレンジモード中だけ、残り時間と解いた数を表示 -->
+            <div class="stats" id="challengeStats" hidden>
+                <div class="stat stat-remaining" id="remainingStat">
+                    <span class="stat-label">残り時間</span>
+                    <span class="stat-value"><span id="challengeTime">0</span><small>秒</small></span>
+                    <span class="challenge-bonus" id="challengeBonus" aria-live="polite"></span>
+                </div>
+                <div class="stat">
+                    <span class="stat-label">解いた数</span>
+                    <span class="stat-value"><span id="challengeSolved">0</span><small>問</small></span>
+                </div>
+            </div>
+
+            <!-- オンライン対戦中だけ、問題の番号と全員の勝ち数を表示 -->
+            <div class="online-bar" id="onlineBar" hidden></div>
+
+            <div class="game-board" id="gameBoard">
+                <!-- ゲームボードはJavaScriptで動的に生成されます -->
+            </div>
+
+            <div class="blocks-container" id="blocksContainer">
+                <!-- ブロックはJavaScriptで動的に生成されます -->
+            </div>
+        </main>
+
+        <div class="modal" id="clearModal">
+            <div class="modal-content">
+                <h2 class="title-clear">クリア！</h2>
+                <dl class="result-list">
+                    <div><dt>クリア時間</dt><dd><span id="clearTime">0</span>秒</dd></div>
+                    <div><dt>クリア回数</dt><dd><span id="clearCountResult">0</span>回</dd></div>
+                </dl>
+                <div class="modal-actions">
+                    <button id="nextGame" class="primary-button">次のゲーム</button>
+                    <div class="modal-sub-actions">
+                        <button id="clearHome" class="secondary-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/></svg>ホーム</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- チャレンジの結果画面：タイムアップでも降参でも同じ内容（解いた数と、最後の問題の想定解）を表示 -->
+        <div class="modal" id="challengeModal">
+            <div class="modal-content">
+                <h2>チャレンジ終了</h2>
+                <p class="result-highlight"><span id="challengeResult">0</span><small>問</small></p>
+                <div class="solution-board" id="challengeSolutionBoard"></div>
+                <div class="modal-actions">
+                    <button id="challengeRetry" class="primary-button">もう一度挑戦</button>
+                    <button id="challengeExit" class="secondary-button">ホームに戻る</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 降参したときの結果画面：想定解を表示する（盤面はJavaScriptで生成） -->
+        <div class="modal" id="surrenderModal">
+            <div class="modal-content">
+                <h2>降参</h2>
+                <div class="solution-board" id="solutionBoard"></div>
+                <div class="modal-actions">
+                    <button id="surrenderNext" class="primary-button">次の問題へ</button>
+                    <div class="modal-sub-actions">
+                        <button id="surrenderHome" class="secondary-button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/></svg>ホーム</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- オンライン対戦：参加画面（部屋に入る前）と部屋の画面（ロビー） -->
+        <div class="modal" id="onlineModal">
+            <div class="modal-content online-content" role="dialog" aria-labelledby="onlineTitle">
+                <button id="onlineClose" class="hint-close" aria-label="閉じる">×</button>
+                <h2 id="onlineTitle">オンライン対戦</h2>
+
+                <div id="onlineEntry">
+                    <p class="result-note">2〜4人で同じ問題を同時に解き、早く解いた人の勝ちです</p>
+                    <label class="online-field">
+                        <span>名前</span>
+                        <input id="onlineName" type="text" maxlength="12" autocomplete="nickname" placeholder="プレイヤー">
+                    </label>
+                    <button id="onlineCreate" class="primary-button">部屋を作る</button>
+                    <div class="online-divider"><span>または</span></div>
+                    <label class="online-field">
+                        <span>部屋番号</span>
+                        <input id="onlineCode" type="text" inputmode="numeric" maxlength="4" placeholder="数字4桁">
+                    </label>
+                    <button id="onlineJoin" class="secondary-button">参加する</button>
+                </div>
+
+                <div id="onlineLobby" hidden>
+                    <p class="result-label">部屋番号</p>
+                    <p class="online-code" id="onlineRoomCode">-----</p>
+                    <button id="onlineInvite" class="secondary-button online-invite">招待URLを共有</button>
+                    <ul class="online-players" id="onlinePlayers"></ul>
+                    <label class="online-field online-wins">
+                        <span>勝ち抜け</span>
+                        <select id="onlineWins">
+                            <option value="1">1勝</option>
+                            <option value="2">2勝</option>
+                            <option value="3">3勝</option>
+                            <option value="4">4勝</option>
+                            <option value="5">5勝</option>
+                        </select>
+                    </label>
+                    <p class="result-note online-waiting" id="onlineWaiting"></p>
+                    <div class="modal-actions">
+                        <button id="onlineStart" class="primary-button">対戦開始</button>
+                        <button id="onlineLeave" class="secondary-button">部屋を出る</button>
+                    </div>
+                </div>
+
+                <p class="online-error" id="onlineError" aria-live="polite"></p>
+            </div>
+        </div>
+
+        <!-- オンライン対戦の結果画面：問題の勝者・全員の勝ち数・想定解・次の問題までのカウントダウン（降参して待っている間も表示） -->
+        <div class="modal" id="onlineResultModal">
+            <div class="modal-content">
+                <h2 id="onlineResultTitle"></h2>
+                <p class="result-note" id="onlineResultDetail"></p>
+                <ul class="online-players" id="onlineStandings"></ul>
+                <p class="result-label">想定解</p>
+                <div class="solution-board" id="onlineSolutionBoard"></div>
+                <!-- 試合の途中：押さなくても、想定解を見せたまま次の問題までカウントダウンする -->
+                <div class="online-next-countdown" id="onlineNextCountdown" hidden>
+                    <p class="online-next-round" id="onlineNextRound"></p>
+                    <p class="online-next-number" id="onlineNextNumber" aria-live="polite"></p>
+                </div>
+                <div class="modal-actions">
+                    <button id="onlineNext" class="primary-button">再戦する</button>
+                    <button id="onlineResultLeave" class="secondary-button">部屋を出る</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- オンライン対戦の開始前のカウントダウン（開始まで盤面を操作できないよう、画面全体を覆う） -->
+        <div class="countdown" id="onlineCountdown" hidden>
+            <p class="countdown-round" id="onlineCountdownRound"></p>
+            <p class="countdown-number" id="onlineCountdownNumber">3</p>
+        </div>
+
+        <!-- ご意見・不具合の報告：書いた内容を入れて GitHub の Issue 作成画面を開く -->
+        <div class="modal" id="feedbackModal">
+            <div class="modal-content feedback-content" role="dialog" aria-labelledby="feedbackHeading">
+                <button id="feedbackClose" class="hint-close" type="button" aria-label="閉じる">×</button>
+                <h2 id="feedbackHeading">ご意見・不具合</h2>
+                <form id="feedbackForm">
+                    <div class="feedback-kinds" role="radiogroup" aria-label="種類">
+                        <label><input type="radio" name="feedbackKind" value="bug" checked><span>不具合</span></label>
+                        <label><input type="radio" name="feedbackKind" value="idea"><span>ご意見・要望</span></label>
+                    </div>
+                    <label class="online-field">
+                        <span>ひとことで</span>
+                        <input id="feedbackTitle" type="text" maxlength="80" required placeholder="例：ピースが置けるはずなのに置けない">
+                    </label>
+                    <label class="online-field">
+                        <span>くわしく（任意）</span>
+                        <textarea id="feedbackBody" rows="4" maxlength="2000" placeholder="どの画面で、何をしたら、どうなったか"></textarea>
+                    </label>
+                    <label class="feedback-attach">
+                        <input id="feedbackAttach" type="checkbox" checked>
+                        <span>遊んでいた問題と端末の情報を添える</span>
+                    </label>
+                    <pre class="feedback-context" id="feedbackContext"></pre>
+                    <p class="result-note feedback-note">GitHub の画面が開きます。内容を確かめて送信してください（GitHub のアカウントが必要です）</p>
+                    <button type="submit" class="primary-button feedback-submit">GitHub で報告する</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- 画面下に出す短いお知らせ -->
+        <div class="toast" id="toast" role="status" hidden></div>
+
+        <!-- 遊び方：小さな盤面のアニメーションでルールを説明する（盤面はJavaScriptで生成） -->
+        <div class="modal" id="hintModal">
+            <div class="modal-content hint-content" role="dialog" aria-labelledby="hintTitle">
+                <button id="hintClose" class="hint-close" aria-label="閉じる">×</button>
+                <h2 id="hintTitle">遊び方</h2>
+
+                <section class="hint-slide">
+                    <div class="demo" data-scene="fill"></div>
+                    <div class="hint-captions">
+                        <p class="hint-caption">青は赤マスを1個覆う → 数字は「1」</p>
+                        <p class="hint-caption">緑は赤マスを2個覆う → 数字は「2」</p>
+                        <p class="hint-caption">すべて埋まったらクリア！</p>
+                    </div>
+                    <h3>ピースで盤面を埋めよう</h3>
+                    <p>下の置き場からピースを選んで盤面に置き、斜線以外のマスをすべて埋めればクリアです。</p>
+                </section>
+
+                <section class="hint-slide">
+                    <div class="demo" data-scene="rule"></div>
+                    <div class="hint-captions">
+                        <p class="hint-caption is-ng">赤マス1個なのに「2」を覆う → 置けない</p>
+                        <p class="hint-caption is-ok">赤マス1個、数字もすべて「1」→ 置ける</p>
+                    </div>
+                    <h3>数字 ＝ ピースが覆う赤マスの数</h3>
+                    <p>ピースが覆う数字が、すべて「そのピースが覆う赤マスの数」と同じときだけ置けます。</p>
+                </section>
+
+                <section class="hint-slide">
+                    <div class="demo" data-scene="move"></div>
+                    <div class="hint-captions">
+                        <p class="hint-caption">ドラッグで置く（タップで選んで盤面をタップでもOK）</p>
+                        <p class="hint-caption">置いたピースはタップで外せる（スワイプで動かせる）</p>
+                    </div>
+                    <ul class="hint-tips">
+                        <li><span class="tip-icon tip-striped"></span>斜線のマスには置けません</li>
+                        <li><span class="tip-icon tip-piece"></span>ピースは8個。使うのはそのうち6個です</li>
+                        <li><span class="tip-icon tip-timer"></span>チャレンジはトップ画面から。60秒から始まり、1問解くごとに+20秒</li>
+                    </ul>
+                </section>
+
+                <div class="hint-dots" id="hintDots"></div>
+                <div class="hint-actions">
+                    <button id="hintPrev" class="secondary-button">戻る</button>
+                    <button id="hintNext" class="primary-button">次へ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- モジュール分割したJSファイル -->
+    <script src="js/random.js"></script>
+    <script src="js/game-state.js"></script>
+    <script src="js/sound.js"></script>
+    <script src="js/piece-shape.js"></script>
+    <script src="js/board.js"></script>
+    <script src="js/effects.js"></script>
+    <script src="js/block.js"></script>
+    <script src="js/solution.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/interaction.js"></script>
+    <script src="js/challenge.js"></script>
+    <script src="js/hint.js"></script>
+    <script src="js/surrender.js"></script>
+    <script src="js/top.js"></script>
+    <script src="js/feedback.js"></script>
+    <script src="js/netplay/netplay-client.js"></script>
+    <script src="js/online-config.js"></script>
+    <script src="js/online.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

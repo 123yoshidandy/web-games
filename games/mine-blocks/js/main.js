@@ -1,0 +1,66 @@
+/**
+ * メインモジュール
+ * ゲームの初期化と全体のフロー管理を行います
+ */
+
+// 指定したシードのゲームを生成
+function generateGame(seed) {
+    // ボードとブロックをクリア
+    clearBoard();
+
+    // シードを設定（同じシードなら同じパズルになる）
+    gameState.seed = seed;
+    setSeed(seed);
+
+    // ブロックと想定解（配置不可能なセルを含む）を生成
+    // 想定解を作れなかった場合は、乱数列の続きを使って作り直す（同じシードなら結果も同じ）
+    const maxAttempts = 100;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        gameState.blocks = [];
+        generateBlocks();
+        if (generateSolutionAndNotPlaceableCells()) {
+            break;
+        }
+    }
+    
+    // ボードを生成して描画
+    generateBoard();
+    renderBoard();
+    
+    // ブロックを描画
+    renderBlocks();
+    
+    // 問題を出した時刻を覚える（クリア時間に使う）
+    gameState.startTime = Date.now();
+}
+
+// ゲーム初期化
+function initGame() {
+    gameState.clearedCount = 0;
+
+    // 以前の版で共有された問題番号つきのURL（?seed=）は使わないので、URLから外す
+    const url = new URL(location.href);
+    if (url.searchParams.has('seed')) {
+        url.searchParams.delete('seed');
+        history.replaceState(null, '', url);
+    }
+
+    // 毎回ランダムな問題で始める
+    generateGame(createRandomSeed());
+    setupEventListeners();
+}
+
+// DOMContentLoaded イベントでゲームを初期化
+document.addEventListener('DOMContentLoaded', initGame);
+
+// 画面を拡大させない（ふつうは style.css の touch-action で止まる。iOS は viewport の user-scalable を無視するので、2本指の操作を止める）
+// document 全体の touchmove は止めない（passive でない touchmove があると、スクロールの始まりが遅れるため）
+document.addEventListener('gesturestart', event => event.preventDefault());
+
+// ホーム画面に置いて、オフラインでも開けるようにする（PWA）
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').then(() => navigator.serviceWorker.ready).then(registration => {
+        const urls = [location.href, ...performance.getEntriesByType('resource').map(entry => entry.name)];
+        registration.active?.postMessage({ type: 'cache-urls', urls });
+    }).catch(() => {});
+}
