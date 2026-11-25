@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1d3b34">
+    <title>フォーセール</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="フォーセール">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">For Sale</h1>
+            <p class="subtitle">フォーセール</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">人数</span>
+                    <div class="stepper">
+                        <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="count-value" class="count-value"></span>
+                        <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="phase-info" class="phase-info"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="players" class="players"></div>
+            <div id="table" class="table"></div>
+            <div id="me" class="me"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <ol id="result-list" class="result-list"></ol>
+        <p id="result-note" class="muted note"></p>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>前半の競りで物件を買い、後半にそれを売って小切手に換えます。最後に<strong>小切手とコインの合計</strong>が一番多い人の勝ちです。</p>
+            <h3>前半：競り</h3>
+            <div class="help-pic" id="help-bid"></div>
+            <p>人数分の物件が並びます。手番の人は、今の最高額より多いコインを出して<strong>上げる</strong>か、<strong>降りる</strong>かを選びます。</p>
+            <p>降りたら、残っている中で<strong>一番安い物件</strong>を取り、出したコインの<strong>半分</strong>（切り捨て）が戻ります。最後に残った人は一番高い物件を取り、出したコインを全部払います。その人が次の競りを始めます。</p>
+            <h3>後半：売り</h3>
+            <div class="help-pic" id="help-sell"></div>
+            <p>人数分の小切手が並びます。全員が同時に物件を1枚出し、<strong>高い物件から順に、高い小切手</strong>をもらいます。</p>
+            <h3>終わり</h3>
+            <p>小切手を配り終えたら終わりです。同点なら残りのコインが多い人、それでも同点なら競りで買った一番高い物件の人が勝ちです。</p>
+            <h3>人数</h3>
+            <p>3〜4人はコイン18枚、5〜6人は14枚で始めます。3人なら物件と小切手を6枚ずつ、4人なら2枚ずつ、伏せて除きます。小切手は 0 と 2〜15 が2枚ずつ（単位は千ドル）です。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
