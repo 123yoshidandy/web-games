@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#14261f">
+    <title>ショッテントッテン</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ショッテントッテン">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">SCHOTTEN<br>TOTTEN</h1>
+            <p class="subtitle">ショッテントッテン</p>
+            <div class="setup">
+                <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ">
+                    <button data-level="easy" role="radio">やさしい</button>
+                    <button data-level="normal" role="radio">ふつう</button>
+                </div>
+                <div class="segment" id="tactics" role="radiogroup" aria-label="戦術カード">
+                    <button data-tactics="off" role="radio">戦術カードなし</button>
+                    <button data-tactics="on" role="radio">あり</button>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="decks" class="decks"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="rival" class="strip rival"></div>
+            <div id="board" class="board"></div>
+            <div id="me" class="strip me"></div>
+            <div id="hand" class="hand"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- ジョーカー・スパイ・盾持ちの色と数 -->
+    <dialog id="wild" class="sheet">
+        <h2 id="wild-title" tabindex="-1" autofocus></h2>
+        <div id="wild-colors" class="choice-row"></div>
+        <div id="wild-values" class="choice-row"></div>
+        <div class="buttons">
+            <button id="wild-go" class="btn primary">出す</button>
+            <button class="btn ghost close">やめる</button>
+        </div>
+    </dialog>
+
+    <!-- 新兵募集で引く山札 -->
+    <dialog id="recruit" class="sheet">
+        <h2 tabindex="-1" autofocus>新兵募集で引く3枚</h2>
+        <div id="recruit-options" class="recruit-options"></div>
+        <div class="buttons"><button class="btn ghost close">やめる</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-note" class="muted note"></p>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>9つの境界石を取り合います。<strong>5つ</strong>か、<strong>隣り合う3つ</strong>を取った方の勝ちです。</p>
+            <h3>手番</h3>
+            <ul class="help-list">
+                <li>手札から1枚を、自分の側の境界石に出す（各石3枚まで）</li>
+                <li>取れる境界石があれば主張する（何個でも）</li>
+                <li>1枚引く</li>
+            </ul>
+            <h3>組の強さ</h3>
+            <div class="help-ranks" id="help-ranks"></div>
+            <p>同じ種類なら、数の合計が大きい方が強く、それも同じなら先に3枚そろえた方の勝ちです。</p>
+            <h3>主張</h3>
+            <p>自分の側に3枚そろっていて、相手より強ければ、その石を取れます。相手がまだそろっていなくても、<strong>場に出ているカード</strong>から、相手がどう埋めても勝てないと分かれば取れます（手札は数えません）。取れる石には「主張」の札が光ります。</p>
+            <h3>戦術カード（設定であり）</h3>
+            <p>手札は7枚になり、引くときに氏族か戦術の山札を選びます。戦術カードは、相手が出した枚数＋1枚までしか出せません。</p>
+            <ul class="help-list" id="help-tactics"></ul>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
