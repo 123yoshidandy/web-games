@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#16323a">
+    <title>七不思議デュエル</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="七不思議デュエル">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">7 WONDERS<span>DUEL</span></h1>
+            <p class="subtitle">世界の七不思議デュエル</p>
+            <div class="setup">
+                <div class="row">CPU
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <header class="bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></button>
+                <div id="board-info" class="board-info"></div>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録"><svg class="ico" aria-hidden="true"><use href="#i-log"/></svg></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+            </header>
+            <div id="city-1" class="city opp"></div>
+            <div id="military" class="military"></div>
+            <div id="structure" class="structure"></div>
+            <div id="city-0" class="city me"></div>
+            <div id="status" class="status" role="status"></div>
+        </section>
+    </main>
+
+    <!-- カードの説明と、使い方 -->
+    <dialog id="card-detail" class="sheet card-detail">
+        <div id="card-detail-body"></div>
+        <div id="card-detail-buttons" class="buttons stack"></div>
+    </dialog>
+
+    <!-- 都市 -->
+    <dialog id="city-detail" class="sheet city-detail">
+        <h2 id="city-detail-name" tabindex="-1" autofocus></h2>
+        <div id="city-detail-body"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 選ぶ（進歩トークン・大図書館・捨てさせるカード・霊廟・次の時代の先手） -->
+    <dialog id="pick" class="sheet pick">
+        <h2 id="pick-title" tabindex="-1" autofocus></h2>
+        <div id="pick-list" class="pick-list"></div>
+        <div class="buttons"><button class="btn secondary" data-close>盤を見る</button></div>
+    </dialog>
+
+    <!-- 捨て札 -->
+    <dialog id="discard-pile" class="sheet">
+        <h2 tabindex="-1" autofocus>捨て札</h2>
+        <div id="discard-list" class="card-grid"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 終わり -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-sub" class="note"></p>
+        <table id="result-table" class="result-table"></table>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <h2 tabindex="-1" autofocus>遊び方</h2>
+        <div class="help-body">
+            <h3>目的</h3>
+            <p>3つの時代でカードを取り合い、都市を発展させます。勝ち方は3つ。</p>
+            <ul>
+                <li><strong>軍事</strong>：駒を相手の都（端）まで進めたら、その場で勝ち</li>
+                <li><strong>科学</strong>：違う科学の印を6種類そろえたら、その場で勝ち</li>
+                <li><strong>点</strong>：時代IIIの終わりに、点の多い方の勝ち（同点なら青のカードの点で比べる）</li>
+            </ul>
+            <h3>準備</h3>
+            <p>はじめは7コイン。七不思議を4枚ずつ2回、交互に選び、各自4つを持ちます（1回目は先手1枚 → 後手2枚 → 先手が残り、2回目は逆）。</p>
+            <h3>手番</h3>
+            <p>ほかのカードに覆われていないカードを1枚取り、どれかに使います。取って覆いがなくなった裏のカードは表になります。</p>
+            <ol class="help-steps">
+                <li><strong>建てる</strong>：費用を払って都市に置く。連鎖の印（右上の印）を持っていれば無料</li>
+                <li><strong>捨てる</strong>：2コイン＋自分の黄のカードの数だけコインを得る</li>
+                <li><strong>七不思議</strong>：カードを使って、自分の七不思議を1つ建てる。2人合わせて7つまで</li>
+            </ol>
+            <h3>資源と買い物</h3>
+            <p>茶と灰のカードが資源を生みます。足りない資源は、1つにつき「2＋相手の茶と灰のカードが生むその資源の数」コインで買えます。黄のカードや七不思議の「どれか1つ」は、相手の値段に数えません。</p>
+            <h3>軍事と科学</h3>
+            <p>盾1つで駒が相手側へ1マス進みます。3マス目と6マス目では、相手が2コイン・5コインを失います。同じ科学の印を2つそろえると、進歩トークンを1枚取れます。</p>
+            <h3>時代の終わり</h3>
+            <p>カードがなくなったら時代が終わります。軍事で負けている方が、次の時代の先手を決めます（並んでいれば、最後のカードを取った人）。</p>
+            <h3>点</h3>
+            <p>カードと七不思議と進歩トークンの点、軍事の位置の点（2・5・10点）、3コインにつき1点を合わせます。</p>
+            <h3>カードの色</h3>
+            <ul class="help-colors">
+                <li><span class="swatch c-brown"></span>茶：原料（木・粘土・石）</li>
+                <li><span class="swatch c-grey"></span>灰：製品（ガラス・パピルス）</li>
+                <li><span class="swatch c-blue"></span>青：点</li>
+                <li><span class="swatch c-green"></span>緑：科学の印</li>
+                <li><span class="swatch c-red"></span>赤：盾</li>
+                <li><span class="swatch c-yellow"></span>黄：コインと買い物</li>
+                <li><span class="swatch c-purple"></span>紫：ギルド（時代IIIだけ）</li>
+            </ul>
+            <h3>七不思議</h3>
+            <ul class="help-list" id="help-wonders"></ul>
+            <h3>進歩トークン</h3>
+            <ul class="help-list" id="help-tokens"></ul>
+        </div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
