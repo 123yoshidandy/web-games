@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#14263b">
+    <title>レイルロードインク</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="レイルロードインク">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Rye&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">RAILROAD INK</h1>
+            <p class="subtitle">レイルロードインク</p>
+            <div class="setup">
+                <div class="setup-row">人数
+                    <div class="stepper">
+                        <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="count-value" class="count-value"></span>
+                        <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <div class="setup-row">CPU
+                    <div class="segment" id="level">
+                        <button data-level="easy">やさしい</button>
+                        <button data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"></button>
+                <span id="round" class="round"></span>
+                <span id="others" class="others"></span>
+                <button id="open-others" class="icon-btn" aria-label="ほかの人のボード" title="ほかの人のボード"></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"></button>
+            </div>
+            <div id="tray" class="tray"></div>
+            <div id="specials" class="specials"></div>
+            <div id="board" class="board"></div>
+            <div id="score" class="score"></div>
+            <div id="prompt" class="prompt"></div>
+            <div id="actions" class="actions">
+                <button id="rotate" class="icon-btn big" aria-label="回す" title="回す"></button>
+                <button id="flip" class="icon-btn big" aria-label="裏返す" title="裏返す"></button>
+                <button id="undo" class="icon-btn big" aria-label="取り消す" title="取り消す"></button>
+                <button id="place" class="btn primary small">描く</button>
+                <button id="end" class="btn secondary small">次へ</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- ほかの人のボード -->
+    <dialog id="others-dialog" class="sheet">
+        <h2 tabindex="-1" autofocus>みんなのボード</h2>
+        <div id="others-list" class="others-list"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <div id="result-board" class="result-board"></div>
+        <table id="result-table" class="score-table"></table>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body" id="help-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
