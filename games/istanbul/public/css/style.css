@@ -1,0 +1,458 @@
+/* イスタンブール
+ * 縦持ちのスマホ（最小 375×548）に、5人でもスクロールなしで収める。真ん中の盤だけが残りの高さを使う
+ */
+
+:root {
+    --bg: #18252d;
+    --bg2: #22343e;
+    --panel: rgba(255, 255, 255, .06);
+    --panel-line: rgba(255, 255, 255, .13);
+    --text: #f3ede2;
+    --muted: #a9b5b9;
+    --accent: #e8a33c;
+    --accent-deep: #a86d17;
+    --teal: #2f8f8a;
+    --tile: #efe3cb;
+    --tile-ink: #3a2f25;
+    --tile-line: #c9b48e;
+    --ruby: #c8173a;
+    --warn: #ff9b7a;
+    --font: 'M PLUS Rounded 1c', 'Hiragino Maru Gothic ProN', 'Hiragino Sans', sans-serif;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html {
+    height: 100%;
+    touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    color: var(--text);
+    font-family: var(--font);
+    font-weight: 500;
+    background:
+        radial-gradient(ellipse at 50% 30%, rgba(232, 163, 60, .10), transparent 60%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32' viewBox='0 0 32 32'%3E%3Cpath d='M16 2l14 14-14 14L2 16z' fill='none' stroke='%23ffffff' stroke-opacity='.035'/%3E%3C/svg%3E") 0 0 / 32px 32px,
+        linear-gradient(170deg, var(--bg2), var(--bg));
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+
+button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent; }
+
+#app {
+    position: relative;
+    height: 100%;
+    max-width: 540px;
+    margin: 0 auto;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+.screen { height: 100%; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+
+/* ---- 絵 ---- */
+
+svg.ic { width: 16px; height: 16px; flex: none; display: block; }
+svg.ic.s { width: 13px; height: 13px; }
+svg.ic.xs { width: 10px; height: 10px; }
+svg.mini { width: 13px; height: 13px; flex: none; display: block; }
+
+.tok { display: inline-block; flex: none; }
+.tok.merchant {
+    display: inline-grid;
+    place-items: center;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: var(--c);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .45), inset 0 -2px 0 rgba(0, 0, 0, .18);
+    color: #1b1b1b;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1;
+}
+.tok.merchant.you { outline: 2px solid #fff; outline-offset: 0; }
+.tok.merchant.neutral { width: 13px; height: 13px; }
+.tok.assistant { width: 8px; height: 8px; border-radius: 2px; background: var(--c); box-shadow: 0 0 0 1px rgba(0, 0, 0, .35); }
+.tok.family { width: 10px; height: 11px; background: var(--c); clip-path: polygon(50% 0, 100% 42%, 100% 100%, 0 100%, 0 42%); filter: drop-shadow(0 0 1px #000); }
+.tok.npc {
+    display: inline-grid;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1;
+}
+.tok.gov { background: #6a3aa6; }
+.tok.smug { background: #1d1d1d; box-shadow: 0 0 0 1px rgba(255, 255, 255, .5); }
+
+/* ---- ボタン ---- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 110px;
+    height: 44px;
+    padding: 0 18px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: transform .08s, box-shadow .08s;
+}
+.btn.primary { color: #2a1a04; background: linear-gradient(#f4bf62, var(--accent)); box-shadow: 0 4px 0 var(--accent-deep); }
+.btn.secondary { color: #fff; background: linear-gradient(#3f6d78, #2e5560); box-shadow: 0 4px 0 #1d3a42; }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .3); }
+.btn:disabled { opacity: .4; cursor: default; }
+
+.icon-btn {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 10px;
+    color: var(--muted);
+    background: rgba(255, 255, 255, .08);
+    cursor: pointer;
+}
+.line-icon { width: 21px; height: 21px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.link { border: none; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px; }
+
+/* ---- タイトル ---- */
+
+#screen-title:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px;
+    touch-action: none;
+}
+.title-art { position: relative; width: 200px; height: 96px; }
+.title-goods { position: absolute; left: 14px; top: 20px; display: flex; gap: 8px; transform: rotate(-6deg); }
+.title-good { width: 38px; height: 38px; filter: drop-shadow(0 3px 3px rgba(0, 0, 0, .4)); }
+.title-ruby { position: absolute; right: -14px; top: 40px; width: 54px; height: 54px; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .5)); }
+.logo { margin: 2px 0 0; font-size: 40px; font-weight: 800; letter-spacing: .04em; color: var(--accent); text-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
+.subtitle { margin: -2px 0 10px; color: var(--muted); font-size: 13px; letter-spacing: .4em; }
+.setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.setup .row { display: flex; align-items: center; gap: 12px; font-weight: 800; }
+.row-label { width: 36px; text-align: right; }
+.setup .buttons { display: flex; gap: 12px; margin-top: 4px; }
+.stepper, .segment { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+.step-btn { width: 40px; height: 36px; border: none; border-radius: 8px; background: rgba(255, 255, 255, .1); font-size: 20px; font-weight: 800; cursor: pointer; }
+.step-btn:disabled { opacity: .3; cursor: default; }
+.count-value { min-width: 48px; text-align: center; font-size: 17px; font-weight: 800; }
+.segment button { width: 86px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+.segment.three button { width: 76px; }
+.segment button.on { color: #2a1a04; background: var(--accent); }
+
+/* ---- ゲーム画面 ---- */
+
+#screen-game:not([hidden]) {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 5px 6px 6px;
+    touch-action: none;
+}
+
+.topbar { display: flex; align-items: center; gap: 6px; flex: none; height: 34px; }
+.status { flex: 1; min-width: 0; display: flex; justify-content: center; gap: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; }
+.status .sep { opacity: .5; }
+.status .warn { color: var(--warn); }
+
+/* 相手：1人1行（高さは固定） */
+.opponents { flex: none; display: flex; flex-direction: column; gap: 3px; }
+.opp {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 24px;
+    padding: 0 8px;
+    border-radius: 7px;
+    background: var(--panel);
+    border: 1px solid transparent;
+    font-size: 13px;
+}
+.opp.active { border-color: var(--c); box-shadow: 0 0 8px color-mix(in srgb, var(--c) 45%, transparent); }
+.opp-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); flex: none; }
+.opp-name { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-weight: 800; }
+.opp-stat { display: inline-flex; align-items: center; gap: 2px; flex: none; min-width: 30px; }
+.opp-stat b { font-size: 13px; }
+.opp-goods { display: inline-flex; gap: 2px; flex: none; }
+.g-num {
+    display: inline-grid;
+    place-items: center;
+    width: 15px;
+    height: 15px;
+    border-radius: 3px;
+    background: var(--g);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 800;
+    text-shadow: 0 1px 1px rgba(0, 0, 0, .5);
+}
+.thinking { display: inline-flex; gap: 2px; flex: none; }
+.thinking i { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); animation: think 1s ease-in-out infinite; }
+.thinking i:nth-child(2) { animation-delay: .15s; }
+.thinking i:nth-child(3) { animation-delay: .3s; }
+@keyframes think { 50% { opacity: .2; transform: translateY(-2px); } }
+
+/* 盤：残りの高さを使う。タイルは横長すぎ・縦長すぎにしない */
+.board-wrap { flex: 1; min-height: 0; container-type: size; display: grid; place-items: center; }
+.board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+    width: min(100cqw, 100cqh * 1.45);
+    height: min(100cqh, 100cqw * 0.95);
+}
+.tile {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    min-width: 0;
+    min-height: 0;
+    padding: 3px 3px 2px;
+    overflow: hidden;
+    border: none;
+    border-radius: 8px;
+    color: var(--tile-ink);
+    background: var(--tile);
+    box-shadow: inset 0 0 0 1.5px var(--tile-line), 0 2px 4px rgba(0, 0, 0, .35);
+    text-align: left;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+/* 場所の種類ごとの帯の色 */
+.tile::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: var(--band, #b08a55); }
+.tile.p2 { --band: #d2463c; }
+.tile.p3 { --band: #4f9a3c; }
+.tile.p4 { --band: #e6b52c; }
+.tile.p14, .tile.p15 { --band: var(--teal); }
+.tile.p13, .tile.p16 { --band: var(--ruby); }
+.tile.p10, .tile.p11 { --band: #c7762b; }
+.tile.p7 { --band: #4aa3c9; }
+.tile.target { box-shadow: inset 0 0 0 2.5px var(--accent), 0 0 10px rgba(232, 163, 60, .55); animation: glow 1.6s ease-in-out infinite; }
+@keyframes glow { 50% { box-shadow: inset 0 0 0 2.5px rgba(232, 163, 60, .55), 0 0 4px rgba(232, 163, 60, .25); } }
+.tile.acting { box-shadow: inset 0 0 0 2.5px #4aa3c9, 0 0 10px rgba(74, 163, 201, .6); }
+.t-head { display: flex; align-items: baseline; gap: 2px; min-width: 0; margin-top: 1px; }
+.t-no { flex: none; font-size: 9.5px; color: #8b7457; font-weight: 800; }
+.t-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 11.5px; font-weight: 800; letter-spacing: -.02em; }
+.t-info { display: flex; align-items: center; gap: 2px; min-height: 14px; font-size: 11px; font-weight: 800; color: #5b4a37; white-space: nowrap; overflow: hidden; }
+.t-info small { font-size: 10px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+.t-info .demand { display: inline-flex; flex-wrap: wrap; gap: 1px; max-width: 100%; }
+.t-info .post { display: inline-flex; gap: 1px; align-items: center; }
+.t-info .pl { display: inline-grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; background: #d9a441; color: #3a2600; font-size: 9px; font-style: normal; }
+.t-info .mosque { display: inline-flex; gap: 3px; }
+.t-info .mq { display: inline-flex; align-items: center; gap: 1px; font-size: 10.5px; }
+.t-toks { display: flex; flex-wrap: wrap; align-content: flex-end; align-items: center; gap: 2px; flex: 1; min-height: 0; }
+.t-cost { position: absolute; right: 3px; top: 3px; padding: 0 3px; border-radius: 4px; background: #8c2f1d; color: #fff; font-size: 10px; font-weight: 800; }
+
+/* 操作の欄（高さは固定） */
+.prompt {
+    flex: none;
+    height: 82px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 5px 7px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, .22);
+}
+.prompt-text {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.35;
+    height: 2.7em;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+.prompt-buttons { display: flex; gap: 5px; overflow-x: auto; overscroll-behavior: contain; touch-action: pan-x; scrollbar-width: none; }
+.pbtn {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    height: 34px;
+    padding: 0 11px;
+    border: none;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .12);
+    font-size: 13.5px;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+.pbtn.primary { background: var(--accent); color: #2a1a04; }
+.pbtn:disabled { opacity: .35; cursor: default; }
+.pbtn:active:not(:disabled) { transform: translateY(1px); }
+
+/* 自分の欄（高さは固定） */
+.me {
+    flex: none;
+    height: 72px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    padding: 5px 7px;
+    border-radius: 10px;
+    border: 1px solid var(--panel-line);
+    background: var(--panel);
+}
+.me.active { border-color: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 40%, transparent); }
+.me-row { display: flex; align-items: center; gap: 7px; min-width: 0; height: 26px; }
+.cart { display: inline-flex; gap: 5px; flex: none; }
+.cart-cell { display: inline-flex; align-items: center; gap: 2px; padding: 2px 4px; border-radius: 6px; background: rgba(0, 0, 0, .2); }
+.cart-cell b { font-size: 15px; }
+.cart-cell small, .me-stat small { font-size: 10.5px; color: var(--muted); }
+.me-stat { display: inline-flex; align-items: center; gap: 3px; flex: none; }
+.me-stat b { font-size: 16px; }
+.cart + .me-stat { margin-left: auto; }
+.helpers .tok.merchant { width: 21px; height: 21px; font-size: 12px; }
+.tile-chip { flex: none; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: none; border-radius: 6px; background: rgba(47, 143, 138, .45); cursor: pointer; }
+.hand { display: flex; gap: 4px; min-width: 0; overflow-x: auto; overscroll-behavior: contain; touch-action: pan-x; scrollbar-width: none; margin-left: auto; }
+.hand-card {
+    flex: none;
+    height: 24px;
+    padding: 0 7px;
+    border: none;
+    border-radius: 6px;
+    background: #4f6f91;
+    color: #fff;
+    font-size: 11.5px;
+    font-weight: 800;
+    white-space: nowrap;
+    cursor: pointer;
+}
+.hand-card.usable { background: #5f86b0; box-shadow: 0 0 0 1px rgba(255, 255, 255, .35); }
+
+/* ---- シート（下から出る） ---- */
+
+dialog.sheet {
+    width: min(500px, calc(100vw - 16px));
+    max-height: calc(100dvh - 24px);
+    margin: auto auto max(12px, env(safe-area-inset-bottom));
+    padding: 16px 16px 14px;
+    border: 1px solid var(--panel-line);
+    border-radius: 16px;
+    color: var(--text);
+    background: #20323b;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, .5);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+}
+dialog.sheet::backdrop { background: rgba(0, 0, 0, .5); }
+dialog.sheet h2 { margin: 0 0 8px; font-size: 18px; outline: none; display: flex; align-items: center; gap: 6px; }
+dialog.sheet p { margin: 6px 0; font-size: 14px; line-height: 1.55; }
+dialog.sheet p .ic { display: inline-block; vertical-align: -2px; }
+dialog .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin-top: 12px; }
+.choice-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+.chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 38px;
+    padding: 0 12px;
+    border: 1px solid var(--panel-line);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .08);
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+}
+.chip.on { background: var(--accent); color: #2a1a04; border-color: var(--accent); }
+.chip:disabled { opacity: .35; cursor: default; }
+.bet-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin-top: 8px; }
+.chip.bet { flex-direction: column; justify-content: center; gap: 0; height: 50px; padding: 0; }
+.chip.bet b { font-size: 18px; line-height: 1.1; }
+.chip.bet small { font-size: 11px; color: var(--muted); font-weight: 500; }
+.market { display: flex; flex-direction: column; gap: 6px; }
+.m-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m-good { display: inline-flex; align-items: center; gap: 5px; font-weight: 800; }
+.m-good small { color: var(--muted); font-weight: 500; font-size: 12px; }
+.m-total { text-align: center; font-size: 16px !important; }
+.any-toggle { display: flex; align-items: center; gap: 6px; font-size: 14px; }
+.any-toggle input { width: 18px; height: 18px; }
+
+.log-list { margin: 0; padding: 0 0 0 4px; list-style: none; font-size: 13px; line-height: 1.5; max-height: 60dvh; overflow-y: auto; overscroll-behavior: contain; }
+.log-list li { padding: 3px 0; border-bottom: 1px solid rgba(255, 255, 255, .06); }
+
+.result-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.result-list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--panel); border-left: 4px solid var(--c); }
+.result-list li.win { background: rgba(232, 163, 60, .18); }
+.r-rank { font-weight: 800; color: var(--muted); width: 14px; }
+.r-name { flex: 1; min-width: 0; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-stat { display: inline-flex; align-items: center; gap: 2px; font-weight: 800; }
+.r-sub { font-size: 12px; color: var(--muted); }
+.note { text-align: center; font-size: 12px !important; }
+
+.help .help-body h3 { margin: 14px 0 4px; font-size: 15px; color: var(--accent); }
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(env(safe-area-inset-bottom) + 170px);
+    z-index: 10;
+    max-width: min(460px, calc(100vw - 24px));
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(10, 18, 22, .92);
+    color: #fff;
+    font-size: 13.5px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, .4);
+    opacity: 0;
+    transform: translate(-50%, -6px);
+    transition: opacity .2s, transform .2s;
+    pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* 広い画面（PC・タブレット）では、タイルの中を大きくする */
+@media (min-width: 600px) and (min-height: 700px) {
+    .tile { padding: 6px 7px 5px; gap: 4px; border-radius: 10px; }
+    .t-no { font-size: 12px; }
+    .t-name { font-size: 15px; }
+    .t-info { font-size: 14px; min-height: 20px; gap: 4px; }
+    .t-info small { font-size: 12.5px; }
+    .tile svg.ic { width: 20px; height: 20px; }
+    .tile svg.ic.s { width: 17px; height: 17px; }
+    .tile svg.ic.xs { width: 14px; height: 14px; }
+    .t-info .pl { width: 17px; height: 17px; font-size: 11px; }
+    .t-info .mq { font-size: 13px; }
+    .t-toks { gap: 3px; }
+    .tile .tok.merchant { width: 23px; height: 23px; font-size: 12.5px; }
+    .tile .tok.assistant { width: 11px; height: 11px; }
+    .tile .tok.family { width: 13px; height: 14px; }
+    .tile .tok.npc { width: 19px; height: 19px; font-size: 12px; }
+    .t-cost { font-size: 12px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .tile.target, .thinking i { animation: none; }
+}

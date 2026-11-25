@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1d2b33">
+    <title>イスタンブール</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="イスタンブール">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">イスタンブール</h1>
+            <p class="subtitle">ISTANBUL</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">人数</span>
+                    <div class="stepper">
+                        <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                        <span id="count-value" class="count-value"></span>
+                        <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                    </div>
+                </div>
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="row"><span class="row-label">並び</span>
+                    <div class="segment three" id="layout" role="radiogroup" aria-label="場所の並び"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="status" class="status"></span>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4h12v16H6zM9 8.5h6M9 12h6M9 15.5h4"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="opponents" class="opponents"></div>
+            <div id="board-wrap" class="board-wrap"><div id="board" class="board"></div></div>
+            <div id="prompt" class="prompt">
+                <p id="prompt-text" class="prompt-text"></p>
+                <div id="prompt-buttons" class="prompt-buttons"></div>
+            </div>
+            <div id="me" class="me"></div>
+        </section>
+    </main>
+
+    <!-- 選ぶ（賭け・売る品物・カードの説明など） -->
+    <dialog id="sheet" class="sheet">
+        <h2 id="sheet-title" tabindex="-1" autofocus></h2>
+        <div id="sheet-body" class="sheet-body"></div>
+        <div id="sheet-buttons" class="buttons"></div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <ol id="result-list" class="result-list"></ol>
+        <p class="muted note">ルビーの数で決め、同じならリラ → 品物 → カードの多い順</p>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>市場の16の場所を回って品物とお金を集め、<strong>ルビー</strong>を集めます。だれかが5個（2人なら6個）になったら、そのラウンドの最後の人まで遊んで終わり。ルビーの多い人の勝ちです。</p>
+            <h3>手番</h3>
+            <p><strong>商人</strong>（大きい丸）を<strong>1〜2マス</strong>動かします（斜めは2マス）。行き先で行動するには、<strong>助手</strong>を1人そこに置いて手伝わせます。自分の助手が置いてある場所なら、その助手を連れ戻して行動できます。</p>
+            <p>連れている助手がいなくなったら行動できません。<strong>噴水</strong>では、助手がいなくても行動でき、置いた助手を呼び戻せます。</p>
+            <p>行き先にほかの商人がいれば、<strong>1人に2リラ</strong>ずつ払います（噴水では払いません）。</p>
+            <h3>主な場所</h3>
+            <p><strong>倉庫</strong>：その品物を手押し車いっぱいまで。<strong>工房</strong>：7リラで手押し車を広げる（3回目でルビー）。<strong>市場</strong>：需要の品物を売る。<strong>郵便局・茶屋</strong>：お金や品物。<strong>闇市</strong>：品物1つとサイコロで宝石。<strong>宝石商</strong>：お金でルビー。<strong>宮殿</strong>：品物のセットでルビー。<strong>モスク</strong>：品物をそろえて特技のタイル。同じモスクの2枚でルビー。<strong>警察署</strong>：家族を好きな場所へ送り、そこの行動をする。<strong>隊商宿</strong>：ボーナスカード。</p>
+            <p>場所を長押し（PC では右クリック）すると、くわしい説明が出ます。</p>
+            <h3>出会い</h3>
+            <p>行動のあと、ほかの人の<strong>家族</strong>がいれば警察署へ送り、3リラかカードをもらえます。<strong>総督</strong>（総）からは2リラか手札1枚でカードを、<strong>密輸人</strong>（密）からは2リラか品物1つで好きな品物をもらえます。</p>
+            <h3>ボーナスカード</h3>
+            <p>自分の番ならいつでも使えます。手札をタップすると説明が出ます。</p>
+            <h3>終わり</h3>
+            <p>同じルビーの数なら、リラ → 品物 → カードの多い人が上です。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
