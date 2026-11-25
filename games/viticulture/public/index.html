@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2a1420">
+    <title>ヴィティカルチャー</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ヴィティカルチャー">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">Viticulture</h1>
+            <p class="subtitle">ヴィティカルチャー</p>
+            <div class="setup">
+                <div class="row">人数
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="2">2</button>
+                        <button type="button" role="radio" data-count="3">3</button>
+                        <button type="button" role="radio" data-count="4">4</button>
+                        <button type="button" role="radio" data-count="5">5</button>
+                        <button type="button" role="radio" data-count="6">6</button>
+                    </div>
+                </div>
+                <div class="row">CPU
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <header class="bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></button>
+                <span id="status" class="status"></span>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録"><svg class="ico" aria-hidden="true"><use href="#i-log"/></svg></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+            </header>
+            <div id="players" class="players"></div>
+            <div id="ticker" class="ticker"></div>
+            <div id="board" class="board"></div>
+            <div id="me" class="me"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 選ぶ -->
+    <dialog id="decide" class="sheet decide">
+        <h2 id="decide-title" tabindex="-1" autofocus></h2>
+        <div id="decide-body" class="decide-body"></div>
+        <div class="buttons"><button class="btn ghost" data-close>盤面を見る</button></div>
+    </dialog>
+
+    <!-- 手札・プレイヤーの持ち物 -->
+    <dialog id="cards" class="sheet">
+        <h2 id="cards-title" tabindex="-1" autofocus></h2>
+        <div id="cards-body" class="cards-body"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 終わり -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <div id="result-table" class="score-table"></div>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <h2 tabindex="-1" autofocus>遊び方</h2>
+        <div class="help-body" id="help-body"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
