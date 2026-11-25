@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1f5f3a">
+    <title>Lucky Numbers</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Lucky Numbers">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- クローバー型のタイルの形。色は使う側の CSS 変数（--leaf / --leaf-light / --stem）で変える -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+            <g id="clover-leaf">
+                <path d="M50 50 C 31 43, 19 23, 32 12 C 40 6, 50 11, 50 20 C 50 11, 60 6, 68 12 C 81 23, 69 43, 50 50 Z" style="fill: var(--leaf, #43a047)"/>
+                <path d="M50 46 L50 23" style="stroke: var(--leaf-light, #81c784)" stroke-width="2.5" stroke-linecap="round"/>
+            </g>
+            <symbol id="clover" viewBox="0 0 100 100">
+                <path d="M53 55 Q 64 74 80 90" fill="none" style="stroke: var(--stem, #2e7d32)" stroke-width="6" stroke-linecap="round"/>
+                <use href="#clover-leaf"/>
+                <use href="#clover-leaf" transform="rotate(90 50 50)"/>
+                <use href="#clover-leaf" transform="rotate(180 50 50)"/>
+                <use href="#clover-leaf" transform="rotate(270 50 50)"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <header id="topbar">
+        <h1><svg class="logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#clover"/></svg>Lucky Numbers</h1>
+        <div class="topbar-buttons">
+            <!-- 効果音と BGM の切り替え（トップ画面にも同じものを置く） -->
+            <button class="small icon sound-toggle" data-kind="effects" aria-label="効果音">
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/>
+                    <path class="sound-on" d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>
+                    <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
+                </svg>
+            </button>
+            <button class="small icon sound-toggle" data-kind="bgm" aria-label="BGM">
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M9 17.5V6l10-2v11.5"/>
+                    <circle cx="6.5" cy="17.5" r="2.5"/>
+                    <circle cx="16.5" cy="15.5" r="2.5"/>
+                    <path class="sound-off" d="M3.5 3.5l17 17"/>
+                </svg>
+            </button>
+            <button id="help-button" class="small icon" aria-label="遊び方">？</button>
+            <!-- ホーム（開始画面に戻る） -->
+            <button id="menu-button" class="small icon hidden" aria-label="ホームに戻る">
+                <svg class="home-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <main>
+        <!-- 開始画面（ローカル対戦） -->
+        <section id="screen-setup" class="screen">
+            <!-- ゲーム画面をイメージした絵：最初に置かれる斜めの4枚が埋まった庭と、空いたマスへ置こうとしているタイル
+                 （盤面は data-garden、_ は空き。data-target のマスに data-number のタイルを浮かべる） -->
+            <!-- トップ画面では上部のバーを出さず、タイトルを絵の上に大きく出す -->
+            <h1 class="title"><svg class="title-logo" viewBox="0 0 100 100" aria-hidden="true"><use href="#clover"/></svg>Lucky Numbers</h1>
+            <div class="hero" aria-hidden="true">
+                <div class="hero-board">
+                    <div class="hero-axis hero-axis-x">小 → 大</div>
+                    <div class="hero-axis hero-axis-y">小 → 大</div>
+                    <div class="hero-garden garden" data-garden="2,5,_,13/4,7,11,_/_,10,14,17/8,_,16,19" data-target="2,0"></div>
+                    <div class="hero-held" data-number="6"></div>
+                </div>
+            </div>
+            <p class="tagline">クローバーを並べて<strong>庭を埋めよう！</strong></p>
+
+            <div class="panel">
+            <h2>ゲームの準備</h2>
+            <!-- 人数は切り替えボタンで選ぶ（ブラウザのプルダウンは出る位置を決められないため） -->
+            <div class="row">人数
+                <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                    <button type="button" role="radio" data-count="2">2人</button>
+                    <button type="button" role="radio" data-count="3">3人</button>
+                    <button type="button" role="radio" data-count="4">4人</button>
+                </div>
+            </div>
+            <div id="seat-list"></div>
+            <div class="buttons">
+                <button id="start-local" class="primary">ゲーム開始</button>
+                <button id="open-online">オンラインで遊ぶ</button>
+            </div>
+            <!-- 遊び方と、効果音・BGM の切り替えは同じ行に並べる（画面の高さを増やさない） -->
+            <div class="setup-footer">
+                <button id="open-help" class="link">📖 遊び方を見る</button>
+                <div class="title-sound">
+                    <button class="small icon sound-toggle" data-kind="effects" aria-label="効果音">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/>
+                            <path class="sound-on" d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>
+                            <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
+                        </svg>
+                    </button>
+                    <button class="small icon sound-toggle" data-kind="bgm" aria-label="BGM">
+                        <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9 17.5V6l10-2v11.5"/>
+                            <circle cx="6.5" cy="17.5" r="2.5"/>
+                            <circle cx="16.5" cy="15.5" r="2.5"/>
+                            <path class="sound-off" d="M3.5 3.5l17 17"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            </div>
+        </section>
+
+        <!-- オンライン対戦の入口 -->
+        <section id="screen-online" class="screen panel hidden">
+            <h2 id="online-title">オンライン対戦</h2>
+            <label class="row">名前 <input id="online-name" maxlength="12" autocomplete="nickname"></label>
+            <div class="buttons not-invited">
+                <button id="create-room" class="primary">部屋を作る</button>
+                <label class="public-toggle" title="公開の部屋の一覧に出し、部屋番号を知らない人も入れるようにします"><input type="checkbox" id="public-room">公開</label>
+            </div>
+            <label class="row not-invited">部屋番号 <input id="room-code" inputmode="numeric" maxlength="4" placeholder="4桁の数字"></label>
+            <div class="buttons">
+                <button id="join-room" class="primary">参加する</button>
+                <button id="back-to-setup">戻る</button>
+            </div>
+            <!-- 公開の部屋の一覧（押すとその部屋に入る） -->
+            <div class="public-rooms not-invited">
+                <button id="find-rooms">公開の部屋を探す</button>
+                <ul id="public-rooms"></ul>
+            </div>
+        </section>
+
+        <!-- ロビー -->
+        <section id="screen-lobby" class="screen panel hidden">
+            <h2>部屋 <span id="lobby-code"></span> <span id="lobby-public" class="badge hidden">公開</span></h2>
+            <div class="buttons">
+                <button id="share-invite">招待URLを共有</button>
+            </div>
+            <ul id="lobby-players"></ul>
+            <div id="host-controls" class="buttons">
+                <button id="add-cpu">CPUを追加</button>
+                <button id="start-online" class="primary">ゲーム開始</button>
+            </div>
+            <p id="guest-note" class="hint">部屋を作った人がゲームを始めるまでお待ちください</p>
+            <div class="buttons">
+                <button id="leave-room">部屋を出る</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <!-- スマホの縦画面に収まるよう、相手の庭（小）・山札と場・自分の庭（残りの高さ）の順に並べる -->
+        <section id="screen-game" class="screen hidden">
+            <div id="opponents" class="opponents"></div>
+            <div id="center" class="panel">
+                <div class="center-row">
+                    <!-- 山札（裏向きのクローバーの束と残りの枚数） -->
+                    <button id="pool-button" class="pool" aria-label="山札から引く">
+                        <svg class="pool-back" viewBox="0 0 100 100" aria-hidden="true"><use href="#clover"/></svg>
+                        <svg class="pool-front" viewBox="0 0 100 100" aria-hidden="true"><use href="#clover"/></svg>
+                        <span class="pool-mark">?</span>
+                        <span id="pool-count" class="pool-count"></span>
+                    </button>
+                    <div id="holding" class="holding"></div>
+                    <button id="discard-button" class="hidden">場に出す</button>
+                </div>
+                <div class="table-row">
+                    <span class="table-label">場に出た<br>クローバー</span>
+                    <div id="table-tiles" class="table-tiles"></div>
+                </div>
+                <!-- 2行のログ：最近の出来事。自分の番のときは、操作の案内が最新の行として流れる -->
+                <div id="log-lines" class="log-lines" aria-live="polite"></div>
+            </div>
+            <div id="my-garden" class="garden mine panel"></div>
+            <div id="result" class="result hidden"></div>
+        </section>
+    </main>
+
+    <!-- 遊び方（上部の「？」と、開始画面の「遊び方を見る」から開く。data-numbers の図は JS で描く） -->
+    <dialog id="help-dialog" class="help">
+        <div class="help-head">
+            <h2>遊び方</h2>
+            <button id="close-help" class="small icon" aria-label="閉じる">✕</button>
+        </div>
+        <div class="help-body">
+            <section>
+                <h3>🎯 目的</h3>
+                <p>自分の庭（4×4 の16マス）を、数字のクローバーで<strong>最初に全部埋めた人の勝ち</strong>です。クローバーは 1〜20 が人数分あり、最初に4枚が左上から右下への斜めに置かれます。</p>
+            </section>
+            <section>
+                <h3>📏 置き方のルール</h3>
+                <p>どの<strong>行も左から右へ</strong>、どの<strong>列も上から下へ</strong>、数字が大きくなるように置きます。同じ行・列に同じ数字は置けません。斜めは関係ありません。</p>
+                <div class="demo">
+                    <div class="demo-row" data-numbers="3,8,12,17"></div>
+                    <span class="demo-mark ok">○</span>
+                </div>
+                <div class="demo">
+                    <div class="demo-row" data-numbers="3,12,8,17"></div>
+                    <span class="demo-mark ng">×</span>
+                </div>
+            </section>
+            <section>
+                <h3>🔁 手番の流れ</h3>
+                <ol>
+                    <li><strong>山札を引く</strong>か、<strong>場のクローバーを取る</strong>（タップ）</li>
+                    <li>光っているマスをタップして<strong>庭に置く</strong>。空いたマスに置くか、置いてあるクローバーと入れ替えます（外したクローバーは場へ）</li>
+                    <li>山札から引いたクローバーは、置かずに<strong>「場に出す」</strong>こともできます。場から取ったクローバーは必ず置きます</li>
+                    <li>すでに<strong>1・20</strong>を置いている人は、山札から 1・20 を引きません（飛ばして次のクローバーを引きます）</li>
+                </ol>
+            </section>
+            <section>
+                <h3>🏁 ゲームの終わり</h3>
+                <p>誰かが16マスを埋めたら、その人の勝ち。山札がなくなったら、庭のクローバーが一番多い人の勝ちです。</p>
+            </section>
+            <section>
+                <h3>💡 コツ</h3>
+                <p>左上には小さい数、右下には大きい数を。真ん中の数（10前後）は、庭の真ん中あたりに置くと後で困りません。場に出たクローバーは相手も取れるので、出すときは相手の庭も見てみましょう。</p>
+            </section>
+        </div>
+    </dialog>
+
+    <div id="toast" class="toast hidden" role="alert"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
