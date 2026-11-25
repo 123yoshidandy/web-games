@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#14213d">
+    <title>ポケモンカードゲーム</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ポケカ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="icon-home" viewBox="0 0 24 24"><path d="M3 11 12 4l9 7M6 9.5V20h12V9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="icon-back" viewBox="0 0 24 24"><path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4.5 7h15M9.5 7V4.5h5V7M6.5 7l1 13h9l1-13M10 11v5.5M14 11v5.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        <symbol id="icon-games" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></g></symbol>
+        <symbol id="icon-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="17.2" r="1.2" fill="currentColor"/></symbol>
+    </svg>
+
+    <!-- 開始画面 -->
+    <main id="title-screen" class="screen">
+        <button id="open-games" class="icon-btn back-corner" aria-label="ほかのゲーム"><svg><use href="#icon-games"/></svg></button>
+        <button id="open-rules" class="icon-btn corner-btn" aria-label="遊び方"><svg><use href="#icon-help"/></svg></button>
+        <div class="title-wrap">
+            <h1 class="title-logo">Pokémon Card Game</h1>
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <div class="settings-row">
+                <div class="setting">
+                    <span class="setting-label">デッキ</span>
+                    <button type="button" class="deck-picker-btn" data-open-deck-picker></button>
+                </div>
+                <div class="setting">
+                    <span class="setting-label">相手</span>
+                    <button type="button" class="deck-picker-btn" data-open-cpu-deck-picker></button>
+                </div>
+            </div>
+            <div class="title-buttons">
+                <button id="resume-cpu" class="btn btn-primary" hidden>続きから</button>
+                <button id="start-cpu" class="btn btn-primary">CPU と対戦</button>
+                <button id="open-online" class="btn btn-secondary">オンライン対戦</button>
+                <button id="open-decks" class="btn btn-tertiary">デッキ構築</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- オンライン対戦の入口 -->
+    <main id="online-screen" class="screen" hidden>
+        <div class="panel-wrap">
+            <h2 id="online-title" class="panel-title">オンライン対戦</h2>
+            <input id="online-name" class="text-input" maxlength="12" placeholder="名前" autocomplete="nickname">
+            <div class="online-create">
+                <button id="create-room" class="btn btn-primary">部屋を作る</button>
+                <label class="check"><input id="room-public" type="checkbox">公開する</label>
+            </div>
+            <div class="online-join">
+                <input id="room-code" class="text-input code-input" inputmode="numeric" maxlength="4" placeholder="部屋番号" autocomplete="off">
+                <button id="join-room" class="btn btn-secondary">参加する</button>
+            </div>
+            <button id="open-rooms" class="btn btn-tertiary online-rooms">公開の部屋をさがす</button>
+        </div>
+        <button id="online-back" class="icon-btn back-corner" aria-label="戻る"><svg><use href="#icon-back"/></svg></button>
+    </main>
+
+    <!-- ロビー -->
+    <main id="lobby-screen" class="screen" hidden>
+        <div class="panel-wrap lobby">
+            <h2 class="panel-title">部屋 <span id="lobby-code" class="lobby-code"></span> <span id="lobby-public" class="badge" hidden>公開</span></h2>
+            <ul id="lobby-players" class="lobby-players"></ul>
+            <div class="setting">
+                <span class="setting-label">デッキ</span>
+                <button type="button" class="deck-picker-btn" data-open-deck-picker></button>
+            </div>
+            <div class="lobby-buttons">
+                <button id="share-invite" class="btn btn-secondary">招待</button>
+                <button id="add-cpu" class="btn btn-secondary host-only">CPU を追加</button>
+                <button id="start-online" class="btn btn-primary host-only">開始</button>
+                <button id="leave-room" class="btn btn-secondary">部屋を出る</button>
+            </div>
+            <p id="guest-note" class="note">ホストが開始すると始まります</p>
+        </div>
+    </main>
+
+    <!-- デッキの一覧 -->
+    <main id="decks-screen" class="screen" hidden>
+        <header class="topbar">
+            <button id="decks-back" class="icon-btn" aria-label="戻る"><svg><use href="#icon-back"/></svg></button>
+            <div class="turn-info">デッキ構築</div>
+            <button id="import-deck" class="btn btn-secondary btn-small">貼り付け</button>
+            <button id="new-deck" class="btn btn-primary btn-small">新しく作る</button>
+        </header>
+        <ul id="deck-list" class="deck-list"></ul>
+    </main>
+
+    <!-- デッキの編集 -->
+    <main id="editor-screen" class="screen" hidden>
+        <header class="topbar">
+            <button id="editor-back" class="icon-btn" aria-label="戻る"><svg><use href="#icon-back"/></svg></button>
+            <input id="deck-name" class="text-input name-input" maxlength="16" autocomplete="off" aria-label="デッキの名前">
+            <span id="deck-count" class="deck-count"></span>
+            <span id="deck-problem" class="deck-problem"></span>
+            <button id="deck-export" class="btn btn-secondary btn-small">コピー</button>
+            <button id="deck-try" class="btn btn-primary btn-small">CPU と試す</button>
+            <button id="deck-share" class="btn btn-secondary btn-small" hidden>共有する</button>
+            <button id="deck-reset" class="btn btn-secondary btn-small" hidden>初期に戻す</button>
+            <button id="deck-delete" class="icon-btn" aria-label="削除"><svg><use href="#icon-trash"/></svg></button>
+        </header>
+        <div class="editor">
+            <section class="pool-wrap">
+                <div class="pool-bar">
+                    <div id="pool-tabs" class="segment pool-tabs"></div>
+                    <input id="pool-search" class="text-input pool-search" type="search" placeholder="さがす" autocomplete="off" aria-label="名前やカードの文でさがす">
+                </div>
+                <div id="pool-filters" class="pool-filters" aria-label="しぼりこみ"></div>
+                <div id="pool" class="pool"></div>
+            </section>
+            <ol id="deck-cards" class="deck-cards"></ol>
+        </div>
+    </main>
+
+    <div id="toast" class="toast" hidden></div>
+
+    <!-- 対戦画面 -->
+    <main id="game-screen" class="screen" hidden>
+        <!-- メニューは左端の縦の列（画面の縦の幅を盤面に使うため） -->
+        <nav class="side-menu" aria-label="メニュー">
+            <button id="go-home" class="icon-btn" aria-label="ホーム"><svg><use href="#icon-home"/></svg></button>
+            <button id="open-log" class="icon-btn" aria-label="ログ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6.5h12M8 12h12M8 17.5h12M4 6.5h.01M4 12h.01M4 17.5h.01"/></svg></button>
+            <button id="sound-toggle" class="icon-btn sound-toggle" aria-label="効果音" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="sound-wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="sound-slash" d="M3.5 3.5l17 17"/></svg></button>
+            <button id="open-rules-game" class="icon-btn" aria-label="遊び方"><svg><use href="#icon-help"/></svg></button>
+        </nav>
+        <div id="fx" class="fx-layer" aria-hidden="true"></div>
+        <div class="table">
+            <!-- 対面なので左右を反転する：サイドはそれぞれの左手側（自分は左下、相手は右上）、山札・トラッシュは右手側 -->
+            <aside class="rail rail-left">
+                <div id="opp-info" class="info"></div>
+                <div id="my-prizes" class="prize-box"></div>
+            </aside>
+            <section class="field">
+                <div id="opp-side" class="side side-opp"></div>
+                <div class="midline">
+                    <div id="stadium" class="stadium"></div>
+                    <div id="status" class="status"></div>
+                    <div class="midline-actions"><button id="prompt-done" class="btn btn-secondary btn-small" hidden>決定</button></div>
+                </div>
+                <div id="my-side" class="side side-me"></div>
+            </section>
+            <aside class="rail panel">
+                <div id="opp-prizes" class="prize-box"></div>
+                <ol id="log" class="log"></ol>
+                <div id="my-info" class="info"></div>
+            </aside>
+        </div>
+        <footer class="dock">
+            <div id="hand" class="hand"></div>
+            <div class="dock-actions">
+                <button id="end-turn" class="btn btn-primary">番を終える</button>
+            </div>
+        </footer>
+    </main>
+
+    <!-- カードの説明（ワザ・特性・にげるもここから使う） -->
+    <dialog id="detail" class="sheet"></dialog>
+
+    <!-- 選択（カード・選択肢・はい／いいえ） -->
+    <dialog id="prompt" class="sheet prompt"></dialog>
+
+    <!-- トラッシュなどのカードの一覧 -->
+    <dialog id="pile" class="sheet"></dialog>
+
+    <!-- デッキを選ぶ -->
+    <dialog id="deck-picker" class="sheet"></dialog>
+
+    <!-- 確認（デッキの削除） -->
+    <dialog id="confirm" class="sheet"></dialog>
+
+    <!-- 公開の部屋の一覧 -->
+    <dialog id="rooms" class="sheet rooms">
+        <div class="sheet-body">
+            <h2>公開の部屋</h2>
+            <ul id="room-list" class="room-list"></ul>
+        </div>
+        <div class="sheet-actions">
+            <button id="refresh-rooms" type="button" class="btn btn-secondary">更新</button>
+            <form method="dialog"><button class="btn btn-secondary">閉じる</button></form>
+        </div>
+    </dialog>
+
+    <!-- 決着 -->
+    <dialog id="result" class="sheet result"></dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="rules" class="sheet rules">
+        <div class="sheet-body">
+            <h2>遊び方</h2>
+            <h3>目的</h3>
+            <p>相手のポケモンをきぜつさせてサイドを6枚取るか、相手の場のポケモンをいなくするか、相手が番の始めに山札を引けなくなれば勝ち。ex がきぜつしたときは、サイドを2枚（メガシンカex は3枚）取る。</p>
+            <h3>準備</h3>
+            <p>手札は7枚。たねポケモンがなければ引き直し、相手はその回数まで追加で引ける。たねポケモンをバトル場に1匹、ベンチに5匹まで出し、山札の上からサイドを6枚置く。</p>
+            <h3>自分の番</h3>
+            <p>山札を1枚引いてから、好きな順に行う。</p>
+            <ul>
+                <li>たねポケモンをベンチに出す・進化させる（最初の番と、出したばかりのポケモンは進化できない）</li>
+                <li>エネルギーを1回つける</li>
+                <li>グッズ・どうぐは何枚でも、サポートとスタジアムは1回</li>
+                <li>特性を使う・にげる（1回。エネルギーをトラッシュする）</li>
+                <li>ワザを使うと番が終わる。先攻の最初の番は、ワザもサポートも使えない</li>
+            </ul>
+            <h3>特殊状態</h3>
+            <p>どく（10）・やけど（20、コインでオモテなら治る）は番の終わりにダメージ。ねむりはコインでオモテなら起きる。マヒは持ち主の次の番の終わりに治る。こんらんはワザの前にコインを投げ、ウラなら失敗して自分に30。ベンチに下がるか進化すると治る。</p>
+            <h3>操作</h3>
+            <ul>
+                <li>金の縁のついた手札が、今使えるカード。タップして使う。エネルギー・進化・どうぐは、光ったポケモンをタップする</li>
+                <li>バトルポケモンをタップすると、説明の下にワザ・にげるのボタンが出る</li>
+                <li>カードを長押しすると説明が出る。使えないカードは、その理由も出る</li>
+                <li>対面なので、相手の側は左右が逆。自分のサイドは左下、手札の枚数と山札・トラッシュの山は右下。相手のサイドは右上、相手の山は左上（トラッシュはタップで中身を見る）。左端の列に、ホーム・ログ・効果音・遊び方のボタン</li>
+                <li>相手の番は、盤面の中央の帯に、相手がしたことが出る</li>
+                <li>対戦の途中でホームを押すと、降参するかを確かめる</li>
+            </ul>
+            <h3>コツ</h3>
+            <ul>
+                <li>エネルギーは毎番つける。ワザに足りないポケモンに先につけておく</li>
+                <li>ベンチに次のポケモンを育てておくと、バトルポケモンがきぜつしても攻めが続く</li>
+                <li>ex はサイドを2枚（メガシンカex は3枚）とられる。倒されそうなら、にげるかベンチの別のポケモンで戦う</li>
+            </ul>
+            <h3>デッキ構築</h3>
+            <p>新しく作るか、共有デッキをコピーして作る。作ったデッキは「共有する」で共有デッキにできる。共有デッキは全員のもので、編集・削除すると（編集は遊べるデッキのときだけ）全員のデッキが変わる。「初期に戻す」で、共有したときの中身に戻せる。カードをタップすると1枚入り、右の −／＋ で増減する。60枚で、同じ名前のカードは4枚まで（基本エネルギーは何枚でも）、たねポケモンが1枚以上必要。変えた内容はすぐ保存される。</p>
+            <h3>オンライン対戦</h3>
+            <p>部屋を作って招待を送るか、部屋番号で参加する。「公開する」にして作った部屋は、「公開の部屋をさがす」の一覧から誰でも入れる。デッキはロビーで選ぶ。対戦中に部屋を出ると、その人の番は CPU が代わりに打つ。</p>
+        </div>
+        <form method="dialog" class="sheet-actions"><button class="btn btn-secondary">閉じる</button></form>
+    </dialog>
+
+    <!-- ほかのゲーム -->
+    <dialog id="games" class="sheet games">
+        <div class="sheet-body">
+            <h2>ほかのゲーム</h2>
+            <ul class="game-links">
+                <li><a href="https://123yoshidandy.github.io/katan/" target="_blank" rel="noopener"><b>KATAN</b><span>島を開拓するボードゲーム</span></a></li>
+                <li><a href="https://123yoshidandy.github.io/dominion/" target="_blank" rel="noopener"><b>ドミニオン</b><span>デッキを育てるカードゲーム</span></a></li>
+                <li><a href="https://123yoshidandy.github.io/lucky-numbers/" target="_blank" rel="noopener"><b>ラッキーナンバー</b><span>数字を並べるボードゲーム</span></a></li>
+                <li><a href="https://123yoshidandy.github.io/panel-de-pon/" target="_blank" rel="noopener"><b>パネルでポン</b><span>パネルを消す落ち物パズル</span></a></li>
+                <li><a href="https://123yoshidandy.github.io/mine-blocks/" target="_blank" rel="noopener"><b>MINE BLOCKS</b><span>数字をヒントにピースで埋めるパズル</span></a></li>
+                <li><a href="https://123yoshidandy.github.io/wordle/" target="_blank" rel="noopener"><b>Wordle</b><span>ひらがな5文字の言葉当て</span></a></li>
+                <li><a href="https://123yoshidandy.github.io/pokemon-ierukana/" target="_blank" rel="noopener"><b>ポケモンいえるかな</b><span>みんなで図鑑を埋める暗記クイズ</span></a></li>
+            </ul>
+        </div>
+        <form method="dialog" class="sheet-actions"><button class="btn btn-secondary">閉じる</button></form>
+    </dialog>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

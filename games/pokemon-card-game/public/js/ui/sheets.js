@@ -1,0 +1,286 @@
+/**
+ * ダイアログ：選択（カード・選択肢・はい／いいえ）、カードの説明、カードの一覧、決着
+ */
+
+import { getCard } from '../card-data.js';
+import { cardOrder } from '../deck-builder.js';
+import { cardFace, cardDetail } from './card-view.js';
+import { bindPress } from './press.js';
+
+// 外側のタップで閉じる（closable なダイアログだけ）
+export function closeOnBackdrop(dialog) {
+    dialog.addEventListener('click', event => {
+        if (event.target === dialog && dialog.dataset.closable !== 'false') dialog.close();
+    });
+}
+
+export function escapeHtml(text) {
+    return String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+}
+
+function open(dialog) {
+    if (!dialog.open) dialog.showModal();
+}
+
+// ===== 選択 =====
+
+// prompt はビューの prompt。onAnswer(answer) / onPeek()（盤面を見るために一時的に閉じる） / onDetail(cardId)
+// 選ぶカードを、種類の順（デッキ構築の一覧と同じ）に並べ、同じカードは1つにまとめる。答えの番号は元の順のまま
+function pickGroups(prompt) {
+    const indices = prompt.cards.map((_, index) => index)
+        .sort((a, b) => cardOrder(prompt.cards[a].id) - cardOrder(prompt.cards[b].id) || a - b);
+    const groups = [];
+    for (const index of indices) {
+        const last = groups.at(-1);
+        if (last && prompt.cards[last[0]].id === prompt.cards[index].id) last.push(index);
+        else groups.push([index]);
+    }
+    return groups;
+}
+
+export function showPrompt(dialog, prompt, { onAnswer, onPeek, onDetail }) {
+    const groups = prompt.cards ? pickGroups(prompt) : [];
+    // 山札から探すときは、山札をすべて見ることもできる（選べないカードは薄く並べる）。選べるカードがなければ、初めから山札をすべて見せる
+    let showAll = Boolean(prompt.deck) && !prompt.cards?.length;
+    const pickButton = (g, total) => `<button type="button" class="pick" data-group="${g}">${cardFace(prompt.cards[groups[g][0]].id)}${total > 1 ? `<span class="pool-count pick-total">×${total}</span>` : ''}<span class="pick-picked"></span></button>`;
+    const renderPicks = () => {
+        const grid = dialog.querySelector('.prompt-cards');
+        if (!showAll) {
+            grid.innerHTML = groups.length ? groups.map((group, g) => pickButton(g, group.length)).join('') : '<p class="empty">選べるカードはありません</p>';
+        } else {
+            const counts = new Map();
+            prompt.deck.forEach(id => counts.set(id, (counts.get(id) ?? 0) + 1));
+            const groupOf = new Map(groups.map((group, g) => [prompt.cards[group[0]].id, g]));
+            grid.innerHTML = [...counts].sort((a, b) => cardOrder(a[0]) - cardOrder(b[0])).map(([id, count]) => (groupOf.has(id)
+                ? pickButton(groupOf.get(id), groups[groupOf.get(id)].length)
+                : `<div class="pick pick-locked" data-card="${id}">${cardFace(id)}${count > 1 ? `<span class="pool-count pick-total">×${count}</span>` : ''}</div>`)).join('') || '<p class="empty">山札はありません</p>';
+        }
+        const toggle = dialog.querySelector('[data-toggle-deck]');
+        if (toggle) toggle.textContent = showAll ? '選べるカードだけ' : `山札をすべて見る（${prompt.deck.length}枚）`;
+    };
+    dialog.dataset.closable = 'false';
+    dialog.dataset.promptId = prompt.id;
+    const selected = new Set();
+    const peek = '<button type="button" class="btn btn-quiet" data-peek>盤面を見る</button>';
+
+    if (prompt.type === 'confirm') {
+        dialog.innerHTML = `<div class="sheet-body"><h2 class="prompt-title">${escapeHtml(prompt.title)}</h2>${prompt.card ? `<div class="detail">${cardDetail(prompt.card)}</div>` : ''}</div>
+            <div class="sheet-actions">${peek}<button type="button" class="btn btn-secondary" data-answer="no">いいえ</button><button type="button" class="btn btn-primary" data-answer="yes">はい</button></div>`;
+    } else if (prompt.type === 'choose') {
+        dialog.innerHTML = `<div class="sheet-body"><h2 class="prompt-title">${escapeHtml(prompt.title)}</h2>
+            <div class="choose-options">${prompt.options.map((option, index) => `<button type="button" class="btn btn-primary" data-option="${index}">${escapeHtml(option)}</button>`).join('')}</div></div>
+            <div class="sheet-actions">${peek}</div>`;
+    } else {
+        const count = prompt.min === prompt.max ? `${prompt.max}枚` : `${prompt.min ? `${prompt.min}〜` : ''}${prompt.max}枚まで`;
+        dialog.innerHTML = `<div class="sheet-body"><h2 class="prompt-title">${escapeHtml(prompt.title)}<span class="prompt-count">${count}</span></h2>
+            <div class="prompt-cards"></div></div>
+            <div class="sheet-actions">${peek}${prompt.deck && prompt.cards.length ? '<button type="button" class="btn btn-quiet" data-toggle-deck></button>' : ''}<button type="button" class="btn btn-primary" data-submit>${prompt.max === 0 ? '閉じる' : '決定'}</button></div>`;
+        renderPicks();
+    }
+
+    const submit = dialog.querySelector('[data-submit]');
+    const refresh = () => {
+        dialog.querySelectorAll('.pick[data-group]').forEach(button => {
+            const picked = groups[Number(button.dataset.group)].filter(index => selected.has(index)).length;
+            button.classList.toggle('selected', picked > 0);
+            const badge = button.querySelector('.pick-picked');
+            if (badge) badge.textContent = picked ? `${picked}枚` : '';
+        });
+        if (submit) submit.disabled = selected.size < prompt.min || selected.size > prompt.max;
+    };
+    refresh();
+
+    dialog.onclick = event => {
+        const target = event.target.closest('button');
+        if (!target) return;
+        if (target.dataset.toggleDeck !== undefined) {
+            showAll = !showAll;
+            renderPicks();
+            refresh();
+            return;
+        }
+        if (target.dataset.peek !== undefined) {
+            dialog.close();
+            onPeek();
+        } else if (target.dataset.answer) {
+            onAnswer(target.dataset.answer === 'yes');
+        } else if (target.dataset.option !== undefined) {
+            onAnswer([Number(target.dataset.option)]);
+        } else if (target.dataset.submit !== undefined) {
+            onAnswer([...selected].sort((a, b) => a - b));
+        }
+    };
+
+    const grid = dialog.querySelector('.prompt-cards');
+    if (grid) {
+        bindPress(grid, '.pick', {
+            // タップするたびに、まとめたカードから1枚ずつ選ぶ。全部選んだら（またはもう選べないなら）外す
+            onTap: button => {
+                if (button.dataset.group === undefined) return; // 選べないカード（山札をすべて見るときの）
+                const group = groups[Number(button.dataset.group)];
+                const next = group.find(index => !selected.has(index));
+                if (prompt.max === 1) {
+                    const had = group.some(index => selected.has(index));
+                    selected.clear();
+                    if (!had) selected.add(group[0]);
+                } else if (next !== undefined && selected.size < prompt.max) {
+                    selected.add(next);
+                } else {
+                    group.forEach(index => selected.delete(index));
+                }
+                refresh();
+            },
+            onLongPress: button => onDetail(button.dataset.card ?? prompt.cards[groups[Number(button.dataset.group)][0]].id)
+        });
+    }
+    open(dialog);
+}
+
+// ===== カードの説明 =====
+// actions：{ attacks: [使えるか...], retreat, ability, play } と、それぞれの処理 onAttack(index)・onRetreat()・onAbility()・onPlay()
+// note：今は使えない理由など、説明の下に薄く出す1行
+export function showDetail(dialog, { cardId, pokemon = null, actions = {}, playLabel = '使う', note = '', onAttack, onRetreat, onAbility, onPlay }) {
+    dialog.dataset.closable = 'true';
+    // ワザ・特性のボタンは、説明をスクロールしなくても押せるよう、下のボタンの列にワザの名前で並べる
+    const card = getCard(cardId);
+    const attacks = card.kind === 'pokemon' ? [...card.attacks, ...(pokemon?.extraAttacks ?? [])] : [];
+    const attackButtons = attacks.map((attack, index) => (actions.attacks?.[index]
+        ? `<button type="button" class="btn btn-primary" data-use-attack="${index}">${escapeHtml(attack.name)}</button>` : '')).join('');
+    const abilityButton = actions.ability ? `<button type="button" class="btn btn-primary" data-use-ability>${escapeHtml(card.ability?.name ?? '特性')}</button>` : '';
+    dialog.innerHTML = `<div class="sheet-body detail">${cardDetail(cardId, pokemon)}${note ? `<p class="detail-note">${escapeHtml(note)}</p>` : ''}</div>
+        <div class="sheet-actions detail-actions">
+            ${abilityButton}${attackButtons}
+            ${actions.retreat ? '<button type="button" class="btn btn-secondary" data-retreat>にげる</button>' : ''}
+            ${actions.play ? `<button type="button" class="btn btn-primary" data-play>${playLabel}</button>` : ''}
+            <button type="button" class="btn btn-secondary" data-close>閉じる</button>
+        </div>`;
+    dialog.onclick = event => {
+        const target = event.target.closest('button');
+        if (!target) return;
+        dialog.close();
+        if (target.dataset.useAttack !== undefined) onAttack?.(Number(target.dataset.useAttack));
+        else if (target.dataset.useAbility !== undefined) onAbility?.();
+        else if (target.dataset.retreat !== undefined) onRetreat?.();
+        else if (target.dataset.play !== undefined) onPlay?.();
+    };
+    open(dialog);
+}
+
+// ===== カードの一覧（トラッシュ） =====
+// cards：[{ id, count? }]（count があれば、カードに枚数の印を重ねる）
+export function showPile(dialog, title, cards, onDetail) {
+    const total = cards.reduce((sum, card) => sum + (card.count ?? 1), 0);
+    dialog.dataset.closable = 'true';
+    dialog.innerHTML = `<div class="sheet-body"><h2 class="prompt-title">${title}<span class="prompt-count">${total}枚</span></h2>
+        <div class="prompt-cards">${cards.length ? cards.map(card => `<button type="button" class="pick" data-card="${card.id}">${cardFace(card.id)}${card.count > 1 ? `<span class="pool-count">${card.count}</span>` : ''}</button>`).join('') : '<p class="empty">カードはありません</p>'}</div></div>
+        <div class="sheet-actions"><button type="button" class="btn btn-secondary" data-close>閉じる</button></div>`;
+    dialog.onclick = event => {
+        const pick = event.target.closest('.pick');
+        if (pick) onDetail(pick.dataset.card);
+        else if (event.target.closest('[data-close]')) dialog.close();
+    };
+    open(dialog);
+}
+
+// ===== デッキの取り込み（「枚数 名前 版の番号」の文を貼り付ける） =====
+// onSubmit(text) は、うまく作れたら null、作れなければ知らせる文を返す
+export function showImport(dialog, { onSubmit }) {
+    dialog.dataset.closable = 'true';
+    dialog.innerHTML = `<div class="sheet-body"><h2 class="prompt-title">デッキを貼り付けて作る</h2>
+        <textarea class="text-input import-text" rows="8" placeholder="4 ヒトカゲ MC-083&#10;17 基本炎エネルギー" aria-label="デッキの文"></textarea>
+        <p class="import-error" hidden></p></div>
+        <div class="sheet-actions"><button type="button" class="btn btn-secondary" data-close>やめる</button><button type="button" class="btn btn-primary" data-submit>作る</button></div>`;
+    const error = dialog.querySelector('.import-error');
+    dialog.onclick = event => {
+        if (event.target.closest('[data-close]')) dialog.close();
+        if (!event.target.closest('[data-submit]')) return;
+        const message = onSubmit(dialog.querySelector('.import-text').value);
+        error.hidden = !message;
+        error.textContent = message ?? '';
+        if (!message) dialog.close();
+    };
+    open(dialog);
+}
+
+// ===== ログの一覧（盤面の横の欄は狭いので、広げて読む） =====
+// 同じ行が続いたら「（×2）」のようにまとめる
+function groupLines(lines) {
+    const grouped = [];
+    for (const text of lines) {
+        const last = grouped.at(-1);
+        if (last && last.text === text && !text.startsWith('—')) last.count++;
+        else grouped.push({ text, count: 1 });
+    }
+    return grouped;
+}
+
+export function showLog(dialog, lines) {
+    dialog.dataset.closable = 'true';
+    dialog.innerHTML = `<div class="sheet-body"><h2 class="prompt-title">ログ</h2>
+        <ol class="log log-full">${groupLines(lines).map(({ text, count }) => `<li class="${text.startsWith('—') ? 'log-turn' : ''}">${escapeHtml(text)}${count > 1 ? `（×${count}）` : ''}</li>`).join('')}</ol></div>
+        <div class="sheet-actions"><button type="button" class="btn btn-secondary" data-close>閉じる</button></div>`;
+    dialog.onclick = event => {
+        if (event.target.closest('[data-close]')) dialog.close();
+    };
+    open(dialog);
+    const body = dialog.querySelector('.sheet-body');
+    body.scrollTop = body.scrollHeight; // 最新のログから見せる
+}
+
+// ===== 確認（失うものが大きい操作だけに使う） =====
+export function showConfirm(dialog, { title, yesLabel, onYes }) {
+    dialog.dataset.closable = 'true';
+    dialog.innerHTML = `<div class="sheet-body"><h2 class="prompt-title">${title}</h2></div>
+        <div class="sheet-actions"><button type="button" class="btn btn-secondary" data-no>やめる</button><button type="button" class="btn btn-primary" data-yes>${yesLabel}</button></div>`;
+    dialog.onclick = event => {
+        const target = event.target.closest('button');
+        if (!target) return;
+        dialog.close();
+        if (target.dataset.yes !== undefined) onYes();
+    };
+    open(dialog);
+}
+
+// ===== デッキを選ぶ =====
+// decks：[{ id, name, problem }]（problem があるデッキは選べない）。any を渡すと、先頭に「おまかせ」などの選択肢を出す（選ぶと onPick('')）
+export function showDeckPicker(dialog, { decks, currentId, onPick, onBuild, title = 'デッキ', any = null }) {
+    dialog.dataset.closable = 'true';
+    dialog.innerHTML = `<div class="sheet-body"><h2 class="prompt-title">${title}</h2>
+        <div class="deck-picks">${any ? `<button type="button" class="deck-pick ${currentId ? '' : 'active'}" data-pick-any><span class="deck-pick-name">${any}</span></button>` : ''}${decks.map(deck => `<button type="button" class="deck-pick ${deck.id === currentId ? 'active' : ''}" data-pick="${deck.id}" ${deck.problem ? 'disabled' : ''}>
+            <span class="deck-pick-name">${escapeHtml(deck.name)}${deck.note ? `<span class="deck-pick-summary">${escapeHtml(deck.note)}</span>` : ''}</span>${deck.problem ? `<span class="deck-pick-note">${escapeHtml(deck.problem)}</span>` : ''}</button>`).join('')}</div></div>
+        <div class="sheet-actions"><button type="button" class="btn btn-tertiary" data-build>デッキ構築</button><button type="button" class="btn btn-secondary" data-close>閉じる</button></div>`;
+    dialog.onclick = event => {
+        const target = event.target.closest('button');
+        if (!target || target.disabled) return;
+        dialog.close();
+        if (target.dataset.pickAny !== undefined) onPick('');
+        else if (target.dataset.pick) onPick(target.dataset.pick);
+        else if (target.dataset.build !== undefined) onBuild();
+    };
+    open(dialog);
+}
+
+// ===== 決着 =====
+// buttons：[{ label, primary, onClick }]
+// onPeek を渡すと「盤面を見る」を出す（最後の盤面を見返す）
+export function showResult(dialog, { title, message, note = '', buttons, onPeek = null, onLog = null }) {
+    dialog.dataset.closable = 'false';
+    dialog.innerHTML = `<div class="sheet-body result-body"><h2 class="result-title">${title}</h2><p>${message}</p>${note ? `<p class="note">${note}</p>` : ''}</div>
+        <div class="sheet-actions">${onPeek ? '<button type="button" class="btn btn-quiet" data-peek>盤面を見る</button>' : ''}${onLog ? '<button type="button" class="btn btn-quiet result-log" data-log>ログ</button>' : ''}${buttons.map((button, index) => `<button type="button" class="btn ${button.primary ? 'btn-primary' : 'btn-secondary'}" data-index="${index}">${button.label}</button>`).join('')}</div>`;
+    dialog.onclick = event => {
+        if (event.target.closest('[data-peek]')) {
+            dialog.close();
+            onPeek();
+            return;
+        }
+        if (event.target.closest('[data-log]')) {
+            onLog(); // 決着のダイアログは閉じずに、上にログを重ねる
+            return;
+        }
+        const target = event.target.closest('[data-index]');
+        if (!target) return;
+        dialog.close();
+        buttons[Number(target.dataset.index)].onClick();
+    };
+    open(dialog);
+}
