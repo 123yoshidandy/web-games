@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1d1735">
+    <title>花見小路</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="花見小路">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">花見小路</h1>
+            <p class="subtitle">HANAMIKOJI</p>
+            <div class="setup">
+                <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ">
+                    <button data-level="easy" role="radio">やさしい</button>
+                    <button data-level="normal" role="radio">ふつう</button>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <span id="round-info" class="round-info"></span>
+                <span id="deck" class="deck" title="山札"></span>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="rival" class="strip rival"></div>
+            <div id="board" class="board"></div>
+            <div id="me" class="strip me"></div>
+            <div id="tray" class="tray">
+                <div id="hand" class="hand"></div>
+                <div id="actions" class="actions"></div>
+                <div id="offer" class="offer" hidden></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ラウンドの結果 -->
+    <dialog id="round-result" class="sheet">
+        <h2 id="round-title" tabindex="-1" autofocus></h2>
+        <div id="round-body" class="round-body"></div>
+        <div class="buttons"><button id="next-round" class="btn primary">次のラウンドへ</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-note" class="muted note"></p>
+        <div id="result-body" class="round-body"></div>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>7人の芸者の好意を競います。好意を得た芸者の点数の合計が<strong>11点</strong>以上か、<strong>4人</strong>以上の好意を得た方の勝ちです（11点の方が先）。</p>
+            <div class="help-geisha" id="help-geisha"></div>
+            <h3>手番</h3>
+            <p>山札から1枚引き、まだ使っていない行動を1つ行います。4つの行動は、各ラウンドに1回ずつ使います。</p>
+            <ul class="help-list">
+                <li><strong>秘密</strong>（1枚）：伏せて取っておき、ラウンドの終わりに自分の側に置きます</li>
+                <li><strong>放棄</strong>（2枚）：伏せて捨てます。このラウンドでは数えません</li>
+                <li><strong>贈り物</strong>（3枚）：見せた3枚から相手が1枚取り、残りの2枚は自分の側に置きます</li>
+                <li><strong>競争</strong>（2枚×2組）：相手が1組取り、残りの1組は自分の側に置きます</li>
+            </ul>
+            <h3>ラウンドの終わり</h3>
+            <p>両者が4つの行動を使い終えたら、秘密のカードを開けます。芸者ごとに、置いたカードの多い方が好意を得ます。同じ数なら、好意の印は動きません。</p>
+            <p>勝負がつかなければ、好意の印をそのままにして、次のラウンドを行います。</p>
+            <h3>操作</h3>
+            <p>手札を選んだ枚数で行動が決まります（1枚で秘密、2枚で放棄、3枚で贈り物、4枚で競争）。競争は、選んだ順に前の2枚と後の2枚が組になります。</p>
+            <p>相手が贈り物・競争を出したら、下に出たカードから取るものを選びます。選ぶと、置いたあとの数が芸者の列に点線で出ます。</p>
+            <h3>コツ</h3>
+            <p>カードは芸者ごとに点数と同じ枚数しかなく、1枚は伏せて除かれています。相手に何が渡ったかを見て、競り合う芸者を選びましょう。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
