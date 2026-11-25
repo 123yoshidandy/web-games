@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#16252f">
+    <title>ギズモ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ギズモ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Righteous&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">GIZMOS</h1>
+            <p class="subtitle">ギズモ</p>
+            <div class="setup">
+                <div class="row">人数
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="2">2人</button>
+                        <button type="button" role="radio" data-count="3">3人</button>
+                        <button type="button" role="radio" data-count="4">4人</button>
+                    </div>
+                </div>
+                <div class="row">CPU
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico line" aria-hidden="true"><use href="#i-home"/></svg></button>
+                <div id="opponents" class="opponents"></div>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico line" aria-hidden="true"><use href="#i-help"/></svg></button>
+            </div>
+            <div id="display" class="display"></div>
+            <div id="row" class="energy-row"></div>
+            <div id="me" class="me"></div>
+            <div id="ticker" class="ticker" aria-live="polite"></div>
+            <div id="actions" class="actions"></div>
+        </section>
+    </main>
+
+    <!-- 研究で引いたカード -->
+    <dialog id="research" class="sheet">
+        <h2 id="research-title" tabindex="-1" autofocus></h2>
+        <div id="research-cards" class="research-cards"></div>
+        <p id="research-text" class="research-text"></p>
+        <div id="research-buttons" class="buttons"></div>
+    </dialog>
+
+    <!-- ほかの人の機械 -->
+    <dialog id="player-detail" class="sheet">
+        <h2 id="player-detail-name" tabindex="-1" autofocus></h2>
+        <div id="player-detail-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- ギズモの説明 -->
+    <dialog id="card-detail" class="sheet card-detail">
+        <div id="card-detail-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <ol id="result-list" class="result-list"></ol>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>エネルギーを集めてギズモ（発明品）を建て、点を集めます。建てたギズモは機械になり、行動のたびに働いて、次々と効果がつながります。</p>
+            <h3>手番にすること（どれか1つ）</h3>
+            <ul class="help-list">
+                <li><span class="help-pic" id="help-file"></span><span><strong>保管</strong>：場のギズモを1枚、保管庫に置く。あとで建てられる</span></li>
+                <li><span class="help-pic" id="help-pick"></span><span><strong>取る</strong>：列のエネルギーを1個取る</span></li>
+                <li><span class="help-pic" id="help-build"></span><span><strong>建てる</strong>：場か保管庫のギズモを、その色のエネルギーを払って建てる</span></li>
+                <li><span class="help-pic" id="help-research"></span><span><strong>研究</strong>：山札を選んで何枚か引き、1枚を建てるか保管する</span></li>
+            </ul>
+            <h3>連鎖</h3>
+            <p>保管・取る・建てるのあと、それに合うギズモが働きます。効果で取ったり建てたりすると、さらに別のギズモが働きます。各ギズモは1巡に1回だけです。建てたギズモは、その建てた行動では働きません。</p>
+            <p>変換のギズモは、建てるときにエネルギーの色や数を変えます。重ねて使えます。</p>
+            <h3>上限</h3>
+            <p>はじめは、エネルギー5個・保管庫1枚・研究3枚まで。強化のギズモで増えます。</p>
+            <h3>終わり</h3>
+            <p>だれかがギズモを<strong>16枚</strong>（最初のギズモを含む）建てるか、レベル3を<strong>4枚</strong>建てたら、その巡の終わりまで続けて終わります。</p>
+            <p>点は、ギズモの点と得点チップの合計です。同点なら、建てた枚数が多い人、残りのエネルギーが多い人、最初の手番の人から遠い人の順に勝ちです。</p>
+            <h3>操作</h3>
+            <p>カード・山札・エネルギーをタップして選び、下のボタンで行動します。光っているカードは、今建てられるものです。連鎖の番では、働いたギズモを選び、光っている相手（エネルギー・カード・山札）をタップします。機械の札をタップすると、説明が出ます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
