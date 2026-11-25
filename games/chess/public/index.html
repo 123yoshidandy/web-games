@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1b1713">
+    <title>チェス</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="チェス">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <div id="symbols"></div>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">CHESS</h1>
+            <p class="subtitle">チェス</p>
+            <div class="setup">
+                <div id="mode" class="segmented" role="radiogroup" aria-label="対戦">
+                    <button type="button" role="radio" data-value="cpu">CPU と対戦</button>
+                    <button type="button" role="radio" data-value="two">2人で対戦</button>
+                </div>
+                <div id="cpu-level" class="segmented cpu-only" role="radiogroup" aria-label="CPU の強さ">
+                    <button type="button" role="radio" data-value="easy">やさしい</button>
+                    <button type="button" role="radio" data-value="normal">ふつう</button>
+                    <button type="button" role="radio" data-value="strong">つよい</button>
+                    <button type="button" role="radio" data-value="expert">とてもつよい</button>
+                </div>
+                <div id="color" class="segmented cpu-only" role="radiogroup" aria-label="あなたの色">
+                    <button type="button" role="radio" data-value="w"><svg class="piece" viewBox="0 0 100 100" aria-hidden="true"><use href="#p-wk"/></svg>白（先手）</button>
+                    <button type="button" role="radio" data-value="b"><svg class="piece" viewBox="0 0 100 100" aria-hidden="true"><use href="#p-bk"/></svg>黒（後手）</button>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <header class="bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></button>
+                <span class="spacer"></span>
+                <button id="flip" class="icon-btn" aria-label="盤の向きを変える" title="盤の向きを変える"><svg class="ico" aria-hidden="true"><use href="#i-flip"/></svg></button>
+                <button id="undo" class="icon-btn" aria-label="待った" title="待った"><svg class="ico" aria-hidden="true"><use href="#i-undo"/></svg></button>
+                <button id="offer-draw" class="icon-btn" aria-label="引き分けを提案" title="引き分けを提案"><svg class="ico" aria-hidden="true"><use href="#i-draw"/></svg></button>
+                <button id="resign" class="icon-btn" aria-label="投了" title="投了"><svg class="ico" aria-hidden="true"><use href="#i-flag"/></svg></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+            </header>
+            <div class="play-area">
+                <div id="side-top" class="side-wrap"></div>
+                <div id="board" class="board" aria-label="盤"></div>
+                <div id="side-bottom" class="side-wrap"></div>
+            </div>
+            <div id="moves" class="moves" aria-label="棋譜"></div>
+        </section>
+    </main>
+
+    <!-- 昇格 -->
+    <dialog id="promo" class="sheet promo">
+        <h2 tabindex="-1" autofocus>何に成りますか</h2>
+        <div id="promo-choices" class="promo-choices"></div>
+        <div class="buttons"><button class="btn secondary" data-close>やめる</button></div>
+    </dialog>
+
+    <!-- 引き分けの提案（2人で遊ぶとき） -->
+    <dialog id="draw-offer" class="sheet small">
+        <h2 tabindex="-1" autofocus>引き分けの提案</h2>
+        <p id="draw-offer-text" class="center"></p>
+        <div class="buttons">
+            <button id="draw-accept" class="btn primary">受ける</button>
+            <button id="draw-decline" class="btn secondary">断る</button>
+        </div>
+    </dialog>
+
+    <!-- 投了の確認 -->
+    <dialog id="confirm-resign" class="sheet small">
+        <h2 tabindex="-1" autofocus>投了しますか</h2>
+        <div class="buttons">
+            <button id="resign-yes" class="btn primary">投了する</button>
+            <button class="btn secondary" data-close>続ける</button>
+        </div>
+    </dialog>
+
+    <!-- 終わり -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-text" class="result-text"></p>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-board" class="btn secondary">盤を見る</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <h2 tabindex="-1" autofocus>遊び方</h2>
+        <div class="help-body" id="help-body"></div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
