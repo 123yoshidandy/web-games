@@ -27,7 +27,9 @@ describe('launchChrome の片付け', () => {
         fs.chmodSync(fakeChrome, 0o755);
     });
     afterEach(() => {
-        process.env.TMPDIR = originalTmp;
+        // TMPDIR がもともとない環境（Linux の CI）で undefined を代入すると、文字列の 'undefined' が入ってしまう
+        if (originalTmp === undefined) delete process.env.TMPDIR;
+        else process.env.TMPDIR = originalTmp;
         delete process.env.FAKE_CHROME_IGNORE_TERM;
         vi.restoreAllMocks();
         fs.rmSync(tmp, { recursive: true, force: true });
