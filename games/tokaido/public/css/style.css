@@ -1,0 +1,372 @@
+/* 東海道
+ * 縦持ちのスマホ（最小 375×548）に、スクロールなしで収める。道（区間の盤）が残りの高さを使う
+ * 横持ちと PC では、道を左に、旅人と操作を右に置く
+ */
+
+:root {
+    --bg: #efe6d2;
+    --bg2: #f7f1e3;
+    --paper: #fbf7ec;
+    --ink: #2e2a24;
+    --muted: #7a6f60;
+    --line: rgba(80, 60, 30, .18);
+    --indigo: #3d5f8f;
+    --indigo-deep: #26405f;
+    --shu: #b8574a;
+    --shu-deep: #7e3a30;
+    --gold: #d9a53a;
+    --font: 'Zen Kaku Gothic New', 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', sans-serif;
+    --mincho: 'Shippori Mincho B1', 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+    --panel-h: 132px;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html {
+    height: 100%;
+    touch-action: pan-x pan-y;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    height: 100dvh;
+    overflow: hidden;
+    overscroll-behavior: none;
+    color: var(--ink);
+    font-family: var(--font);
+    font-weight: 500;
+    background:
+        radial-gradient(ellipse at 10% -10%, rgba(217, 130, 110, .16), transparent 55%),
+        radial-gradient(ellipse at 100% 110%, rgba(79, 115, 154, .16), transparent 55%),
+        repeating-linear-gradient(97deg, rgba(120, 90, 40, .025) 0 2px, transparent 2px 9px),
+        linear-gradient(180deg, var(--bg2), var(--bg));
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    user-select: none;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+    position: relative;
+    height: 100%;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.screen { height: 100%; }
+
+.ico { width: var(--ico, 20px); height: var(--ico, 20px); fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.muted { color: var(--muted); }
+
+/* ---- ボタン ---- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    min-width: 108px;
+    height: 44px;
+    padding: 0 16px;
+    border: none;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform .08s, box-shadow .08s;
+}
+.btn.primary { color: #fff; background: linear-gradient(#5677a6, var(--indigo)); box-shadow: 0 4px 0 var(--indigo-deep); }
+.btn.secondary { color: #fff; background: linear-gradient(#c96d5f, var(--shu)); box-shadow: 0 4px 0 var(--shu-deep); }
+.btn:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 rgba(0, 0, 0, .3); }
+.btn:disabled { opacity: .4; cursor: default; }
+
+.icon-btn {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 10px;
+    color: var(--indigo-deep);
+    background: rgba(61, 95, 143, .1);
+    cursor: pointer;
+    --ico: 22px;
+}
+
+.link { border: none; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px; }
+
+.segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(80, 60, 30, .1); }
+.segmented button {
+    min-width: 50px;
+    height: 36px;
+    padding: 0 10px;
+    border: none;
+    border-radius: 8px;
+    background: none;
+    color: var(--muted);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.segmented button[aria-checked="true"] { color: #fff; background: var(--indigo); }
+
+/* ---- タイトル ---- */
+
+#screen-title {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 16px;
+}
+.title-art { width: min(340px, 90%); }
+.title-art svg { display: block; width: 100%; height: auto; border-radius: 14px; }
+.logo { margin: 6px 0 0; font-family: var(--mincho); font-weight: 800; font-size: 50px; letter-spacing: .18em; color: var(--ink); line-height: 1.1; padding-left: .18em; }
+.subtitle { margin: 0 0 8px; font-family: var(--mincho); letter-spacing: .5em; color: var(--shu); font-size: 13px; padding-left: .5em; }
+.setup { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.setup .row { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--muted); }
+.setup .buttons { display: flex; gap: 12px; margin-top: 6px; }
+
+/* ---- ゲーム画面 ---- */
+
+#screen-game { display: flex; flex-direction: column; }
+
+.bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 44px;
+    padding: 4px 8px;
+}
+.stage { flex: 1; text-align: center; font-family: var(--mincho); font-weight: 800; font-size: 17px; letter-spacing: .06em; white-space: nowrap; }
+
+.main-area { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.road-area { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 0 8px; }
+.side-area { flex: none; display: flex; flex-direction: column; min-height: 0; }
+
+.route { flex: none; display: block; width: 100%; height: 14px; }
+.board { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.board svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+.road { fill: none; stroke: #d9c9a4; stroke-width: 14; stroke-linecap: round; stroke-linejoin: round; }
+.road-line { fill: none; stroke: #b9a477; stroke-width: 1.6; stroke-dasharray: 2 6; stroke-linecap: round; stroke-linejoin: round; }
+.node .hit { fill: transparent; }
+.node .glyph { color: #fffaf0; }
+.node.can { cursor: pointer; }
+.node .ring { fill: none; stroke: var(--gold); stroke-width: 3; animation: glow 1.4s ease-in-out infinite; }
+.node.sel .ring { stroke: var(--indigo); stroke-width: 4; animation: none; }
+.node.neutral .ring { stroke: #8a8478; }
+.node.sel.neutral .ring { stroke: #5a554c; }
+.slot2 { fill: #fbf7ec; stroke: #b9a477; stroke-width: 1.4; }
+.slot2.off { opacity: .35; stroke-dasharray: 2 2; }
+.inn-label { font-family: var(--mincho); font-weight: 800; font-size: 11px; fill: #fffaf0; text-anchor: middle; }
+@keyframes glow { 50% { opacity: .35; } }
+
+.token { transition: transform .45s cubic-bezier(.3, .7, .3, 1); pointer-events: none; }
+.token.instant { transition: none; }
+.token circle:first-child { stroke: #fffaf0; stroke-width: 2.2; filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, .35)); }
+.token .you-dot { fill: #fffaf0; }
+.token.mover circle:first-child { stroke: var(--gold); stroke-width: 3; }
+
+/* 旅人の一覧（横に並べた小さな枠） */
+.players { flex: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(62px, 1fr)); gap: 4px; padding: 4px 8px; }
+.pcell {
+    min-width: 0;
+    padding: 3px 5px 4px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .5);
+    border: 1px solid var(--line);
+    border-top: 4px solid var(--pc);
+    cursor: pointer;
+    line-height: 1.25;
+    white-space: nowrap;
+}
+.pcell.actor { background: rgba(255, 250, 236, .95); box-shadow: 0 0 0 2px var(--gold); }
+.pcell.you .pname { color: var(--indigo-deep); }
+.pcell > div { overflow: hidden; text-overflow: ellipsis; }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--pc); flex: none; margin-right: 3px; vertical-align: 0; }
+.pname { font-weight: 700; font-size: 13px; }
+.ptrav { color: var(--muted); font-size: 11px; height: 14px; }
+.pnums { display: flex; align-items: baseline; justify-content: space-between; gap: 4px; }
+.pscore { font-weight: 700; font-size: 15px; }
+.pscore small, .pcoins small { font-size: 10px; color: var(--muted); font-weight: 500; }
+.pcoins { font-weight: 700; font-size: 13px; color: #8a6a22; }
+.pmini { display: flex; gap: 2px; font-size: 10.5px; letter-spacing: -.02em; }
+.pmini .pan { color: var(--c); font-weight: 700; }
+.pmini-inline { display: inline-flex; align-items: center; gap: 2px; --ico: 13px; color: var(--muted); font-size: 12px; }
+.pcell.neutral { cursor: default; }
+
+/* 操作の欄（高さを固定して、盤が揺れないようにする） */
+.panel {
+    flex: none;
+    height: var(--panel-h);
+    margin: 2px 8px 8px;
+    padding: 6px 8px;
+    border-radius: 12px;
+    background: rgba(255, 252, 244, .8);
+    border: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    overflow: hidden;
+}
+.panel.tall { height: auto; }
+.actions { display: flex; justify-content: center; gap: 10px; }
+.actions .btn { min-width: 0; flex: 1; max-width: 160px; height: 40px; }
+.hint { margin: 0; text-align: center; font-weight: 700; color: var(--muted); font-size: 13px; }
+.last-log { margin: 0; font-size: 12px; color: var(--muted); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.space-info { display: flex; align-items: center; gap: 10px; font-size: 14px; line-height: 1.35; padding: 0 4px; }
+.space-info .muted { font-size: 12.5px; }
+
+.cards-row { display: flex; justify-content: center; gap: 5px; min-width: 0; }
+.cards-wrap { display: flex; flex-wrap: wrap; gap: 5px; }
+.choice-row { display: flex; gap: 6px; }
+.choice-row .traveler { flex: 1; }
+.choice-row.one .traveler { flex: none; width: 100%; }
+
+/* ---- 札 ---- */
+
+.card {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 66px;
+    height: 74px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    padding: 4px 2px 3px;
+    border-radius: 8px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-top: 5px solid var(--c, #a8774c);
+    box-shadow: 0 1px 3px rgba(60, 40, 10, .18);
+    color: var(--ink);
+    --ico: 20px;
+}
+.card .ico { color: var(--c, #a8774c); }
+.card .name { font-family: var(--mincho); font-weight: 800; font-size: 13px; line-height: 1.1; white-space: nowrap; }
+.card .kind { font-size: 10px; color: var(--muted); line-height: 1.1; text-align: center; }
+.card .price { font-weight: 700; font-size: 12px; line-height: 1.1; color: #8a6a22; min-height: 13px; }
+.card .price small { font-size: 10px; }
+.card.meal { --c: #b8574a; }
+.card.encounter { --c: #b06a7e; }
+.card.spring { --c: #5f9598; }
+.card.encounter.wide { max-width: 150px; }
+.card.encounter .kind { font-size: 10px; padding: 0 3px; }
+.cards-wrap .card { flex: none; width: 58px; }
+.cards-wrap .card.encounter { width: 112px; }
+.pickable { cursor: pointer; }
+.pickable.selected { box-shadow: 0 0 0 3px var(--indigo); transform: translateY(-2px); }
+.card.disabled { opacity: .38; }
+.card.free .price { color: var(--shu); }
+
+.badge { display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--c); color: #fffaf0; --ico: 20px; }
+
+/* 旅人の札 */
+.traveler {
+    padding: 6px 9px 7px;
+    border-radius: 10px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--pc, var(--shu));
+    font-size: 12.5px;
+    line-height: 1.35;
+}
+.traveler.pickable.selected { box-shadow: 0 0 0 3px var(--indigo); }
+.t-head { display: flex; align-items: baseline; gap: 6px; }
+.t-role { font-size: 11px; color: var(--muted); }
+.t-name { font-family: var(--mincho); font-weight: 800; font-size: 15px; }
+.t-coins { margin-left: auto; font-weight: 700; color: #8a6a22; }
+.t-coins small { font-size: 10px; }
+.t-text { margin-top: 2px; }
+.traveler.small { font-size: 12px; }
+
+/* ---- ダイアログ ---- */
+
+dialog.sheet {
+    width: min(94vw, 520px);
+    max-height: 88dvh;
+    padding: 14px 14px 12px;
+    border: none;
+    border-radius: 16px;
+    color: var(--ink);
+    background: var(--paper);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, .35);
+    overflow: hidden;
+    flex-direction: column;
+}
+dialog.sheet[open] { display: flex; }
+dialog::backdrop { background: rgba(40, 30, 20, .45); }
+dialog h2 { margin: 0 0 8px; font-family: var(--mincho); font-weight: 800; font-size: 20px; text-align: center; outline: none; }
+dialog h3 { margin: 12px 0 6px; font-size: 14px; color: var(--shu-deep); }
+dialog .buttons { flex: none; display: flex; justify-content: center; gap: 12px; margin-top: 10px; }
+.help-body, .detail-body, .log-list, .score-table { overflow-y: auto; overscroll-behavior: contain; touch-action: pan-x pan-y; min-height: 0; }
+.help-body { font-size: 14px; line-height: 1.6; }
+.help-body p { margin: 4px 0; }
+.help-spaces { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.help-spaces li { display: flex; align-items: center; gap: 10px; line-height: 1.4; }
+.help-travelers { display: grid; gap: 6px; }
+.detail-stats { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; font-size: 14px; --ico: 15px; margin: 8px 0 0; }
+.log-list { margin: 0; padding: 0 0 0 1.6em; font-size: 13px; line-height: 1.55; }
+
+.score-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.score-table th, .score-table td { padding: 5px 3px; text-align: center; border-bottom: 1px solid var(--line); }
+.score-table tbody th { text-align: left; white-space: nowrap; font-weight: 700; }
+.score-table thead th { font-size: 11px; color: var(--muted); font-weight: 700; }
+.score-table .total { font-weight: 800; font-size: 15px; }
+.score-table tr.win .total { color: var(--shu); }
+.score-table tr.you th { color: var(--indigo-deep); }
+.score-table .dot { margin-right: 4px; vertical-align: -1px; }
+.awards { font-size: 12px; color: var(--muted); line-height: 1.6; margin: 8px 0 0; }
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(150px + env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    padding: 8px 16px;
+    border-radius: 999px;
+    background: rgba(40, 30, 20, .85);
+    color: #fff;
+    font-size: 14px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s;
+    z-index: 10;
+}
+.toast.show { opacity: 1; }
+
+/* ---- 横持ち・PC：道を左、旅人と操作を右 ---- */
+
+@media (orientation: landscape) and (min-width: 600px) {
+    .main-area { flex-direction: row; }
+    .road-area { flex: 1.35; padding-bottom: 8px; }
+    .side-area { flex: 1; min-width: 0; max-width: 400px; justify-content: flex-end; }
+    .players { grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); align-content: end; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+    .bar { height: 38px; }
+    :root { --panel-h: 124px; }
+    .card { height: 68px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .token { transition: none; }
+    .node .ring { animation: none; }
+}
