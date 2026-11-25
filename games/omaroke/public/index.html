@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <title>お前、もしかしてロケット団？</title>
+    <meta name="theme-color" content="#16182e">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="オマロケ">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <svg id="sprites" width="0" height="0" style="position:absolute" aria-hidden="true"></svg>
+
+    <main id="screen-title" class="screen title">
+        <h1 class="logo"><span>お前、</span><span>もしかして</span><span class="accent">ロケット団？</span></h1>
+        <div id="title-art" class="title-art" aria-hidden="true"></div>
+        <div class="settings">
+            <div class="setting">
+                <span class="label">人数</span>
+                <div class="segment" id="player-count" role="radiogroup" aria-label="人数">
+                    <button type="button" role="radio" data-count="4">4</button>
+                    <button type="button" role="radio" data-count="5">5</button>
+                    <button type="button" role="radio" data-count="6">6</button>
+                </div>
+            </div>
+            <div class="setting">
+                <span class="label">ルール</span>
+                <div class="segment" id="rule-mode" role="radiogroup" aria-label="ルール">
+                    <button type="button" role="radio" data-mode="basic">基本</button>
+                    <button type="button" role="radio" data-mode="expert">玄人</button>
+                </div>
+            </div>
+            <div class="setting">
+                <span class="label">CPU</span>
+                <div class="segment" id="cpu-level" role="radiogroup" aria-label="CPU の強さ">
+                    <button type="button" role="radio" data-level="normal">ふつう</button>
+                    <button type="button" role="radio" data-level="easy">やさしい</button>
+                </div>
+            </div>
+        </div>
+        <div class="title-buttons">
+            <button type="button" id="start" class="primary big">はじめる</button>
+            <button type="button" id="resume" class="secondary big" hidden>続きから</button>
+        </div>
+        <button type="button" id="open-help-title" class="text-button">遊び方</button>
+    </main>
+
+    <main id="screen-game" class="screen game" hidden>
+        <header class="topbar">
+            <button type="button" id="home" class="icon-button" aria-label="タイトルへ" title="タイトルへ"></button>
+            <div id="turn-info" class="turn-info"></div>
+            <div id="deck-info" class="deck-info"></div>
+            <button type="button" id="open-log" class="icon-button" aria-label="記録" title="記録"></button>
+            <button type="button" id="open-help" class="icon-button" aria-label="遊び方" title="遊び方"></button>
+        </header>
+        <section id="rivals" class="rivals"></section>
+        <div id="ticker" class="ticker" aria-live="polite"></div>
+        <section id="me" class="me"></section>
+        <section id="action" class="action"></section>
+        <section id="hand" class="hand"></section>
+        <div id="choose" class="choose" hidden></div>
+    </main>
+
+    <dialog id="help-dialog" class="sheet">
+        <div class="sheet-head"><h2>遊び方</h2><button type="button" class="icon-button close" data-close aria-label="閉じる"></button></div>
+        <div id="help-content" class="sheet-body help"></div>
+    </dialog>
+    <dialog id="log-dialog" class="sheet">
+        <div class="sheet-head"><h2>記録</h2><button type="button" class="icon-button close" data-close aria-label="閉じる"></button></div>
+        <ol id="log-list" class="sheet-body log-list"></ol>
+    </dialog>
+    <dialog id="detail-dialog" class="sheet small">
+        <div class="sheet-head"><h2 id="detail-title"></h2><button type="button" class="icon-button close" data-close aria-label="閉じる"></button></div>
+        <div id="detail-body" class="sheet-body"></div>
+    </dialog>
+    <dialog id="result-dialog" class="sheet small">
+        <div class="sheet-head"><h2 id="result-title"></h2></div>
+        <div class="sheet-body">
+            <ul id="result-list" class="result-list"></ul>
+            <div class="result-buttons">
+                <button type="button" id="again" class="primary">もう一度</button>
+                <button type="button" id="result-home" class="secondary">タイトルへ</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
