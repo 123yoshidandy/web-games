@@ -1,0 +1,19 @@
+{
+    "name": "ラー",
+    "short_name": "ラー",
+    "description": "太陽駒を出してタイルを競り落とし、古代エジプトで名声を集めるボードゲーム。CPU と遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "orientation": "portrait",
+    "background_color": "#24170e",
+    "theme_color": "#3a2414",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
