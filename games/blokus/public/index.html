@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1b2233">
+    <title>ブロックス</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ブロックス">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@600&family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+        <symbol id="i-home" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></g></symbol>
+        <symbol id="i-help" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.6 2.2c-.7.4-1.1 1-1.1 1.8v.5"/><path d="M12 17.2v.1"/></g></symbol>
+        <symbol id="i-rotate" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v5h-5"/></g></symbol>
+        <symbol id="i-flip" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M8 7L3 12l5 5z"/><path d="M16 7l5 5-5 5z"/></g></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></g></symbol>
+        <symbol id="i-close" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></g></symbol>
+    </svg>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <h1 class="logo">BLOKUS</h1>
+            <p class="subtitle">ブロックス</p>
+            <div class="setup">
+                <div class="row"><span class="label">人数</span>
+                    <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
+                        <button type="button" role="radio" data-count="2">2人</button>
+                        <button type="button" role="radio" data-count="3">3人</button>
+                        <button type="button" role="radio" data-count="4">4人</button>
+                    </div>
+                </div>
+                <div class="row"><span class="label">CPU</span>
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+                <div class="row"><span class="label">得点</span>
+                    <div id="scoring" class="segmented" role="radiogroup" aria-label="得点法">
+                        <button type="button" role="radio" data-scoring="basic">基本</button>
+                        <button type="button" role="radio" data-scoring="advanced">上級</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <header class="bar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></button>
+                <div id="players" class="players"></div>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
+            </header>
+            <div id="board-wrap" class="board-wrap">
+                <div id="board" class="board" aria-label="盤"></div>
+            </div>
+            <div id="tray" class="tray" aria-label="ピース"></div>
+            <div class="controls">
+                <button id="rotate" class="icon-btn big" aria-label="回す" title="回す"><svg class="ico" aria-hidden="true"><use href="#i-rotate"/></svg></button>
+                <button id="flip" class="icon-btn big" aria-label="裏返す" title="裏返す"><svg class="ico" aria-hidden="true"><use href="#i-flip"/></svg></button>
+                <button id="status" class="status" role="status"></button>
+                <button id="cancel" class="icon-btn big" aria-label="やめる" title="やめる"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
+                <button id="place" class="icon-btn big place" aria-label="置く" title="置く"><svg class="ico" aria-hidden="true"><use href="#i-check"/></svg></button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <!-- 終わり -->
+    <dialog id="result" class="sheet result">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <p id="result-sub" class="note"></p>
+        <table id="result-table" class="result-table"></table>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+            <button id="result-board" class="btn ghost" data-close>盤を見る</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <h2 tabindex="-1" autofocus>遊び方</h2>
+        <div class="help-body">
+            <h3>目的</h3>
+            <p>自分の色のピース21個（1〜5マス、合わせて89マス）を、盤にできるだけ多く置きます。</p>
+            <h3>置き方</h3>
+            <ul>
+                <li>青 → 黄 → 赤 → 緑の順に、1個ずつ置く</li>
+                <li>最初のピースは、自分の色の角のマスを覆う</li>
+                <li>2個目からは、同じ色のピースと<strong>角で</strong>接するように置く。同じ色とは<strong>辺で</strong>接してはいけない</li>
+                <li>ほかの色とは、辺で接してもよい</li>
+                <li>置けなくなった色は、そこで終わり。どの色も置けなくなったらゲームの終わり</li>
+            </ul>
+            <div class="help-figure" id="help-figure" aria-hidden="true"></div>
+            <h3>人数</h3>
+            <ul>
+                <li>4人：1人1色</li>
+                <li>3人：1人1色。残りの緑は、3人が順番に置く（緑の点は数えない）</li>
+                <li>2人：先手が青と赤、後手が黄と緑。点は2色の合計</li>
+            </ul>
+            <h3>得点</h3>
+            <ul>
+                <li>基本：残ったピースのマスの数が少ない人の勝ち</li>
+                <li>上級：残り1マスにつき−1点。全部置けたら+15点、最後に置いたのが1マスのピースなら、さらに+5点</li>
+            </ul>
+            <h3>操作</h3>
+            <ul>
+                <li>下のピースを押して選ぶ。盤の上で指を動かすとピースが動き、押したマスに寄せられる</li>
+                <li>回す・裏返すで向きを変え、置ける位置（色がはっきり）になったら「✓」で置く</li>
+                <li>盤の小さな点は、今の色を置ける角</li>
+            </ul>
+        </div>
+        <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

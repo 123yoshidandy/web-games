@@ -1,0 +1,19 @@
+{
+    "name": "ブロックス",
+    "short_name": "ブロックス",
+    "description": "4色のピースを角でつなげて、盤にできるだけ多く置くゲーム。CPU と2〜4人で遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "orientation": "portrait",
+    "background_color": "#161c2b",
+    "theme_color": "#1b2233",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
