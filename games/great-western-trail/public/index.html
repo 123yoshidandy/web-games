@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#2a1d14">
+    <title>グレート・ウエスタン・トレイル</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ウエスタントレイル">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" aria-hidden="true">
+                <svg viewBox="0 0 160 70"><path d="M4 62h152" stroke="#c9a46a" stroke-width="2"/><path d="M14 62 L34 34 L54 62 Z" fill="#3f9a52"/><path d="M40 62 L56 40 L72 62 Z" fill="#3a6fc0"/><rect x="88" y="40" width="40" height="16" rx="3" fill="#b5462f"/><rect x="118" y="30" width="10" height="12" fill="#b5462f"/><circle cx="96" cy="58" r="5" fill="#2a1d14"/><circle cx="120" cy="58" r="5" fill="#2a1d14"/><path d="M128 34 h10 l6 10 h-16 Z" fill="#7d4a2e"/><circle cx="141" cy="20" r="4" fill="#d8c8a8" opacity=".6"/><circle cx="148" cy="12" r="3" fill="#d8c8a8" opacity=".45"/></svg>
+            </div>
+            <h1 class="logo">Great Western Trail</h1>
+            <p class="subtitle">グレート・ウエスタン・トレイル</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">人数</span>
+                    <div class="segment" id="count" role="radiogroup" aria-label="人数"></div>
+                </div>
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="round-info" class="round-info"></div>
+                <button id="open-log" class="icon-btn" aria-label="ログ" title="ログ">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12M6 10h12M6 15h12M6 20h7"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="players" class="players"></div>
+            <div class="game-body">
+                <div class="views">
+                    <div class="tabs" id="tabs" role="tablist">
+                        <button data-tab="trail" class="tab narrow-only">道</button>
+                        <button data-tab="rail" class="tab narrow-only">鉄道</button>
+                        <button data-tab="market" class="tab">市場</button>
+                        <button data-tab="board" class="tab">ボード</button>
+                    </div>
+                    <div id="view-trail" class="view view-trail">
+                        <div id="trail" class="trail"></div>
+                        <div class="zoom-buttons">
+                            <button id="zoom-in" class="icon-btn small" aria-label="拡大">＋</button>
+                            <button id="zoom-out" class="icon-btn small" aria-label="縮小">−</button>
+                            <button id="zoom-fit" class="icon-btn small" aria-label="全体">⤢</button>
+                        </div>
+                    </div>
+                    <div id="view-rail" class="view view-rail"><div id="rail" class="rail"></div></div>
+                    <div id="view-market" class="view view-market scroll"></div>
+                    <div id="view-board" class="view view-board scroll"></div>
+                </div>
+                <div class="panel">
+                    <div id="status" class="status"></div>
+                    <div id="work" class="work scroll"></div>
+                    <div id="hand" class="hand"></div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ログ -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>ログ</h2>
+        <ol id="log-list" class="log-list scroll"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <div id="result-body" class="result-body scroll"></div>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body scroll">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <p>牛を連れて道を進み、カンザスシティから鉄道で西の都市へ届ける牧場主のゲームです。終わったときの<strong>得点が一番多い人の勝ち</strong>です。</p>
+            <h3>手番</h3>
+            <p><strong>1. 進む</strong>：牧場主を、歩数の上限まで進めます。建物・災害・ティーピーのあるマスだけを1歩と数え、空いたマスは数えません。カンザスシティは通り越せません。</p>
+            <p>手の印（緑・黒）のある場所を通ったり止まったりすると通行料を払います（ほかの人の建物なら持ち主に、災害とティーピーは銀行に）。払えなければ払えるだけ払います。</p>
+            <p><strong>2. 止まった場所を使う</strong>：中立の建物（A〜G）か自分の建物なら、そのアクションを好きな順に1回ずつ使えます。使わないなら、代わりに補助アクションを1つ。ほかの人の建物・災害・ティーピーでは、補助アクションを1つだけ使えます。</p>
+            <p><strong>3. 手札を補充</strong>：手札の上限（最初は4枚）まで引きます。</p>
+            <h3>カンザスシティ</h3>
+            <p>着いたら、先読みの3列から1枚ずつ選んで場に出し（労働者は求人市場へ、災害は道へ、ティーピーは交易の場所へ）、手札を全部見せて収入を得ます。収入は<strong>手札の違う品種の繁殖値の合計</strong>＋使った証明書です。</p>
+            <p>その値までの都市へ配達し、ボードの円盤を1つ都市に置きます。円盤を外すと、補助アクションや手札の上限などが増えます。機関車が都市より手前なら、間の × の数だけ運賃を払います。カンザスシティとサンフランシスコ以外は、1回ずつしか配達できません。</p>
+            <h3>主なアクション</h3>
+            <ul>
+                <li><strong>雇う</strong>：求人市場から。カウボーイは牛を買う、職人は建物を建てる、技師は機関車を進める力になります。トークンのある段からは雇えません。</li>
+                <li><strong>建てる</strong>：職人の数までの建物を、職人1人につき$2で。建物は得点と自分専用のアクションになります。</li>
+                <li><strong>牛を買う</strong>：市場から。カウボーイが多いほど安く買えます。</li>
+                <li><strong>機関車を進める</strong>：駅のマス（待避線）に止まると、お金を払って駅を改良し、得点と駅長を得られます。</li>
+            </ul>
+            <h3>終わり</h3>
+            <p>カンザスシティで求人市場の最後のマスが埋まったら、ほかの人が1回ずつ手番をして終わりです。得点は、$5ごとに1点・建物・都市・駅・災害・牛・目標カード・駅長・5〜6人目の労働者など。</p>
+            <h3>画面</h3>
+            <p>選べる場所は光ります。道は2本指かホイールで拡大できます。上の人の欄を押すと、その人のボードを見られます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
