@@ -1,0 +1,10 @@
+{
+  "name": "love-letter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "sim": "node scripts/cpu-sim.mjs"
+  }
+}
