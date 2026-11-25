@@ -1,0 +1,93 @@
+import { describe, it, expect } from 'vitest';
+import Game from '../public/js/game.js';
+import { runCpuStep, chooseCommand, nextCpuSeat, cpuRandom } from '../public/js/cpu-player.js';
+import { createGameView } from '../public/js/game-view.js';
+import { COLORS } from '../public/js/data.js';
+import { players, snapshot } from './helpers.js';
+
+// CPU だけで最後まで進めたゲーム
+function playOut(n, seed, levels = ['normal', 'easy']) {
+    const game = new Game(players(n, true).map((p, i) => ({ ...p, cpuLevel: levels[i % levels.length] })), { seed });
+    let steps = 0;
+    while (!game.isOver() && steps++ < 3000) runCpuStep(game);
+    return game;
+}
+
+describe('記録からの再現', () => {
+    it('操作の記録から、最後の状態まで同じに作り直せる（JSON を通しても）', () => {
+        for (const n of [2, 3, 4]) {
+            for (const seed of [1, 7]) {
+                const game = playOut(n, seed);
+                expect(game.isOver(), `${n}人 シード${seed}`).toBe(true);
+                const saved = JSON.parse(JSON.stringify(game.persist()));
+                const copy = Game.replay(saved.players, saved.options, saved.commands);
+                expect(snapshot(copy)).toBe(snapshot(game));
+            }
+        }
+    });
+
+    it('途中までの記録からも作り直せ、そこから同じ手で同じ結果になる', () => {
+        const game = playOut(3, 5);
+        const half = Math.floor(game.commands.length / 2);
+        const saved = game.persist();
+        const partial = Game.replay(saved.players, saved.options, saved.commands.slice(0, half));
+        saved.commands.slice(half).forEach(({ playerId, command }) => expect(partial.applyCommand(playerId, command)).toBe(true));
+        expect(snapshot(partial)).toBe(snapshot(game));
+    });
+
+    it('再現できない記録はエラーにする', () => {
+        const game = playOut(2, 3);
+        const saved = game.persist();
+        saved.commands[0] = { ...saved.commands[0], playerId: (saved.commands[0].playerId + 1) % 2 };
+        expect(() => Game.replay(saved.players, saved.options, saved.commands)).toThrow();
+    });
+
+    it('CPU の判断は、ゲームの乱数を使わない', () => {
+        const a = new Game(players(3, true), { seed: 11 });
+        const b = new Game(players(3, true), { seed: 11 });
+        for (let i = 0; i < 120 && !a.isOver(); i++) {
+            const seat = nextCpuSeat(a);
+            for (let k = 0; k < 2; k++) chooseCommand(createGameView(a, seat), 'normal', cpuRandom(a, seat)); // 何度考えても
+            const command = runCpuStep(a);
+            expect(b.applyCommand(seat, command)).toBe(true);
+        }
+        expect(snapshot(a)).toBe(snapshot(b));
+    });
+
+    it('ランダムな操作を浴びせても、断った操作で状態が変わらず、記録から再現できる', () => {
+        const types = ['tile', 'leader', 'withdraw', 'catastrophe', 'swap', 'pass', 'support', 'war', 'monument', 'skip', 'bogus'];
+        const colors = [...COLORS, 'x'];
+        let r = 12345;
+        const rand = (k) => { r = (Math.imul(r, 1103515245) + 12345) >>> 0; return r % k; };
+        for (const n of [2, 3, 4]) {
+            const game = new Game(players(n, true), { seed: n * 31 });
+            for (let i = 0; i < 2500 && !game.isOver(); i++) {
+                const command = {
+                    type: types[rand(types.length)], color: colors[rand(5)], cell: rand(180) - 2,
+                    count: rand(4) - 1, tiles: [colors[rand(5)], colors[rand(5)]].slice(0, rand(3)), monument: rand(7) - 1
+                };
+                const seat = rand(n);
+                const before = snapshot(game);
+                if (!game.applyCommand(seat, command)) expect(snapshot(game)).toBe(before);
+                if (rand(3) === 0) runCpuStep(game, nextCpuSeat(game), 'easy');
+            }
+            const saved = game.persist();
+            expect(snapshot(Game.replay(saved.players, saved.options, saved.commands))).toBe(snapshot(game));
+        }
+    });
+});
+
+describe('CPU どうしの試合', () => {
+    it('人数・強さ・シードを変えても、止まらずに最後まで進む', () => {
+        for (const n of [2, 3, 4]) {
+            for (const levels of [['easy'], ['normal'], ['normal', 'easy']]) {
+                for (const seed of [2, 9, 23]) {
+                    const game = playOut(n, seed, levels);
+                    expect(game.isOver(), `${n}人 ${levels} シード${seed}`).toBe(true);
+                    expect(['treasure', 'bag']).toContain(game.endReason);
+                    expect(game.winners.length).toBeGreaterThan(0);
+                }
+            }
+        }
+    });
+});
