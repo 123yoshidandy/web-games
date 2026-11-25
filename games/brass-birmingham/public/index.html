@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#231a14">
+    <title>ブラス：バーミンガム</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ブラス">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-art" aria-hidden="true">
+                <svg viewBox="0 0 120 60"><path d="M6 52h108" stroke="#c9a46a" stroke-width="2"/><rect x="14" y="24" width="22" height="28" fill="#8a5a3c"/><rect x="18" y="8" width="6" height="18" fill="#6b4630"/><rect x="44" y="30" width="26" height="22" fill="#a06b45"/><rect x="50" y="14" width="5" height="18" fill="#6b4630"/><rect x="78" y="20" width="28" height="32" fill="#7a4b33"/><rect x="96" y="4" width="6" height="18" fill="#6b4630"/><circle cx="21" cy="5" r="3" fill="#cbb79a" opacity=".6"/><circle cx="99" cy="2" r="2.5" fill="#cbb79a" opacity=".5"/></svg>
+            </div>
+            <h1 class="logo">Brass: Birmingham</h1>
+            <p class="subtitle">ブラス：バーミンガム</p>
+            <div class="setup">
+                <div class="row"><span class="row-label">人数</span>
+                    <div class="segment" id="count" role="radiogroup" aria-label="人数"></div>
+                </div>
+                <div class="row"><span class="row-label">CPU</span>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" class="btn primary">ゲーム開始</button>
+                    <button id="resume" class="btn secondary" hidden>続きから</button>
+                </div>
+                <button id="open-help-title" class="link">遊び方</button>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="era-info" class="era-info"></div>
+                <div id="market-info" class="market-info"></div>
+                <button id="open-log" class="icon-btn" aria-label="ログ" title="ログ">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h12M6 10h12M6 15h12M6 20h7"/></svg>
+                </button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="players" class="players"></div>
+            <div class="board-area">
+                <div id="map" class="map"></div>
+                <div class="zoom-buttons">
+                    <button id="zoom-in" class="icon-btn small" aria-label="拡大">＋</button>
+                    <button id="zoom-out" class="icon-btn small" aria-label="縮小">−</button>
+                    <button id="zoom-fit" class="icon-btn small" aria-label="全体">⤢</button>
+                </div>
+            </div>
+            <div class="panel">
+                <div id="status" class="status"></div>
+                <div id="work" class="work"></div>
+                <div id="hand" class="hand"></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- プレイヤーのボード -->
+    <dialog id="mat" class="sheet">
+        <h2 id="mat-title" tabindex="-1" autofocus></h2>
+        <div id="mat-body" class="mat-body"></div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- ログ -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>ログ</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <ol id="result-list" class="result-list"></ol>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-home" class="btn secondary">ホーム</button>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>産業革命期のバーミンガムで、工場を建て、運河と鉄道でつなぎ、品物を売って<strong>得点</strong>を集めます。運河の時代と鉄道の時代の2つの時代の終わりに得点を数え、合計がいちばん多い人の勝ちです（同点なら収入、お金の順）。</p>
+            <h3>手番</h3>
+            <p>手番では、手札を1枚捨てるごとにアクションを1つ行います。1回の手番でアクションは2つ（最初のラウンドだけ1つ）。手番のあと、山札から8枚まで補います。</p>
+            <p>手番の順は、前のラウンドで<strong>使ったお金が少ない人から</strong>です。ラウンドの終わりに、収入の分のお金をもらいます（マイナスなら払います）。</p>
+            <h3>アクション</h3>
+            <p><strong>建てる</strong>：産業タイルを、ボードのいちばん低いレベルから建てます。場所カードならその町に（つながっていなくてよい）、産業カードならその産業を自分のネットワークの町に。お金と、必要なら石炭・鉄を払います。</p>
+            <p><strong>ネットワーク</strong>：自分のネットワークに隣り合うつながりに、運河（£3）か鉄道（£5＋石炭1。2本なら £15＋石炭2＋ビール1）を引きます。</p>
+            <p><strong>開発</strong>：ボードからタイルを1〜2枚外し、1枚につき鉄を1つ払います。上のレベルに早く進めます。電球の印（陶器のレベル1・3）は外せません。</p>
+            <p><strong>売る</strong>：綿工場・製造所・陶器のタイルを、その品を買う商人につながっていれば売れます。タイルに描かれた数のビールを使い、タイルを裏返して収入が上がります。商人のビールを使うと、その商人のおまけがもらえます。</p>
+            <p><strong>借りる</strong>：£30 借り、収入が3つ下がります。<strong>偵察</strong>：3枚捨てて、ワイルドカード（場所・産業）を1枚ずつもらいます。<strong>パス</strong>：1枚捨てるだけです。</p>
+            <h3>石炭・鉄・ビール</h3>
+            <p><strong>石炭</strong>：建てる町からリンクでつながった一番近い炭鉱（だれのものでも）から。なければ、商人につながっていれば市場から買います。</p>
+            <p><strong>鉄</strong>：どこの製鉄所からでも。なければ市場から買います（つながりは不要）。</p>
+            <p><strong>ビール</strong>：自分の醸造所（どこでも）か、つながったほかの人の醸造所から。売るときは売り先の商人のビールも使えます。</p>
+            <p>炭鉱・製鉄所・醸造所は、資源がなくなると裏返り、持ち主の収入が上がります。炭鉱を商人につながった町に建てたり、製鉄所を建てたりすると、市場に空きがある分だけ売れてお金になります。</p>
+            <p>この画面では、資源の取り先は自動で選びます（石炭は一番近い炭鉱、同じ近さなら自分のもの。ビールは商人→自分→ほかの人の順）。</p>
+            <h3>時代の終わり</h3>
+            <p>山札と全員の手札がなくなると、時代が終わります。自分のリンク1本ごとに、両端の町の<strong>裏返ったタイルのリンクの点</strong>（商人の町は2点）を数え、裏返った自分のタイルの得点を足します。</p>
+            <p>運河の時代のあとは、運河とレベル1のタイルを外し、鉄道の時代に移ります。鉄道の時代は、1つの町に自分のタイルを何枚でも建てられます。運河の時代は1つの町に1枚までです。</p>
+            <h3>人数</h3>
+            <p>2人ではストーク・リーク・ストーン・アトックスター・ベルパー・ダービーとウォリントン・ノッティンガムを使いません。3人ではベルパー・ダービー・ノッティンガムを使いません。</p>
+            <h3>地図の操作</h3>
+            <p>2本指でつまむかホイールで拡大、ドラッグで移動します。選べるものは黄色く光ります。小さくて選びにくいときは、タップすると拡大します。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
