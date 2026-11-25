@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#173326">
+    <title>DOMINION - デッキ構築型カードゲーム</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ドミニオン">
+    <!-- タイトルの英字（読み込めないときは Georgia などの書体になる） -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap">
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <!-- アニメーションのためのオーバーレイ -->
+    <div id="animation-overlay"></div>
+
+    <!-- 手番とフェーズ、残りリソースを常に表示するヘッダー -->
+    <header id="topbar">
+        <div class="topbar-row">
+            <div class="brand">
+                <h1>DOMINION</h1>
+                <button id="home-btn" class="icon-btn" aria-label="ホームに戻る" title="ホームに戻る">⌂</button>
+                <button id="help-btn" class="icon-btn" aria-label="遊び方" title="遊び方">?</button>
+                <button id="settings-btn" class="icon-btn" aria-label="設定" title="設定">⚙</button>
+            </div>
+            <div id="game-status">ゲームの準備をしています...</div>
+        </div>
+        <div id="turn-stats"></div>
+        <div id="latest-log" aria-live="polite"></div>
+    </header>
+
+    <main id="table">
+        <section id="supply-section" class="panel">
+            <h2>サプライ <span class="hint">タップで購入・長押しで説明</span></h2>
+            <div id="supply-piles">
+                <!-- サプライパイルはJavaScriptで動的に生成されます -->
+            </div>
+        </section>
+
+        <!-- 横長の画面では右の列（サプライとは別にスクロールする）。縦長の画面ではプレイヤーをサプライの上に出す -->
+        <div id="table-side">
+            <section id="players-info">
+                <!-- プレイヤー情報はJavaScriptで動的に生成されます -->
+            </section>
+
+            <details id="game-log" class="panel">
+                <summary>ゲームログ</summary>
+                <div id="log-entries"></div>
+            </details>
+        </div>
+    </main>
+
+    <!-- 場札はサプライと手札のあいだに常に表示する -->
+    <section id="play-area">
+        <h2>場札</h2>
+        <div id="played-cards"></div>
+    </section>
+
+    <!-- 手札と操作ボタンは親指の届く画面下部に固定 -->
+    <footer id="dock">
+        <div id="game-controls">
+            <div id="action-buttons">
+                <!-- アクションボタンはJavaScriptで動的に生成されます -->
+            </div>
+            <button id="end-turn-btn" disabled>ターン終了</button>
+        </div>
+        <!-- 左から山札・手札・捨て札 -->
+        <div class="dock-main">
+            <div id="deck" class="pile">
+                <div id="deck-pile" class="pile-slot"></div>
+                <span class="pile-label">山札</span>
+            </div>
+            <div id="hand">
+                <div id="hand-cards"></div>
+            </div>
+            <div id="discard" class="pile">
+                <div id="discard-cards" class="pile-slot"></div>
+                <span class="pile-label">捨て札</span>
+            </div>
+        </div>
+    </footer>
+
+    <div id="game-modal" class="modal">
+        <div class="modal-content">
+            <span class="close" role="button" aria-label="閉じる">&times;</span>
+            <div id="modal-title"></div>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- JavaScriptファイル - ES Modulesとして読み込み -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>

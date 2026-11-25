@@ -1,0 +1,2631 @@
+/* ドミニオン カードゲーム用のスタイル（スマホ優先） */
+
+:root {
+    /* テーブル（フェルト） */
+    --felt: #1d4030;
+    --felt-dark: #142d22;
+    --felt-light: #2a5741;
+    --on-felt: #f3eedf;
+    --on-felt-muted: rgba(243, 238, 223, 0.62);
+    --panel: rgba(0, 0, 0, 0.2);
+    --panel-border: rgba(255, 255, 255, 0.07);
+
+    /* カード（紙） */
+    --paper: #fbf6e9;
+    --paper-dim: #efe7d3;
+    --ink: #2b2620;
+    --ink-muted: #7a7166;
+
+    /* アクセント */
+    --gold: #e6b84f;
+    --danger: #c8553d;
+    --primary: #2f7a55;
+
+    /* カードタイプ */
+    --type-action: #4a7fb5;
+    --type-treasure: #c9971f;
+    --type-victory: #3f8a4c;
+    --type-curse: #85549f;
+    --type-duration: #d17a22;
+    --type-reaction: #3a9bb5;
+
+    --radius: 12px;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+    /* 拡大させない（ピンチ・ダブルタップ）。スクロールは縦横とも効かせる */
+    touch-action: pan-x pan-y;
+}
+
+/* 一覧の端まで来ても、スワイプを画面全体に渡さない（iOS で、しばらく一覧がスクロールしなくなるのを防ぐ） */
+html,
+body {
+    overscroll-behavior: none;
+}
+
+#table,
+#supply-section,
+#table-side,
+#log-entries,
+#players-info,
+#played-cards,
+#hand,
+.modal-content {
+    overscroll-behavior: contain;
+}
+
+body {
+    margin: 0;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: system-ui, -apple-system, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Meiryo", sans-serif;
+    line-height: 1.4;
+    color: var(--on-felt);
+    background: radial-gradient(ellipse at top, var(--felt-light), var(--felt) 55%, var(--felt-dark));
+    -webkit-tap-highlight-color: transparent;
+    /* 長押しで文字が選択されたり、iOSのメニューが出たりしないようにする */
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+/* 入力欄は、文字の選択や貼り付けができるようにする */
+input,
+textarea,
+select {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+}
+
+button {
+    font: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 999px;
+    padding: 0 18px;
+    height: 44px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--felt-light);
+    transition: transform 0.1s, opacity 0.2s, background-color 0.2s;
+}
+
+button:active:not(:disabled) {
+    transform: scale(0.96);
+}
+
+button:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+button.primary {
+    display: block;
+    width: 100%;
+    height: 48px;
+    margin-top: 16px;
+    border-radius: var(--radius);
+    font-size: 16px;
+    background: var(--primary);
+}
+
+/* ===== ヘッダー ===== */
+
+#topbar {
+    flex: none;
+    padding: calc(8px + var(--safe-top)) 12px 8px;
+    background: rgba(20, 45, 34, 0.92);
+    border-bottom: 1px solid var(--panel-border);
+    z-index: 20;
+}
+
+.topbar-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.brand {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--on-felt-muted);
+    background: var(--panel);
+}
+
+#topbar h1 {
+    margin: 0;
+    font-size: 15px;
+    letter-spacing: 0.12em;
+    color: var(--gold);
+}
+
+#game-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    min-width: 0;
+}
+
+.status-player {
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.status-phase {
+    flex: none;
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    background: var(--type-action);
+}
+
+.status-phase.phase-buy {
+    background: var(--type-treasure);
+}
+
+.status-phase.phase-night {
+    background: #2c3e6b;
+}
+
+#turn-stats {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 6px;
+    margin-top: 8px;
+}
+
+#turn-stats:empty {
+    display: none;
+}
+
+.stat {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px;
+    padding: 4px 0;
+    border-radius: 10px;
+    background: var(--panel);
+    transition: opacity 0.2s;
+}
+
+.stat.dim {
+    opacity: 0.4;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: var(--on-felt-muted);
+}
+
+.stat-value {
+    font-size: 20px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+}
+
+#latest-log {
+    margin-top: 6px;
+    min-height: 1.4em;
+    font-size: 12px;
+    color: var(--on-felt-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 1〜2文字しか見えない幅のときは出さない（幅は JS で見る） */
+#latest-log.too-narrow {
+    visibility: hidden;
+}
+
+/* ===== テーブル（スクロール領域） ===== */
+
+#table {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+}
+
+.panel {
+    padding: 10px 12px 12px;
+    border-radius: 14px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+}
+
+.panel h2,
+#game-log summary {
+    margin: 0 0 8px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--on-felt-muted);
+    letter-spacing: 0.06em;
+}
+
+.panel h2 .hint {
+    margin-left: 6px;
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
+/* 右の列（横長の画面だけ列にする）。縦長の画面では枠をなくし、プレイヤー → サプライ → ログの順に並べる */
+#table-side {
+    display: contents;
+}
+
+/* プレイヤー一覧（横スクロール） */
+#players-info {
+    order: -1;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    flex: none;
+    scrollbar-width: none;
+}
+
+#players-info::-webkit-scrollbar {
+    display: none;
+}
+
+.player-stats {
+    flex: 1 0 160px;
+    padding: 8px 10px;
+    border-radius: var(--radius);
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+}
+
+.player-stats.active-player {
+    border-color: var(--gold);
+    box-shadow: 0 0 0 1px var(--gold) inset;
+}
+
+.player-name {
+    font-weight: 700;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.cpu-badge {
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    background: var(--felt-light);
+    color: var(--on-felt-muted);
+}
+
+/* リアルタイムモードの各人の状況（進行中・番を終えた・この番は休み） */
+.realtime-badge {
+    margin-left: 4px;
+    padding: 0 6px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.realtime-playing {
+    background: var(--gold);
+    color: #3a2a10;
+}
+
+.realtime-done,
+.realtime-idle {
+    background: var(--felt-light);
+    color: var(--on-felt-muted);
+}
+
+.player-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--on-felt-muted);
+}
+
+.player-meta b {
+    color: var(--gold);
+}
+
+/* ===== カード共通 ===== */
+
+/* --type-tint はイラストの背景色（魔女の三日月はこの色の円を重ねて描いている） */
+/* 他のプレイヤーが選択に答えるのを待っている表示 */
+.status-waiting {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gold, #e6b84f);
+    white-space: nowrap;
+}
+
+.action-card { --type: var(--type-action); --type-tint: #dce8f5; }
+.reaction-card { --type: var(--type-reaction); --type-tint: #d8eef3; }
+.treasure-card { --type: var(--type-treasure); --type-tint: #f7ecd0; }
+.victory-card { --type: var(--type-victory); --type-tint: #e2f0dc; }
+.curse-card { --type: var(--type-curse); --type-tint: #ece2f3; }
+.duration-card { --type: var(--type-duration); --type-tint: #f8e5d0; }
+.night-card { --type: #2c3e6b; --type-tint: #dfe3f0; }
+.ruins-card { --type: #8a6a4a; --type-tint: #efe3d6; }
+.shelter-card { --type: #b5523b; --type-tint: #f5ddd5; }
+
+.card {
+    position: relative;
+    color: var(--ink);
+    background: var(--paper);
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none; /* 長押しでiOSのメニューを出さない */
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+}
+
+.card-cost {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--ink);
+    background: var(--gold);
+    box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.15) inset;
+}
+
+/* ===== サプライ ===== */
+
+/* 横7列：勝利点の列・財宝の列・アクション5列×2行。外側と内側の間隔をそろえて全タイルを同じ幅にする */
+#supply-piles {
+    --supply-gap: 4px;
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: var(--supply-gap);
+    align-items: start;
+}
+
+.supply-kingdom {
+    grid-column: span 5;
+}
+
+.supply-group h3 {
+    margin: 0 0 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--on-felt-muted);
+}
+
+.supply-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--supply-gap);
+}
+
+.supply-kingdom .supply-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+/* 縦画面のスマホではタイル幅が約44pxしかないので、中身を小さくする（640px以上で大きくする） */
+.supply-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    min-height: 52px;
+    padding: 17px 2px 4px;
+    border-top: 4px solid var(--type);
+}
+
+.tile-art {
+    display: flex;
+}
+
+.tile-art svg {
+    width: 28px;
+    height: 19px;
+}
+
+.supply-tile .card-cost {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 15px;
+    height: 15px;
+    font-size: 9.5px;
+}
+
+.supply-tile .card-title {
+    max-width: 100%;
+    overflow: hidden;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.supply-tile.no-art .tile-art {
+    display: none;
+}
+
+.supply-tile .card-count {
+    position: absolute;
+    top: 3px;
+    right: 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--ink-muted);
+}
+
+/* 購入フェーズでコインが足りず買えないカードはグレーアウトする */
+.supply-tile.unaffordable {
+    opacity: 0.5;
+    filter: grayscale(0.85);
+}
+
+/* コストにポーションがあるカード（錬金術）：コストの右下に青い印を付ける */
+.card-cost.has-potion {
+    position: relative;
+}
+
+.supply-tile .card-cost.has-potion {
+    position: absolute;
+}
+
+.card-cost.has-potion::after {
+    content: '';
+    position: absolute;
+    right: -4px;
+    bottom: -3px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #3f7fd6;
+    border: 1px solid #fff;
+}
+
+/* 負債（帝国）：銅色の六角形 */
+.card-debt {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    background: #a0522d;
+    clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+
+.supply-tile .card-debt {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 15px;
+    height: 15px;
+    font-size: 9px;
+}
+
+.supply-tile .card-debt.with-coin {
+    left: 19px;
+}
+
+/* 山や札に置いた勝利点トークン（緑の丸）と負債 */
+.vp-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--type-victory);
+}
+
+.pile-tokens {
+    position: absolute;
+    bottom: 3px;
+    right: 3px;
+    display: flex;
+    gap: 2px;
+}
+
+.pile-tokens .card-debt {
+    position: static;
+}
+
+.landscape-landmark {
+    border-left-color: #3f8a4c;
+}
+
+.landscape-ally {
+    border-left-color: #c98a1a;
+}
+
+/* 予言（旭日）：残りの☀の数。すべて取り除くと「実現」 */
+.landscape-prophecy {
+    border-left-color: #d9534f;
+}
+
+.sun-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 4px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #5a3200;
+    background: #f6c344;
+}
+
+.sun-badge.active {
+    color: #fff;
+    background: #d9534f;
+}
+
+/* 影（旭日）：山札にある影のカード。手札の後ろに点線の枠で並べる */
+.card.from-deck {
+    outline: 2px dashed rgba(255, 255, 255, 0.8);
+    outline-offset: -2px;
+}
+
+.card.from-deck::after {
+    content: '山札';
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    padding: 0 4px;
+    border-radius: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(30, 30, 40, 0.75);
+}
+
+/* 山に置いた恩恵トークン（発明家の一族） */
+.favor-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 15px;
+    height: 15px;
+    padding: 0 3px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 800;
+    color: #fff;
+    background: #c98a1a;
+}
+
+.landscape-project {
+    border-left-color: #c0392b;
+}
+
+/* プロジェクトにキューブを置いたプレイヤー */
+.landscape-cubes {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: #c0392b;
+}
+
+/* 橋・街道などでコストが下がっているときは色を変える */
+.card-cost.reduced {
+    color: #fff;
+    background: var(--primary);
+}
+
+/* イベントなど（カードではない横長の札）は、アクションの欄のすぐ下の空いたところに並べる
+   （勝利点と財宝の列を2段ぶん使い、アクションの欄の下に2段目を作る） */
+.supply-victory,
+.supply-treasure {
+    grid-row: span 2;
+}
+
+.supply-landscapes {
+    grid-column: 3 / -1;
+}
+
+.landscape-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.landscape-tile {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 132px;
+    padding: 6px 10px 6px 6px;
+    border-radius: 8px;
+    background: #efe6d2;
+    border-left: 5px solid #8e6fae;
+    color: var(--ink);
+    cursor: pointer;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+}
+
+.landscape-tile .landscape-name {
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.landscape-tile .landscape-kind {
+    margin-left: auto;
+    font-size: 9.5px;
+    color: var(--ink-muted);
+}
+
+.landscape-tile.unaffordable {
+    opacity: 0.5;
+    filter: grayscale(0.85);
+}
+
+.landscape-detail .landscape-kind {
+    font-size: 12px;
+    color: var(--ink-muted);
+}
+
+/* 魔女娘の災いカード */
+.bane-badge {
+    position: absolute;
+    top: 3px;
+    left: 50%;
+    transform: translateX(-50%);
+    line-height: 15px;
+    padding: 0 3px;
+    border-radius: 4px;
+    font-size: 8.5px;
+    font-weight: 700;
+    color: #fff;
+    background: var(--type-curse);
+}
+
+/* 特性（略奪）は、その山のタイルに名前を出す。名前が長いので、はみ出さないように縮める */
+.bane-badge.trait-badge {
+    max-width: calc(100% - 6px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    background: #2a7f86;
+}
+
+/* サプライ外の山（褒賞・渡し守の山）は横一列に並べる */
+.supply-extra {
+    grid-column: 1 / -1;
+}
+
+.supply-extra .supply-grid {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+/* 売り切れは、買えないカードよりさらに薄くして区別する */
+.supply-tile.empty {
+    opacity: 0.3;
+    filter: grayscale(1);
+}
+
+/* ===== 手札・場札などの通常カード ===== */
+
+.card:not(.supply-tile) {
+    flex: none;
+    width: 92px;
+    height: 128px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.card-head {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 5px;
+    color: #fff;
+    background: var(--type);
+}
+
+.card-head .card-title {
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.card-type {
+    padding: 2px 4px;
+    font-size: 10px;
+    text-align: center;
+    color: var(--ink-muted);
+    background: var(--paper-dim);
+}
+
+.card-description {
+    padding: 4px 6px;
+    font-size: 10.5px;
+    line-height: 1.35;
+    overflow: hidden;
+}
+
+/* カードのイラスト */
+.card-art {
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 40px;
+    padding: 2px 0;
+    background: var(--type-tint);
+}
+
+.card-art svg {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+}
+
+/* 手札はイラストを入れる分、種類の行を省く（種類はヘッダーの色で分かる） */
+#hand-cards .card-type {
+    display: none;
+}
+
+#hand-cards .card-art {
+    height: 34px;
+}
+
+/* 今プレイできるカード */
+.card.playable {
+    transform: translateY(-4px);
+    box-shadow: 0 0 0 2px var(--gold), 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+/* 重ねたカード：後ろに2枚ずれて重なっているように見せる（overflow で切れないよう影で描く） */
+.card.stacked {
+    --stack-shadow: 3px -3px 0 -1px #e6dcc3, 6px -6px 0 -2px #d3c6a6;
+    box-shadow: var(--stack-shadow), 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.card.stacked.playable {
+    box-shadow: var(--stack-shadow), 0 0 0 2px var(--gold), 0 6px 16px rgba(0, 0, 0, 0.45);
+}
+
+.stack-count {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    z-index: 1;
+    padding: 1px 6px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--ink);
+}
+
+/* 場札は名前だけの小さな表示にする */
+.card.mini {
+    width: 76px;
+    height: auto;
+    cursor: default;
+}
+
+.card.mini .card-type,
+.card.mini .card-art,
+.card.mini .card-description {
+    display: none;
+}
+
+/* 場札のまとめ表示：帯の上下で影が切れるので重なりの影は使わず、名前の右に ×枚数 を置く */
+.card.mini.stacked {
+    width: auto;
+    min-width: 76px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.card.mini.stacked .card-head {
+    padding-right: 34px;
+}
+
+.card.mini .stack-count {
+    top: 50%;
+    right: 4px;
+    bottom: auto;
+    transform: translateY(-50%);
+    padding: 0 5px;
+    font-size: 10px;
+}
+
+/* 詳細表示用の大きなカード */
+.card.large {
+    width: 150px;
+    height: auto;
+    min-height: 200px;
+    cursor: default;
+}
+
+.card.large .card-head .card-title {
+    font-size: 15px;
+}
+
+.card.large .card-description {
+    font-size: 13px;
+}
+
+.card.large .card-art {
+    height: 90px;
+}
+
+@media (hover: hover) {
+    .card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+    }
+
+    .card.mini:hover,
+    .card.large:hover {
+        transform: none;
+    }
+}
+
+/* ===== 場札（サプライと手札のあいだの帯） ===== */
+
+#play-area {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    background: rgba(20, 45, 34, 0.9);
+    border-top: 1px solid var(--panel-border);
+    z-index: 20;
+}
+
+#play-area h2 {
+    flex: none;
+    margin: 0;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--on-felt-muted);
+}
+
+/* 枚数が多いときは帯の高さを変えずに横スクロールする */
+#played-cards {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 26px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+#played-cards::-webkit-scrollbar {
+    display: none;
+}
+
+#played-cards .card.mini {
+    flex: none;
+}
+
+.empty-note {
+    margin: 0;
+    font-size: 12px;
+    color: var(--on-felt-muted);
+}
+
+/* ===== ゲームログ ===== */
+
+#game-log {
+    position: relative;
+}
+
+#game-log summary {
+    margin: 0;
+    cursor: pointer;
+    list-style: none;
+}
+
+#game-log summary::-webkit-details-marker {
+    display: none;
+}
+
+#game-log summary::after {
+    content: "＋";
+    float: right;
+}
+
+#game-log[open] summary::after {
+    content: "－";
+}
+
+#game-log[open] summary {
+    margin-bottom: 8px;
+}
+
+#log-entries {
+    max-height: 40vh;
+    overflow-y: auto;
+    font-size: 12px;
+    scrollbar-width: thin;
+}
+
+.log-entry {
+    padding: 4px 0;
+    border-bottom: 1px solid var(--panel-border);
+}
+
+.log-entry:last-child {
+    border-bottom: none;
+}
+
+.new-log {
+    color: var(--gold);
+    font-weight: 700;
+}
+
+.scroll-to-bottom-btn {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    font-size: 14px;
+    background: var(--gold);
+    color: var(--ink);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* ===== 下部ドック（手札と操作） ===== */
+
+/* 縦画面は「ボタン」の行と「山札｜手札｜捨て札」の行の2段にする */
+#dock {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 12px calc(8px + var(--safe-bottom));
+    background: rgba(20, 45, 34, 0.96);
+    border-top: 1px solid var(--panel-border);
+    box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.3);
+    z-index: 20;
+}
+
+.dock-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 山札・捨て札：カードの絵と ×枚数 を表示し、下にラベルを置く */
+.pile {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+}
+
+.pile-slot {
+    width: 52px;
+    height: 74px;
+}
+
+.pile-label {
+    font-size: 10px;
+    color: var(--on-felt-muted);
+}
+
+.pile-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    border-radius: 8px;
+    color: var(--ink);
+    background: var(--paper);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    -webkit-touch-callout: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+/* 2枚以上あるときは後ろにカードが重なっているように見せる */
+.pile-card.piled {
+    --pile-under: #d3c6a6;
+    box-shadow: 2px 2px 0 -0.5px var(--pile-under), 4px 4px 0 -1px var(--pile-under), 0 2px 6px rgba(0, 0, 0, 0.35);
+    overflow: visible;
+}
+
+.pile-card.card-back {
+    --pile-under: #16223f;
+    background: #23345c;
+}
+
+.pile-card.card-back svg {
+    width: 100%;
+    height: 100%;
+    border-radius: 8px;
+}
+
+.pile-card.empty {
+    background: transparent;
+    border: 1.5px dashed rgba(255, 255, 255, 0.25);
+    box-shadow: none;
+}
+
+.pile-card-name {
+    flex: none;
+    padding: 3px 2px;
+    overflow: hidden;
+    border-radius: 8px 8px 0 0;
+    font-size: 10px;
+    font-weight: 700;
+    text-align: center;
+    white-space: nowrap;
+    color: #fff;
+    background: var(--type);
+}
+
+.pile-card .card-art {
+    flex: 1;
+    height: auto;
+    border-radius: 0 0 8px 8px;
+}
+
+.pile-card .stack-count {
+    right: 3px;
+    bottom: 3px;
+    padding: 0 5px;
+    font-size: 10px;
+}
+
+#game-controls {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+#action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+#buy-phase-btn {
+    color: var(--ink);
+    background: var(--gold);
+}
+
+#buy-phase-btn.highlight {
+    animation: pulse 1.4s ease-in-out infinite;
+}
+
+#end-turn-btn {
+    background: var(--danger);
+}
+
+@keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(230, 184, 79, 0.7); }
+    50% { box-shadow: 0 0 0 8px rgba(230, 184, 79, 0); }
+}
+
+#hand {
+    flex: 1;
+    min-width: 0;
+    padding: 6px 0 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+}
+
+#hand::-webkit-scrollbar {
+    display: none;
+}
+
+#hand-cards {
+    display: flex;
+    gap: 8px;
+    width: max-content;
+    min-height: 124px;
+    padding-top: 4px;
+}
+
+/* 山札・捨て札（52px×2）と余白を除いた幅に5枚並べる。狭い画面では60pxを下限にして横スクロールする */
+#hand-cards .card {
+    width: clamp(60px, calc((100vw - 172px) / 5), 92px);
+    height: 116px;
+    scroll-snap-align: start;
+}
+
+#hand-cards .card-head {
+    padding: 4px 3px;
+    gap: 2px;
+}
+
+#hand-cards .card-head .card-cost {
+    width: 17px;
+    height: 17px;
+    font-size: 11px;
+}
+
+#hand-cards .card-description {
+    padding: 3px 4px;
+    font-size: 10px;
+}
+
+/* ===== モーダル（スマホではボトムシート） ===== */
+
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.modal-content {
+    position: relative;
+    width: 100%;
+    max-width: 640px;
+    max-height: 88vh;
+    max-height: 88dvh;
+    overflow-y: auto;
+    padding: 18px 16px calc(18px + var(--safe-bottom));
+    color: var(--ink);
+    background: var(--paper);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
+    animation: sheet-up 0.22s ease-out;
+}
+
+@keyframes sheet-up {
+    from { transform: translateY(40px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+.close {
+    position: absolute;
+    top: 8px;
+    right: 14px;
+    font-size: 28px;
+    line-height: 1;
+    color: var(--ink-muted);
+    cursor: pointer;
+}
+
+#modal-title {
+    margin-bottom: 14px;
+    padding-right: 32px;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+.prompt-text {
+    margin: 0 0 12px;
+    font-size: 14px;
+}
+
+/* ゲーム設定 */
+.setup-form .field {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-weight: 700;
+}
+
+.setup-form select,
+.setup-form input[type="text"] {
+    font: inherit;
+    font-size: 16px; /* iOSで入力時に拡大されないように16px以上にする */
+    padding: 8px 10px;
+    border: 1px solid #d6ccb4;
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+}
+
+#player-names {
+    margin-top: 12px;
+}
+
+.setup-form .field + .field {
+    margin-top: 12px;
+}
+
+.player-input {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 8px;
+    margin: 8px 0;
+}
+
+.player-input input[type="text"] {
+    min-width: 0;
+    width: 100%;
+}
+
+.cpu-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.cpu-toggle input {
+    width: 20px;
+    height: 20px;
+}
+
+/* 選択待ち：はい／いいえのボタンは横に並べ、「いいえ」側は控えめにする */
+.prompt-card {
+    display: flex;
+    justify-content: center;
+}
+
+.prompt-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+button.primary.secondary {
+    color: var(--ink);
+    background: var(--paper-dim);
+}
+
+/* 文字の選択肢から選ぶ選択 */
+.prompt-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.prompt-option.selected {
+    color: #fff;
+    background: var(--primary);
+    box-shadow: 0 0 0 2px var(--gold) inset;
+}
+
+/* 使うカードのセット */
+.card-set-checks {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    margin: 12px 0 0;
+    padding: 0;
+    border: none;
+}
+
+.card-set-checks legend {
+    margin-bottom: 6px;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.card-set-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    background: var(--paper-dim);
+    cursor: pointer;
+}
+
+.card-set-check input {
+    width: 18px;
+    height: 18px;
+}
+
+/* 設定のスイッチ */
+.setting-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 14px;
+    padding: 12px;
+    border-radius: 10px;
+    font-size: 15px;
+    font-weight: 700;
+    background: var(--paper-dim);
+    cursor: pointer;
+}
+
+.setting-toggle input {
+    width: 22px;
+    height: 22px;
+}
+
+/* カードの詳細 */
+.card-detail {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.card-detail-info p {
+    margin: 0 0 6px;
+    font-size: 14px;
+}
+
+
+/* 手札から選ぶ（地下室・礼拝堂） */
+.card-selection {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+    gap: 10px;
+    padding-top: 4px;
+}
+
+/* 選ぶ前に効果を読めるよう、選択画面のカードは説明文の長さに合わせて伸ばす */
+.card-selection .card {
+    width: auto;
+    height: auto;
+    min-height: 128px;
+}
+
+.card-selection .card .card-description {
+    overflow: visible;
+}
+
+/* 候補が多くてスクロールしても、決定ボタンはシートの下端に見えたままにする
+   （シートの下の余白まで背景で覆い、後ろのカードが透けたりはみ出したりしないようにする） */
+.prompt-footer {
+    position: sticky;
+    bottom: -18px;
+    z-index: 1;
+    margin: 0 -16px -18px;
+    padding: 4px 16px 18px;
+    background: var(--paper);
+    box-shadow: 0 -8px 12px -8px rgba(0, 0, 0, 0.25);
+}
+
+.prompt-footer button.primary {
+    margin-top: 10px;
+}
+
+.card.selectable.selected {
+    transform: translateY(-4px);
+    box-shadow: 0 0 0 3px var(--danger), 0 6px 14px rgba(0, 0, 0, 0.3);
+}
+
+.card.selectable.selected::after {
+    content: "✓";
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--danger);
+}
+
+/* ゲーム結果 */
+.result-row {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    align-items: center;
+    padding: 12px;
+    margin-bottom: 6px;
+    border-radius: 10px;
+    background: var(--paper-dim);
+    font-size: 15px;
+}
+
+.result-row.winner {
+    background: var(--gold);
+    font-weight: 800;
+}
+
+/* ===== カードアニメーション ===== */
+
+#animation-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 999;
+}
+
+.card-animating {
+    position: absolute;
+    z-index: 100;
+    pointer-events: none;
+}
+
+@keyframes cardPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+    100% { transform: scale(1); }
+}
+
+.card-pulse,
+.card-played,
+.card-discarded,
+.card-purchased {
+    animation: cardPulse var(--anim-ms, 250ms) ease-in-out;
+}
+
+/* ===== 広い画面（タブレット・PC） ===== */
+
+@media (min-width: 640px) {
+    .modal {
+        align-items: center;
+    }
+
+    .modal-content {
+        border-radius: 18px;
+        max-height: 85vh;
+    }
+
+    #supply-piles {
+        --supply-gap: 6px;
+    }
+
+    .supply-tile {
+        gap: 2px;
+        min-height: 64px;
+        padding: 20px 4px 6px;
+        border-top-width: 5px;
+    }
+
+    .tile-art svg {
+        width: 34px;
+        height: 23px;
+    }
+
+    .supply-tile .card-cost {
+        top: 4px;
+        left: 4px;
+        width: 20px;
+        height: 20px;
+        font-size: 12px;
+    }
+
+    .supply-tile .card-count {
+        top: 5px;
+        right: 7px;
+        font-size: 11px;
+    }
+
+    .supply-tile .card-title {
+        font-size: 13px;
+    }
+}
+
+@media (min-width: 900px) {
+    #turn-stats {
+        max-width: 480px;
+    }
+
+    #table {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 300px;
+        grid-template-areas: "supply side";
+        grid-template-rows: minmax(0, 1fr);
+        align-items: start;
+        overflow: hidden;
+        padding: 16px;
+        gap: 16px;
+    }
+
+    /* サプライと右の列（プレイヤー・ログ）は、それぞれ別にスクロールする */
+    /* スクロールバーは細く、緑の地になじむ色にする（標準の白く太いバーは目立つ） */
+    #supply-section {
+        grid-area: supply;
+        max-height: 100%;
+        overflow-y: auto;
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
+    }
+
+    #table-side {
+        grid-area: side;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        max-height: 100%;
+        overflow-y: auto;
+        scrollbar-width: thin;
+    }
+
+    #players-info {
+        flex-direction: column;
+        overflow: visible;
+    }
+
+    /* 縦並びでは flex-basis が高さになるので、内容の高さに戻す */
+    .player-stats {
+        flex: none;
+    }
+
+    .supply-tile {
+        min-height: 70px;
+    }
+
+    .supply-tile .card-title {
+        font-size: 14px;
+    }
+
+    #hand-cards .card {
+        width: 110px;
+        height: 150px;
+    }
+
+    #hand-cards .card-description {
+        font-size: 11.5px;
+    }
+}
+
+/* ===== スマホ横画面（高さの低い画面）：サプライと手札を同時に見せる ===== */
+
+@media (orientation: landscape) and (max-height: 500px) {
+    :root {
+        --safe-left: max(12px, env(safe-area-inset-left, 0px));
+        --safe-right: max(12px, env(safe-area-inset-right, 0px));
+    }
+
+    button {
+        height: 40px;
+    }
+
+    /* ヘッダーは1行にまとめる */
+    #topbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 6px var(--safe-right) 6px var(--safe-left);
+    }
+
+    /* 手番の数字（アクション・購入・コイン…）は切らさない。足りなければ、こちらの名前を省略して縮める */
+    .topbar-row {
+        flex: 0 1 auto;
+        min-width: 0;
+        gap: 10px;
+    }
+
+    #turn-stats {
+        flex: none;
+        grid-auto-columns: auto;
+        max-width: none;
+        margin-top: 0;
+    }
+
+    .stat {
+        padding: 2px 10px;
+    }
+
+    .stat-value {
+        font-size: 16px;
+    }
+
+    #latest-log {
+        flex: 1;
+        min-width: 0;
+        margin-top: 0;
+    }
+
+    /* 左にサプライ、右にプレイヤー・ログ */
+    #table {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 210px;
+        grid-template-areas: "supply side";
+        grid-template-rows: minmax(0, 1fr);
+        align-items: start;
+        overflow: hidden;
+        gap: 8px;
+        padding: 4px var(--safe-right) 4px var(--safe-left);
+    }
+
+    /* サプライと右の列（プレイヤー・ログ）は、それぞれ別にスクロールする */
+    #supply-section {
+        grid-area: supply;
+        max-height: 100%;
+        overflow-y: auto;
+    }
+
+    #table-side {
+        grid-area: side;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 100%;
+        overflow-y: auto;
+        scrollbar-width: none;
+    }
+
+    #players-info {
+        flex-direction: column;
+        gap: 6px;
+        overflow: visible;
+    }
+
+    .player-stats {
+        flex: none;
+        padding: 6px 8px;
+    }
+
+    .panel {
+        padding: 5px 8px;
+    }
+
+    /* サプライは見出しをなくし、タイルを詰めてスクロールなしで見せる */
+    #supply-section h2,
+    .supply-group h3 {
+        display: none;
+    }
+
+    #supply-piles {
+        --supply-gap: 4px;
+    }
+
+    /* イラストは名前の左に置き、高さを抑える（iPhone SE ではタイル幅が約54px） */
+    .supply-tile {
+        flex-direction: row;
+        gap: 1px;
+        min-height: 40px;
+        padding: 17px 2px 2px;
+        border-top-width: 4px;
+    }
+
+    .tile-art svg {
+        width: 16px;
+        height: 11px;
+    }
+
+    .supply-tile .card-cost {
+        top: 3px;
+        left: 3px;
+        width: 15px;
+        height: 15px;
+        font-size: 9.5px;
+    }
+
+    .supply-tile .card-count {
+        top: 3px;
+        right: 4px;
+        font-size: 9.5px;
+    }
+
+    .supply-tile .card-title {
+        font-size: 11px;
+    }
+
+    /* 場札の帯の分だけ高さが減るので、各部を少しずつ詰めてサプライをスクロールなしで見せる */
+    #play-area {
+        padding: 2px var(--safe-right) 2px var(--safe-left);
+    }
+
+    /* ドックは「山札｜手札｜捨て札｜ボタン」の1行にする */
+    #dock {
+        flex-direction: row;
+        align-items: center;
+        gap: 10px;
+        padding: 6px var(--safe-right) calc(6px + var(--safe-bottom)) var(--safe-left);
+    }
+
+    .dock-main {
+        order: 1;
+        flex: 1;
+        min-width: 0;
+        gap: 8px;
+    }
+
+    .pile-slot {
+        height: 64px;
+    }
+
+    #hand {
+        padding: 4px 0;
+    }
+
+    #game-controls,
+    #action-buttons {
+        flex-direction: column;
+    }
+
+    #game-controls {
+        order: 2;
+        width: 112px;
+    }
+
+    #game-controls button {
+        width: 100%;
+        padding: 0 8px;
+    }
+
+    /* 高さが足りないので、詳細シートの購入ボタンがスクロールなしで見えるよう詰める */
+    .modal-content {
+        max-height: 94vh;
+        max-height: 94dvh;
+        padding: 12px 16px calc(12px + var(--safe-bottom));
+    }
+
+    #modal-title {
+        margin-bottom: 8px;
+    }
+
+    .prompt-footer {
+        bottom: -12px;
+        margin-bottom: -12px;
+        padding-bottom: 12px;
+    }
+
+    .card.large {
+        min-height: 0;
+        height: 150px;
+    }
+
+    .card.large .card-art {
+        height: 56px;
+    }
+
+    button.primary {
+        height: 44px;
+        margin-top: 10px;
+    }
+
+    #hand-cards {
+        min-height: 92px;
+    }
+
+    #hand-cards .card {
+        width: 72px;
+        height: 88px;
+    }
+}
+
+/* 狭い横画面で数字が4つ以上（恩恵・村人など）のときは、ロゴの文字を外して数字の幅を空ける */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 760px) {
+    #topbar:has(#turn-stats .stat:nth-child(4)) h1 {
+        display: none;
+    }
+}
+
+/* ===== オンライン対戦 ===== */
+.online-form,
+.lobby {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.online-form input[type="text"] {
+    min-width: 0;
+    width: 100%;
+}
+
+.online-join {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+}
+
+.online-join input {
+    letter-spacing: 0.15em;
+}
+
+/* 部屋を作るボタンの横に、公開の切り替えを並べる */
+.online-create {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 8px;
+}
+
+.online-form .public-toggle {
+    height: 48px;
+    margin-top: 0;
+    padding: 0 14px;
+}
+
+/* 公開の部屋の一覧。押すとその部屋に入る */
+.public-rooms {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.public-room {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 2px 10px;
+    width: 100%;
+    height: auto;
+    padding: 10px 14px;
+    border: none;
+    border-radius: var(--radius);
+    font: inherit;
+    text-align: left;
+    color: var(--ink);
+    background: var(--paper-dim);
+    box-shadow: 0 3px 0 #d8ccb1;
+    cursor: pointer;
+}
+
+.public-room:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 #d8ccb1;
+}
+
+.public-room-name {
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: 700;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+.public-room-count {
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.public-room-note {
+    grid-column: 1 / -1;
+    overflow: hidden;
+    font-size: 13px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    color: var(--ink-muted);
+}
+
+/* 低い横画面では、作る・参加を横に並べて、高さを抑える */
+@media (orientation: landscape) and (max-height: 500px) {
+    .online-form:has(.online-create) {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 16px;
+    }
+
+    .online-form:has(.online-create) > :not(.online-create):not(.online-join) {
+        grid-column: 1 / -1;
+    }
+
+    .online-form .public-toggle {
+        height: 44px;
+    }
+
+    /* 一覧は、名前・使うカード・人数を1行に並べる */
+    .public-room {
+        grid-template-columns: auto 1fr auto;
+        align-items: baseline;
+        padding: 8px 14px;
+    }
+
+    .public-room-note {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .public-room-count {
+        grid-column: 3;
+        grid-row: 1;
+    }
+}
+
+.online-error {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: #c0392b;
+}
+
+/* 文字だけのボタン（戻る・部屋を出る） */
+.link-button {
+    align-self: center;
+    padding: 6px 8px;
+    border: none;
+    background: none;
+    font: inherit;
+    font-size: 14px;
+    color: var(--ink);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.lobby-code {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--paper-dim);
+}
+
+.lobby-code b {
+    font-size: 24px;
+    letter-spacing: 0.2em;
+}
+
+.lobby-players {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.lobby-players li {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 4px;
+    border-bottom: 1px solid #e3dac6;
+    font-weight: 700;
+}
+
+.lobby-players .link-button {
+    margin-left: auto;
+}
+
+.host-badge,
+.offline-badge {
+    padding: 1px 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    background: #8b6b4a;
+}
+
+.offline-badge {
+    background: #c0392b;
+}
+
+.public-badge {
+    display: block;
+    width: fit-content;
+    margin-top: 4px;
+    background: var(--primary);
+}
+
+.lobby-note {
+    margin: 0;
+    font-size: 14px;
+}
+
+/* 画面の下に出す短いお知らせ */
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    z-index: 2000;
+    max-width: calc(100% - 32px);
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    background: rgba(30, 30, 30, 0.9);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, 8px);
+    transition: opacity 0.2s, transform 0.2s;
+}
+
+.toast.visible {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+/* ===== トップ画面（タイトル画面） ===== */
+/* トップ画面だけはシートではなく全画面にし、左にタイトルと絵、右に設定を並べる */
+
+.modal[data-kind="setup"] {
+    align-items: stretch;
+    justify-content: stretch;
+}
+
+/* タイトル画面と、そこから開く画面（拡張・遊び方）は、フェルトの背景にする */
+.modal[data-kind="setup"],
+.modal[data-backdrop="title"] {
+    background:
+        radial-gradient(ellipse at 28% 38%, rgba(230, 184, 79, 0.16), transparent 55%),
+        radial-gradient(ellipse at 50% 50%, var(--felt-light), var(--felt-dark) 80%);
+}
+
+.modal[data-kind="setup"] .modal-content {
+    display: flex;
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: none;
+    padding: calc(12px + var(--safe-top)) max(16px, env(safe-area-inset-right)) calc(12px + var(--safe-bottom)) max(16px, env(safe-area-inset-left));
+    overflow-y: auto;
+    color: var(--on-felt);
+    background: transparent;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+}
+
+.modal[data-kind="setup"] #modal-title {
+    display: none;
+}
+
+.modal[data-kind="setup"] #modal-body {
+    display: flex;
+    flex: 1;
+}
+
+.title-screen {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 430px);
+    gap: 28px;
+    align-items: center;
+    width: 100%;
+    max-width: 980px;
+    margin: auto;
+}
+
+.title-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+/* 扇形に広げたカード */
+.title-cards {
+    position: relative;
+    width: 240px;
+    height: 170px;
+}
+
+.title-card {
+    position: absolute;
+    left: 50%;
+    bottom: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 92px;
+    height: 130px;
+    margin-left: -46px;
+    padding: 4px 4px 6px;
+    overflow: hidden;
+    color: var(--ink);
+    background: var(--paper);
+    border-top: 16px solid var(--type-action);
+    border-radius: 9px;
+    box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+    transform-origin: 50% 160%;
+}
+
+.title-card-back {
+    padding: 0;
+    border-top: none;
+    background: #23305c;
+    transform: rotate(-33deg);
+}
+
+.title-card-back svg {
+    width: 100%;
+    height: 100%;
+}
+
+.title-card-0 {
+    transform: rotate(-12deg);
+}
+
+.title-card-1 {
+    border-top-color: var(--type-treasure);
+    transform: rotate(9deg);
+}
+
+.title-card-2 {
+    border-top-color: var(--type-victory);
+    transform: rotate(30deg);
+}
+
+.title-card-name {
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.title-card-art {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+}
+
+.title-card-art svg {
+    width: 76px;
+    height: 76px;
+}
+
+.title-logo {
+    margin: 18px 0 0;
+    font-size: 46px;
+    font-weight: 900;
+    letter-spacing: 0.16em;
+    color: var(--gold);
+    text-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
+}
+
+.title-sub {
+    margin: 4px 0 0;
+    font-size: 14px;
+    letter-spacing: 0.12em;
+    color: var(--on-felt-muted);
+}
+
+/* 右側の設定 */
+.title-panel {
+    padding: 16px;
+    color: var(--ink);
+    background: var(--paper);
+    border-radius: 16px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+.setup-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px;
+    align-items: end;
+}
+
+.setup-row .field {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 3px;
+    font-size: 12px;
+}
+
+.setup-form .setup-row .field + .field {
+    margin-top: 0;
+}
+
+.title-panel #player-names {
+    margin-top: 6px;
+}
+
+.title-panel .player-input {
+    margin: 6px 0;
+}
+
+.title-panel .setting-toggle {
+    margin-top: 8px;
+    padding: 9px 12px;
+    font-size: 14px;
+}
+
+/* タイトル画面の切り替え（手札を重ねる・リアルタイム）は2列に並べて、高さを抑える */
+.title-toggles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.title-panel .title-toggles .setting-toggle {
+    margin-top: 0;
+    gap: 8px;
+    font-size: 13px;
+    line-height: 1.3;
+}
+
+.title-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.title-buttons button.primary {
+    margin-top: 0;
+    padding: 0 8px;
+    white-space: nowrap;
+}
+
+/* ===== 使う拡張（トップ画面とロビーのボタン、選ぶ画面） ===== */
+
+.card-set-field {
+    min-width: 0;
+}
+
+.setup-form .card-set-field:not(.setup-row .card-set-field) {
+    margin-top: 12px;
+}
+
+.card-set-button {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    min-height: 42px;
+    padding: 8px 10px;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    text-align: left;
+    color: var(--ink);
+    background: #fff;
+    border: 1px solid #d6ccb4;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.set-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.card-set-button-change {
+    flex: none;
+    font-size: 12px;
+    color: var(--primary);
+}
+
+.card-set-button-change::after {
+    content: ' ›';
+}
+
+.card-set-note {
+    margin: 0 0 6px;
+    font-size: 13px;
+    color: var(--ink-muted);
+}
+
+.card-set-actions {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 8px;
+}
+
+.card-set-actions .link-button {
+    margin: 0;
+    padding: 4px 0;
+    font-size: 14px;
+}
+
+.card-set-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 6px;
+}
+
+/* 各セット：チェック・名前と難しさ（★）・説明 */
+.card-set-list .card-set-item {
+    align-items: flex-start;
+    gap: 8px;
+    padding: 8px 10px;
+    font-weight: 400;
+}
+
+.card-set-item input {
+    flex: none;
+    margin-top: 2px;
+}
+
+.card-set-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.card-set-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.card-set-level {
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    color: #b8862b;
+}
+
+.card-set-desc {
+    font-size: 12px;
+    line-height: 1.45;
+    color: var(--ink-muted);
+}
+
+/* 決定ボタンは、一覧をスクロールしても下に残す */
+.card-set-footer {
+    position: sticky;
+    bottom: -18px;
+    margin: 12px -16px -18px;
+    padding: 10px 16px calc(14px + var(--safe-bottom));
+    background: linear-gradient(rgba(251, 246, 233, 0), var(--paper) 30%);
+}
+
+#card-sets-done-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    margin-top: 0;
+}
+
+#card-sets-done-btn .set-summary {
+    flex: 0 1 auto;
+}
+
+/* ===== ボタンの色 ===== */
+
+/* オンラインで遊ぶ：ゲーム開始（緑）と並べるので、別の色で塗る */
+button.primary.online {
+    color: #fff;
+    background: #3f6fa6;
+}
+
+/* ===== 英字のロゴ ===== */
+
+.title-logo,
+#topbar h1 {
+    font-family: 'Cinzel', 'Trajan Pro', Georgia, 'Times New Roman', serif;
+}
+
+.title-help-btn {
+    margin-top: 12px;
+    padding: 6px 16px;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(230, 184, 79, 0.6);
+    border-radius: 999px;
+    cursor: pointer;
+}
+
+/* ===== 遊び方 ===== */
+
+.modal[data-kind="help"] .modal-content {
+    max-width: 720px;
+}
+
+.help-section {
+    margin-bottom: 8px;
+    background: var(--paper-dim);
+    border-radius: 10px;
+}
+
+.help-section summary {
+    padding: 10px 12px;
+    font-size: 15px;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.help-body {
+    padding: 0 14px 10px;
+    font-size: 14px;
+    line-height: 1.65;
+}
+
+.help-body p,
+.help-body ol,
+.help-body ul {
+    margin: 0 0 8px;
+}
+
+.help-body ol,
+.help-body ul {
+    padding-left: 1.3em;
+}
+
+.help-terms {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 4px 12px;
+    margin: 0 0 8px;
+}
+
+.help-terms dt {
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.help-terms dd {
+    margin: 0;
+}
+
+#help-close-btn {
+    width: 100%;
+}
+
+/* スマホの横画面：高さが足りないので、絵と入力欄を小さくしてスクロールなしで収める */
+@media (orientation: landscape) and (max-height: 500px) {
+    .title-screen {
+        grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+        gap: 16px;
+    }
+
+    .title-cards {
+        width: 170px;
+        height: 112px;
+    }
+
+    .title-card {
+        width: 64px;
+        height: 90px;
+        margin-left: -32px;
+        border-top-width: 11px;
+    }
+
+    .title-card-name {
+        font-size: 9px;
+    }
+
+    .title-card-art svg {
+        width: 50px;
+        height: 50px;
+    }
+
+    .title-logo {
+        margin-top: 10px;
+        font-size: 30px;
+    }
+
+    .title-sub {
+        font-size: 12px;
+    }
+
+    .title-panel {
+        padding: 10px 12px;
+    }
+
+    .title-panel select,
+    .title-panel input[type="text"] {
+        padding: 5px 8px;
+    }
+
+    .card-set-list .card-set-item {
+        padding: 6px 8px;
+    }
+
+    .card-set-note,
+    .card-set-actions {
+        margin-bottom: 2px;
+    }
+
+    .card-set-footer {
+        bottom: -12px;
+        margin: 8px -16px -12px;
+        padding: 8px 16px calc(10px + var(--safe-bottom));
+    }
+
+    .title-panel .card-set-button {
+        min-height: 36px;
+        padding: 5px 10px;
+    }
+
+    .title-panel .player-input {
+        margin: 4px 0;
+    }
+
+    .title-panel .setting-toggle {
+        margin-top: 6px;
+        padding: 6px 12px;
+    }
+
+    .title-buttons {
+        margin-top: 8px;
+    }
+
+    .title-buttons button.primary {
+        height: 40px;
+    }
+
+    .title-logo {
+        letter-spacing: 0.08em;
+    }
+}
+
+/* 縦長の狭い画面：絵を上、設定を下に並べる */
+@media (max-width: 639px) and (orientation: portrait) {
+    .title-screen {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+        align-content: center;
+    }
+
+    .title-cards {
+        width: 190px;
+        height: 130px;
+    }
+
+    .title-card {
+        width: 72px;
+        height: 102px;
+        margin-left: -36px;
+    }
+
+    .title-card-art svg {
+        width: 58px;
+        height: 58px;
+    }
+
+    .title-logo {
+        font-size: 34px;
+    }
+}
