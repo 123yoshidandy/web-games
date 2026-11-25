@@ -1,0 +1,19 @@
+{
+    "name": "ツォロ",
+    "short_name": "ツォロ",
+    "description": "タイルを置いて自分の道をのばし、最後まで盤に残るボードゲーム。CPU と遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "orientation": "portrait",
+    "background_color": "#14110e",
+    "theme_color": "#14110e",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
