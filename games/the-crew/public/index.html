@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0d1230">
+    <title>ザ・クルー</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ザ・クルー">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Orbitron:wght@700&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- 色の記号とロケット（自作）。色だけに頼らず見分けられるようにする -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+            <symbol id="sym-pink" viewBox="0 0 20 20"><circle cx="10" cy="10" r="5.2" fill="currentColor"/><ellipse cx="10" cy="10" rx="8.6" ry="2.6" fill="none" stroke="currentColor" stroke-width="1.6" transform="rotate(-20 10 10)"/></symbol>
+            <symbol id="sym-yellow" viewBox="0 0 20 20"><path d="M10 2 L12.3 7.4 L18 7.8 L13.6 11.4 L15 17 L10 13.9 L5 17 L6.4 11.4 L2 7.8 L7.7 7.4 Z" fill="currentColor"/></symbol>
+            <symbol id="sym-blue" viewBox="0 0 20 20"><path d="M10 2 L17.5 10 L10 18 L2.5 10 Z" fill="currentColor"/></symbol>
+            <symbol id="sym-green" viewBox="0 0 20 20"><path d="M10 2.5 L18 17 H2 Z" fill="currentColor"/></symbol>
+            <symbol id="sym-rocket" viewBox="0 0 20 20">
+                <path d="M10 1.5 C13.2 4 14 7.6 13.6 12 H6.4 C6 7.6 6.8 4 10 1.5 Z" fill="currentColor"/>
+                <path d="M6.4 9.5 L3.6 13.6 L6.6 13.2 Z M13.6 9.5 L16.4 13.6 L13.4 13.2 Z" fill="currentColor"/>
+                <path d="M8.2 13.2 L10 18.5 L11.8 13.2 Z" fill="#ffb347"/>
+                <circle cx="10" cy="7" r="1.6" fill="#0d1230"/>
+            </symbol>
+            <symbol id="sym-check" viewBox="0 0 20 20"><path d="M4.5 10.5 L8.5 14.5 L15.5 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+        </defs>
+    </svg>
+
+    <!-- タイトル -->
+    <section id="title-screen" class="screen">
+        <div class="title-inner">
+            <h1 class="logo">THE CREW</h1>
+            <p class="logo-sub">ザ・クルー　第9惑星への旅</p>
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <div class="settings">
+                <div class="setting">
+                    <span class="setting-label">人数</span>
+                    <div class="segment" id="count-select">
+                        <button type="button" data-value="2">2人</button>
+                        <button type="button" data-value="3">3人</button>
+                        <button type="button" data-value="4">4人</button>
+                        <button type="button" data-value="5">5人</button>
+                    </div>
+                </div>
+                <button type="button" id="mission-button" class="mission-pick">
+                    <span class="mission-pick-label">ミッション</span>
+                    <span id="mission-number" class="mission-pick-number">1</span>
+                    <span id="mission-progress" class="mission-pick-note"></span>
+                </button>
+            </div>
+            <div class="title-buttons">
+                <button type="button" id="start-button" class="btn btn-primary">出発する</button>
+                <button type="button" id="resume-button" class="btn btn-secondary" hidden>続きから</button>
+            </div>
+            <button type="button" class="icon-btn title-help" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </div>
+    </section>
+
+    <!-- プレイ中 -->
+    <section id="game-screen" class="screen" hidden>
+        <header id="topbar">
+            <button type="button" class="icon-btn" data-action="home" aria-label="ホーム" title="ホーム">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+            </button>
+            <button type="button" id="mission-label" class="mission-label" data-action="mission"></button>
+            <span id="trick-label" class="trick-label"></span>
+            <button type="button" class="icon-btn" data-action="log" aria-label="記録" title="記録">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 8.5h6M9 12h6M9 15.5h4"/></svg>
+            </button>
+            <button type="button" class="icon-btn" data-action="result" id="result-button" aria-label="結果" title="結果" hidden>
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5a3 3 0 0 0 3 4M16.5 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/></svg>
+            </button>
+            <button type="button" class="icon-btn" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </header>
+        <main id="play">
+            <div id="others"></div>
+            <div id="right">
+                <div id="table"></div>
+                <div id="status" class="status"></div>
+                <div id="me"></div>
+                <div id="actions"></div>
+            </div>
+        </main>
+    </section>
+
+    <!-- ミッションを選ぶ -->
+    <dialog id="missions-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">航海日誌</h2>
+            <p class="sheet-note">クリアしたミッションの次まで選べます。数字の下は、クリアまでの挑戦の回数です。</p>
+            <div id="missions-grid" class="missions-grid"></div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-secondary" data-action="close-missions">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- ミッションの内容 -->
+    <dialog id="mission-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="mission-title" class="sheet-title"></h2>
+            <div id="mission-body" class="mission-body"></div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-mission">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 遭難信号 -->
+    <dialog id="distress-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">遭難信号</h2>
+            <p class="sheet-note">全員が、ロケット以外の手札を1枚ずつ、同じ向きの隣の人へ渡します。航海日誌では挑戦の回数が1回増えます。最初のトリックの前で、だれも通信していないときだけ使えます。</p>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-secondary" data-action="distress-left">左の人へ渡す</button>
+                <button type="button" class="btn btn-secondary" data-action="distress-right">右の人へ渡す</button>
+            </div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-plain" data-action="close-distress">やめる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">記録</h2>
+            <ol id="log-body" class="log-list"></ol>
+        </div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="result-title" class="sheet-title"></h2>
+            <div id="result-body"></div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-secondary" data-action="close-result">盤面を見る</button>
+                <button type="button" class="btn btn-primary" id="result-next" data-action="next"></button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="sheet help">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">遊び方</h2>
+            <section>
+                <h3>目的</h3>
+                <p>全員で協力して、ミッションの課題を果たします。航海日誌の50のミッションを、1から順に進めます。失敗しても、何度でも挑戦できます。</p>
+            </section>
+            <section>
+                <h3>カード</h3>
+                <p>4色（桃・黄・青・緑）の1〜9と、ロケットの1〜4。ロケットの4を持つ人が<b>指揮官</b>で、最初のトリックを始めます。</p>
+            </section>
+            <section>
+                <h3>トリック</h3>
+                <ul>
+                    <li>最初の人が1枚出し、時計回りに1枚ずつ出します</li>
+                    <li>最初に出された色を持っていれば、その色を出します（出せない札は暗くなります）</li>
+                    <li>出された色で一番大きいカードが勝ちます。ロケットは切り札で、ロケットがあれば一番大きいロケットが勝ちます</li>
+                    <li>勝った人がカードを取り、次のトリックを始めます</li>
+                </ul>
+            </section>
+            <section>
+                <h3>課題</h3>
+                <ul>
+                    <li>課題のカードと同じカードを、課題の持ち主がトリックで取れば達成。ほかの人が取ったら、すぐ失敗です</li>
+                    <li>課題は、指揮官から順に1枚ずつ選びます</li>
+                    <li>順番のトークン：<b>1・2・3…</b> はその番目に、<b>›・››・›››</b> はこの順に、<b>Ω</b> は最後に果たします</li>
+                    <li>すべての課題を果たしたら成功です</li>
+                </ul>
+            </section>
+            <section>
+                <h3>通信</h3>
+                <p>ミッションごとに1回、トリックの前に、手札の色のカードを1枚見せられます。そのカードがその色で<b>一番上</b>（●が上）・<b>唯一</b>（●が真ん中）・<b>一番下</b>（●が下）のどれかを伝えます。それ以外のカードやロケットは通信できません。不感地帯のミッションでは、カードだけを見せ、位置は伝わりません（？）。</p>
+            </section>
+            <section>
+                <h3>遭難信号</h3>
+                <p>最初のトリックの前に1回だけ、全員がロケット以外の1枚を隣の人へ渡せます。航海日誌の挑戦の回数が1回増えます。</p>
+            </section>
+            <section>
+                <h3>人数</h3>
+                <ul>
+                    <li>3人：1人が14枚、2人が13枚。最後に1枚残ります</li>
+                    <li>2人：3人目の <b>JARVIS</b> が加わります。JARVIS は7枚の表のカード（下に裏のカード）を持ち、指揮官が JARVIS の課題を選び、JARVIS のカードを出します</li>
+                    <li>5人：ミッション25からは、最初のトリックの前に、課題を1枚ほかの人へ渡せます</li>
+                </ul>
+            </section>
+            <section>
+                <h3>CPU の考え</h3>
+                <ul id="cpu-help"></ul>
+            </section>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-help">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
