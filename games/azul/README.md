@@ -81,9 +81,17 @@ CPU の判断には、ゲームの乱数を使わない（状態から作った�
 | `public/sw.js` | Service Worker（オフライン） |
 | `tools/cpu-bench.mjs` | CPU の強さを測る |
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の「サーバーがゲームを進める型」にそのまま差し込める形にしてある。
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'azul' })`。web-games の1つのスタックから `?game=azul` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
+ゲームの定義（`server/src/game-definition.js`）:
 
 - `create`：`new Game(players, { seed })`
 - `persist` / `restore`：`{ players, options: { seed }, commands }` と `Game.replay`

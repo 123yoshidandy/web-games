@@ -210,6 +210,8 @@ button {
 }
 .title-buttons {
     display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
     gap: 12px;
     margin-top: 4px;
 }

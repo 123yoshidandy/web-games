@@ -57,8 +57,16 @@ npm test
 | `public/js/game-controller.js` | ローカル対戦のコントローラー（`getView()` / `send()`） |
 | `public/js/card-text.js` | カードの効果・費用の短い表示 |
 | `public/js/main.js` | 画面の進行 |
-| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだ使っていない） |
+| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形） |
+| `server/src/handler.js` | オンライン対戦の Lambda の入口 |
+| `public/js/online-config.js` | オンライン対戦の接続先 |
 
-## オンライン対戦（未実装）
+## オンライン対戦
 
-ロジックは DOM から切り離し、操作の入口を 1 つにして、記録から再現できるようにしてある（配るカードもシード付きの乱数）。各人のビューには、自分の手札と自分が選んだ中身だけを入れている。netplay-kit を同期すれば、`server/src/game-definition.js` をそのまま部屋の処理に渡せる。抜けた人の番を CPU が代わりに打つ処理（代行）は、そのときに足す。
+netplay-kit の「サーバーがゲームを進める型」。3〜7人で、足りない席は CPU で埋められる。全員が同時に選び、各人のビューには自分の手札と自分が選んだ中身だけを入れる（配るカードもシード付きの乱数で、記録から再現できる）。対戦中に部屋を出た人の席は CPU が引き継ぐ。不思議の面と CPU の強さは、ロビーでホストが決める。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'seven-wonders' })`。web-games の1つのスタックから `?game=seven-wonders` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）

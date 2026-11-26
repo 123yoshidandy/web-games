@@ -53,6 +53,10 @@
                         <button id="start" class="primary">ゲーム開始</button>
                         <button id="resume" class="secondary" hidden>続きから</button>
                     </div>
+                    <!-- オンライン対戦の接続先がないとき（デプロイ前の公開ページ）は隠す -->
+                    <div class="buttons" id="online-row" hidden>
+                        <button id="online" class="secondary">オンラインで遊ぶ</button>
+                    </div>
                     <div class="title-links">
                         <button id="open-help-title" class="link">遊び方</button>
                         <button type="button" class="link sound-toggle" aria-pressed="true">サウンド</button>

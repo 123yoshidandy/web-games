@@ -4,10 +4,12 @@
  */
 
 import LocalGameController from './game-controller.js';
-import { canPlaceInLine, wallColor, FLOOR_PENALTIES, FIRST, BONUS, COLOR_NAMES } from './game.js';
+import { canPlaceInLine, wallColor, FLOOR_PENALTIES, FIRST, BONUS, COLOR_NAMES, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { measureBefore, playMove } from './motion.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const CPU_NAMES = ['ルシア', 'マテウス', 'イネス'];
 const HUMAN_NAME = 'あなた';
@@ -47,25 +49,58 @@ function renderTitle() {
         button.classList.toggle('on', button.dataset.value === app.settings.level);
     }
     $('#resume-button').hidden = !LocalGameController.loadSaved();
+    $('#online-button').hidden = !online.available;
 }
 
 function startGame(setup) {
-    app.controller?.stop();
-    app.selection = null;
-    app.view = null;
-    app.freshRound = null;
-    hideToast();
-    $('#result-dialog').open && $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, {
+    beginGame(new LocalGameController(setup, {
         onUpdate: () => update(),
         onError: () => {
             music.play('error');
             update();
         }
-    });
+    }));
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(controller) {
+    if (app.controller !== controller) app.controller?.stop();
+    app.selection = null;
+    app.hint = null;
+    app.view = null;
+    app.freshRound = null;
+    hideToast();
+    $('#result-dialog').open && $('#result-dialog').close();
+    app.controller = controller;
     showScene('game');
     update();
 }
+
+// ===== オンライン対戦（入口とロビーは netplay-lobby.js の画面） =====
+
+const online = new NetplayLobby({
+    title: 'アズール',
+    game: 'azul',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: 650,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [{ key: 'level', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }],
+    onStart: (controller) => beginGame(controller),
+    onUpdate: () => update(),
+    onError: (message) => {
+        music.play('error');
+        showNote('オンライン対戦', message);
+        update();
+    },
+    onExit: () => {
+        app.controller = null;
+        hideToast();
+        for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+        showScene('title');
+    }
+});
+app.online = online;
 
 function newSetup() {
     const players = [{ name: HUMAN_NAME, isCPU: false }];
@@ -74,6 +109,8 @@ function newSetup() {
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (app.controller?.isOnline) return online.confirmLeave();
     app.controller?.stop();
     app.controller = null;
     hideToast();
@@ -128,6 +165,7 @@ function render(view) {
     const myTurn = view.phase === 'offer' && view.current === view.viewer;
     $('#round-label').textContent = view.phase === 'end' ? '終了' : `ラウンド ${view.round}`;
     $('#result-button').hidden = view.phase !== 'end';
+    $('#hint').hidden = Boolean(app.controller?.isOnline); // ヒントはローカル対戦だけ
     $('#play').classList.toggle('my-turn', myTurn);
     $('#play').classList.toggle('picking', myTurn && !!app.selection);
     renderOpponents(view);
@@ -458,6 +496,7 @@ function init() {
         renderTitle();
     });
     $('#start-button').addEventListener('click', () => startGame(newSetup()));
+    $('#online-button').addEventListener('click', () => online.open());
     $('#resume-button').addEventListener('click', () => {
         const saved = LocalGameController.loadSaved();
         if (saved) startGame(saved);
@@ -476,6 +515,11 @@ function init() {
         if (action === 'close-log') $('#log').close();
         if (action === 'result') showResult();
         if (action === 'close-result') $('#result-dialog').close();
+        if (action === 'rematch' && app.controller?.isOnline) {
+            $('#result-dialog').close();
+            online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+            return;
+        }
         if (action === 'rematch') {
             const setup = app.controller?.setup;
             $('#result-dialog').close();
@@ -502,6 +546,8 @@ function init() {
     });
 
     showScene('title');
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('sw.js').then(registration => {

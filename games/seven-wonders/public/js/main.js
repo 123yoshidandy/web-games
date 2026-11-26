@@ -10,6 +10,9 @@ import { res, coin, shield, vp, sci, costHtml, effectHtml, chainHtml, stageHtml,
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'sevenwonders.settings.v1', save: 'sevenwonders.save.v1' };
@@ -46,6 +49,31 @@ let lastAction = null; // 自分が最後に選んだ手（効果音を選ぶ）
 const nameOf = seat => (seat === view.seat ? 'あなた' : view.players[seat].name);
 const wonderName = city => WONDER_BY_KEY[city.wonder].name;
 
+// ---------- オンライン対戦（入口とロビーは netplay-lobby.js の画面） ----------
+
+const online = new NetplayLobby({
+    title: '世界の七不思議',
+    game: 'seven-wonders',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: 300,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [
+        { key: 'sides', label: '不思議の面', options: [{ value: 'A', label: 'A面' }, { value: 'B', label: 'B面' }, { value: 'random', label: 'ランダム' }] },
+        { key: 'cpuLevel', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }
+    ],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        view = null;
+        clearTimeout(revealTimer);
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
+
 // ---------- 画面の切り替え ----------
 
 function showScene(name) {
@@ -60,6 +88,7 @@ function renderTitle() {
     document.querySelectorAll('#wonder-side button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.side === settings.sides)));
     document.querySelectorAll('#cpu-level button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.level === settings.level)));
     $('resume').hidden = !store.load(KEYS.save);
+    $('online-row').hidden = !online.available;
 }
 
 // タイトルの絵：ピラミッドと柱と、色とりどりのカード
@@ -83,17 +112,24 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    controller?.stop();
-    document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    clearTimeout(revealTimer);
-    resultPending = false;
+    let local;
     try {
-        controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
     } catch (error) {
         console.warn(error);
         store.remove(KEYS.save);
-        controller = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
     }
+    beginGame(local);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    document.querySelectorAll('dialog[open]').forEach(d => d.close());
+    clearTimeout(revealTimer);
+    resultPending = false;
+    controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = { card: null, buildPay: 0, wonderPay: 0, key: null };
@@ -104,12 +140,14 @@ function startGame(setup) {
 }
 
 function saveProgress() {
-    if (!controller) return;
+    if (!controller || controller.isOnline) return; // オンライン対戦はサーバーが持つ
     if (controller.game.isOver()) store.remove(KEYS.save);
     else store.save(KEYS.save, controller.saveData());
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     clearTimeout(revealTimer);
@@ -212,6 +250,7 @@ function showHint() {
 }
 
 function markHint() {
+    $('hint').hidden = Boolean(controller?.isOnline); // ヒントはローカル対戦だけ
     $('hint').disabled = !choosing();
     const h = ui.hint;
     if (!h || !choosing()) return;
@@ -516,12 +555,15 @@ function setup() {
     });
     $('again').addEventListener('click', () => {
         $('result-dialog').close();
-        startGame(newSetup());
+        if (controller?.isOnline) online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        else startGame(newSetup());
     });
     $('result-home').addEventListener('click', () => {
         $('result-dialog').close();
-        goHome();
+        if (controller?.isOnline) online.leave();
+        else goHome();
     });
+    $('online').addEventListener('click', () => online.open());
 
     // ページの拡大を止める
     document.addEventListener('gesturestart', e => e.preventDefault());
@@ -531,8 +573,10 @@ function setup() {
 
     showScene('title');
     registerServiceWorker();
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, selectCard, play };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, online, startGame, selectCard, play };
 }
 
 function registerServiceWorker() {
