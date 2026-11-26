@@ -11,6 +11,9 @@ import { unseenCounts } from './cpu-player.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'loveletter.settings.v1', save: 'loveletter.save.v1' };
@@ -65,6 +68,7 @@ function renderTitle() {
     document.querySelectorAll('#player-count button').forEach(b => b.setAttribute('aria-checked', String(Number(b.dataset.count) === settings.count)));
     document.querySelectorAll('#cpu-level button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.level === settings.level)));
     $('resume').hidden = !store.load(KEYS.save);
+    $('online-button').hidden = !online.available;
 }
 
 function drawTitleArt() {
@@ -80,18 +84,26 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    controller?.stop();
-    clearTimeout(roundTimer);
-    document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    pendingRound = null;
+    let local;
     try {
-        controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
     } catch (error) {
         // 保存した記録が読めないときは、新しく始める
         console.warn(error);
         store.remove(KEYS.save);
-        controller = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
     }
+    beginGame(local);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    clearTimeout(roundTimer);
+    document.querySelectorAll('dialog[open]').forEach(d => d.close());
+    pendingRound = null;
+    hint = null;
+    controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = freshUi();
@@ -102,17 +114,41 @@ function startGame(setup) {
 }
 
 function saveProgress() {
-    if (!controller) return;
+    if (!controller || controller.isOnline) return; // オンライン対戦はサーバーが持つ
     if (controller.game.isOver()) store.remove(KEYS.save);
     else store.save(KEYS.save, controller.saveData());
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     clearTimeout(roundTimer);
     showScene('title');
 }
+
+// ---------- オンライン対戦（入口とロビーは netplay-lobby.js の画面） ----------
+
+const online = new NetplayLobby({
+    title: 'ラブレター',
+    game: 'love-letter',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: 1400,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [{ key: 'cpuLevel', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        view = null;
+        clearTimeout(roundTimer);
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
 
 // ---------- 更新 ----------
 
@@ -219,7 +255,7 @@ function openGuess() {
 
 // おすすめの手を、そのまま選んだ状態にする（「出す」「残す」を押せば打てる）
 function showHint() {
-    if (!myTurn() || !controller) return;
+    if (!myTurn() || !controller || controller.isOnline) return;
     const command = controller.suggest();
     if (!command) return;
     music.play('select');
@@ -323,6 +359,7 @@ function renderAction() {
     choices.innerHTML = '';
     button.textContent = view.phase === 'chancellor' ? '残す' : '出す';
     button.disabled = !ready();
+    $('hint').hidden = Boolean(controller?.isOnline); // ヒントはローカル対戦だけ
     $('hint').disabled = !myTurn();
     button.classList.toggle('suggested', myTurn() && ready() && hinted());
     if (view.phase === 'end') {
@@ -451,6 +488,7 @@ function setup() {
         renderTitle();
     });
     $('start').addEventListener('click', () => startGame(newSetup()));
+    $('online-button').addEventListener('click', () => online.open());
     $('resume').addEventListener('click', () => startGame(store.load(KEYS.save) ?? newSetup()));
     $('open-help-title').addEventListener('click', () => openDialog('help-dialog'));
     $('open-help').addEventListener('click', () => openDialog('help-dialog'));
@@ -486,11 +524,13 @@ function setup() {
     });
     $('again').addEventListener('click', () => {
         $('round-dialog').close();
-        startGame(newSetup());
+        if (controller?.isOnline) online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        else startGame(newSetup());
     });
     $('result-home').addEventListener('click', () => {
         $('round-dialog').close();
-        goHome();
+        if (controller?.isOnline) online.leave();
+        else goHome();
     });
 
     // ページの拡大を止める
@@ -500,9 +540,11 @@ function setup() {
     });
 
     showScene('title');
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
     registerServiceWorker();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, selectCard, selectTarget, confirm, setGuess: g => { ui.guess = g; render(); } };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, online, startGame, selectCard, selectTarget, confirm, setGuess: g => { ui.guess = g; render(); } };
 }
 
 function registerServiceWorker() {
