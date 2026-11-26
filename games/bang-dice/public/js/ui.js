@@ -8,6 +8,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CHARACTER_BY_ID, ROLE_NAMES, FACE_NAMES, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { installSymbols, faceSvg, icon, LINE_ICONS } from './art.js';
 import { HELP_HTML } from './help.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'bang-dice.settings';
 const CPU_NAMES = ['ジョー', 'ハンク', 'ケイト', 'ビリー', 'モリー', 'ネッド', 'エラ'];
@@ -133,7 +134,10 @@ export default class UI {
         this.resultShown = false;
         this.controller = new LocalGameController(setup, {
             onUpdate: () => this.render(),
-            onError: (message) => this.toast(message)
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            }
         });
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         $('screen-title').hidden = true;
@@ -235,7 +239,11 @@ export default class UI {
         if (!view.actors.includes(view.you) || view.pending) return;
         if (t.stage === 'roll' && t.rolls > 0) {
             const blackjack = view.players[view.you].character === 'blackjack';
-            if (t.dice[index] === 'dynamite' && !blackjack) return this.toast('ダイナマイトは振り直せません');
+            if (t.dice[index] === 'dynamite' && !blackjack) {
+                music.play('error');
+                return this.toast('ダイナマイトは振り直せません');
+            }
+            music.play(this.reroll.has(index) ? 'cancel' : 'select');
             if (this.reroll.has(index)) this.reroll.delete(index);
             else this.reroll.add(index);
             return this.render();
@@ -453,6 +461,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         if (fresh.length === 0) return;
         this.lastSeq = fresh.at(-1).seq;
+        this.playSound(view, fresh);
         const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         fresh.forEach(e => {
             if (e.type === 'damage') this.float(e.target, `−${e.amount}`, 'hurt');
@@ -465,6 +474,20 @@ export default class UI {
                 e.rolled.forEach(i => $('dice').querySelector(`[data-die="${i}"]`)?.classList.add('rolling'));
             }
         });
+    }
+
+    // 効果音：1回の更新に1つだけ、大事な順に選んで鳴らす。CPU の細かい手（ロールなど）は鳴らさない
+    playSound(view, fresh) {
+        const me = view.you;
+        const mine = (type) => fresh.some(e => e.type === type && e.seat === me);
+        if (fresh.some(e => e.type === 'end')) return music.play(view.winners.includes(me) ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'turn' && e.seat === me)) return music.play('turn');
+        if (fresh.some(e => e.type === 'damage' && e.target === me)) return music.play('pay');
+        if (mine('roll')) return music.play('dice');
+        if (mine('shot') || mine('gatling')) return music.play('capture');
+        if (fresh.some(e => e.type === 'heal' && e.target === me && e.amount > 0)) return music.play('gain');
+        if (fresh.some(e => e.seat === me)) return music.play('place');
+        if (fresh.some(e => ['eliminate', 'indians', 'gatling'].includes(e.type))) music.play('notify');
     }
 
     float(seat, text, kind) {

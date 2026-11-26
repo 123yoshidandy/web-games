@@ -1,6 +1,7 @@
-// BGM（曲は sound/bgm.js、再生エンジンは packages/sound の写しの sound/engine.mjs）
-// 最初のタップ・クリック・キー入力のあとに流れ始める。.bgm-toggle のボタンで ON/OFF を切り替え、localStorage に保存する
+// 音（BGM は sound/bgm.js、効果音は共通の sound/effects.js、再生エンジンは packages/sound の写しの sound/engine.mjs）
+// 最初のタップ・クリック・キー入力のあとに鳴り始める。.sound-toggle のボタン1つで BGM と効果音をまとめて ON/OFF し、localStorage に保存する
 import Sound from './sound/engine.mjs';
+import './sound/effects.js';
 import './sound/bgm.js';
 
 export const music = Sound.createPlayer({ library: 'bang-dice', storageKey: 'bang-dice.sound' });
@@ -9,15 +10,15 @@ music.playBgm('duel');
 
 // ボタンの表示（aria-pressed。チェックボックスなら checked）を ON/OFF に合わせる。あとから描かれたボタンにも合わせる
 function syncButtons(settings = music.getSettings()) {
-    const pressed = String(settings.bgm);
-    document.querySelectorAll('.bgm-toggle').forEach(button => {
-        if (button.type === 'checkbox') button.checked = settings.bgm;
-        else if (button.getAttribute('aria-pressed') !== pressed) button.setAttribute('aria-pressed', pressed);
+    const on = settings.bgm || settings.effects;
+    document.querySelectorAll('.sound-toggle').forEach(button => {
+        if (button.type === 'checkbox') button.checked = on;
+        else if (button.getAttribute('aria-pressed') !== String(on)) button.setAttribute('aria-pressed', String(on));
     });
 }
 
 document.addEventListener('click', event => {
-    if (event.target.closest('.bgm-toggle')) music.toggle('bgm');
+    if (event.target.closest('.sound-toggle')) music.toggleAll();
 });
 music.onChange(syncButtons);
 syncButtons();

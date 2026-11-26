@@ -103,3 +103,10 @@ export function decideSale(view, random, profile = PROFILES.normal) {
     if (random() < profile.careless) return { type: 'sell', card: scored[1].card };
     return { type: 'sell', card: scored[0].card };
 }
+
+// ヒント：人が操作する番に、CPU（揺らぎのない設定）が選ぶ手を返す。その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.strong);
+}

@@ -7,7 +7,8 @@
  */
 
 import { MIN_PLAYERS, MAX_PLAYERS, rankResults } from './game.js';
-import { LEVELS } from './cpu-player.js';
+import { LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, coinIcon, propertyHtml, checkHtml, propTagHtml, checkTagHtml, money } from './art.js';
 import { fly, rectOf, reducedMotion } from './animator.js';
@@ -74,7 +75,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -141,6 +145,7 @@ export default class UI {
             dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
         });
 
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#me').addEventListener('click', (event) => {
             const card = event.target.closest('.card[data-card]');
             if (card) this.pickCard(Number(card.dataset.card));
@@ -216,6 +221,7 @@ export default class UI {
         if (!this.canSell()) return;
         // 選んだ物件をもう一度押したら出す
         if (this.picked === card) return this.sellPicked();
+        music.play('select');
         this.picked = card;
         this.renderMe();
         this.renderActions();
@@ -261,6 +267,7 @@ export default class UI {
 
     // イベントを display に当てて描く。次までの間（ミリ秒）を返す。null なら止める
     step(event) {
+        this.playSound(event);
         const before = this.display;
         const next = { ...structuredClone(event.state), you: this.view.you, mySelection: null, reveal: null };
         switch (event.type) {
@@ -328,6 +335,62 @@ export default class UI {
         }
     }
 
+    // 出来事の音。自分のことは結果の音、ほかの人のことは notify。売りの段は全員まとめて1回
+    playSound(event) {
+        const mine = event.seat === this.view.you;
+        switch (event.type) {
+        case 'auction':
+        case 'checks':
+        case 'sale':
+            return music.play('draw');
+        case 'bid':
+            return music.play(mine ? 'pay' : 'notify');
+        case 'pass':
+        case 'win':
+            return music.play(mine ? 'gain' : 'notify');
+        case 'selected':
+            if (mine) music.play('place');
+            return;
+        case 'award': {
+            const best = Math.max(...event.plays.map(p => p.check));
+            if (event.plays.some(p => p.seat === this.view.you && p.check === best && best > 0)) music.play('gain');
+            return;
+        }
+        case 'end': {
+            const winner = rankResults(this.view.results)[0];
+            return music.play(winner?.seat === this.view.you ? 'win' : 'lose');
+        }
+        }
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = (this.canBid() || this.canSell()) ? suggest(this.controller.game, this.view.you) : null;
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        if (command.type === 'bid') this.amount = command.amount;
+        if (command.type === 'sell') this.picked = command.card;
+        this.renderMe();
+        this.renderActions();
+    }
+
+    // おすすめの手の要素に .recommended を付ける。盤面が進んだら消す
+    markHint() {
+        const hint = this.hint;
+        const can = this.canBid() || this.canSell();
+        $('#hint').disabled = !can;
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        if (!hint || hint.at !== this.controller?.game.commands.length || !can) {
+            this.hint = null;
+            return;
+        }
+        const c = hint.command;
+        const selector = c.type === 'sell' ? `#me .card[data-card="${c.card}"]` : `#actions [data-act="${c.type}"]`;
+        document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
+    }
+
     seatEl(seat) {
         return seat === this.view.you ? $('#me') : $(`[data-player="${seat}"]`);
     }
@@ -354,6 +417,10 @@ export default class UI {
         const range = view.options?.range;
         if (range) this.amount = range.min;
         this.renderActions();
+        // 自分が操作できるようになったら知らせる
+        const canAct = this.canBid() || this.canSell();
+        if (canAct && !this.couldAct && view.phase !== 'end') music.play('turn', { delay: 0.15 });
+        this.couldAct = canAct;
         if (this.canBid() && !range) {
             this.autoTimer = setTimeout(() => { if (this.canBid() && !this.view.options.range) this.controller?.send({ type: 'pass' }); }, AUTO_PASS_MS);
         }
@@ -490,6 +557,7 @@ export default class UI {
             html = `<span class="act-label muted">${escapeHtml(view.players[view.turn].name)}の番</span>`;
         }
         $('#actions').innerHTML = html;
+        this.markHint();
     }
 
     // ---- 結果 ----

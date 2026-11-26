@@ -7,6 +7,7 @@
 import { CARDS, WONDERS, TOKENS, TOKEN_ORDER, WONDER_ORDER, RESOURCES, COLORS, COLOR_NAMES, militaryPoints } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import {
     symbolsSvg, icon, resourceIcon, scienceIcon, coinHtml, vpHtml, cardHtml, cardBackHtml, wonderHtml,
     tokenHtml, cardText, wonderText, costHtml
@@ -96,7 +97,10 @@ export default class UI {
                     if (this.hintCommand) this.hintCommand = this.controller.hint();
                     this.render();
                 },
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -157,11 +161,15 @@ export default class UI {
         $('#structure').addEventListener('click', (event) => {
             const wonder = event.target.closest('[data-pick-wonder]');
             if (wonder) {
+                music.play('select');
                 this.openDraftWonder(wonder.dataset.pickWonder);
                 return;
             }
             const slot = event.target.closest('[data-slot]');
-            if (slot) this.openCard(Number(slot.dataset.slot));
+            if (slot) {
+                music.play('select');
+                this.openCard(Number(slot.dataset.slot));
+            }
         });
         ['#city-0', '#city-1'].forEach(id => $(id).addEventListener('click', (event) => {
             const token = event.target.closest('[data-token]');
@@ -355,11 +363,31 @@ export default class UI {
         $('#status').innerHTML = `<strong>${escapeHtml(this.statusText())}</strong><span class="last">${escapeHtml(last)}</span>`;
     }
 
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、相手の手は notify、自分の番になったら turn、終わりは勝ち負け
+    playSound(fresh, previous) {
+        const v = this.view;
+        const me = v.you;
+        if (fresh.length === 0) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === null ? 'notify' : end.winner === me ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'age')) return music.play('shuffle');
+        const mine = fresh.filter(e => e.seat === me && e.type !== 'turn' && e.type !== 'coins');
+        const took = fresh.find(e => e.type === 'take' && e.seat === me);
+        if (fresh.some(e => e.type === 'destroy' && e.seat !== me) || fresh.some(e => e.type === 'militaryToken' && e.loser !== me && previous.current === me)) return music.play('capture');
+        if (mine.some(e => e.type === 'token')) return music.play('gain');
+        if (took?.action === 'discard') return music.play('gain');
+        if (mine.length > 0) return music.play('place');
+        const turn = fresh.findLast(e => e.type === 'turn');
+        if (turn?.seat === me && previous.current !== me) return music.play('turn');
+        if (previous.current !== me) music.play('notify');
+    }
+
     // コインの増減を、都市の上に浮かべる
     playEvents(previous) {
         const v = this.view;
         const fresh = v.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = v.events.at(-1)?.seq ?? this.lastSeq;
+        if (previous) this.playSound(fresh, previous);
         if (!previous || reduceMotion()) return;
         const sums = [0, 0];
         fresh.filter(e => e.type === 'coins').forEach(e => { sums[e.seat] += e.delta; });

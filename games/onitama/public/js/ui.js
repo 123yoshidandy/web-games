@@ -12,6 +12,7 @@ import { CARDS, CARD_IDS, TEMPLE, seatOf, isMaster } from './rules.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, pieceSvg, templeSvg, cardHtml, gridSvg, SEAT_NAME } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'onitama.settings';
 const RESULT_DELAY_MS = 900;
@@ -68,7 +69,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -151,6 +155,7 @@ export default class UI {
             this.pendingTo = command.to;
         }
         this.hint = command;
+        music.play('select');
         this.render();
     }
 
@@ -174,6 +179,7 @@ export default class UI {
         if (seatOf(v.board[sq]) === v.you) {
             this.selPiece = this.selPiece === sq ? null : sq;
             this.pendingTo = null;
+            music.play(this.selPiece === null ? 'cancel' : 'select');
             return this.render();
         }
         if (this.selPiece === null || !this.targets().includes(sq)) {
@@ -183,6 +189,7 @@ export default class UI {
         const cards = [...new Set(v.moves.filter(m => m.from === this.selPiece && m.to === sq && (!this.selCard || m.card === this.selCard)).map(m => m.card))];
         if (cards.length === 1) return this.send({ type: 'move', card: cards[0], from: this.selPiece, to: sq });
         this.pendingTo = sq;
+        music.play('select');
         this.render();
     }
 
@@ -196,6 +203,7 @@ export default class UI {
         }
         this.selCard = this.selCard === card ? null : card;
         this.pendingTo = null;
+        music.play(this.selCard === null ? 'cancel' : 'select');
         this.render();
     }
 
@@ -344,6 +352,10 @@ export default class UI {
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
         const move = [...fresh].reverse().find(e => e.type === 'move');
+        // 音：終わったら勝ち負け、自分の手は置く・取る、相手の手のあとは自分の番
+        if (view.over && !prev.over) music.play(view.winner === null ? 'notify' : view.winner === view.you ? 'win' : 'lose');
+        else if (move?.seat === view.you) music.play(move.captured ? 'capture' : 'place');
+        else if (move) music.play(this.myTurn() ? 'turn' : 'notify');
         if (!move) return;
         this.freshSide = true;
         if (move.pass || reduceMotion()) return;
