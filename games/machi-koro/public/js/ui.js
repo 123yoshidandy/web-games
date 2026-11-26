@@ -6,6 +6,7 @@
 import { ESTABLISHMENTS, ESTABLISHMENT_ORDER, LANDMARKS, LANDMARK_ORDER, COLOR_NAMES, rollText } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, cardHtml, chipHtml, landmarkHtml, artSvg, coinHtml, dieHtml, icon } from './art.js';
 
 const SETTINGS_KEY = 'machi-koro.settings';
@@ -67,7 +68,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -169,6 +173,7 @@ export default class UI {
             const pick = event.target.closest('[data-pick]');
             if (!pick) return;
             const [side, value] = [pick.dataset.side, pick.dataset.pick];
+            music.play(this.tradePick[side] === value ? 'cancel' : 'select');
             this.tradePick[side] = this.tradePick[side] === value ? null : value;
             this.renderTrade();
         });
@@ -331,6 +336,7 @@ export default class UI {
         if (!this.myTurn()) return;
         const command = this.controller?.suggest();
         if (!command) return;
+        music.play('select');
         this.hint = { at: `${this.view.turn}:${this.view.phase}:${this.view.logs.length}`, command };
         if (command.type === 'trade') {
             this.tradePick = { give: command.give, take: `${command.target}:${command.take}` };
@@ -400,6 +406,7 @@ export default class UI {
     // ---- 説明のシート ----
 
     showCardDetail(key, { readOnly = false } = {}) {
+        music.play('select');
         const v = this.view;
         if (!v) return;
         const info = cardInfo(key);
@@ -455,6 +462,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.playSound(view, fresh);
         const deltas = new Map();
         const add = (seat, amount) => deltas.set(seat, (deltas.get(seat) ?? 0) + amount);
         fresh.forEach(e => {
@@ -472,6 +480,20 @@ export default class UI {
         });
         if (fresh.some(e => e.type === 'roll')) $('#status .dice')?.classList.add('rolled');
         deltas.forEach((amount, seat) => { if (amount) this.floatText(seat, amount); });
+    }
+
+    // 1つの更新に1つの音。自分の手はサイコロ・建てる・交換、ほかの人の手は notify（自分にコインが入れば gain）、自分の番になったら turn
+    playSound(view, fresh) {
+        const win = fresh.find(e => e.type === 'win');
+        if (win) return music.play(win.seat === view.you ? 'win' : 'lose');
+        const mine = fresh.filter(e => e.seat === view.you).map(e => e.type);
+        if (mine.includes('roll')) return music.play('dice');
+        if (mine.includes('build') || mine.includes('trade')) return music.play('place');
+        if (fresh.some(e => e.type === 'turn' && e.seat === view.you)) return music.play('turn');
+        const income = fresh.filter(e => e.type === 'pay').reduce((sum, e) => sum + (e.to === view.you ? e.amount : 0) - (e.from === view.you ? e.amount : 0), 0);
+        if (income > 0) return music.play('gain');
+        if (income < 0) return music.play('pay');
+        if (fresh.some(e => e.seat !== undefined && e.seat !== view.you)) music.play('notify');
     }
 
     floatText(seat, amount) {
