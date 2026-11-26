@@ -4,12 +4,15 @@
  */
 
 import { spriteMarkup, tileUse, meepleUse, PLAYER_COLORS, meepleStroke, TITLE_LAYOUT } from './tile-art.js';
-import LocalGameController from './game-controller.js';
+import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import BoardView from './board-view.js';
 import { createSeed } from './random.js';
 import { TILE_TYPES, UNIQUE_ROTATIONS, KIND_NAMES, rotatedTile } from './tiles.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'carcassonne.settings.v1', save: 'carcassonne.save.v1' };
@@ -58,6 +61,7 @@ function renderTitle() {
     document.querySelectorAll('#player-count button').forEach(b => b.setAttribute('aria-checked', String(Number(b.dataset.count) === settings.count)));
     document.querySelectorAll('#cpu-level button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.level === settings.level)));
     $('resume').hidden = !store.load(KEYS.save);
+    $('online-button').hidden = !online.available;
 }
 
 function drawTitleArt() {
@@ -81,18 +85,25 @@ const CPU_DELAY = Number(new URLSearchParams(location.search).get('cpuDelay')) |
 
 function startGame(setup) {
     setup = { ...setup, cpuDelay: CPU_DELAY };
-    controller?.stop();
-    clearTimeout(resultTimer);
-    $('result-dialog').close?.();
-    boardView.clear();
+    let local;
     try {
-        controller = new LocalGameController(setup, { onUpdate, onError });
+        local = new LocalGameController(setup, { onUpdate, onError });
     } catch (error) {
         // 保存した記録が読めないときは、新しく始める
         console.warn(error);
         store.remove(KEYS.save);
-        controller = new LocalGameController(newSetup(), { onUpdate, onError });
+        local = new LocalGameController(newSetup(), { onUpdate, onError });
     }
+    beginGame(local);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    clearTimeout(resultTimer);
+    $('result-dialog').close?.();
+    boardView.clear();
+    controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = freshUi();
@@ -104,18 +115,42 @@ function startGame(setup) {
     saveProgress();
 }
 
+// オンライン対戦は保存しない（部屋の記録はサーバーにある）
 function saveProgress() {
-    if (!controller) return;
+    if (!controller || controller.isOnline) return;
     if (controller.game.isOver()) store.remove(KEYS.save);
     else store.save(KEYS.save, controller.saveData());
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     clearTimeout(resultTimer);
     showScene('title');
 }
+
+// ---------- オンライン対戦（入口とロビーは netplay-lobby.js の画面） ----------
+
+const online = new NetplayLobby({
+    title: 'カルカソンヌ',
+    game: 'carcassonne',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: CPU_STEP_DELAY_MS,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [{ key: 'cpuLevel', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        clearTimeout(resultTimer);
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
 
 // ---------- 更新 ----------
 
@@ -280,6 +315,7 @@ function back() {
 
 function render() {
     if (!view) return;
+    $('hint').hidden = Boolean(controller?.isOnline); // ヒントはローカル対戦だけ
     // 手番が変わったら、仮置きを消す
     const turnKey = `${view.turn}:${view.current}:${view.phase}`;
     if (ui.turnKey !== turnKey) {
@@ -460,6 +496,7 @@ function setup() {
         renderTitle();
     });
     $('start').addEventListener('click', () => startGame(newSetup()));
+    $('online-button').addEventListener('click', () => online.open());
     $('resume').addEventListener('click', () => {
         const saved = store.load(KEYS.save);
         startGame(saved ?? newSetup());
@@ -477,10 +514,12 @@ function setup() {
     $('show-result').addEventListener('click', showResult);
     $('again').addEventListener('click', () => {
         $('result-dialog').close();
+        if (controller?.isOnline) return online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
         startGame(newSetup());
     });
     $('result-home').addEventListener('click', () => {
         $('result-dialog').close();
+        if (controller?.isOnline) return online.leave();
         goHome();
     });
     document.addEventListener('keydown', e => {
@@ -499,7 +538,9 @@ function setup() {
     showScene('title');
     registerServiceWorker();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, boardView, startGame, onBoardTap, confirm };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, boardView, startGame, onBoardTap, confirm, online };
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
 }
 
 function registerServiceWorker() {
