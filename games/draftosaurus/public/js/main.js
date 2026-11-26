@@ -10,6 +10,7 @@ import { spritesMarkup, dinoSvg, faceSvg } from './art.js';
 import { boardHtml } from './board.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
+import { music } from './music.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'draftosaurus.settings.v1', save: 'draftosaurus.save.v1' };
@@ -154,11 +155,28 @@ function onUpdate() {
         clearTimeout(resultTimer);
         resultTimer = setTimeout(showResult, RESULT_DELAY_MS);
     }
+    playSounds(fresh);
     saveProgress();
     render();
 }
 
+// 効果音：1回の更新に1つだけ鳴らす。終局は1位なら勝ち（同点は知らせ）・それ以外は負け、
+// 自分が選び終えたら置く音、新しいラウンドは引く音、ダイスを振ったらさいころの音、公開は知らせ（ほかの人が選び終えたのは鳴らさない）
+function playSounds(fresh) {
+    const end = fresh.find(e => e.type === 'end');
+    if (end) {
+        const firsts = end.ranking.filter(r => r.rank === 1);
+        if (!firsts.some(r => r.seat === view.seat)) return music.play('lose');
+        return music.play(firsts.length > 1 ? 'notify' : 'win');
+    }
+    if (fresh.some(e => e.type === 'chosen' && e.seat === view.seat)) return music.play('place');
+    if (fresh.some(e => e.type === 'round' && e.round > 1)) return music.play('draw');
+    if (fresh.some(e => e.type === 'roll')) return music.play('dice');
+    if (fresh.some(e => e.type === 'reveal' || e.type === 'discarded')) music.play('notify');
+}
+
 function onError(message) {
+    music.play('error');
     const prompt = $('action').querySelector('.prompt');
     if (prompt) prompt.textContent = message;
 }
@@ -174,6 +192,7 @@ const optionOf = dino => view.handOptions?.find(o => o.dino === dino) ?? null;
 function selectDino(dino) {
     if (!(choosing() || discarding()) || performance.now() < lockUntil) return;
     ui.dino = ui.dino === dino ? null : dino;
+    music.play(ui.dino ? 'select' : 'cancel');
     ui.zone = null;
     render();
 }
@@ -187,6 +206,7 @@ function selectZone(zone) {
         place();
         return;
     }
+    music.play('select');
     ui.zone = zone;
     render();
 }
@@ -207,6 +227,18 @@ function discard() {
     controller.send(command);
 }
 
+// ヒント：おすすめの恐竜と場所を選んだ状態にし、決めるボタンに印を付ける
+function showHint() {
+    if (!controller || !view) return;
+    const command = controller.hint();
+    if (!command) return showToast('選ぶ番になったら、おすすめを出せます');
+    ui.dino = command.dino;
+    ui.zone = command.type === 'place' ? command.zone : null;
+    ui.hint = `${ui.dino}:${ui.zone}`;
+    render();
+    showToast(command.type === 'place' ? `おすすめ：${SPECIES[command.dino].short}を${ZONES[command.zone].name}へ` : `おすすめ：${SPECIES[command.dino].short}を箱に戻す`);
+}
+
 // できることが 1 つだけなら選んでおく（最後の 1 匹）
 function autoSelect() {
     if (!choosing() || ui.dino) return;
@@ -225,6 +257,7 @@ function render() {
     renderRivals();
     renderBoard();
     renderAction();
+    markHint();
     renderHand();
     // 演出は 1 回だけ（恐竜を選び直したときの描き直しで、くり返さない）
     fx = { just: null, flash: false, handFrom: null, roll: false };
@@ -288,7 +321,7 @@ function renderBoard() {
 }
 
 function renderAction() {
-    const el = $('action');
+    const el = $('action-main');
     if (view.phase === 'end') {
         el.innerHTML = '<div class="prompt">ゲーム終了</div><button class="primary" data-act="result">結果</button>';
         return;
@@ -314,6 +347,12 @@ function renderAction() {
         text = `${ZONES[ui.zone].name}へ<span class="gain-inline${gain < 0 ? ' minus' : ''}">${gain > 0 ? '+' : ''}${gain}点</span>`;
     }
     el.innerHTML = `<div class="prompt">${text}</div><button class="primary" data-act="place" ${ui.zone ? '' : 'disabled'}>置く</button>`;
+}
+
+// ヒントの手を選んでいる間は、決めるボタンに印を付ける（描き直しても消さない）
+function markHint() {
+    const button = $('action').querySelector('[data-act]');
+    if (button && ui.hint && ui.hint === `${ui.dino}:${ui.zone}`) button.classList.add('recommended');
 }
 
 function renderHand() {
@@ -419,6 +458,7 @@ function setup() {
     $('resume').addEventListener('click', () => startGame(store.load(KEYS.save) ?? newSetup()));
     $('open-help-title').addEventListener('click', () => openDialog('help-dialog'));
     $('open-help').addEventListener('click', () => openDialog('help-dialog'));
+    $('hint').addEventListener('click', showHint);
     $('home').addEventListener('click', goHome);
     $('rivals').addEventListener('click', e => {
         const b = e.target.closest('[data-seat]');

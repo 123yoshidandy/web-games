@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuSeatsToAct, fallbackCommand } from './cpu-player.js';
+import { runCpuStep, cpuSeatsToAct, fallbackCommand, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 550;
 const STALL_LIMIT = 3;
@@ -47,6 +47,11 @@ export default class LocalGameController {
         this.listeners.onUpdate?.();
         this.scheduleCpu();
         return true;
+    }
+
+    // ヒント：人が選ぶ番に、おすすめの手を返す（手は打たず、記録にも入れない）。選ぶ番でなければ null
+    hint() {
+        return suggest(this.getView());
     }
 
     // 公開の一覧や遊び方を開いている間は、CPU を止める

@@ -119,6 +119,12 @@ export function chooseCommand(view, cfg = LEVELS.normal) {
     return best?.command ?? null;
 }
 
+// ヒント：選ぶ番の人に、ゆらぎのない CPU が選ぶ手（置くなら { type: 'place', dino, zone }、箱に戻すなら { type: 'discard', dino }）。選ぶ番でなければ null
+export function suggest(view) {
+    if (!view.handOptions && !view.discarding) return null;
+    return chooseCommand(view, LEVELS.strong);
+}
+
 // 想定外の断りでも止めないための手：箱に戻す番なら手の最初の恐竜を戻し、置く番なら川に置く（川にはいつでも置ける）
 export function fallbackCommand(game, seat) {
     const dino = game.hands[seat][0];

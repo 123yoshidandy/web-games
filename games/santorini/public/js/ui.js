@@ -9,6 +9,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { GODS, GOD_NAMES, GOD_POWERS } from './game.js';
 import { N, xOf, yOf } from './rules.js';
 import * as art from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'santorini.settings';
 const $ = (id) => document.getElementById(id);
@@ -188,9 +189,14 @@ export default class UI {
             onUpdate: () => {
                 // ヒントを出している間は、今の場面のおすすめに出し直す（自分の番でなくなれば消す）
                 if (this.hintCommand) this.applyHint(this.controller.hint());
+                const previous = this.view;
                 this.render();
+                this.playUpdateSound(previous);
             },
-            onError: (message) => this.toast(message)
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            }
         });
         this.resultShown = this.controller.game.isOver();
         this.hintCommand = null;
@@ -209,6 +215,27 @@ export default class UI {
     get myTurn() {
         const v = this.view;
         return !!v && !v.over && v.current === v.seat;
+    }
+
+    // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const v = this.view;
+        if (!previous) return;
+        if (v.over) {
+            if (!previous.over) music.play(v.winner === v.seat ? 'win' : 'lose');
+            return;
+        }
+        if (this.sending) return;
+        const wasMine = !previous.over && previous.current === previous.seat;
+        music.play(this.myTurn && !wasMine ? 'turn' : 'notify');
+    }
+
+    send(command) {
+        this.sending = true;
+        const ok = this.controller.send(command);
+        this.sending = false;
+        if (ok && !this.view.over) music.play(command.type === 'end' ? 'select' : 'place');
+        return ok;
     }
 
     nameOf(seat) {
@@ -423,12 +450,14 @@ export default class UI {
         if (act === 'mode-move' || act === 'mode-build') {
             this.mode = act === 'mode-move' ? 'move' : 'build';
             this.selected = null;
+            music.play('select');
             this.render();
         } else if (act === 'dome') {
             this.domeMode = !this.domeMode;
+            music.play('select');
             this.render();
         } else if (act === 'end') {
-            this.controller.send({ type: 'end' });
+            this.send({ type: 'end' });
         }
     }
 
@@ -437,12 +466,13 @@ export default class UI {
         const v = this.view;
         const g = this.groups();
         if (v.phase === 'place') {
-            if (g.place.some(a => a.to === c)) this.controller.send({ type: 'place', to: c });
+            if (g.place.some(a => a.to === c)) this.send({ type: 'place', to: c });
             return;
         }
         // 選べる職人を押したら、選び直す
         if (this.actors().includes(c) && !(this.selected !== null && this.targets().includes(c))) {
             this.selected = c;
+            music.play('select');
             this.render();
             return;
         }
@@ -452,12 +482,12 @@ export default class UI {
         }
         if (this.mode === 'move') {
             const step = g.move.find(a => a.from === this.selected && a.to === c);
-            if (step) this.controller.send(step);
+            if (step) this.send(step);
             return;
         }
         const options = g.build.filter(a => a.by === this.selected && a.at === c);
         const step = options.find(a => !!a.dome === this.domeMode) ?? options[0];
-        if (step) this.controller.send(step);
+        if (step) this.send(step);
     }
 
     // ---- ダイアログ・知らせ ----
@@ -489,6 +519,7 @@ export default class UI {
         const command = this.myTurn ? this.controller?.hint() : null;
         if (!command) return this.toast('いまはあなたの番ではありません');
         this.applyHint(command);
+        music.play('select');
         this.render();
         const text = { place: '白い枠のマスに職人を置く', move: '白い枠のマスへ動く', build: command.dome ? '白い枠のマスにドームを建てる' : '白い枠のマスに建てる', end: '番を終える' }[command.type] ?? '';
         this.toast(`おすすめ：${text}`);

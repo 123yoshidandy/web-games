@@ -280,7 +280,13 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
     .portal-link { display: none; }
 }
 
-/* BGM の ON/OFF（js/music.js） */
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+/* サウンド（BGM と効果音）の ON/OFF（js/music.js） */
+.sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント：決めるボタンの左に置く。おすすめの手を決めるボタンに印を付ける（js/main.js の showHint） */
+.action-main { display: contents; }
+.action #hint { order: 1; }
+.action button.primary { order: 2; }
+.recommended { outline: 3px solid #fff8d6; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(243, 198, 78, .55), 0 0 14px 4px rgba(243, 198, 78, .75); }

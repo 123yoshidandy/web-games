@@ -206,9 +206,9 @@ dialog h2:focus-visible { outline: none; }
 }
 
 /* BGM の ON/OFF（js/music.js） */
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+.sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }
 
 /* ---- 低い横画面のタイトル ----
    画面に収まらないときは縦にスクロールできるようにし、上から並べて、下のボタンまで届くようにする */

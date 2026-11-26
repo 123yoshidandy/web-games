@@ -8,6 +8,7 @@ import { MANDATORY } from './game.js';
 import { buildTargets, tileTargets, moveSources, usableTiles } from './rules.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import BoardView from './board-view.js';
 import { symbolsSvg, icon, terrainHex, locationHex, houseSvg, PLAYER_COLORS } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
@@ -70,7 +71,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -151,7 +155,7 @@ export default class UI {
             if (event.target.closest('#undo')) {
                 clearTimeout(this.endTimer);
                 this.mode = null;
-                this.controller?.undo();
+                if (this.controller?.undo()) music.play('cancel');
             }
         });
         document.addEventListener('keydown', (event) => {
@@ -193,6 +197,7 @@ export default class UI {
             return;
         }
         this.mode = this.mode?.tile === type ? null : { tile: type, from: -1 };
+        music.play(this.mode ? 'select' : 'cancel');
         if (this.mode) this.toast(`${info.name}：${info.text}`);
         this.render();
     }
@@ -202,6 +207,7 @@ export default class UI {
         if (!this.myTurn()) return;
         const command = this.controller?.suggest();
         if (!command) return;
+        music.play('select');
         this.hint = { at: this.view.commandCount, command };
         if (command.type === 'tile') this.mode = { tile: command.tile, from: command.from ?? -1 };
         this.render();
@@ -236,6 +242,7 @@ export default class UI {
             this.mode = null;
             this.send({ type: 'tile', tile, cell });
         } else if (kind === 'source') {
+            music.play('select');
             this.mode.from = cell;
             this.render();
         } else if (kind === 'target') {
@@ -270,6 +277,7 @@ export default class UI {
         if (!this.controller) return;
         const view = this.controller.getView();
         this.view = view;
+        this.playSound(view);
         this.trackRecent(view);
         if (this.mode && (!this.myTurn(view) || !usableTiles(view, view.you).includes(this.mode.tile))) this.mode = null;
         const { pick, kind } = this.picking(view);
@@ -292,6 +300,30 @@ export default class UI {
             this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
         }
         if ($('#log').open) this.renderLog();
+    }
+
+    // 1つの更新に1つの音。自分の手は建てる・タイルを得る、ほかの人の手は notify、自分の番になったら turn
+    playSound(view) {
+        const last = view.events.at(-1)?.seq ?? 0;
+        const myTurn = this.myTurn(view);
+        // 始めたとき・一手戻したとき（出来事の番号が戻る）は、鳴らさずに今の番号から数える
+        if (this.soundController !== this.controller || last < this.soundSeq) {
+            this.soundController = this.controller;
+            this.soundSeq = last;
+            this.wasMyTurn = myTurn;
+            return;
+        }
+        const fresh = view.events.filter(e => e.seq > this.soundSeq);
+        this.soundSeq = last;
+        const wasMyTurn = this.wasMyTurn;
+        this.wasMyTurn = myTurn;
+        if (fresh.some(e => e.type === 'end')) return music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+        const mine = fresh.filter(e => e.seat === view.you).map(e => e.type);
+        if (mine.includes('take')) return music.play('gain');
+        if (mine.includes('build') || mine.includes('move')) return music.play('place');
+        if (mine.includes('drop')) return music.play('pay');
+        if (myTurn && !wasMyTurn) return music.play('turn');
+        if (fresh.some(e => e.seat !== undefined && e.seat !== view.you && e.type !== 'turn')) music.play('notify');
     }
 
     // 自分の前の番のあとに、ほかの人が建てた家と動かした家を覚えておく（盤に印を付ける）
