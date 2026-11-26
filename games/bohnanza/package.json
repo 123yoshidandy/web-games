@@ -15,5 +15,8 @@
     "genres": [
       "カードゲーム"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }
