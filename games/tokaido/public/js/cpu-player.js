@@ -195,6 +195,12 @@ function chooseMeal(me, pending, level, rand) {
 
 // ---- 進める ----
 
+// ヒント：seat のおすすめの手（CPU の「ふつう」が選ぶ手）。seat が操作する番でなければ null
+export function suggest(game, seat) {
+    if (game.phase === 'end') return null;
+    return chooseCommand(game, seat, 'normal');
+}
+
 export function nextCpuSeat(game) {
     return game.actors().find(seat => game.players[seat].isCPU) ?? null;
 }

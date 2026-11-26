@@ -13,6 +13,7 @@ import {
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { souvenirCost, mealCost, mealPriceTotal } from './scoring.js';
+import { music } from './music.js';
 import {
     symbolsSvg, icon, SPACE_COLORS, spaceBadge, souvenirCard, mealCard, encounterCard, panoramaCard, springCard, travelerCard, titleArtSvg
 } from './art.js';
@@ -87,7 +88,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -99,6 +103,8 @@ export default class UI {
         this.view = null;
         this.sel = null;
         this.segment = null;
+        this.hintCommand = null;
+        this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は鳴らさない
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
@@ -145,6 +151,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => this.showLog());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（終わりの画面は、外側では閉じない）
@@ -187,6 +194,7 @@ export default class UI {
             return;
         }
         this.sel = pos;
+        music.play('select');
         this.render();
     }
 
@@ -198,6 +206,7 @@ export default class UI {
         } else {
             this.sel = this.sel === value ? null : value;
         }
+        music.play(this.sel === value || (Array.isArray(this.sel) && this.sel.includes(value)) ? 'select' : 'cancel');
         this.render();
     }
 
@@ -221,7 +230,77 @@ export default class UI {
     send(command) {
         if (!this.controller) return;
         this.sel = null;
-        this.controller.send(command);
+        this.hintCommand = null;
+        this.sending = true;
+        let ok = false;
+        try {
+            ok = this.controller.send(command);
+        } finally {
+            this.sending = false;
+        }
+        if (ok) this.playSent(command);
+    }
+
+    // ---- 効果音 ----
+
+    freshEvents() {
+        const events = this.controller.getView().events;
+        const fresh = events.filter(e => e.seq > this.lastSeq);
+        this.lastSeq = events.at(-1)?.seq ?? this.lastSeq;
+        return fresh;
+    }
+
+    endSound(fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) music.play(end.winners.includes(this.view.you) ? 'win' : 'lose');
+        return !!end;
+    }
+
+    // 自分が送った操作の音（1つの操作に1つ）
+    playSent(command) {
+        if (this.endSound(this.freshEvents())) return;
+        const sound = {
+            choose: 'select', move: 'place', donate: 'pay', encounter: 'gain', panorama: 'gain',
+            buy: command.cards?.length ? 'pay' : 'cancel', meal: command.card ? 'pay' : 'cancel'
+        }[command.type];
+        if (sound) music.play(sound);
+    }
+
+    // ほかの人が動いたときの音。自分が操作する番になったら turn、終わりは勝ち負け（CPU の手ごとには鳴らさない）
+    playUpdate(prev) {
+        const fresh = this.freshEvents();
+        if (fresh.length) this.hintCommand = null;
+        if (this.endSound(fresh)) return;
+        const view = this.view;
+        if (view.actors.includes(view.you) && !prev.actors.includes(prev.you)) music.play('turn');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        // 選ぶものは選んだ状態にする（決めるボタンで決められる）
+        const sel = { choose: command.traveler, move: command.to, buy: command.cards, encounter: command.card, panorama: command.kind, meal: command.card }[command.type];
+        if (sel !== undefined && sel !== null && !(Array.isArray(sel) && sel.length === 0)) this.sel = sel;
+        this.render();
+        const text = {
+            choose: '選んだ旅人にする', move: '光っているマスへ進む', buy: command.cards?.length ? '選んだ土産を買う' : '買わない',
+            donate: `${command.amount}文寄付する`, encounter: '選んだ出会い', panorama: '選んだ景色', meal: command.card ? '選んだ食事を買う' : '食べない'
+        }[command.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    // おすすめの手のボタンに印を付ける
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        let selector = `[data-act="${c.type}"]`;
+        if (c.type === 'buy' && !c.cards.length) selector = '[data-act="skip-buy"]';
+        if (c.type === 'meal' && !c.card) selector = '[data-act="skip-meal"]';
+        if (c.type === 'donate') selector = `[data-act="donate"][data-value="${c.amount}"]`;
+        document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
     }
 
     // ---- タイトル ----
@@ -258,7 +337,9 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
         this.view = view;
+        if (prev && !this.sending) this.playUpdate(prev);
         // 選ぶ場面が変わったら、選択を消す
         const key = `${view.phase}:${view.logCount}:${view.pending?.kind ?? ''}:${view.actors.join(',')}`;
         if (key !== this.selKey) {
@@ -270,6 +351,7 @@ export default class UI {
         this.renderBoard(view);
         this.renderPlayers(view);
         this.renderPanel(view);
+        this.markHint();
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer && !this.resultShown) {
             this.resultTimer = setTimeout(() => {
