@@ -13,5 +13,8 @@
       "ボードゲーム",
       "タイル配置"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }
