@@ -16,5 +16,8 @@
       "ダイス",
       "正体隠し・ブラフ"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }
