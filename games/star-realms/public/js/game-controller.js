@@ -8,7 +8,7 @@ import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
-const CPU_ACTION_DELAY_MS = 600; // CPU が出す・獲得する・攻撃する前は、前の手が見えるように待つ
+export const CPU_ACTION_DELAY_MS = 600; // CPU が出す・獲得する・攻撃する前は、前の手が見えるように待つ
 const CPU_CHOICE_DELAY_MS = 500; // 効果で選ぶものに答えるとき
 const CPU_TURN_DELAY_MS = 900;   // CPU の手番の始め（あなたの手番の終わりが見えるように）
 const SAVE_KEY = 'star-realms.save';

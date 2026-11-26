@@ -162,6 +162,12 @@ npm test
 - `game-definition.test.js`：オンライン対戦の定義と、ビューで手札・山札と交易デッキの並び・シードが漏れないこと
 - `pwa.test.js`・`offline.test.js`：service worker が画面のファイルを全部先に読むこと、manifest とアイコン、ネットワークが切れてもキャッシュから開けること
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。操作を待っている人は `game.actors()`（手番の人。捨てる効果も、自分の手番の始めに答える）。選ぶものの中身は、選ぶ人のビューにだけ入る。シードと CPU の値（`cpuSalt`）はビューに入れない。
+netplay-kit の「サーバーがゲームを進める型」。2人で、相手がいなければ CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'star-realms' })`。web-games の1つのスタックから `?game=star-realms` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
