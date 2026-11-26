@@ -17,6 +17,8 @@ export default {
     minPlayers: 2,
     maxPlayers: 4,
     allowCpu: true,
+    // 隠れた情報も先の乱数もない（ビューに入るシードは何も明かさない）
+    perfectInformation: true,
 
     // CPU の強さ（部屋で1つ）
     settings: {
