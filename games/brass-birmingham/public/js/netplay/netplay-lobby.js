@@ -1,4 +1,4 @@
-// netplay-kit 1.10.0（5aca66c）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.11.0（809916e）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * オンライン対戦の入口とロビーの画面（どのゲームでも同じ見た目と流れ）と、ローカル対戦と同じ形のコントローラー
  * 画面は自分で作る（body の下に重ねて出す）。ゲームの側は、始まった・更新された・抜けた、の知らせを受けて盤面を描くだけ
@@ -48,6 +48,70 @@ function withGame(url, game) {
     return parsed.toString();
 }
 
+// ===== 記録（logs・events）をためる =====
+
+// 多くのゲームの定義は、操作のたびに「その操作で増えた分」だけの logs・events をビューに載せる（view の since で切る）
+// ローカル対戦の getView() は対戦の初めからの記録を返すので、オンラインでも同じになるように、届いた分をためる
+// - ためるのは、サーバー（netplay-kit 1.11.0 の RoomService）が state の history に挙げた配列だけ
+//   （since で切っていない配列。最後の30行だけ・その手の演出だけ、のようなものは、届いたまま使う）
+// - seq・n の番号を持つ項目（events など）は番号で重ねる（同じ番号は新しい方。何度届いても増えない）
+// - 番号のない項目（文字の logs など）は、state の since を、その配列の位置として重ねる。since が null なら丸ごと入れ替える
+// - history に挙がる前に届いた分は、丸ごとの写しとして覚えておき、挙がったときの土台にする
+// - 別の対戦（matchId が変わった）のビューが届いたら、ためた記録を捨てる
+// 再接続（ページの読み込み直し）のあとは、サーバーが送り直す範囲（定義の joinMark から）より前の記録は戻らない
+const HISTORY_KEYS = ['logs', 'events'];
+
+const idKeyOf = (items) => ['seq', 'n'].find(key => items.length > 0
+    && items.every(item => item && typeof item === 'object' && Number.isFinite(item[key])));
+
+export function createViewHistory() {
+    let matchId;
+    let lists = new Map(); // logs・events → { idKey, start, items }
+
+    const merge = (key, incoming, since) => {
+        const list = lists.get(key) ?? { idKey: undefined, start: 0, items: [] };
+        const idKey = idKeyOf(incoming) ?? (incoming.length === 0 ? list.idKey : undefined);
+        let next;
+        if (idKey) {
+            const byId = new Map(list.items.map(item => [item[idKey], item]));
+            incoming.forEach(item => byId.set(item[idKey], item));
+            next = { idKey, start: 0, items: [...byId.values()].sort((x, y) => x[idKey] - y[idKey]) };
+        } else if (!Number.isFinite(since)) {
+            next = { idKey: undefined, start: 0, items: [...incoming] };                 // 丸ごとのビュー
+        } else if (list.items.length === 0 || since < list.start || since - list.start > list.items.length) {
+            next = { idKey: undefined, start: since, items: [...incoming] };             // 前の記録とつながらない
+        } else {
+            next = { idKey: undefined, start: list.start, items: list.items.slice(0, since - list.start).concat(incoming) };
+        }
+        lists.set(key, next);
+        return next.items;
+    };
+
+    return {
+        // state のメッセージ（{ matchId, since, history, view }）から、記録をためたビューを返す（届いたビューは書き換えない）
+        apply(message) {
+            const view = message?.view;
+            if (!view || typeof view !== 'object') return view;
+            if (message.matchId !== matchId) {
+                matchId = message.matchId;
+                lists = new Map();
+            }
+            const since = Number.isFinite(message.since) ? message.since : null;
+            const incremental = new Set(Array.isArray(message.history) ? message.history : []);
+            const next = { ...view };
+            HISTORY_KEYS.filter(key => Array.isArray(view[key])).forEach(key => {
+                if (incremental.has(key)) next[key] = merge(key, view[key], since);
+                else lists.set(key, { idKey: idKeyOf(view[key]), start: 0, items: [...view[key]] }); // 丸ごとの写し。土台として覚えるだけ
+            });
+            return next;
+        },
+        reset() {
+            matchId = undefined;
+            lists = new Map();
+        }
+    };
+}
+
 // ===== コントローラー（ローカル対戦の LocalGameController と同じ形） =====
 
 export class OnlineGameController {
@@ -58,10 +122,11 @@ export class OnlineGameController {
         this.hydrate = hydrate;
         this.listeners = new Map();
         this.replyTimer = null;
+        this.history = createViewHistory(); // logs・events を対戦の初めからためる（getView() をローカル対戦と同じにする）
         this.net = new NetplayClient({ serverUrl, storageKey, cpuStepDelayMs });
-        this.net.on('state', ({ view }) => {
+        this.net.on('state', (message) => {
             this.settle();
-            this.view = this.hydrate(view);
+            this.view = this.hydrate(this.history.apply(message));
             this.emit('update');
         });
         this.net.on('error', (error) => {
