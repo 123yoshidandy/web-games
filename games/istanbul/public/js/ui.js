@@ -11,6 +11,8 @@ import {
 } from './data.js';
 import { LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { GOOD_COLORS, PLAYER_COLORS, goodIcon, anyIcon, rubyIcon, coinIcon, cardIcon, merchantToken, assistantToken, familyToken } from './art.js';
 
@@ -93,6 +95,26 @@ export default class UI {
         this.moveCard = null;      // 移動に使うカード（'move34' | 'stay'）
         this.resultTimer = null;
         this.toastTimer = null;
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'イスタンブール',
+            game: 'istanbul',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 700,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.onUpdate(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         this.bindStatic();
         this.renderTitleArt();
     }
@@ -104,13 +126,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
                 onError: (message) => {
                     music.play('error');
@@ -124,6 +147,15 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.stopGame();
+        else document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        this.hint = null;
         this.view = this.controller.getView();
         this.lastSeq = this.view.events.at(-1)?.seq ?? 0;
         this.lastLog = this.view.logCount;
@@ -131,8 +163,14 @@ export default class UI {
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
-        this.controller.scheduleCpu();
+        if (!this.controller.isOnline) this.controller.scheduleCpu();
         if (this.view.phase === 'end') this.showResult();
+    }
+
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    goHome() {
+        if (this.controller?.isOnline) return this.online.confirmLeave();
+        this.showTitle();
     }
 
     newGame() {
@@ -172,13 +210,18 @@ export default class UI {
             if (button) this.changeSetting({ layout: button.dataset.value });
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#result-home').addEventListener('click', () => this.showTitle());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            $('#result').close();
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#home').addEventListener('click', () => this.goHome());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.openLog());
@@ -239,7 +282,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         this.playSound(fresh, this.wasMyTurn);
-        const logs = this.controller.game.logs;
+        const logs = view.logs;
         const newLogs = logs.slice(Math.max(0, logs.length - (view.logCount - this.lastLog)));
         this.lastLog = view.logCount;
         const notable = newLogs.filter(line => /ルビー|茶屋|闇市|このラウンドで終わり/.test(line));
@@ -485,7 +528,8 @@ export default class UI {
         $('#prompt-text').innerHTML = text;
         const box = $('#prompt-buttons');
         // 自分の番には、ヒントのボタンを先に置く
-        const hint = this.view?.phase !== 'end' && this.view && this.myTurn() ? HINT_BUTTON : '';
+        // ヒントはローカル対戦だけ
+        const hint = this.view?.phase !== 'end' && this.view && this.myTurn() && !this.controller?.isOnline ? HINT_BUTTON : '';
         box.innerHTML = hint + buttons.map((b, i) => `<button class="pbtn ${b.cls ?? ''}" data-i="${i}" ${b.disabled ? 'disabled' : ''}>${b.label}</button>`).join('');
         this.promptActions = buttons.map(b => b.onClick);
         this.promptCommands = buttons.map(b => b.command ?? null);
@@ -494,13 +538,13 @@ export default class UI {
     // ヒントが指す場面（手を打つと変わる）
     hintKey() {
         const v = this.view;
-        return JSON.stringify([v.round, v.turn, v.step, this.controller?.game.commands.length]);
+        return JSON.stringify([v.round, v.turn, v.step, v.logCount]);
     }
 
     // おすすめの手を光らせる（行き先の場所か、案内の欄のボタン）
     showHint() {
         if (!this.myTurn()) return;
-        const command = this.controller?.suggest();
+        const command = this.controller?.isOnline ? null : this.controller?.suggest();
         if (!command) return;
         music.play('select');
         this.hint = { at: this.hintKey(), command };
@@ -533,7 +577,7 @@ export default class UI {
         }
         if (!this.myTurn()) {
             const p = view.players[view.turn];
-            const logs = this.controller.game.logs;
+            const logs = view.logs;
             this.setPrompt(`<b style="color:${this.colorOf(p.id)}">${escapeHtml(p.name)}</b>の番　<span class="muted">${escapeHtml(logs.at(-1) ?? '')}</span>`);
             return;
         }
@@ -925,7 +969,7 @@ export default class UI {
     }
 
     openLog() {
-        const logs = this.controller?.game.logs ?? [];
+        const logs = this.view?.logs ?? [];
         $('#log-list').innerHTML = logs.slice(-80).reverse().map(line => `<li>${escapeHtml(line)}</li>`).join('');
         $('#log').showModal();
     }
