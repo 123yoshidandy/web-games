@@ -70,3 +70,28 @@ describe('DynamoStore の公開の部屋の一覧', () => {
         expect(rooms).toHaveLength(10);
     });
 });
+
+describe('DynamoStore の keyPrefix（1つのテーブルに複数のゲーム）', () => {
+    it('部屋を ROOM#ゲーム#番号 で読み書きし、公開の部屋の一覧もそのゲームの部屋に絞る', async () => {
+        const client = fakeClient([{ Item: null }, {}, { Items: [] }]);
+        const store = new DynamoStore('rooms', client, { keyPrefix: 'azul' });
+        await store.getRoom('1234');
+        await store.putRoom({ code: '1234', version: 1 }, 0, 1000);
+        await store.listPublicRooms(1000);
+        expect(client.sent[0].input.Key).toEqual({ pk: 'ROOM#azul#1234' });
+        expect(client.sent[1].input.Item.pk).toBe('ROOM#azul#1234');
+        expect(client.sent[2].input.ExpressionAttributeValues[':room']).toBe('ROOM#azul#');
+    });
+
+    it('keyPrefix がなければ今までどおりのキー、接続のゲームは GAME#接続ID に置く', async () => {
+        const client = fakeClient([{ Item: null }, {}, { Item: { pk: 'GAME#c1', game: 'azul', expiresAt: 9 } }, {}]);
+        const store = new DynamoStore('rooms', client);
+        await store.getRoom('1234');
+        await store.putConnectionGame('c1', 'azul', 9);
+        expect(await store.getConnectionGame('c1')).toEqual({ game: 'azul', expiresAt: 9 });
+        await store.deleteConnectionGame('c1');
+        expect(client.sent[0].input.Key).toEqual({ pk: 'ROOM#1234' });
+        expect(client.sent[1].input.Item).toEqual({ pk: 'GAME#c1', game: 'azul', expiresAt: 9 });
+        expect(client.sent[3].input.Key).toEqual({ pk: 'GAME#c1' });
+    });
+});

@@ -3,6 +3,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./pwa.js": "./pwa.js"
+    "./pwa.js": "./pwa.js",
+    "./online.js": "./online.js"
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }

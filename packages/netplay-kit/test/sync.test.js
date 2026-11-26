@@ -30,7 +30,7 @@ describe('同期の仕組み', () => {
         const { version, serverDir, clientDir, files } = lock();
         expect(version).toMatch(/^\d+\.\d+\.\d+$/);
         expect([serverDir, clientDir]).toEqual(['server/netplay', 'js/netplay']);
-        expect(Object.keys(files)).toHaveLength(8);
+        expect(Object.keys(files)).toHaveLength(11);
         expect(fs.readFileSync(path.join(repo, 'server/netplay/handler.js'), 'utf8')).toMatch(/^\/\/ netplay-kit .*からコピーしたファイル/);
         expect(run(['check', repo])).toBe(0);
     });
@@ -73,7 +73,7 @@ describe('同期の仕組み', () => {
         expect(run([repo, '--client-only'])).toBe(0);
         expect(fs.existsSync(path.join(repo, 'server/netplay'))).toBe(false);
         expect(lock().serverDir).toBeNull();
-        expect(Object.keys(lock().files)).toEqual(['js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs']);
+        expect(Object.keys(lock().files)).toEqual(['js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/netplay-lobby.js']);
         expect(run([repo])).toBe(0);
         expect(fs.existsSync(path.join(repo, 'server/netplay'))).toBe(false);
         expect(run(['check', repo])).toBe(0);

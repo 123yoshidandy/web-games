@@ -8,7 +8,8 @@
   ],
   "scripts": {
     "test:game": "node scripts/test-games.mjs",
-    "test:all": "node scripts/test-games.mjs --all"
+    "test:all": "node scripts/test-games.mjs --all",
+    "dev:online": "node scripts/dev-online.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

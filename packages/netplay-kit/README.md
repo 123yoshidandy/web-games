@@ -13,11 +13,14 @@
   - `room-service.js`: 部屋の処理（ゲームに共通の部分）
   - `handler.js`: `createHandler(ゲームの定義)` で Lambda の入口を作る
   - `dynamo-store.js` / `memory-store.js`: DynamoDB／メモリへの保存
-  - `dev-server.js`: `startDevServer(ゲームの定義)` で手元のテスト用サーバーを動かす
+  - `dev-server.js`: `startDevServer(ゲームの定義)` で手元のテスト用サーバーを動かす。`startMultiDevServer({ load })` は1つのポートで全ゲーム（`?game=` で選ぶ）
+  - `router.js`: `createRouter({ load })` で、1つの Lambda に複数のゲームをまとめる入口を作る（`?game=` で選ぶ）
+  - `game-name.js`: `?game=` で受け付けるゲームの名前の形
   - `testing.js`: テストの道具（メモリの保存先、時刻・乱数の固定、N人分の接続）
 - `client/`: 画面側（各ゲームの `js/netplay/`、`public/js` があるゲームは `public/js/netplay/` にコピーする）
   - `netplay-client.js`: 本体（普通の `<script>` で読むと `window.NetplayClient` になる）
   - `netplay-client.mjs`: ES モジュールから使うための入口
+  - `netplay-lobby.js`: 入口とロビーの画面（`NetplayLobby`）と、ローカル対戦と同じ形のコントローラー（`OnlineGameController`）。ES モジュール
 - `examples/`: 3つの型のサンプルゲーム（テストに使う。コピーはしない）
   - `turn-game.js`: ①サーバーがゲームを進める型（dominion・lucky-numbers）
   - `relay-game.js`: ②中継の型（panel-de-pon）
@@ -309,6 +312,24 @@ if (roomCode) {
     }
 }
 ```
+
+## 1つのサーバーで全ゲーム（1.10.0）
+
+web-games では、全ゲームを1つの WebSocket の API・Lambda・テーブルで受け持つ（docs/server-merge.md）。ゲームは、つなぐときの URL の `?game=<名前>` で選ぶ。
+
+- 保存先の `keyPrefix`：`createHandler(定義, { keyPrefix: '<名前>' })` で、部屋のキーが `ROOM#<名前>#部屋番号` になる（部屋番号がゲームどうしで重なっても、ほかのゲームの部屋には入れない）。公開の部屋の一覧も、そのゲームの部屋だけ。渡さなければ今までどおり
+- `createRouter({ load })`（`router.js`）：`$connect` で `?game=` を確かめ（`game-name.js` の形で、`load(name)` が handler を返すときだけ。ほかは 400）、`GAME#接続ID` に記録する。以降のメッセージと切断は、そのゲームの handler に渡す。`load` は使うゲームだけを読み込む関数（`(name) => import('../../games/' + name + '/server/src/handler.js')` なら esbuild がゲームごとに分けてまとめる）
+- `startMultiDevServer({ load })`（`dev-server.js`）：手元のテスト用サーバーを1つのポートで全ゲーム分動かす。`load(name)` はゲームの定義（かそのモジュール）を返す。保存先は1つの MemoryStore を共有し、ゲームごとに `keyPrefix` を付ける（AWS と同じ形）。知らないゲームの接続は 4004 で閉じる。web-games の `npm run dev:online` がこれを使う
+- MemoryStore も `new MemoryStore({ keyPrefix, from })` で同じ形を試せる（`from` に渡した MemoryStore と保存場所を共有する）
+
+## 入口とロビーの画面（netplay-lobby.js、1.10.0）
+
+どのゲームでも同じ入口（名前・部屋を作る・部屋番号で入る・公開の部屋を探す）とロビー（参加者・CPU の追加と外す・設定・開始・招待URL・退出）を、`body` の下に重ねて出す。ゲームの画面の作りに依らない（CSS は `.netplay-lobby` の下だけ。色は `--np-bg`・`--np-fg`・`--np-accent` などで変えられる）。使い方はファイルの先頭のコメント。
+
+- `resolveOnlineServerUrl({ game, deployed })`：`?server=`、手元（localhost）なら `ws://localhost:8787`、なければ `deployed`。どれにも `?game=<game>` を付ける。`deployed` が空で手元でもなければ `null`（ゲームの側は「オンラインで遊ぶ」を隠す）
+- `NetplayLobby`：`open()`・`boot()`（招待URLか前回の部屋に入る）・`rematch()`（結果の「もう一度」）・`confirmLeave()`（対戦中の「ホーム」）・`leave()`。対戦が始まると `onStart(controller)`、ビューが届くと `onUpdate()`、操作を断られると `onError(message)`、部屋を出ると `onExit()`
+- `OnlineGameController`：`getView()`・`send(command)`（返事を待つ間は false）・`isOnline: true`。`hint`・`undo`・`pause`・`resume`・`stop` は何もしない
+- 名前は `localStorage` の `netplay.name` に、全ゲームで共有して覚える
 
 ## 同期
 

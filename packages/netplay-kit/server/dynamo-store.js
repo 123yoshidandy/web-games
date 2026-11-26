@@ -4,6 +4,8 @@
  * 接続には部屋番号だけを持ち、席番号は持たない（席は部屋の players から connectionId で求める）
  * どちらも expiresAt（UNIX秒）を過ぎると DynamoDB の TTL で自動的に消える
  * 公開の部屋の一覧は、テーブルを Scan して絞る（索引を足さずに済むように。部屋が数百までなら十分に軽い）
+ * keyPrefix（ゲームの名前）を渡すと、部屋を ROOM#ゲーム#部屋番号 にする（1つのテーブルに複数のゲームを入れるため。router.js）
+ * 接続（CONN#）は接続 ID が API の中で一意なので、頭を付けない
  */
 
 const MAX_SCAN_PAGES = 10; // 公開の部屋の一覧で読むページ（1ページ最大1MB）の上限
@@ -15,9 +17,10 @@ import { ConflictError } from './room-service.js';
 export class DynamoStore {
     constructor(tableName, client = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
         marshallOptions: { removeUndefinedValues: true }
-    })) {
+    }), { keyPrefix = '' } = {}) {
         this.tableName = tableName;
         this.client = client;
+        this.roomPrefix = keyPrefix ? `ROOM#${keyPrefix}#` : 'ROOM#';
     }
 
     // 強い整合性で読む（既定の結果整合性では、保存した直後に1つ前の部屋が返ることがあり、古い部屋で操作を判定してしまう）
@@ -29,7 +32,7 @@ export class DynamoStore {
     }
 
     async getRoom(code) {
-        return this.getItem(`ROOM#${code}`);
+        return this.getItem(`${this.roomPrefix}${code}`);
     }
 
     // 読み込んだときの版のままなら保存する
@@ -44,7 +47,7 @@ export class DynamoStore {
         try {
             await this.client.send(new PutCommand({
                 TableName: this.tableName,
-                Item: { pk: `ROOM#${room.code}`, ...room },
+                Item: { pk: `${this.roomPrefix}${room.code}`, ...room },
                 ...condition
             }));
         } catch (error) {
@@ -68,7 +71,7 @@ export class DynamoStore {
                     '#code': 'code', '#isPublic': 'isPublic', '#status': 'status', '#expiresAt': 'expiresAt',
                     '#createdAt': 'createdAt', '#players': 'players', '#settings': 'settings', '#spectators': 'spectators'
                 },
-                ExpressionAttributeValues: { ':room': 'ROOM#', ':true': true, ':status': status, ':now': nowSeconds },
+                ExpressionAttributeValues: { ':room': this.roomPrefix, ':true': true, ':status': status, ':now': nowSeconds },
                 ExclusiveStartKey: startKey
             }));
             rooms.push(...Items);
@@ -91,5 +94,22 @@ export class DynamoStore {
 
     async deleteConnection(connectionId) {
         await this.client.send(new DeleteCommand({ TableName: this.tableName, Key: { pk: `CONN#${connectionId}` } }));
+    }
+
+    // ===== 接続ごとのゲーム（router 用。部屋を出ても接続は残るので、CONN# とは別の項目にする） =====
+
+    async getConnectionGame(connectionId) {
+        return this.getItem(`GAME#${connectionId}`);
+    }
+
+    async putConnectionGame(connectionId, game, expiresAt) {
+        await this.client.send(new PutCommand({
+            TableName: this.tableName,
+            Item: { pk: `GAME#${connectionId}`, game, expiresAt }
+        }));
+    }
+
+    async deleteConnectionGame(connectionId) {
+        await this.client.send(new DeleteCommand({ TableName: this.tableName, Key: { pk: `GAME#${connectionId}` } }));
     }
 }

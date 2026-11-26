@@ -6,6 +6,8 @@
  *   import { createHandler } from '../netplay/handler.js';
  *   import game from './game-definition.js';
  *   export const handler = createHandler(game);
+ * web-games の1つのスタックにまとめるときは、ゲームの名前を keyPrefix に渡す（部屋のキーがゲームどうしでぶつからない。router.js）
+ *   export const handler = createHandler(game, { keyPrefix: 'azul' });
  */
 
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
@@ -14,9 +16,9 @@ import { DynamoStore } from './dynamo-store.js';
 
 const SEND_RETRY_DELAYS_MS = [100, 300, 900]; // 送信が 429 で断られたときに、送り直すまで待つ時間
 
-export function createHandler(game, { tableName = process.env.TABLE_NAME } = {}) {
+export function createHandler(game, { tableName = process.env.TABLE_NAME, keyPrefix = '' } = {}) {
     // 以下は Lambda の呼び出しをまたいで使い回す
-    const store = new DynamoStore(tableName);
+    const store = new DynamoStore(tableName, undefined, { keyPrefix });
     const clients = new Map();          // 送信用のクライアント
     const connectionCache = new Map();  // 接続→部屋番号
     const limiter = new RateLimiter({ perSecond: game.messagesPerSecond ?? 10, burst: game.messagesBurst ?? 20 });

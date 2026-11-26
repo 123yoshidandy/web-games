@@ -21,8 +21,8 @@ import { fileURLToPath } from 'node:url';
 
 const KIT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const LOCK_FILE = 'netplay-kit.lock.json';
-const SERVER_FILES = ['room-service.js', 'handler.js', 'dynamo-store.js', 'memory-store.js', 'dev-server.js', 'testing.js'];
-const CLIENT_FILES = ['netplay-client.js', 'netplay-client.mjs'];
+const SERVER_FILES = ['room-service.js', 'handler.js', 'dynamo-store.js', 'memory-store.js', 'dev-server.js', 'testing.js', 'router.js', 'game-name.js'];
+const CLIENT_FILES = ['netplay-client.js', 'netplay-client.mjs', 'netplay-lobby.js'];
 
 // ===== 入口 =====
 
