@@ -12,6 +12,7 @@ import { MAHJONG, DRAGON, classify, beats, rankOf, rankLabel, comboLabel, points
 import { teamOf } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { cardHtml } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'tichu.settings';
 const NAMES = ['あなた', 'ロン', '味方のメイ', 'ハク'];
@@ -69,7 +70,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -104,6 +108,7 @@ export default class UI {
     send(command) {
         const selected = this.selected;
         const giving = this.giving;
+        this.hintCommand = null;
         this.selected = [];
         if (command.type === 'exchange') this.giving = [];
         const ok = this.controller?.send(command);
@@ -151,6 +156,7 @@ export default class UI {
             };
         };
         $('#open-help-game').addEventListener('click', pausing('#help'));
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', pausing('#log', () => {
             $('#log-list').innerHTML = (this.view?.logs ?? []).map(text => `<li>${escapeHtml(text)}</li>`).join('');
             requestAnimationFrame(() => { $('#log-list').scrollTop = $('#log-list').scrollHeight; });
@@ -196,6 +202,7 @@ export default class UI {
             if (!chip) return;
             const cards = chip.dataset.cards.split(',').map(Number);
             this.selected = sameCards(cards, this.selected) ? [] : cards;
+            music.play(this.selected.length ? 'select' : 'cancel');
             this.render();
         });
         $('#actions').addEventListener('click', (event) => {
@@ -221,11 +228,13 @@ export default class UI {
         if (!view) return;
         if (view.phase === 'exchange' && !view.myExchange) {
             this.giving = this.giving.includes(card) ? this.giving.filter(c => c !== card) : this.giving.length < 3 ? [...this.giving, card] : this.giving;
+            music.play(this.giving.includes(card) ? 'select' : 'cancel');
             this.render();
             return;
         }
         if (view.phase !== 'play' || !view.hand.length) return;
         this.selected = this.selected.includes(card) ? this.selected.filter(c => c !== card) : [...this.selected, card];
+        music.play(this.selected.includes(card) ? 'select' : 'cancel');
         this.render();
     }
 
@@ -235,6 +244,7 @@ export default class UI {
         else if (act === 'tichu') this.send({ type: 'tichu' });
         else if (act === 'give') this.send({ type: 'exchange', cards: [...this.giving] });
         else if (act === 'reset') {
+            music.play('cancel');
             this.giving = [];
             this.selected = [];
             this.render();
@@ -274,6 +284,7 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
         this.view = view;
         this.selected = this.selected.filter(c => view.hand.includes(c));
         this.giving = this.giving.filter(c => view.hand.includes(c));
@@ -281,6 +292,8 @@ export default class UI {
 
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        if (prev) this.playSound(fresh, prev);
+        if (prev && (prev.current !== view.current || prev.phase !== view.phase)) this.hintCommand = null;
 
         this.renderScore();
         [0, 1, 2, 3].forEach(s => this.renderSeat(s));
@@ -288,6 +301,7 @@ export default class UI {
         this.renderHand();
         this.renderCandidates();
         this.renderActions();
+        this.markHint();
         this.notify(fresh);
 
         // 竜の場を渡す相手を選ぶ
@@ -295,6 +309,52 @@ export default class UI {
         const roundEnd = fresh.filter(e => e.type === 'roundEnd').at(-1);
         if (roundEnd) this.showRound(roundEnd.result);
         else if (view.phase === 'end' && !$('#round').open && !$('#result').open) this.showResult();
+    }
+
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、自分の番になったら turn、終わりは勝ち負け（チーム）
+    // CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
+    playSound(fresh, prev) {
+        const view = this.view;
+        const me = view.seat;
+        if (fresh.length === 0) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === teamOf(me) ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'roundEnd')) return music.play('notify');
+        if (fresh.some(e => e.type === 'deal')) return music.play('shuffle');
+        const mine = fresh.filter(e => e.seat === me);
+        if (mine.some(e => e.type === 'out')) return music.play('gain');
+        if (fresh.some(e => e.type === 'trick' && e.to === me)) return music.play('capture');
+        if (mine.some(e => e.type === 'play')) return music.play('place');
+        if (mine.some(e => e.type === 'call')) return music.play('notify');
+        if (mine.some(e => e.type === 'pass')) return music.play('cancel');
+        if (fresh.some(e => e.type === 'exchange')) return music.play('draw');
+        if (view.current === me && prev.current !== me) music.play('turn');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        // 出す札・渡す札は、選んだ状態にする（「出す」「渡す」で決められる）
+        if (command.type === 'play') this.selected = [...command.cards];
+        if (command.type === 'exchange') this.giving = [...command.cards];
+        if (command.type === 'dragon' && !$('#dragon').open) this.showDragon();
+        this.render();
+        const text = { pass: 'パス', tichu: 'ティチューを宣言する', grand: command.call ? '大ティチューを宣言する' : '宣言しない', dragon: '印の付いた相手に渡す', exchange: '選んだ3枚を渡す', play: '選んだ札を出す' }[command.type];
+        if (text) this.toast(`おすすめ：${text}`);
+    }
+
+    // おすすめの手のボタンに印を付ける
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const selector = {
+            play: '[data-act="play"], [data-act="bomb"]', pass: '[data-act="pass"]', tichu: '[data-act="tichu"]',
+            grand: c.call ? '[data-act="grand-yes"]' : '[data-act="grand-no"]', exchange: '[data-act="give"]', dragon: `[data-to="${c.to}"]`
+        }[c.type];
+        if (selector) document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
     }
 
     renderScore() {

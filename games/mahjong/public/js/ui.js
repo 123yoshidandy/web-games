@@ -5,6 +5,7 @@
  */
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import { music } from './music.js';
 import { DRAW_REASONS, roundName } from './game.js';
 import { windName } from './tiles.js';
 import { handPoints } from './scoring.js';
@@ -143,7 +144,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら、新しく始める
@@ -152,7 +156,10 @@ export default class UI {
             this.controller = new LocalGameController({
                 players: NAMES.map((name, i) => ({ name, isCPU: i !== 0 })),
                 options: { length: this.settings.length, level: this.settings.level }
-            }, { onUpdate: () => this.render(), onError: (message) => this.toast(message) });
+            }, { onUpdate: () => this.render(), onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                } });
         }
         this.selected = null;
         this.riichiMode = false;
@@ -203,6 +210,7 @@ export default class UI {
         const view = this.view;
         const command = this.controller?.suggest();
         if (!view || !command) return;
+        music.play('select');
         this.hint = { at: this.hintKey(view), command };
         if (command.type === 'discard') {
             this.riichiMode = !!command.riichi;
@@ -234,6 +242,7 @@ export default class UI {
             this.send({ type: 'discard', tile: id, riichi: this.riichiMode });
             return;
         }
+        music.play('select');
         this.selected = id;
         this.render();
     }
@@ -451,6 +460,7 @@ export default class UI {
     renderBubbles(view) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         if (view.events.length) this.lastSeq = Math.max(this.lastSeq, view.events.at(-1).seq);
+        this.playSound(view, fresh);
         fresh.filter(e => e.type === 'call').forEach(e => {
             const el = document.createElement('div');
             el.className = `bubble${e.call === 'ron' || e.call === 'tsumo' ? ' win' : ''}`;
@@ -459,6 +469,25 @@ export default class UI {
             $('bubbles').appendChild(el);
             setTimeout(() => el.remove(), 1400);
         });
+    }
+
+    // 1つの更新に1つの音。自分は捨てる・鳴く・引く、局の終わりは点の増減、相手の鳴き・自分が鳴ける場面は notify
+    // 相手が捨てるたびには鳴らさない（何度も続くので）
+    playSound(view, fresh) {
+        if (!fresh.length) return;
+        if (fresh.some(e => e.type === 'end')) {
+            const mine = view.final?.find(f => f.seat === view.you);
+            return music.play(mine?.rank === 1 ? 'win' : 'lose');
+        }
+        if (fresh.some(e => e.type === 'result')) {
+            const delta = view.result?.deltas?.[view.you] ?? 0;
+            return music.play(delta > 0 ? 'gain' : delta < 0 ? 'pay' : 'notify');
+        }
+        const calls = fresh.filter(e => e.type === 'call');
+        if (calls.some(e => e.seat === view.you && !['riichi', 'kyuushu'].includes(e.call))) return music.play('capture');
+        if (fresh.some(e => e.type === 'discard' && e.seat === view.you)) return music.play('place');
+        if (calls.length > 0 || view.options?.type === 'call') return music.play('notify');
+        if (fresh.some(e => e.type === 'draw' && e.seat === view.you)) music.play('draw');
     }
 
     renderResult(view) {

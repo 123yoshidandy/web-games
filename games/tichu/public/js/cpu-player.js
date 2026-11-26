@@ -266,6 +266,12 @@ export function chooseCpuCommand(game, seat, profile = PROFILES.normal) {
     return game.top() ? chooseFollow(game, seat, profile, options, random) : chooseLead(game, seat, profile, options);
 }
 
+// ヒント：seat のおすすめの手（CPU の「ふつう」が選ぶ手）。seat が操作する番でなければ null
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 // CPU の席のうち、今操作を待っている最初の席
 export function cpuActor(game) {
     return game.actors().find(s => game.players[s].isCPU) ?? null;
