@@ -106,6 +106,12 @@ export function legalCommands(game, seat) {
     }
 }
 
+// ヒント：seat のおすすめの手（CPU の「ふつう」が選ぶ手番の手）。seat の番でなければ null。通信はすすめない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || game.current !== seat) return null;
+    return chooseCommand(game, seat, 'normal');
+}
+
 export function chooseCommand(game, seat, style = 'normal') {
     if (game.passing) return { type: 'passCard', card: choosePass(game, seat) };
     if (game.phase === 'play') return { type: 'play', card: choosePlay(game, seat, CPU_STYLES[style] ?? CPU_STYLES.normal) };

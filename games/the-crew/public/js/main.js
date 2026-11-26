@@ -8,6 +8,7 @@ import { MISSIONS, SPECIAL_TEXT, COMM_TEXT, ASSIGN_TEXT, TOKEN_NAMES, parseCard,
 import { commPosition, answerText } from './game.js';
 import { CPU_HELP } from './cpu.js';
 import * as storage from './storage.js';
+import { music } from './music.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
@@ -22,6 +23,8 @@ const app = {
     selected: null,   // 選んでいるカード
     mode: null,       // 'comm'（通信するカードを選んでいる）
     prepSel: [],      // 準備で選んでいるもの（トークン・課題・人）
+    hint: null,       // ヒントのおすすめの手（場面が変わったら消す）
+    sending: false,   // 自分の操作を送っている間（効果音は送った操作で決める）
     settings: { count: 4, mission: null, ...storage.load('settings', {}) },
     progress: { attempts: {}, cleared: {}, ...storage.load('progress', {}) }
 };
@@ -151,7 +154,10 @@ function startGame(setup) {
     app.view = null;
     resetSelection();
     if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => update(), onEnd: onGameEnd });
+    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => {
+        music.play('error');
+        update();
+    }, onEnd: onGameEnd });
     showScene('game');
     update();
 }
@@ -171,6 +177,7 @@ function resetSelection() {
 
 // ゲームが終わったら、航海日誌に挑戦の回数を書く（遭難信号を使ったら1回増やす）
 function onGameEnd(result) {
+    music.play(result.success ? 'win' : 'lose');
     const view = app.controller.getView();
     const m = view.mission;
     const attempts = (app.progress.attempts[m] ?? 0) + 1 + (view.distressUsed ? 1 : 0);
@@ -191,6 +198,10 @@ function update() {
         // 自分の操作で場面が変わったら、選んでいたものを捨てる
         const keepComm = app.mode === 'comm' && view.options?.communicate;
         if (!keepComm) resetSelection();
+        app.hint = null;
+        // ほかの人が動いて自分の番になったら知らせる（CPU の手ごとには鳴らさない）
+        const myTurn = v => !v.result && v.current === v.viewer;
+        if (!app.sending && myTurn(view) && !myTurn(previous)) music.play('turn');
     }
     app.view = view;
     render(view);
@@ -208,6 +219,7 @@ function render(view) {
     renderStatus(view);
     renderMe(view);
     renderActions(view);
+    markHint();
     // はみ出したら、カードを小さくして描き直す
     for (let i = 0; i < 16 && overflowing(); i++) {
         sizes.mini *= 0.97;
@@ -217,7 +229,38 @@ function render(view) {
         renderOthers(view);
         renderTable(view);
         renderMe(view);
+        markHint();
     }
+}
+
+// ===== ヒント =====
+
+function showHint() {
+    const command = app.controller?.hint();
+    if (!command) return;
+    resetSelection();
+    app.hint = command;
+    // カードを出す・渡すときは、そのカードを選んだ状態にする（「出す」「渡す」で決められる）
+    if (command.type === 'play' || command.type === 'passCard') app.selected = command.card;
+    render(app.view);
+}
+
+// おすすめの手のカード・課題・ボタンに印を付ける
+function markHint() {
+    const c = app.hint;
+    if (!c) return;
+    const selectors = {
+        play: [`#me .card[data-card="${c.card}"]`, '[data-act="play"]'],
+        passCard: [`#me .card[data-card="${c.card}"]`, '[data-act="pass"]'],
+        pickTask: [`.task.pickable[data-task="${c.index}"]`],
+        answer: [`[data-answer="${c.value}"]`],
+        choose: [`[data-choose="${c.seat}"]`],
+        assignTask: [`[data-assign="${c.seat}"]`],
+        silence: [`[data-silence="${c.seat}"]`],
+        roles: [`[data-role="${app.prepSel.length ? c.last : c.first}"]`],
+        skip: ['[data-prep="skip"]']
+    }[c.type] ?? [];
+    selectors.forEach(sel => document.querySelectorAll(sel).forEach(el => el.classList.add('recommended')));
 }
 
 function startSizes(view) {
@@ -544,9 +587,23 @@ function renderActions(view) {
 
 // ===== 入力 =====
 
+// 送った操作の音（1つの操作に1つ。終わったときは onGameEnd が勝ち負けを鳴らす）
+const SEND_SOUNDS = {
+    play: 'place', passCard: 'place', communicate: 'place', pickTask: 'draw', assignTask: 'place', handover: 'place',
+    swapTokens: 'place', moveToken: 'place', answer: 'select', choose: 'select', silence: 'select', roles: 'select',
+    skip: 'cancel', distress: 'shuffle'
+};
+
 function send(command) {
     if (!app.controller) return;
-    app.controller.send(command);
+    app.sending = true;
+    let ok = false;
+    try {
+        ok = app.controller.send(command);
+    } finally {
+        app.sending = false;
+    }
+    if (ok && !app.controller?.game.isOver && SEND_SOUNDS[command.type]) music.play(SEND_SOUNDS[command.type]);
 }
 
 function onPlayClick(event) {
@@ -560,12 +617,14 @@ function onPlayClick(event) {
         if (handCard.classList.contains('dim')) return;
         if (app.mode === 'comm' || view.passing) {
             app.selected = app.selected === card ? null : card;
+            music.play(app.selected ? 'select' : 'cancel');
         } else if (view.options?.play) {
             if (app.selected === card) {
                 send({ type: 'play', card });
                 return;
             }
             app.selected = card;
+            music.play('select');
         } else return;
         render(view);
         return;
@@ -586,6 +645,7 @@ function onPlayClick(event) {
             else app.prepSel = [index];
         }
         if (kind === 'handover') app.prepSel = app.prepSel[0] === index ? [] : [index];
+        music.play(app.prepSel.includes(index) ? 'select' : 'cancel');
         render(view);
         return;
     }
@@ -614,12 +674,14 @@ function onPlayClick(event) {
     if (data.act === 'play' && app.selected) return send({ type: 'play', card: app.selected });
     if (data.act === 'pass' && app.selected) return send({ type: 'passCard', card: app.selected });
     if (data.act === 'comm') {
+        music.play('select');
         app.mode = 'comm';
         app.selected = null;
         render(view);
         return;
     }
     if (data.act === 'cancel-comm') {
+        music.play('cancel');
         resetSelection();
         render(view);
         return;
@@ -716,6 +778,8 @@ function renderStaticArt() {
 // ===== 初期化 =====
 
 function init() {
+    // ヘッドレス Chrome での確認に使う
+    window.__app = app;
     renderStaticArt();
     $('#cpu-help').innerHTML = CPU_HELP.map(line => `<li>${escapeHtml(line)}</li>`).join('');
     $('#count-select').addEventListener('click', event => {
@@ -752,6 +816,7 @@ function init() {
         if (action === 'help') openDialog($('#help-dialog'));
         if (action === 'close-help') $('#help-dialog').close();
         if (action === 'log') openLog();
+        if (action === 'hint') showHint();
         if (action === 'mission') openMission();
         if (action === 'close-mission') $('#mission-dialog').close();
         if (action === 'close-missions') $('#missions-dialog').close();

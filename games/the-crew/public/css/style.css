@@ -167,6 +167,9 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .card.dim { filter: brightness(0.45) saturate(0.5); }
 .card.selected { transform: translateY(-0.14em); box-shadow: 0 0 0 0.05em #fff, 0 0 0.25em rgba(255, 255, 255, 0.75); }
 .card.pickable { cursor: pointer; }
+/* ヒントのおすすめ */
+.card.recommended, .task.recommended .card { box-shadow: 0 0 0 0.06em #7fe8ff, 0 0 0.3em rgba(127, 232, 255, 0.8); }
+.btn.recommended { box-shadow: 0 0 0 2px #7fe8ff, 0 0 12px rgba(127, 232, 255, 0.6); }
 .card.marked { box-shadow: 0 0 0 0.05em var(--accent), 0 0 0.2em var(--accent); }
 
 /* 小さいカード（課題・通信・JARVIS）は、数字を大きめにする */
@@ -629,6 +632,6 @@ body.landscape #right { display: flex; flex-direction: column; gap: 4px; min-hei
 
 /* BGM の ON/OFF（js/music.js）。タイトルでは遊び方の左に置く */
 .title-bgm { position: absolute; top: 8px; right: 52px; }
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+.sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }

@@ -16,6 +16,13 @@ import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { LEVELS } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import BoardView, { RES_COLORS, RES_GLYPH } from './board-view.js';
+import { music } from './music.js';
+
+// 自分の操作の音（書いていない行動は place）
+const COMMAND_SOUND = {
+    section: 'select', skip: 'select', gain: 'gain', produce: 'gain', trade: 'gain', bolster: 'gain',
+    combat: 'capture', encounter: 'draw', factory: 'draw'
+};
 
 const SETTINGS_KEY = 'scythe.settings';
 const CPU_NAMES = ['ヘルガ', 'イワン', 'マレク', 'ベルタ'];
@@ -171,7 +178,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.update(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -188,6 +198,7 @@ export default class UI {
         $('#screen-game').hidden = false;
         this.board.resize();
         this.board.resetZoom();
+        this.view = null; // 前のゲームのビューと比べて音を鳴らさない
         this.update();
         this.controller.scheduleCpu();
     }
@@ -196,7 +207,9 @@ export default class UI {
 
     update() {
         if (!this.controller) return;
+        const previous = this.view;
         this.view = this.controller.getView();
+        this.playUpdateSound(previous);
         const v = this.view;
         const key = `${v.turnCount}:${v.step}:${v.section}:${v.combat ? v.combat.hex : ''}`;
         if (key !== this.selKey) {
@@ -208,6 +221,19 @@ export default class UI {
         this.handleEvents();
         this.render();
         this.openDialogs();
+    }
+
+    // 1回の更新に1つの音。自分の操作の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const v = this.view;
+        if (!previous) return;
+        if (v.phase === 'end') {
+            if (previous.phase !== 'end') music.play(v.winners.includes(v.you) ? 'win' : 'lose');
+            return;
+        }
+        if (this.sending) return;
+        const turnOf = (view) => view.phase === 'play' && view.turn === view.you;
+        music.play(turnOf(v) && !turnOf(previous) ? 'turn' : 'notify');
     }
 
     freshSelection() {
@@ -701,7 +727,10 @@ export default class UI {
     send(command) {
         if (!this.controller) return;
         this.hintCommand = null;
-        this.controller.send(command);
+        this.sending = true;
+        const ok = this.controller.send(command);
+        this.sending = false;
+        if (ok && this.view.phase !== 'end') music.play(COMMAND_SOUND[command.type] ?? 'place');
     }
 
     // ---- ヒント ----
@@ -711,6 +740,7 @@ export default class UI {
         const command = this.controller?.hint();
         if (!command) return this.toast('いまはあなたの番ではありません');
         this.hintCommand = command;
+        music.play('select');
         this.render();
         this.toast(`おすすめ：${this.hintText(command)}`);
     }
