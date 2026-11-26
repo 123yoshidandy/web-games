@@ -5,11 +5,13 @@
  * - 神の力で「動く」と「建てる」の両方ができるときは、下のボタンで切り替える。アトラスはドームの切り替え、デメテル・ヘファイストスは「終える」
  */
 
-import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS } from './game-controller.js';
 import { GODS, GOD_NAMES, GOD_POWERS } from './game.js';
 import { N, xOf, yOf } from './rules.js';
 import * as art from './art.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const SETTINGS_KEY = 'santorini.settings';
 const $ = (id) => document.getElementById(id);
@@ -47,6 +49,23 @@ export default class UI {
         this.seenSeq = 0;
         this.resultShown = false;
         this.buildBoard();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。2〜3人で、足りない席は CPU
+        this.online = new NetplayLobby({
+            title: 'サントリーニ',
+            game: 'santorini',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: CPU_STEP_DELAY_MS,
+            minPlayers: 2,
+            maxPlayers: 3,
+            settings: [
+                { key: 'level', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] },
+                { key: 'gods', label: '神の力（2人のとき）', options: [{ value: false, label: 'なし' }, { value: true, label: 'あり' }] }
+            ],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.onControllerUpdate(),
+            onError: (message) => this.onControllerError(message),
+            onExit: () => this.showTitle()
+        });
         this.bind();
         this.drawStaticArt();
     }
@@ -113,15 +132,17 @@ export default class UI {
             const saved = loadSavedGame();
             if (saved) this.start(saved);
         });
-        $('home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
+        $('online-button').addEventListener('click', () => this.online.open());
         $('hint').addEventListener('click', () => this.showHint());
         const help = $('help');
         $('open-help-title').addEventListener('click', () => help.showModal());
         $('open-help-game').addEventListener('click', () => {
-            this.controller?.pause();
+            this.controller?.pause?.(); // ローカル対戦だけ、読んでいる間 CPU を止める
             help.showModal();
         });
-        help.addEventListener('close', () => this.controller?.resume());
+        help.addEventListener('close', () => this.controller?.resume?.());
         document.querySelectorAll('dialog').forEach(d => {
             d.querySelector('.close')?.addEventListener('click', () => d.close());
             if (d.id !== 'result') d.addEventListener('click', e => { if (e.target === d) d.close(); });
@@ -129,11 +150,13 @@ export default class UI {
         $('look').addEventListener('click', () => $('result').close());
         $('again').addEventListener('click', () => {
             $('result').close();
-            this.startNew();
+            if (this.controller?.isOnline) this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+            else this.startNew();
         });
         $('result-home').addEventListener('click', () => {
             $('result').close();
-            this.showTitle();
+            if (this.controller?.isOnline) this.online.leave();
+            else this.showTitle();
         });
         $('board').addEventListener('click', e => {
             const hit = e.target.closest('.hit');
@@ -158,6 +181,7 @@ export default class UI {
         this.controller = null;
         this.renderSettings();
         $('resume').hidden = !loadSavedGame();
+        $('online-button').hidden = !this.online.available;
         $('screen-game').hidden = true;
         $('screen-title').hidden = false;
     }
@@ -184,30 +208,44 @@ export default class UI {
     }
 
     start(setup) {
-        this.controller?.stop();
-        this.controller = new LocalGameController(setup, {
-            onUpdate: () => {
-                // ヒントを出している間は、今の場面のおすすめに出し直す（自分の番でなくなれば消す）
-                if (this.hintCommand) this.applyHint(this.controller.hint());
-                const previous = this.view;
-                this.render();
-                this.playUpdateSound(previous);
-            },
-            onError: (message) => {
-                music.play('error');
-                this.toast(message);
-            }
+        const controller = new LocalGameController(setup, {
+            onUpdate: () => this.onControllerUpdate(),
+            onError: (message) => this.onControllerError(message)
         });
-        this.resultShown = this.controller.game.isOver();
+        this.beginGame(controller);
+        controller.scheduleCpu();
+    }
+
+    onControllerUpdate() {
+        // ヒントを出している間は、今の場面のおすすめに出し直す（自分の番でなくなれば消す）
+        if (this.hintCommand) this.applyHint(this.controller.hint());
+        const previous = this.view;
+        this.render();
+        this.playUpdateSound(previous);
+    }
+
+    onControllerError(message) {
+        music.play('error');
+        this.toast(message);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        $('hint').hidden = Boolean(controller.isOnline); // ヒントはローカル対戦だけ
+        const view = controller.getView();
+        this.view = null;
+        this.resultShown = view.over;
         this.hintCommand = null;
         this.turnKey = null;
-        this.seenSeq = this.controller.game.eventSeq;
+        this.seenSeq = view.eventSeq;
         this.layers.workers.replaceChildren();
         this.workerEls.clear();
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.render({ still: true });
-        this.controller.scheduleCpu();
     }
 
     // ---- 描画 ----

@@ -12,6 +12,7 @@ const ui = new UI();
 ui.showTitle();
 // 確かめるときに、ページの外から状態を見られるようにする
 window.__app = ui;
+ui.online.boot(); // 招待の URL（?room=）から入る、または前の部屋に戻る
 
 // ホーム画面に置いて、オフラインでも開けるようにする（PWA）
 if ('serviceWorker' in navigator) {
