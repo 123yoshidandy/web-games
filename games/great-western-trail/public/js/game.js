@@ -49,8 +49,10 @@ export default class Game {
         return game;
     }
 
+    // isCPU は今の席から取る（オンライン対戦で部屋を出た人の席は、途中から CPU になる）
     persist() {
-        return { players: this.setup, options: this.options, commands: structuredClone(this.commands) };
+        const players = this.setup.map((p, i) => ({ ...p, isCPU: !!this.players[i]?.isCPU }));
+        return { players, options: this.options, commands: structuredClone(this.commands) };
     }
 
     get players() {
