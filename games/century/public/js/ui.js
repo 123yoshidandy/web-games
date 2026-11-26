@@ -15,6 +15,7 @@ import { MERCHANTS, POINT_CARDS, CARAVAN_LIMIT, GOLD_POINTS, SILVER_POINTS, maxT
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { merchantHtml, pointHtml, coinHtml, cubeHtml, cubesHtml, countChipsHtml, spiceWords } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'century.settings';
 const CPU_NAMES = ['ラシード', 'ミーナ', 'ハサン', 'ライラ'];
@@ -116,7 +117,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -235,6 +239,7 @@ export default class UI {
 
     select(sel) {
         const same = this.sel && this.sel.kind === sel.kind && this.sel.card === sel.card && this.sel.index === sel.index;
+        music.play(same ? 'cancel' : 'select');
         this.clearSelection();
         if (!same) this.sel = sel;
         this.render();
@@ -335,6 +340,22 @@ export default class UI {
 
     // ---- 状態 ----
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分の手は得点カード（得る）・商人カードを使う（置く）・カードを取る／休む（引く）・捨てる（払う）、
+    // ほかの人の手のあとは自分の番か知らせ、終局は勝ち・負け
+    playSounds(view, fresh) {
+        if (!fresh.length) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === view.seat ? 'win' : 'lose');
+        const last = fresh.at(-1);
+        if (last.seat === view.seat) {
+            const sound = { claim: 'gain', play: 'place', acquire: 'draw', rest: 'draw', discard: 'pay' }[last.type];
+            if (sound) music.play(sound);
+            return;
+        }
+        music.play(view.current === view.seat && view.phase !== 'end' ? 'turn' : 'notify');
+    }
+
     myTurn(phase) {
         const view = this.view;
         return !!view && view.current === view.seat && view.phase === phase;
@@ -375,6 +396,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         playEvents(fresh, before, { you: view.seat });
+        this.playSounds(view, fresh);
         if (fresh.some(e => e.type === 'claim') && view.lastRound && !this.lastRoundShown && view.phase !== 'end') {
             this.lastRoundShown = true;
             this.toast(`得点カードが${view.endCount}枚に届きました。この巡で終わりです`);

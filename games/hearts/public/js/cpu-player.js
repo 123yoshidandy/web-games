@@ -120,3 +120,10 @@ export function decidePlay(view, random, profile = PROFILES.normal) {
     if (hearts.length > 0) return highest(hearts);
     return highest(legal);
 }
+
+// ヒント：人が操作する番（渡す札・出す札）に、CPU（揺れのない設定）が選ぶ手を返す。その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.strong);
+}

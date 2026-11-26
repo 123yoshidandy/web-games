@@ -8,7 +8,8 @@
  */
 
 import { suitOf, QUEEN, END_SCORE } from './game.js';
-import { LEVELS } from './cpu-player.js';
+import { LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, suitIcon, cardHtml } from './art.js';
 import { fly, rectOf, reducedMotion } from './animator.js';
@@ -71,7 +72,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -144,6 +148,7 @@ export default class UI {
             dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
         });
 
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#hand').addEventListener('click', (event) => {
             const card = event.target.closest('.card[data-card]');
             if (card) this.pickCard(card.dataset.card);
@@ -197,6 +202,7 @@ export default class UI {
     pickCard(card) {
         if (this.canPass()) {
             const i = this.passPick.indexOf(card);
+            music.play(i >= 0 ? 'cancel' : 'select');
             if (i >= 0) this.passPick.splice(i, 1);
             else if (this.passPick.length < 3) this.passPick.push(card);
             else this.passPick = [...this.passPick.slice(1), card]; // 4枚目を押したら、一番前に選んだ札と入れ替える
@@ -206,11 +212,13 @@ export default class UI {
         }
         if (!this.canPlay()) return;
         if (!this.view.legal.includes(card)) {
+            music.play('error');
             this.toast(this.illegalReason(card));
             return;
         }
         // 選んだ札をもう一度押したら出す
         if (this.picked === card) return this.playPicked();
+        music.play('select');
         this.picked = card;
         this.renderHand();
         this.renderActions();
@@ -271,6 +279,7 @@ export default class UI {
     // イベントを display に当てて描く。次までの間（ミリ秒）を返す。null なら止める
     step(event) {
         const you = this.view.you;
+        this.playSound(event);
         switch (event.type) {
         case 'deal':
             this.display = this.withState(event, { hand: event.hand, received: [] });
@@ -342,6 +351,50 @@ export default class UI {
         }
     }
 
+    // 出来事の音。自分の札は置く、ほかの人の札は notify。取ったトリックに失点があれば pay
+    playSound(event) {
+        const you = this.view.you;
+        switch (event.type) {
+        case 'deal': return music.play('shuffle');
+        case 'exchange': return music.play('draw');
+        case 'play': return music.play(event.seat === you ? 'place' : 'notify');
+        case 'trick':
+            if (event.winner === you) music.play(event.points > 0 ? 'pay' : 'capture', { delay: 0.15 });
+            return;
+        case 'roundEnd': return music.play('notify');
+        case 'end': return music.play(event.winners.includes(you) ? 'win' : 'lose');
+        }
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        if (!this.canPass() && !this.canPlay()) return;
+        const command = suggest(this.controller.game, this.view.you);
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        if (command.type === 'pass') this.passPick = [...command.cards];
+        else this.picked = command.card;
+        this.renderHand();
+        this.renderActions();
+    }
+
+    // おすすめの札と操作のボタンに .recommended を付ける。盤面が進んだら消す
+    markHint() {
+        const can = this.canPass() || this.canPlay();
+        $('#hint').disabled = !can;
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        const hint = this.hint;
+        if (!hint || hint.at !== this.controller?.game.commands.length || !can) {
+            this.hint = null;
+            return;
+        }
+        const c = hint.command;
+        (c.type === 'pass' ? c.cards : [c.card]).forEach(card => $(`#hand .card[data-card="${card}"]`)?.classList.add('recommended'));
+        $(`#actions [data-act="${c.type}"]`)?.classList.add('recommended');
+    }
+
     // 席の要素（自分は自分の欄）
     seatEl(seat) {
         return seat === this.view.you ? $('#me') : $(`.seat[data-pos="${this.posOf(seat)}"]`);
@@ -373,6 +426,10 @@ export default class UI {
         if (this.canPlay() && this.view.legal.length === 1) this.picked = this.view.legal[0];
         this.renderHand();
         this.renderActions();
+        // 自分が操作できるようになったら知らせる
+        const canAct = this.canPass() || this.canPlay();
+        if (canAct && !this.couldAct) music.play('turn', { delay: 0.15 });
+        this.couldAct = canAct;
         if (this.view.phase === 'end' && !$('#result').open) this.showResult({ scores: this.view.players.map(p => p.score), winners: this.view.winners });
     }
 
@@ -470,6 +527,7 @@ export default class UI {
             html = `<span class="act-label muted">${escapeHtml(view.players[view.turn].name)}の番</span>`;
         }
         $('#actions').innerHTML = html;
+        this.markHint();
     }
 
     // ---- ダイアログ ----

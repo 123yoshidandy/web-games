@@ -10,6 +10,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS, decide, suggest } from './cpu-player.js';
 import { REASONS } from './game.js';
 import { symbolsSvg, pieceSvg, PIECE_NAME, COLOR_NAME } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'chess.settings';
 const RESULT_DELAY_MS = 900;
@@ -126,7 +127,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             }, { decider: this.decider });
         } catch (error) {
             console.error(error);
@@ -260,8 +264,12 @@ export default class UI {
         }
         if (own && sq !== this.selected) {
             this.selected = sq;
-            if (!this.movesFrom(sq).length) this.toast(this.view.check ? 'チェックを外す手を指してください' : 'その駒は動かせません');
+            if (!this.movesFrom(sq).length) {
+                music.play('error');
+                this.toast(this.view.check ? 'チェックを外す手を指してください' : 'その駒は動かせません');
+            } else music.play('select');
         } else {
+            if (this.selected) music.play('cancel');
             this.selected = null;
         }
         this.renderBoard(this.view);
@@ -301,6 +309,7 @@ export default class UI {
 
     undo() {
         if (!this.controller?.undo()) return;
+        music.play('cancel');
         this.selected = null;
         clearTimeout(this.resultTimer);
         this.resultTimer = null;
@@ -501,10 +510,28 @@ export default class UI {
 
     // ---- 出来事の演出 ----
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分の手（2人で遊ぶときは両方の手）は置く音、取ったら取る音。CPU の手のあとは自分の番の音。
+    // 終局は引き分けなら知らせ、2人で遊ぶときは勝ちの音、CPU 戦は勝ち・負け
+    playSounds(view, fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) {
+            if (end.winner === null) return music.play('notify');
+            return music.play(view.twoPlayers || end.winner === view.you ? 'win' : 'lose');
+        }
+        const move = fresh.filter(e => e.type === 'move').at(-1);
+        if (move) {
+            if (view.twoPlayers || move.seat === view.you) return music.play(move.captured ? 'capture' : 'place');
+            return music.play(view.myTurn ? 'turn' : 'notify');
+        }
+        if (fresh.some(e => (e.type === 'drawOffer' || e.type === 'drawDeclined') && e.seat !== view.you)) music.play('notify');
+    }
+
     playEvents(view, prev) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.playSounds(view, fresh);
         const move = [...fresh].reverse().find(e => e.type === 'move');
         if (move && !reduceMotion()) this.anim = { from: move.from, to: move.to, rookFrom: move.rookFrom, rookTo: move.rookTo };
         const declined = fresh.filter(e => e.type === 'drawDeclined').at(-1);

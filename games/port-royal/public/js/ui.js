@@ -8,6 +8,10 @@ import { CARDS, ROLES, ROLE_ORDER, SHIP_COLORS, SHIP_NAMES, WIN_POINTS } from '.
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, cardHtml, icon, coinHtml, vpHtml, roleText } from './art.js';
+import { music } from './music.js';
+
+// 自分の操作の音（取るカードは、船ならコインを得る・人物なら払う）
+const COMMAND_SOUND = { draw: 'draw', stop: 'select', repel: 'capture', keep: 'place', claim: 'gain', pass: 'select' };
 
 const SETTINGS_KEY = 'port-royal.settings';
 const CPU_NAMES = ['アンナ', 'ジャック', 'マリー', 'ルイ'];
@@ -64,7 +68,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -125,7 +132,7 @@ export default class UI {
         $('#buttons').addEventListener('click', (event) => {
             if (event.target.closest('#hint')) return this.showHint();
             const button = event.target.closest('button[data-command]');
-            if (button && !button.disabled) this.controller.send({ type: button.dataset.command });
+            if (button && !button.disabled) this.send({ type: button.dataset.command });
         });
         // 港のカード：取れるなら取る（押すと説明が出て、そこで取る）
         $('#harbor').addEventListener('click', (event) => {
@@ -146,9 +153,32 @@ export default class UI {
             if (!button || button.disabled) return;
             $('#card-detail').close();
             const card = Number(button.dataset.card);
-            if (button.dataset.action === 'take') this.controller.send({ type: 'take', card });
-            if (button.dataset.action === 'claim') this.controller.send({ type: 'claim', card });
+            if (button.dataset.action === 'take') this.send({ type: 'take', card });
+            if (button.dataset.action === 'claim') this.send({ type: 'claim', card });
         });
+    }
+
+    send(command) {
+        this.sending = true;
+        const ok = this.controller.send(command);
+        this.sending = false;
+        if (ok && this.view.phase !== 'end') {
+            music.play(command.type === 'take' ? (CARDS[command.card].kind === 'ship' ? 'gain' : 'pay') : COMMAND_SOUND[command.type] ?? 'place');
+        }
+        return ok;
+    }
+
+    // 1回の更新に1つの音。自分の操作の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const v = this.view;
+        if (!previous) return;
+        if (v.phase === 'end') {
+            if (previous.phase !== 'end') music.play(!v.winners.includes(v.you) ? 'lose' : v.winners.length > 1 ? 'notify' : 'win');
+            return;
+        }
+        if (this.sending) return;
+        const mine = v.actors.includes(v.you);
+        music.play(mine && !previous.actors.includes(v.you) ? 'turn' : 'notify');
     }
 
     renderSetup() {
@@ -186,6 +216,7 @@ export default class UI {
         this.renderMe();
         this.renderActions();
         this.playEvents(previous);
+        this.playUpdateSound(previous);
         if ($('#card-detail').open) $('#card-detail').close();
         if ($('#player-detail').open) this.openPlayer(Number($('#player-detail').dataset.seat));
         this.maybeResult();
@@ -285,6 +316,7 @@ export default class UI {
         const command = this.controller?.suggest();
         if (!command) return;
         this.hint = { at: this.hintKey(), command };
+        music.play('select');
         this.renderHint();
     }
 
