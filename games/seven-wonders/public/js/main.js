@@ -9,6 +9,7 @@ import { producersOf, sellableOf, stagesOf, scienceOf } from './city.js';
 import { res, coin, shield, vp, sci, costHtml, effectHtml, chainHtml, stageHtml, COLOR_HEX } from './card-text.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
+import { music } from './music.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'sevenwonders.settings.v1', save: 'sevenwonders.save.v1' };
@@ -40,6 +41,7 @@ let seenSeq = 0;
 let ui = { card: null, buildPay: 0, wonderPay: 0, key: null };
 let revealTimer = null;
 let resultPending = false;
+let lastAction = null; // 自分が最後に選んだ手（効果音を選ぶ）
 
 const nameOf = seat => (seat === view.seat ? 'あなた' : view.players[seat].name);
 const wonderName = city => WONDER_BY_KEY[city.wonder].name;
@@ -123,13 +125,29 @@ function onUpdate() {
     seenSeq = view.eventSeq;
     const reveals = fresh.filter(e => e.type === 'reveal' || e.type === 'discardBuild' || e.type === 'military');
     if (fresh.some(e => e.type === 'end')) resultPending = true;
+    playSound(fresh);
     if (reveals.length) showReveal(reveals);
     else if (resultPending && !$('reveal-dialog').open) showResult();
     saveProgress();
     render();
 }
 
+// 新しい出来事から効果音を1つ鳴らす。自分の手はその音、全員の手が開いて次を選べるようになったら turn、終わりは勝ち負け
+function playSound(fresh) {
+    if (fresh.length === 0) return;
+    if (fresh.some(e => e.type === 'end')) {
+        const first = view.ranking.filter(r => r.rank === 1).map(r => r.seat);
+        return music.play(first.includes(view.seat) ? 'win' : 'lose');
+    }
+    if (fresh.some(e => e.type === 'age')) return music.play('shuffle');
+    const mine = fresh.find(e => (e.type === 'chosen' || e.type === 'discardBuild') && e.seat === view.seat);
+    if (mine?.type === 'discardBuild') return music.play('place');
+    if (mine) return music.play(lastAction === 'discard' ? 'gain' : 'place');
+    if (fresh.some(e => e.type === 'reveal')) music.play(view.handOptions ? 'turn' : 'notify');
+}
+
 function onError(message) {
+    music.play('error');
     $('action').querySelector('.prompt')?.replaceChildren(document.createTextNode(message));
 }
 
@@ -144,6 +162,7 @@ function optionOf(card) {
 function selectCard(card) {
     if (!choosing()) return;
     ui.card = ui.card === card ? null : card;
+    music.play(ui.card === null ? 'cancel' : 'select');
     ui.buildPay = 0;
     ui.wonderPay = 0;
     render();
@@ -162,6 +181,7 @@ function play(action) {
         command = { type: 'play', card: ui.card, action: 'build', pay: choice.pay, free: choice.free };
     }
     ui.card = null;
+    lastAction = action;
     controller.send(command);
 }
 

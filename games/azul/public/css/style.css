@@ -700,9 +700,9 @@ body.landscape #my-board { grid-column: 2; grid-row: 1 / span 2; align-self: cen
 
 /* BGM の ON/OFF（js/music.js）。タイトルでは遊び方の左に置く */
 .title-bgm { position: absolute; top: 8px; right: 52px; }
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+.sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }
 
 /* ヒント・記録 */
 .toast-note { margin: 0; font-weight: 800; font-size: 14px; }

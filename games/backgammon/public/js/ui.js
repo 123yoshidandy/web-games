@@ -10,6 +10,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { createBoard, legalPlays, nextSteps, playSteps, applyStep, diceList, KIND_NAMES } from './rules.js';
 import { MATCH_LENGTHS } from './game.js';
 import * as art from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'backgammon.settings';
 const STEP_MS = 340;
@@ -166,7 +167,10 @@ export default class UI {
         this.controller?.stop();
         this.controller = new LocalGameController(setup, {
             onUpdate: () => this.update(),
-            onError: (message) => this.toast(message),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
             isBusy: () => this.animating
         });
         const view = this.controller.getView();
@@ -220,6 +224,7 @@ export default class UI {
     async playEvent(e) {
         const me = this.seat;
         const shown = this.shown;
+        this.playSound(e);
         switch (e.type) {
         case 'newGame':
             shown.board = createBoard();
@@ -279,6 +284,17 @@ export default class UI {
         default:
             break;
         }
+    }
+
+    // 効果音：出来事ごとに1つ。自分のロールはさいころ、相手の手は自分の番か知らせ、ゲームの終わりは勝ち・負け
+    // 自分の駒の移動は、手元で動かしたときに鳴らす（onPoint）
+    playSound(e) {
+        const me = this.seat;
+        const next = () => (this.queue.length === 0 && this.view.current === me && !this.view.result ? 'turn' : 'notify');
+        if (e.type === 'gameEnd') music.play(e.winner === me ? 'win' : 'lose');
+        else if (e.type === 'opening' || (e.type === 'roll' && e.seat === me)) music.play('dice');
+        else if (e.type === 'noMove') music.play(e.seat === me ? 'notify' : next());
+        else if (['play', 'double', 'take', 'drop'].includes(e.type) && e.seat !== me) music.play(next());
     }
 
     afterMoves(before, owner, moves) {
@@ -504,6 +520,14 @@ export default class UI {
         if (this.selected !== null && this.dests?.has(p)) {
             const steps = this.dests.get(p);
             this.selected = null;
+            let board = this.currentBoard();
+            let hit = false;
+            for (const [from, die] of steps) {
+                const step = applyStep(board, this.seat, from, die);
+                hit ||= step.hit;
+                board = step.board;
+            }
+            music.play(hit ? 'capture' : 'place');
             this.animating = true;
             this.renderActions();
             try {
@@ -518,7 +542,10 @@ export default class UI {
             return;
         }
         const sources = new Set(this.nextList().map(x => x.from));
+        const was = this.selected;
         this.selected = sources.has(p) && this.selected !== p ? p : null;
+        if (this.selected !== null) music.play('select');
+        else if (was !== null) music.play('cancel');
         this.afterLocalChange();
     }
 
@@ -533,6 +560,7 @@ export default class UI {
         const c = this.controller;
         if (!c) return;
         if (action === 'undo' && this.turn?.steps.length) {
+            music.play('cancel');
             this.turn.steps.pop();
             this.selected = null;
             this.afterLocalChange();

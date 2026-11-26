@@ -7,6 +7,7 @@ import LocalGameController from './game-controller.js';
 import { canPlaceInLine, wallColor, FLOOR_PENALTIES, FIRST, BONUS, COLOR_NAMES } from './game.js';
 import { measureBefore, playMove } from './motion.js';
 import * as storage from './storage.js';
+import { music } from './music.js';
 
 const CPU_NAMES = ['ルシア', 'マテウス', 'イネス'];
 const HUMAN_NAME = 'あなた';
@@ -57,7 +58,10 @@ function startGame(setup) {
     $('#result-dialog').open && $('#result-dialog').close();
     app.controller = new LocalGameController(setup, {
         onUpdate: () => update(),
-        onError: () => update()
+        onError: () => {
+            music.play('error');
+            update();
+        }
     });
     showScene('game');
     update();
@@ -99,8 +103,23 @@ function update() {
     app.view = view;
     render(view);
     if (moved) playMove(view.lastMove, before, view.viewer);
+    if (previous) playSounds(previous, view, moved);
     if (view.phase === 'end' && previous && previous.phase !== 'end') {
         setTimeout(() => showResult(), 1400);
+    }
+}
+
+// 効果音：1回の更新に1つだけ鳴らす。終局は勝ち・負け、ラウンドの得点は得た音か知らせ、
+// 自分の手は置いた音、ほかの人の手のあとは自分の番か知らせ
+function playSounds(previous, view, moved) {
+    if (view.phase === 'end' && previous.phase !== 'end') {
+        music.play(view.result?.winners.includes(view.viewer) ? 'win' : 'lose');
+    } else if (view.lastReport && previous.lastReport?.round !== view.lastReport.round) {
+        const mine = view.lastReport.players.find(entry => entry.seat === view.viewer);
+        music.play(mine?.gained ? 'gain' : 'notify');
+    } else if (moved) {
+        if (view.lastMove.seat === view.viewer) music.play('place');
+        else music.play(view.phase === 'offer' && view.current === view.viewer ? 'turn' : 'notify');
     }
 }
 
@@ -285,6 +304,7 @@ function onPlayClick(event) {
         const color = Number(pick.dataset.color);
         const same = app.selection && app.selection.source === source && app.selection.color === color;
         app.selection = same ? null : { source, color };
+        music.play(same ? 'cancel' : 'select');
         app.hint = null;
         render(view);
         return;
@@ -293,7 +313,10 @@ function onPlayClick(event) {
     if (target && app.selection) {
         const line = target.dataset.line === 'floor' ? 'floor' : Number(target.dataset.line);
         const me = view.players[view.viewer];
-        if (line !== 'floor' && !canPlaceInLine(me, line, app.selection.color)) return;
+        if (line !== 'floor' && !canPlaceInLine(me, line, app.selection.color)) {
+            music.play('error');
+            return;
+        }
         app.controller.send({ type: 'take', source: app.selection.source, color: app.selection.color, line });
     }
 }

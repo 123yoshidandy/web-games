@@ -8,6 +8,7 @@ import { CARDS, POKEMON, ROLES, STATUSES, TYPES, ABILITIES, WEATHERS } from './d
 import { spritesMarkup, icon, cardArt, monArt, titleArt } from './art.js';
 import { helpMarkup } from './help.js';
 import { createSeed } from './random.js';
+import { music } from './music.js';
 
 const $ = id => document.getElementById(id);
 const SETTINGS_KEY = 'omaroke.settings.v1';
@@ -33,6 +34,7 @@ let view = null;
 let prevView = null;
 let ui = freshUi();
 let resultTimer = null;
+let sending = false; // 自分の操作を送っている間（その音は送った側で鳴らす）
 
 function freshUi() {
     return { key: null, card: null, band: false, picks: [], choose: [] };
@@ -103,20 +105,36 @@ function onUpdate() {
     prevView = view;
     view = controller.getView();
     render();
+    playUpdateSound();
     if (view.phase === 'end' && prevView?.phase !== 'end') {
         clearTimeout(resultTimer);
         resultTimer = setTimeout(showResult, RESULT_DELAY_MS);
     }
 }
 
+// 1回の更新に1つの音。相手の手は知らせ、自分の番になったらチャイム、終わったら勝ち負け
+function playUpdateSound() {
+    if (view.phase === 'end') {
+        if (prevView?.phase !== 'end') music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+        return;
+    }
+    if (sending) return;
+    if (view.myAction && !prevView?.myAction) music.play('turn');
+    else music.play('notify');
+}
+
 function onError(message) {
+    music.play('error');
     const prompt = $('action').querySelector('.prompt');
     if (prompt) prompt.textContent = message;
 }
 
 function send(command) {
     ui = { ...freshUi(), key: ui.key };
-    controller.send(command);
+    sending = true;
+    const ok = controller.send(command);
+    sending = false;
+    if (ok && view.phase !== 'end') music.play(command.type === 'play' || command.type === 'band' ? 'place' : 'select');
 }
 
 // ---------- 選ぶ操作 ----------
@@ -141,12 +159,14 @@ function selectCard(id) {
     }
     ui.card = ui.card === id ? null : id;
     ui.picks = [];
+    music.play(ui.card === null ? 'cancel' : 'select');
     render();
 }
 
 function togglePick(id, max) {
     if (ui.picks.includes(id)) ui.picks = ui.picks.filter(x => x !== id);
     else if (ui.picks.length < max) ui.picks = [...ui.picks, id];
+    music.play('select');
     render();
 }
 
@@ -163,6 +183,7 @@ function selectSeat(seat) {
     const card = cardInHand(ui.card);
     if (card.key === 'zapdos') {
         ui.picks = ui.picks.includes(seat) ? ui.picks.filter(x => x !== seat) : [...ui.picks, seat].slice(-2);
+        music.play('select');
         render();
         return;
     }
@@ -207,6 +228,7 @@ function showHint() {
     if (c.type === 'band') ui = { ...ui, band: true, picks: [...c.discards] };
     if (c.type === 'respond' && c.discards) ui.picks = [...c.discards];
     hint = { key: ui.key, command: c };
+    music.play('select');
     render();
 }
 
@@ -233,7 +255,7 @@ function act(name) {
     const pr = view.prompt;
     switch (name) {
         case 'use': useCard(); break;
-        case 'cancel': ui = { ...freshUi(), key: ui.key }; render(); break;
+        case 'cancel': ui = { ...freshUi(), key: ui.key }; music.play('cancel'); render(); break;
         case 'band': ui = { ...freshUi(), key: ui.key, band: true }; render(); break;
         case 'switch': send({ type: 'switch' }); break;
         case 'end': send({ type: 'end' }); break;
@@ -520,6 +542,7 @@ function toggleOffer(id) {
     if (ui.choose.includes(id)) ui.choose = ui.choose.filter(x => x !== id);
     else if (view.pick === 1) ui.choose = [id];
     else if (ui.choose.length < view.pick) ui.choose = [...ui.choose, id];
+    music.play('select');
     render();
 }
 
