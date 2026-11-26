@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1f2a1f">
+    <title>テラミスティカ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="テラミスティカ">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen">
+            <div class="title-inner">
+                <div class="title-art" id="title-art" aria-hidden="true"></div>
+                <h1 class="logo">Terra Mystica</h1>
+                <p class="subtitle">テラミスティカ</p>
+                <div class="setup">
+                    <div class="row"><span class="row-label">人数</span>
+                        <div class="stepper">
+                            <button id="count-down" class="step-btn" aria-label="減らす">−</button>
+                            <span id="count-value" class="count-value"></span>
+                            <button id="count-up" class="step-btn" aria-label="増やす">＋</button>
+                        </div>
+                    </div>
+                    <div class="row"><span class="row-label">CPU</span>
+                        <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ"></div>
+                    </div>
+                    <div class="faction-pick">
+                        <div class="pick-head"><span>あなたの勢力</span><span id="faction-note" class="muted"></span></div>
+                        <div id="factions" class="faction-grid"></div>
+                    </div>
+                    <div class="buttons">
+                        <button id="start" class="btn primary">ゲーム開始</button>
+                        <button id="resume" class="btn secondary" hidden>続きから</button>
+                    </div>
+                    <div class="title-links">
+                        <button id="open-help-title" class="link">遊び方</button>
+                        <button type="button" class="link bgm-toggle" aria-pressed="true">BGM</button>
+                        <a class="link portal-link" href="../">← ゲーム一覧</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen" hidden>
+            <div class="topbar">
+                <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <button id="round-info" class="round-info" aria-label="得点タイル"></button>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14M5 10h14M5 15h9M5 20h6"/></svg>
+                </button>
+                <button type="button" class="icon-btn bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
+                <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
+                </button>
+            </div>
+            <div id="players" class="players"></div>
+            <div id="board" class="board">
+                <div class="zoom-btns">
+                    <button id="zoom-in" class="zoom-btn" aria-label="拡大">＋</button>
+                    <button id="zoom-out" class="zoom-btn" aria-label="縮小">−</button>
+                </div>
+            </div>
+            <div id="status" class="status"><span id="status-text" class="status-text"></span><span id="status-buttons" class="status-buttons"></span></div>
+            <div id="me" class="me"></div>
+            <div id="actions" class="actions">
+                <button class="act" data-panel="power"><span class="act-ico" data-ico="power"></span>魔力</button>
+                <button class="act" data-panel="cult"><span class="act-ico" data-ico="cult"></span>宗教</button>
+                <button class="act" data-panel="upgrade"><span class="act-ico" data-ico="upgrade"></span>改良</button>
+                <button class="act" data-panel="convert"><span class="act-ico" data-ico="convert"></span>交換</button>
+                <button class="act" data-panel="info"><span class="act-ico" data-ico="info"></span>情報</button>
+                <button class="act pass" data-panel="pass"><span class="act-ico" data-ico="pass"></span>パス</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 選択・行動・情報のシート（中身は画面が作る） -->
+    <dialog id="sheet" class="sheet">
+        <h2 id="sheet-title" tabindex="-1" autofocus></h2>
+        <div id="sheet-body" class="sheet-body"></div>
+        <div id="sheet-buttons" class="buttons"></div>
+    </dialog>
+
+    <!-- 最後の結果 -->
+    <dialog id="result" class="sheet">
+        <h2 id="result-title" tabindex="-1" autofocus></h2>
+        <div id="result-body" class="sheet-body"></div>
+        <div class="buttons">
+            <button id="again" class="btn primary">もう一度</button>
+            <button id="result-board" class="btn secondary">盤面を見る</button>
+        </div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="help-body">
+            <h2 tabindex="-1" autofocus>遊び方</h2>
+            <h3>目的</h3>
+            <p>14の勢力の1つになり、自分の地形を広げて建物を建てます。6ラウンドのあと、<strong>勝利点</strong>がいちばん多い人の勝ちです。勢力ごとに住める地形（色）が決まっています。</p>
+            <h3>ラウンドの流れ</h3>
+            <p>ラウンドの始めに、建物・恩恵タイル・ボーナスカードの<strong>収入</strong>が入ります。そのあと、手番の順に1つずつ行動し、パスするまで続けます。最初にパスした人が、次のラウンドの先手です。</p>
+            <h3>行動（どれか1つ）</h3>
+            <p><strong>変換と建設</strong>：自分の建物の隣（航海で川の向こうも）の土地を、鋤で自分の地形に変え、住居を建てます。地形は輪の順に並んでいて、1つ離れるごとに鋤が1つ要ります。<span id="help-wheel"></span></p>
+            <p><strong>改良</strong>：住居→交易所→寺院か要塞、寺院→聖域。寺院と聖域では<strong>恩恵タイル</strong>をもらえます。要塞は勢力ごとの強い力が使えるようになります。交易所は、隣にほかの人の建物があるとコインが半分で済みます。</p>
+            <p><strong>航海・鋤の改良</strong>：航海で川を渡って建てられる距離が伸び、鋤の改良で鋤が安くなります。</p>
+            <p><strong>司祭を送る</strong>：宗教の段（火・水・土・風）を進めます。置き場に置くと3つか2つ進み、司祭は戻りません。</p>
+            <p><strong>魔力アクション</strong>：3つ目の器の魔力を使って、橋・司祭・職人・コイン・鋤をもらいます（ラウンドに1回ずつ、早い者勝ち）。</p>
+            <p><strong>特別な行動・パス</strong>：ボーナスカード・恩恵タイル・要塞の行動。パスのときは、次のラウンドのボーナスカードに取り替えます。</p>
+            <h3>魔力</h3>
+            <p>魔力は3つの器を回ります。もらうと1つ目→2つ目、2つ目→3つ目へ動き、使うと3つ目から1つ目へ戻ります。2つ目の器の2つを捨てて1つを3つ目へ送る（燃やす）こともできます。</p>
+            <p>ほかの人が<strong>隣に建てる</strong>と、隣の自分の建物の分だけ魔力をもらえます（住居1・交易所と寺院2・要塞と聖域3）。もらう魔力より1少ない勝利点を払います。</p>
+            <h3>町</h3>
+            <p>つながった自分の建物が4つ以上（聖域は2つ分）で、建物の魔力の合計が7以上になると<strong>町</strong>になり、町タイル（勝利点など）と鍵をもらいます。宗教の段の10には鍵が要ります。</p>
+            <h3>得点</h3>
+            <p>ラウンドごとの<strong>得点タイル</strong>に合う行動で勝利点。ラウンドの終わりには、宗教の段に応じたボーナスもあります。最後に、一番大きな建物のつながり（18・12・6点）と、宗教の段の順位（各段 8・4・2点）、残りの資源（3コインで1点）を数えます。</p>
+            <h3>操作</h3>
+            <p>地図は2本指やボタンで拡大・移動できます。土地をタップすると、そこでできることが出ます。光っている土地は選べる土地です。下のボタンから魔力アクション・宗教・改良・交換・情報・パスを選びます。</p>
+            <h3>この版で決めたこと</h3>
+            <p>地形の変換は、自分の地形に近づける向きだけにしています。人魚の町は、川1マスをはさんだ自分の建物どうしを自動でつながっているとみなします。魔力のもらいは、建てた手番の直後に順に決めます。</p>
+        </div>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

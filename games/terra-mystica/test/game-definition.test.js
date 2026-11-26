@@ -1,0 +1,71 @@
+import { describe, it, expect } from 'vitest';
+import definition from '../server/src/game-definition.js';
+import { createRandom } from '../public/js/random.js';
+import { snapshot } from './helpers.js';
+
+// netplay-kit が行う流れ（create → 操作 → persist → restore）を、共通部品なしでなぞる
+const ctxFor = (game, seat, command) => {
+    const ctx = { game, seat, message: { command }, rejected: null, ignored: false };
+    ctx.reject = (reason) => { ctx.rejected = reason; };
+    ctx.ignore = () => { ctx.ignored = true; };
+    return ctx;
+};
+
+describe('オンライン対戦のゲームの定義', () => {
+    const create = () => definition.create({ players: [{ name: 'A' }, { name: 'B' }, { name: 'C', isCPU: true }], random: createRandom(5) });
+
+    it('操作を受け付け、記録から同じ状態を再現できる。余計な項目は記録しない', () => {
+        const game = create();
+        while (definition.cpu.needsStep(game)) definition.cpu.step(game);
+        const seat = game.actors()[0];
+        const w = game.waiting();
+        expect(w.kind).toBe('place');
+        const hex = game.state.hexes.findIndex((h, id) => game.checkDwelling(seat, id, { free: true, needReach: false }).ok);
+        const ctx = ctxFor(game, seat, { type: 'place', hex, extra: 'x'.repeat(100) });
+        definition.actions.command(ctx);
+        expect(ctx.rejected).toBe(null);
+        expect(game.commands.at(-1).command).toEqual({ type: 'place', hex });
+        const saved = JSON.parse(JSON.stringify(definition.persist(game)));
+        expect(snapshot(definition.restore(saved))).toBe(snapshot(game));
+    });
+
+    it('手番でない人の操作と知らない種類は断り、状態を変えない', () => {
+        const game = create();
+        while (definition.cpu.needsStep(game)) definition.cpu.step(game);
+        const before = snapshot(game);
+        const seat = game.actors()[0];
+        const other = game.players.find(p => p.id !== seat && !p.isCPU).id;
+        [[other, { type: 'place', hex: 0 }], [seat, { type: 'proxy' }], [seat, null], [seat, 'pass']].forEach(([s, command]) => {
+            const ctx = ctxFor(game, s, command);
+            definition.actions.command(ctx);
+            expect(ctx.rejected).toBeTruthy();
+        });
+        expect(snapshot(game)).toBe(before);
+    });
+
+    it('ビューは JSON にでき、見る人の席と待っているものが入る', () => {
+        const game = create();
+        const view = JSON.parse(JSON.stringify(definition.view(game, 0, {})));
+        expect(view.you).toBe(0);
+        expect(view.state.players).toHaveLength(3);
+        expect(view.waiting.kind).toBe('place');
+        expect(definition.spectatorView(game, {}).you).toBe(null);
+    });
+
+    it('全員 CPU なら最後まで進む', () => {
+        const game = create();
+        game.players.forEach(p => { p.isCPU = true; });
+        let steps = 0;
+        while (!definition.isOver(game) && definition.cpu.needsStep(game) && steps++ < 4000) definition.cpu.step(game);
+        expect(definition.isOver(game)).toBe(true);
+    });
+
+    it('対戦中に部屋を出た人の席は CPU が続ける', () => {
+        const game = create();
+        definition.onPlayerGone(ctxFor(game, null, null), { seat: 0, reason: 'left' });
+        expect(game.players[0].isCPU).toBe(true);
+        const ctx = ctxFor(game, null, null);
+        definition.onPlayerGone(ctx, { seat: 1, reason: 'disconnected' });
+        expect(ctx.ignored).toBe(true);
+    });
+});
