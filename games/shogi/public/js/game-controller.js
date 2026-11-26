@@ -10,7 +10,7 @@ import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
-const CPU_MOVE_MS = 450;    // 前の手が見えるように、少し待ってから考える
+export const CPU_MOVE_MS = 450;    // 前の手が見えるように、少し待ってから考える
 const SAVE_KEY = 'shogi.save';
 
 export function loadSavedGame() {

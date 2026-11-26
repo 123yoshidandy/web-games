@@ -111,7 +111,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .subtitle { margin: -2px 0 10px; color: var(--muted); font-size: 14px; letter-spacing: .3em; text-indent: .3em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .setup .off { visibility: hidden; }
-.setup .buttons { display: flex; gap: 12px; margin-top: 4px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 4px; }
 
 /* ---- 対局の画面 ---- */
 

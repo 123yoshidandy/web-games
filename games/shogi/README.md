@@ -127,4 +127,10 @@ node scripts/cpu-match.mjs 20 strong normal      # CPU どうしの勝率と1手
 
 ### オンライン対戦
 
-まだ入れていない。入れるときは、netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者と操作の記録だけを保存し、操作のたびに記録から再現する。部屋の CPU は「ふつう」。対局中に部屋を出た人の席は、CPU が代わりに続ける。投了は手番でなくてもできる。待ったは入れない。
+netplay-kit の「サーバーがゲームを進める型」。2人で、相手がいなければ CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'shogi' })`。web-games の1つのスタックから `?game=shogi` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
