@@ -91,6 +91,16 @@ CPU は自分の席のビュー（盤と手番。リバーシに隠す情報は�
 
 CPU は、前の手で石が返る動きが見えるように、0.7秒おいてから考え始める。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2人で、足りない席は CPU で埋められる。オンラインでは「一手戻す」も使わない。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'reversi' })`。web-games の1つのスタックから `?game=reversi` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 素の HTML / CSS / JavaScript（ES Modules）。ビルドはない。
@@ -117,6 +127,7 @@ GitHub Pages では、リポジトリのルートの `index.html` が `public/` 
 | `public/js/ui.js`・`art.js` | 画面と絵 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（自分のファイルはネットワークを先に、字体はキャッシュを先に使う） |
 | `server/src/game-definition.js` | オンライン対戦の「ゲームの定義」（netplay-kit の形） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU どうしの対戦と勝率・1手の時間 |
 
 ### テスト
@@ -128,6 +139,3 @@ GitHub Pages では、リポジトリのルートの `index.html` が `public/` 
 - `game-definition.test.js`：オンライン対戦の定義（受け付け・断る・再現・CPU の代行）とビュー
 - `pwa.test.js`・`offline.test.js`：PWA のファイルとアイコン、オフラインでの起動（service worker をキャッシュとネットワークを差し替えて動かす）
 
-### オンライン対戦
-
-まだ入れていない。入れるときは、netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者と操作の記録だけを保存し、操作のたびに記録から再現する。部屋の CPU は「ふつう」。対戦中に部屋を出た人の席は、CPU が代わりに続ける。待ったは入れない。

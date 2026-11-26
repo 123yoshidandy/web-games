@@ -11,6 +11,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, stoneSvg, COLOR_NAME } from './art.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const SETTINGS_KEY = 'reversi.settings';
 const RESULT_DELAY_MS = 1100;
@@ -52,6 +54,23 @@ export default class UI {
         this.resultTimer = null;
         this.resultShown = false;
         $('#symbols').innerHTML = symbolsSvg();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。2人で、足りない席は CPU
+        this.online = new NetplayLobby({
+            title: 'リバーシ',
+            game: 'reversi',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 700,
+            minPlayers: 2,
+            maxPlayers: 2,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.onControllerUpdate(),
+            onError: (message) => this.onControllerError(message),
+            onExit: () => {
+                this.stopGame();
+                this.showTitle();
+            }
+        });
         this.bindStatic();
         this.renderTitleArt();
         this.renderHelp();
@@ -64,22 +83,16 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
-                onUpdate: () => {
-                    // ヒントを出している間は、今の場面のおすすめに出し直す
-                    if (this.hintSq !== null) this.hintSq = this.controller.hint()?.sq ?? null;
-                    this.render();
-                },
-                onError: (message) => {
-                    music.play('error');
-                    this.toast(message);
-                }
+            controller = new LocalGameController(setup, {
+                onUpdate: () => this.onControllerUpdate(),
+                onError: (message) => this.onControllerError(message)
             });
         } catch (error) {
             console.error(error);
@@ -87,6 +100,34 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+        controller.scheduleCpu();
+    }
+
+    onControllerUpdate() {
+        // ヒントを出している間は、今の場面のおすすめに出し直す
+        if (this.hintSq !== null) this.hintSq = this.controller.hint()?.sq ?? null;
+        this.render();
+    }
+
+    onControllerError(message) {
+        music.play('error');
+        this.toast(message);
+    }
+
+    // 同じ端末で2人が交代で打つ遊び方か（オンラインは、それぞれの端末で自分の席だけを打つ）
+    hotseat(view) {
+        return !this.controller?.isOnline && view.players.every(p => !p.isCPU);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        this.hintSq = null;
+        clearTimeout(this.resultTimer);
+        this.resultTimer = null;
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
         this.view = null;
         this.anim = null;
         this.resultShown = false;
@@ -94,7 +135,6 @@ export default class UI {
         $('#screen-game').hidden = false;
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         this.render();
-        this.controller.scheduleCpu();
     }
 
     newGame() {
@@ -131,9 +171,18 @@ export default class UI {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
+        $('#again').addEventListener('click', () => {
+            if (this.controller?.isOnline) {
+                $('#result').close();
+                this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+                return;
+            }
+            this.newGame();
+        });
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#result-board').addEventListener('click', () => $('#result').close());
-        $('#home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
         $('#undo').addEventListener('click', () => this.undo());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
@@ -219,6 +268,9 @@ export default class UI {
         this.renderPlayers(view);
         this.renderBoard(view);
         $('#undo').disabled = !view.canUndo;
+        // ヒントと「一手戻す」はローカル対戦だけ
+        $('#undo').hidden = Boolean(this.controller.isOnline);
+        $('#hint').hidden = Boolean(this.controller.isOnline);
         if (!view.over) this.resultShown = false;
         if (view.over && !$('#result').open && !this.resultTimer && !this.resultShown) {
             this.resultTimer = setTimeout(() => {
@@ -235,8 +287,8 @@ export default class UI {
 
     renderPlayers(view) {
         const counts = [view.counts.black, view.counts.white];
-        // 名前は CPU 戦（あなた／CPU）のときだけ出す。2人で遊ぶときは石の色で分かる
-        const named = view.players.some(p => p.isCPU);
+        // 名前は CPU 戦（あなた／CPU）とオンライン対戦のときに出す。同じ端末で2人で遊ぶときは石の色で分かる
+        const named = view.players.some(p => p.isCPU) || Boolean(this.controller?.isOnline);
         $('#players').innerHTML = [0, 1].map(seat => {
             const active = !view.over && view.current === seat;
             const thinking = active && view.players[seat].isCPU;
@@ -286,7 +338,7 @@ export default class UI {
         if (!prev || !fresh.length) return;
         const move = [...fresh].reverse().find(e => e.type === 'move');
         // 音：終わったら勝ち負け、自分の手は石を返す音、CPU の手のあとは自分の番（2人で遊ぶときは、どちらの手も自分の手）
-        const twoPlayers = view.players.every(p => !p.isCPU);
+        const twoPlayers = this.hotseat(view);
         if (view.over && !prev.over) music.play(view.winner === null ? 'notify' : twoPlayers || view.winner === view.you ? 'win' : 'lose');
         else if (move && (twoPlayers || move.seat === view.you)) music.play('capture');
         else if (move) music.play(this.myTurn() ? 'turn' : 'notify');
@@ -307,10 +359,10 @@ export default class UI {
         const v = this.view;
         if (!v || !v.over) return;
         this.resultShown = true;
-        const twoPlayers = v.players.every(p => !p.isCPU);
+        const twoPlayers = this.hotseat(v);
         const title = v.winner === null ? '引き分け'
             : twoPlayers ? `${COLOR_NAME[colorOf(v.winner)]}の勝ち`
-                : v.winner === v.you ? 'あなたの勝ち' : 'CPU の勝ち';
+                : v.winner === v.you ? 'あなたの勝ち' : this.controller?.isOnline ? `${this.nameOf(v.winner)}の勝ち` : 'CPU の勝ち';
         $('#result-title').textContent = title;
         const { black, white, empty } = v.counts;
         $('#result-text').innerHTML = `<span class="score">${stoneSvg(1)}${black}</span><span class="score">${stoneSvg(2)}${white}</span>${empty ? `<small>空き ${empty}</small>` : ''}`;
