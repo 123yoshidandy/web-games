@@ -9,5 +9,15 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Mr. Jack Pocket",
+    "genres": [
+      "ボードゲーム",
+      "正体隠し・ブラフ"
+    ],
+    "players": [
+      2
+    ]
   }
 }

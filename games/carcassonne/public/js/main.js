@@ -230,7 +230,8 @@ function confirm() {
         const options = placementOf(ui.tentative)?.meeples ?? [];
         if (options.length > 0) {
             ui.step = 'meeple';
-            ui.meeple = null;
+            const h = ui.hint;
+            ui.meeple = h && h.x === ui.tentative.x && h.y === ui.tentative.y && h.rot === ui.tentative.rot ? h.meeple : null;
             render();
             return;
         }
@@ -267,6 +268,22 @@ function render() {
     renderPlayers();
     renderBoard();
     renderPanel();
+    const t = ui.tentative;
+    const h = ui.hint;
+    $('confirm').classList.toggle('recommended', !!(myTurn() && h && t && h.x === t.x && h.y === t.y && h.rot === t.rot && (ui.step === 'place' || ui.meeple === h.meeple)));
+}
+
+// ヒント：CPU（ふつう）が選ぶ場所と向きに仮置きし、コマの場所も選んでおく
+function showHint() {
+    const command = myTurn() ? controller?.hint() : null;
+    if (!command) return showToast('自分の番になったら、おすすめを出せます');
+    ui.step = 'place';
+    ui.meeple = null;
+    ui.tentative = { x: command.x, y: command.y, rot: command.rot };
+    ui.previewRot = command.rot;
+    ui.hint = command;
+    render();
+    showToast(command.meeple === null ? 'おすすめ：この場所と向きで置く（コマは置かない）' : 'おすすめ：この場所と向きで置き、コマも置く');
 }
 
 function renderPlayers() {
@@ -429,6 +446,7 @@ function setup() {
     $('home').addEventListener('click', goHome);
     $('fit').addEventListener('click', () => boardView.fit(true));
     $('rotate').addEventListener('click', rotate);
+    $('hint').addEventListener('click', showHint);
     $('tile-preview').addEventListener('click', rotate);
     $('confirm').addEventListener('click', confirm);
     $('back').addEventListener('click', back);

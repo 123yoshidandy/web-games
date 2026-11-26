@@ -164,7 +164,15 @@ function bestReply(s, seat) {
 
 // ---- 手を選ぶ（ビューだけを見る） ----
 
-export function chooseCommand(view, level = 'normal', rand = Math.random) {
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
+export function chooseCommand(view, level = 'normal', rand = viewRandom(view)) {
     const seat = view.you;
     if (view.phase === 'place') {
         if (!view.placeable.length) return null;

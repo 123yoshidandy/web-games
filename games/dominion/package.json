@@ -5,11 +5,28 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs",
     "build:server": "esbuild server/src/handler.js --bundle --platform=node --format=esm --target=node22 --external:@aws-sdk/* --outfile=server/dist/handler.mjs",
     "dev:server": "node server/dev-server.js",
     "deploy:server": "npm run build:server && cd server && sam deploy"
   },
   "dependencies": {
     "netplay-kit": "*"
+  },
+  "portal": {
+    "original": "Dominion",
+    "genres": [
+      "カードゲーム"
+    ],
+    "players": [
+      2,
+      3,
+      4
+    ]
+  },
+  "standards": {
+    "skip": {
+      "cpu-level": "CPU はカードごとに手で調整した動き方を1組だけ持ち、強さを変える仕組みがない"
+    }
   }
 }

@@ -83,6 +83,11 @@ export function decide(view, level = 'normal') {
     return move.promo ? { type: 'move', from: move.from, to: move.to, promo: move.promo } : { type: 'move', from: move.from, to: move.to };
 }
 
+// ヒント：自分の番に、CPU（ふつう）が選ぶ手（引き分けの提案への答えも含む）。手は打たない
+export function suggest(view) {
+    return decide(view, 'normal');
+}
+
 // CPU の番なら1手打つ（引き分けの提案への答えも含む）。打てたら true
 export function runCpuStep(game) {
     if (!isCpuTurn(game)) return false;

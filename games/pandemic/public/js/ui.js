@@ -15,6 +15,8 @@ import { HELP_HTML } from './help.js';
 const SETTINGS_KEY = 'pandemic.settings';
 const CPU_NAMES = ['ハル', 'ミナ', 'ソラ'];
 const ROLE = Object.fromEntries(ROLES.map(r => [r.key, r]));
+// ヒントが指す場面（手を打つと変わる）
+const hintKey = (v) => JSON.stringify([v.logTotal, v.phase, v.actionsLeft, v.current, v.players.map(p => `${p.city}:${p.hand.length}`)]);
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -186,6 +188,7 @@ export default class UI {
         $('player-deck').addEventListener('click', () => this.openPlayerDeck());
         $('infection-deck').addEventListener('click', () => this.openInfection());
         $('assist').addEventListener('click', () => this.controller?.assist());
+        $('hint').addEventListener('click', () => this.showHint());
         $('pick-cancel').addEventListener('click', () => this.setPick(null));
         $('map').addEventListener('click', event => {
             const g = event.target.closest('[data-city]');
@@ -224,6 +227,47 @@ export default class UI {
 
     send(seat, command) {
         return this.controller?.send(seat, command) ?? false;
+    }
+
+    // おすすめの手を、短い文で知らせ、行き先の都市・押すボタン・カードを光らせる（打つのは自分）
+    showHint() {
+        const v = this.view;
+        const h = this.controller?.suggest();
+        if (!v || !h) {
+            this.toast('今はおすすめの手がありません');
+            return;
+        }
+        this.hint = { at: hintKey(v), ...h };
+        this.toast(`おすすめ：${this.hintText(v, h.seat, h.command)}`);
+        this.render();
+    }
+
+    hintText(v, seat, c) {
+        const city = (id) => CITIES[id].name;
+        const name = v.players.length > 1 && seat !== v.current ? `${ROLE[v.players[seat].role].name}：` : '';
+        const text = {
+            drive: () => `${city(c.to)}へ移動`, direct: () => `直行便で${city(c.card)}へ`, charter: () => `チャーター便で${city(c.to)}へ`,
+            shuttle: () => `シャトル便で${city(c.to)}へ`, dispatch: () => `呼び寄せで${city(c.to)}へ`, opsmove: () => `研究所から${city(c.to)}へ`,
+            build: () => '研究所を建てる', treat: () => `${COLOR_NAMES[c.color]}を治療する`, give: () => `${cardName(c.card)}を渡す`,
+            take: () => `${cardName(c.card)}をもらう`, cure: () => '治療薬を作る', retrieve: () => `${cardName(c.card)}を取り戻す`,
+            pass: () => '手番を終える', draw: () => 'カードを引く', infect: () => '感染へ進む', intensify: () => '強化へ進む', continue: () => '先へ進む',
+            discard: () => `${cardName(c.card)}を捨てる`, forecast: () => '予測の順で戻す', event: () => `イベント「${eventOf(c.card).name}」を使う`
+        }[c.type];
+        return name + (text ? text() : c.type);
+    }
+
+    // ヒントの印（その手のあいだだけ）
+    markHint(v) {
+        if (this.hint && this.hint.at !== hintKey(v)) this.hint = null;
+        const c = this.hint?.command;
+        if (!c) return;
+        const mark = (el) => el?.classList.add('suggested');
+        if (c.to !== undefined && ['drive', 'charter', 'shuttle', 'dispatch', 'opsmove'].includes(c.type)) mark($('map').querySelector(`[data-city="${c.to}"]`));
+        if (c.type === 'direct') mark($('map').querySelector(`[data-city="${c.card}"]`));
+        const act = { build: 'build', treat: 'treat', give: 'share', take: 'share', cure: 'cure', pass: 'pass', retrieve: 'special', opsmove: 'special' }[c.type];
+        if (act) mark($('actions').querySelector(`[data-act="${act}"]`));
+        if (['draw', 'infect', 'intensify', 'continue'].includes(c.type)) mark($('step-btn'));
+        if (['discard', 'event'].includes(c.type)) mark($('hand').querySelector(`[data-card="${c.card}"]`));
     }
 
     can(seat) {
@@ -305,6 +349,7 @@ export default class UI {
         $('hand').innerHTML = handCards.join('') || '<span class="empty">手札なし</span>';
         $('hand').classList.toggle('over', fp.hand.length > HAND_LIMIT);
         this.renderActions(v);
+        this.markHint(v);
     }
 
     // 新しい出来事を、上の中央に数秒だけ出す（最後の3行）
@@ -351,6 +396,7 @@ export default class UI {
         });
         $('assist').hidden = !this.controller || v.result || !v.actors.some(s => this.can(s)) || (this.controller.mode === 'team' && v.actors.some(s => v.players[s].isCPU));
         $('assist').disabled = false;
+        $('hint').hidden = !this.controller || !!v.result;
         void me;
     }
 

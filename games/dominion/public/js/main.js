@@ -25,6 +25,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // UIコントローラーを初期化
     const uiController = new UIController(gameController);
+
+    // 動作確認用（ヘッドレス Chrome から状態を見る）
+    window.__app = { gameController, uiController };
     
     // 招待のURL（?room=部屋コード）で開いたら、オンライン対戦の参加画面を出す
     const roomCode = new URLSearchParams(location.search).get('room');

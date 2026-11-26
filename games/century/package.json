@@ -6,5 +6,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "portal": {
+    "original": "Century: Spice Road",
+    "genres": [
+      "カードゲーム"
+    ]
   }
 }

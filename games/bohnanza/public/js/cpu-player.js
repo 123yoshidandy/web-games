@@ -93,6 +93,12 @@ function waitingForPeople(view) {
         && view.players.some(p => p.id !== view.you && !p.isCPU && !view.passed.includes(p.id) && view.offersLeft[p.id] > 0);
 }
 
+// ヒント：自分が操作する番に、CPU（ふつう）が選ぶ操作。ビュー（自分に見えるもの）だけで決める
+export function suggest(view) {
+    if (!view?.actors?.includes(view.you)) return null;
+    return chooseCommand(view, 'normal');
+}
+
 export function chooseCommand(view, level = 'normal') {
     const ctx = { view, me: view.players[view.you], easy: level === 'easy', noise: (k) => hash(view.commandCount, view.turn, view.you, k) };
     // 上限に届いた畑は売る（ふつう）

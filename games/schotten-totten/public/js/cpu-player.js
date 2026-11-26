@@ -220,6 +220,12 @@ function chooseReturn(view, seat) {
     return [ranked[0].card, ranked[1].card];
 }
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || seat !== game.actor()) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 export function chooseCpuCommand(game, seat = game.actor(), profile = PROFILES.normal) {
     const view = createGameView(game, seat, { since: game.logs.length, events: false });
     const random = cpuRandom(game, seat);

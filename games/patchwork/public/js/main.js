@@ -23,6 +23,7 @@ const app = {
     controller: null,
     view: null,
     place: null, // { choice, orient, x, y }
+    hint: null, // ヒントで示している手 { count, command }（その手番の間だけ）
     settings: { level: 'normal', ...storage.load('settings', {}) }
 };
 
@@ -211,6 +212,9 @@ function render(view) {
     fitLayout(view);
     $('#status').textContent = statusText(view);
     $('#result-button').hidden = view.phase !== 'end';
+    $('#hint').disabled = !myTurn(view);
+    if (app.hint && app.hint.count !== view.commandCount) app.hint = null;
+    if ($('#log-dialog').open) renderLog(view);
     renderTimeBoard(view);
     renderOpponent(view);
     renderMarket(view);
@@ -277,6 +281,8 @@ function renderMe(view) {
         }
     }
     $('#quilt').innerHTML = quiltSvg(me, q, { ghost, cand, fresh, interactive: true });
+    const leather = hinted('leather');
+    if (leather) $(`#quilt rect.q-empty[data-x="${leather.x}"][data-y="${leather.y}"]`)?.classList.add('suggested');
     $('#right').classList.toggle('turn', myTurn(view));
 }
 
@@ -290,13 +296,13 @@ function renderControls(view) {
                     <svg class="line-icon" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg></button>
                 <button type="button" class="icon-btn tool" data-action="flip" aria-label="裏返す" title="裏返す">
                     <svg class="line-icon" viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M9 7 4 12l5 5z"/><path d="M15 7l5 5-5 5z"/></svg></button>
-                <button type="button" class="btn btn-primary" data-action="buy">置く</button>
+                <button type="button" class="btn btn-primary${buyHinted() ? ' suggested' : ''}" data-action="buy">置く</button>
                 <button type="button" class="icon-btn tool" data-action="cancel" aria-label="やめる" title="やめる">
                     <svg class="line-icon" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button>`;
         } else {
             const me = view.players[view.viewer];
             const gain = view.advanceTarget - me.position;
-            html = `<button type="button" class="btn btn-secondary" data-action="advance">進む<small>ボタン +${gain}</small></button>`;
+            html = `<button type="button" class="btn btn-secondary${hinted('advance') ? ' suggested' : ''}" data-action="advance">進む<small>ボタン +${gain}</small></button>`;
         }
     }
     $('#controls').innerHTML = html;
@@ -313,6 +319,35 @@ function statusText(view) {
     if (m.type === 'leather') text = `${name}：革のパッチを置いた`;
     if (m.leathers) text += '・革のパッチ';
     return text;
+}
+
+// ===== ヒント・履歴 =====
+
+// ヒントで示している手のうち、種類が合うもの
+const hinted = type => (app.hint?.count === app.view?.commandCount && app.hint.command.type === type ? app.hint.command : null);
+
+// 選んでいる置き方が、ヒントの買い方と同じか
+function buyHinted() {
+    const c = hinted('buy');
+    return !!c && !!app.place && ['choice', 'orient', 'x', 'y'].every(k => app.place[k] === c[k]);
+}
+
+// おすすめの手を示す。買う手なら、そのパッチと向き・場所を選んでおく（「置く」を押せば買える）
+function showHint() {
+    const view = app.view;
+    if (!view || !app.controller || !myTurn(view)) return;
+    const command = app.controller.suggest();
+    if (!command) return;
+    app.hint = { count: view.commandCount, command };
+    if (command.type === 'buy') app.place = { choice: command.choice, orient: command.orient, x: command.x, y: command.y };
+    else if (command.type === 'advance') app.place = null;
+    render(view);
+}
+
+function renderLog(view) {
+    $('#log').innerHTML = view.logs.length
+        ? view.logs.map(line => `<li>${escapeHtml(line)}</li>`).reverse().join('')
+        : '<li class="empty">まだ何も起きていません</li>';
 }
 
 // ===== 大きさ =====
@@ -526,6 +561,12 @@ function init() {
         const action = event.target.closest('[data-action]')?.dataset.action;
         if (action === 'home') goHome();
         if (action === 'help') openDialog($('#help-dialog'));
+        if (action === 'hint') showHint();
+        if (action === 'log' && app.view) {
+            renderLog(app.view);
+            openDialog($('#log-dialog'));
+        }
+        if (action === 'close-log') $('#log-dialog').close();
         if (action === 'close-help') $('#help-dialog').close();
         if (action === 'result') showResult();
         if (action === 'close-result') $('#result-dialog').close();
@@ -564,6 +605,7 @@ function init() {
 
     // 確認用（画面の確認スクリプトから状態を作る）
     window.__pw = app;
+    window.__app = app;
 }
 
 init();

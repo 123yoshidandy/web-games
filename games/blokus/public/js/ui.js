@@ -146,6 +146,7 @@ export default class UI {
         });
         $('#rotate').addEventListener('click', () => this.turnPiece(rotateOrient));
         $('#flip').addEventListener('click', () => this.turnPiece(flipOrient));
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#cancel').addEventListener('click', () => {
             this.selected = null;
             this.renderBoard();
@@ -306,6 +307,18 @@ export default class UI {
         return canPlaceCells(v.board, v.current, this.ghostCells(), v.colors[v.current].placed === 0);
     }
 
+    // ヒント：CPU（ふつう）が選ぶピースを、その向きと位置で選んだ状態にする
+    showHint() {
+        const command = this.isMyTurn() ? this.controller?.hint() : null;
+        if (!command) return this.toast('自分の番になったら、おすすめを出せます');
+        const { piece, orient, x, y } = command;
+        this.orients[piece] = orient;
+        this.selected = { piece, orient, x, y };
+        this.render();
+        $('#place').classList.add('recommended');
+        this.toast('おすすめ：この位置で「✓」を押して置く');
+    }
+
     placeSelected() {
         if (!this.ghostValid()) return;
         const { piece, orient, x, y } = this.selected;
@@ -318,6 +331,7 @@ export default class UI {
     render() {
         if (!this.controller) return;
         this.view = this.controller.getView();
+        $('#place').classList.remove('recommended');
         const v = this.view;
         // 自分の番でなくなったら、選んでいたピースを外す
         if (this.selected && (!this.isMyTurn() || !v.colors[v.current].pieces.includes(this.selected.piece))) this.selected = null;

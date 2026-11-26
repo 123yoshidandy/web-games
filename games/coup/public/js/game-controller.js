@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_ACTION_DELAY_MS = 1000; // CPU が行動を選ぶ前は、前の出来事が見えるように長めに待つ
 const CPU_ANSWER_DELAY_MS = 650;  // チャレンジ・ブロックの答え、失う札、交換
@@ -40,6 +40,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.save();
+    }
+
+    // ヒント：人が答える番に、CPU（ふつう）が選ぶ操作。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

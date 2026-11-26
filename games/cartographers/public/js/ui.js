@@ -147,6 +147,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#edicts').addEventListener('click', () => this.showEdicts());
         $('#seasons').addEventListener('click', () => this.showScores({ final: false }));
         $('#players').addEventListener('click', (event) => {
@@ -225,6 +226,7 @@ export default class UI {
         if (!this.view?.mustPlace || this.view.fallback) return;
         if (this.variant === index) return;
         const keep = this.anchor;
+        this.hintKey = null;
         this.variant = index;
         this.resetPlacement();
         this.anchor = keep;
@@ -239,15 +241,34 @@ export default class UI {
 
     pickCell(cell) {
         if (!this.shape) return;
+        this.hintKey = null;
         this.anchor = cell;
         this.render();
     }
 
     act(action) {
+        if (action === 'rotate' || action === 'flip') this.hintKey = null;
         if (action === 'rotate' && this.shape) this.shape = rotate(this.shape);
         if (action === 'flip' && this.shape) this.shape = flip(this.shape);
         if (action === 'draw') return this.draw();
         this.render();
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ描き方を、形・向き・場所まで選んだ状態にする
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('描く番になったら、おすすめを出せます');
+        if (command.type === 'place' && command.fallback) this.terrain = command.terrain;
+        if (command.type === 'place' && !command.fallback) this.variant = command.variant;
+        const rc = command.cells.map(c => [Math.floor(c / SIZE), c % SIZE]);
+        const minR = Math.min(...rc.map(([r]) => r));
+        const minC = Math.min(...rc.map(([, c]) => c));
+        this.shape = normalize(rc);
+        const [pr, pc] = pivotOf(this.shape);
+        this.anchor = (minR + pr) * SIZE + (minC + pc);
+        this.hintKey = this.cardKey;
+        this.render();
+        this.toast('おすすめ：この形と場所で「描く」');
     }
 
     draw() {
@@ -418,7 +439,7 @@ export default class UI {
             <button class="icon-btn turn" data-act="rotate" aria-label="回転" title="回転" ${canTurn ? '' : 'disabled'}>${icon('rotate')}</button>
             <button class="icon-btn turn" data-act="flip" aria-label="裏返し" title="裏返し" ${canTurn ? '' : 'disabled'}>${icon('flip')}</button>
             <span class="act-label">${label}</span>
-            <button class="btn small primary" data-act="draw" ${placement && !placement.error ? '' : 'disabled'}>描く</button>`;
+            <button class="btn small primary${this.hintKey === this.cardKey && placement && !placement.error ? ' recommended' : ''}" data-act="draw" ${placement && !placement.error ? '' : 'disabled'}>描く</button>`;
     }
 
     // 描いたときの得点の見込み（自分の地図なら今の季節の得点の増え方、襲撃なら相手の減点の増え方）

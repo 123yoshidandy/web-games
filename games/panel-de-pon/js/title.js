@@ -44,7 +44,10 @@ export function showTitle({ onSolo, onOnline }) {
                 <button type="button" class="start-button" data-mode="solo">CPU対戦</button>
                 <button type="button" class="start-button online" data-mode="online">オンライン対戦</button>
             </div>
-            <button type="button" class="help-link" data-action="help">遊び方・操作方法</button>
+            <div class="title-links">
+                <button type="button" class="help-link" data-action="help">遊び方・操作方法</button>
+                <a class="help-link portal-link" href="../">← ゲーム一覧</a>
+            </div>
         </div>
     `;
     document.body.appendChild(titleElement);

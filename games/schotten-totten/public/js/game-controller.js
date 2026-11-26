@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn, PROFILES } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, PROFILES, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 900;    // CPU がカードを出す手は、考えているように少し間を置く
 export const CPU_QUICK_DELAY_MS = 450;   // 主張・番の終わり・新兵募集で戻す手は、短めの間
@@ -44,6 +44,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

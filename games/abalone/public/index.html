@@ -43,7 +43,11 @@
                     <button id="start" class="btn primary">ゲーム開始</button>
                     <button id="resume" class="btn secondary" hidden>続きから</button>
                 </div>
-                <button id="open-help-title" class="link">遊び方</button>
+                <div class="title-links">
+                    <button id="open-help-title" class="link">遊び方</button>
+                    <button type="button" class="link bgm-toggle" aria-pressed="true">BGM</button>
+                    <a class="link portal-link" href="../">← ゲーム一覧</a>
+                </div>
             </div>
         </section>
 
@@ -54,6 +58,13 @@
                     <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
                 </button>
                 <span id="turn-info" class="turn-info"></span>
+                <button type="button" class="icon-btn bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
+                <button id="hint" class="icon-btn" aria-label="ヒント" title="ヒント">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>
+                </button>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg>
+                </button>
                 <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
                     <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
                 </button>
@@ -80,6 +91,13 @@
         <div class="buttons"><button id="result-home" class="link">ホーム</button></div>
     </dialog>
 
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
     <!-- 遊び方 -->
     <dialog id="help" class="sheet help">
         <div class="help-body">
@@ -97,13 +115,14 @@
             <h3>並べ方</h3>
             <p>標準のほかに、7個ずつの花の形のかたまりを2つ並べた<strong>ベルギーデイジー</strong>と<strong>ジャーマンデイジー</strong>を選べます。最初から相手と向き合うので、決着しやすくなります。</p>
             <h3>画面</h3>
-            <p>自分の玉を押すと選べます。一列に並んでいれば3個まで足せ、両端を押すと真ん中も選びます。選ぶと動かせる向きに<strong>矢印</strong>が出るので、押して動かします。<strong>赤い矢印</strong>は相手を押す手です。各人の欄の6つの丸は、押し出した数です。</p>
+            <p>自分の玉を押すと選べます。一列に並んでいれば3個まで足せ、両端を押すと真ん中も選びます。選ぶと動かせる向きに<strong>矢印</strong>が出るので、押して動かします。<strong>赤い矢印</strong>は相手を押す手です。各人の欄の6つの丸は、押し出した数です。電球のボタンを押すと、おすすめの手の玉を選び、その矢印を光らせます。一覧のボタンで、これまでの手の記録を見られます。</p>
         </div>
         <div class="buttons"><button class="btn secondary close">閉じる</button></div>
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+    <script type="module" src="./js/music.js"></script>
     <script type="module" src="./js/main.js"></script>
 </body>
 </html>

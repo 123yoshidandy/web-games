@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 900;   // CPU の手は、何をしたか見えるように間を置く
 const SAVE_KEY = 'saboteur.save';
@@ -41,6 +41,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

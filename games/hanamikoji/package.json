@@ -6,5 +6,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "portal": {
+    "original": "Hanamikoji",
+    "aliases": [
+      "はなみこうじ"
+    ],
+    "genres": [
+      "カードゲーム"
+    ],
+    "players": [
+      2
+    ]
   }
 }

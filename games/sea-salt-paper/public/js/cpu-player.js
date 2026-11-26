@@ -44,6 +44,12 @@ export function chooseCpuCommand(game, seat = game.current, profile = profileOf(
     return decide(view, seat, cpuRandom(game, seat), profile);
 }
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || game.phase === 'roundEnd' || seat !== game.current) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 // CPU に1手打たせる。決めた手が断られたら、通る手を順に試す（必ず前に進める）
 export function runCpuStep(game, seat = game.current, profile) {
     if (game.phase === 'end') return false;

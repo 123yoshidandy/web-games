@@ -52,6 +52,8 @@
 node scripts/cpu-match.mjs 40 normal,easy -
 ```
 
+上の帯の電球（ヒント）を押すと、ふつうの CPU が揺れなしで選ぶ手を示す（動かす駒を選んでおき、行き先を金色にする。押せば動く）。盤と手持ちはすべて公開の情報。
+
 ## 開発
 
 素の HTML / CSS / JavaScript（ES Modules）で、ビルドはない。

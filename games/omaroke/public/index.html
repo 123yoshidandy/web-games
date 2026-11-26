@@ -52,7 +52,11 @@
             <button type="button" id="start" class="primary big">はじめる</button>
             <button type="button" id="resume" class="secondary big" hidden>続きから</button>
         </div>
-        <button type="button" id="open-help-title" class="text-button">遊び方</button>
+        <div class="title-links">
+            <button type="button" id="open-help-title" class="text-button">遊び方</button>
+            <button type="button" class="text-button bgm-toggle" aria-pressed="true">BGM</button>
+            <a class="text-button portal-link" href="../">← ゲーム一覧</a>
+        </div>
     </main>
 
     <main id="screen-game" class="screen game" hidden>
@@ -61,6 +65,7 @@
             <div id="turn-info" class="turn-info"></div>
             <div id="deck-info" class="deck-info"></div>
             <button type="button" id="open-log" class="icon-button" aria-label="記録" title="記録"></button>
+            <button type="button" class="icon-button bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg class="icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
             <button type="button" id="open-help" class="icon-button" aria-label="遊び方" title="遊び方"></button>
         </header>
         <section id="rivals" class="rivals"></section>
@@ -94,6 +99,7 @@
         </div>
     </dialog>
 
+    <script type="module" src="js/music.js"></script>
     <script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -66,7 +66,21 @@ export const cpuRandom = (game, seat) => createRandom((game.cpuSalt ^ Math.imul(
 
 // ---- 手を選ぶ（ビューだけを見る） ----
 
-export function chooseCommand(view, level = 'normal', rand = Math.random) {
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
+// ヒント：自分が操作する番に、CPU（ふつう）が選ぶ操作。ビュー（自分に見えるもの）だけで決める
+export function suggest(view) {
+    if (!view?.answering?.includes(view.you)) return null;
+    return chooseCommand(view, 'normal');
+}
+
+export function chooseCommand(view, level = 'normal', rand = viewRandom(view)) {
     const easy = level === 'easy';
     switch (view.phase) {
         case 'give': return easy ? giveEasy(view, rand) : giveNormal(view, rand);

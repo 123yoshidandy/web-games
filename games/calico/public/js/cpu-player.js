@@ -122,7 +122,20 @@ function chooseGoals(view, level, rand) {
     return { type: 'goals', pick: order.slice(0, 3).map(o => o.i) };
 }
 
-export function chooseCommand(view, level = 'normal', rand = Math.random) {
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
+// ヒント：自分が操作する番に、CPU（ふつう）が選ぶ操作。ビュー（自分に見えるもの）だけで決める
+export function suggest(view) {
+    return chooseCommand(view, 'normal');
+}
+
+export function chooseCommand(view, level = 'normal', rand = viewRandom(view)) {
     const seat = view.you;
     if (!view.answering.includes(seat)) return null;
     const me = view.players[seat];

@@ -127,11 +127,41 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .title-buttons { display: flex; gap: 12px; margin-top: 4px; }
 .title-buttons .btn { min-width: 120px; }
 .title-help { position: absolute; top: 8px; right: 8px; }
+/* ゲーム一覧へのリンク。遊び方と向かい合う左上に置く。
+   ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.portal-link {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: 10px;
+    color: var(--ink-soft);
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+}
+.portal-link:active { background: rgba(255, 255, 255, 0.1); }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
 
 @media (max-height: 600px) {
     .logo { font-size: 42px; }
     .title-art { height: 150px; width: 190px; }
     .title-inner { gap: 8px; }
+}
+/* スマホ横など低い画面：さらに詰め、収まらなければタイトルをスクロールさせる */
+#title-screen { overflow-y: auto; }
+.title-inner { flex: 1 0 auto; justify-content: safe center; }
+@media (max-height: 440px) {
+    .logo { font-size: 36px; }
+    .title-art { height: 110px; width: 140px; }
+    .title-inner { gap: 6px; padding: 8px 16px; }
 }
 
 /* ===== プレイ中 ===== */
@@ -409,3 +439,34 @@ dialog.sheet::backdrop { background: rgba(10, 20, 10, 0.6); }
 @media (prefers-reduced-motion: reduce) {
     .cand, .edge-cand, .obj.ready, .fresh { animation: none !important; }
 }
+
+/* BGM の ON/OFF（js/music.js）。タイトルでは遊び方の左に置く */
+.title-bgm { position: absolute; top: 8px; right: 52px; }
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ---- ヒント ---- */
+
+/* おすすめの場所（盤）とボタン */
+.best { fill: none; stroke: #fff; stroke-width: 5; pointer-events: none; filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6)); }
+.best-edge { stroke: #fff; stroke-width: 9; stroke-linecap: round; pointer-events: none; filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6)); }
+.recommended { outline: 3px solid #fff; outline-offset: 2px; }
+
+.toast {
+    position: fixed;
+    left: 50%;
+    bottom: calc(96px + env(safe-area-inset-bottom));
+    z-index: 80;
+    max-width: calc(100% - 32px);
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(10, 20, 10, 0.92);
+    color: #fff;
+    font-size: 14px;
+    transform: translateX(-50%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+}
+.toast.show { opacity: 1; }

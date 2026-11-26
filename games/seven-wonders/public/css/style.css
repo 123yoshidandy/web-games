@@ -92,6 +92,13 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .age-info { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
 .age-info b { font-size: 17px; }
 .age-info .dir { font-size: 12px; color: var(--muted); }
+/* 狭い縦画面では、上の帯のボタンを少し小さくし、「渡す」を省く（向きは矢印と「左へ」で分かる） */
+@media (orientation: portrait) and (max-width: 440px) {
+    .topbar { gap: 4px; }
+    .topbar .icon-button { width: 36px; height: 36px; }
+    .age-info { gap: 6px; }
+    .age-info .dir-verb { display: none; }
+}
 
 .neighbors { grid-area: nb; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .neighbor { min-width: 0; padding: 5px 7px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); text-align: left; display: flex; flex-direction: column; gap: 3px; }
@@ -226,3 +233,21 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .color-chip { padding: 2px 10px; border-radius: 6px; background: var(--c); color: #fff; font-size: 13px; font-weight: 800; }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒントのおすすめ：金の枠 */
+.recommended { outline: 3px solid var(--gold); outline-offset: 2px; }
+#hint:disabled { opacity: .35; cursor: default; }

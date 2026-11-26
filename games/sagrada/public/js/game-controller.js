@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_DELAY_MS = 650;   // CPU は人に見える速さで1手ずつ打つ（旅人を選ぶ間は、人は CPU を待たずに選べる）
 const SAVE_KEY = 'sagrada.save';
@@ -42,6 +42,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

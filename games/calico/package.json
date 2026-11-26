@@ -9,5 +9,17 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Calico",
+    "genres": [
+      "タイル配置"
+    ],
+    "players": [
+      1,
+      2,
+      3,
+      4
+    ]
   }
 }

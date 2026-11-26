@@ -139,6 +139,7 @@ export default class UI {
     bindGame() {
         $('home').addEventListener('click', () => this.showTitle());
         $('open-help-game').addEventListener('click', () => this.openDialog('help'));
+        $('hint').addEventListener('click', () => this.showHint());
         $('open-log').addEventListener('click', () => {
             $('log-list').innerHTML = this.view.logs.slice().reverse().map(l => `<li>${esc(l)}</li>`).join('');
             this.openDialog('log');
@@ -220,6 +221,7 @@ export default class UI {
         this.renderStore();
         this.renderHand();
         this.renderActions();
+        this.markHint();
         if (this.view.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
             setTimeout(() => this.showResult(), 600);
@@ -256,6 +258,35 @@ export default class UI {
             if (this.colonistsLeft() > 0) ui.glowCities = this.colonistCities();
         }
         $('map').innerHTML = renderMap(v, ui) + this.statusHtml();
+        this.markHint();
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作。使うカード・動かす植民者・建てる都市に印を付ける
+    showHint() {
+        const c = this.myTurn ? this.controller?.hint() : null;
+        if (!c) return this.toast('自分の番になったら、おすすめを出せます');
+        this.mode = null;
+        if (c.type === 'move') this.selected = c.colonist;
+        this.hint = { key: this.view.events.at(-1)?.seq ?? 0, command: c };
+        this.refresh();
+        const text = {
+            play: () => `「${CARD_TYPES[this.me.hand.find(h => h.id === c.card)?.type]?.name ?? 'カード'}」を使う`,
+            move: () => '選んだ植民者を動かす',
+            build: () => '光る都市に家を建てる',
+            finish: () => '建築家を終える'
+        }[c.type]?.() ?? '光るところを押す';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const h = this.hint;
+        if (!h || !this.myTurn || h.key !== (this.view.events.at(-1)?.seq ?? 0)) return;
+        const c = h.command;
+        const mark = (selector) => document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
+        if (c.type === 'play') mark(`#hand [data-card="${c.card}"]`);
+        if (c.type === 'move') mark(`#map [data-road="${c.road}"]`);
+        if (c.type === 'build') mark(`#map [data-city="${c.city}"]`);
+        if (c.type === 'finish') mark('#actions [data-action="finish"]');
     }
 
     // 地図の左上に出す、今していることの短い表示

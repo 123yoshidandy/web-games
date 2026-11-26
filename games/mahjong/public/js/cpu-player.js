@@ -6,6 +6,7 @@
  * - テンパイしたら、門前なら立直する（待ちが残っていないときはしない）
  * - 立直者（や3つ鳴いた人）がいて、手が遠いときは降りる（現物・筋・見えている字牌の順に安全とみる）
  * - 鳴くのは、役牌のポンと、喰いタンや役牌がすでにあるときで、向聴数が進むときだけ
+ * 強さ：ふつう（normal）は上のとおり。やさしい（easy）は、鳴かず（ロンはする）、降りず、受け入れを見ずに向聴数と牌の惜しさだけで打牌する
  * ゲームの乱数は使わない（使うと記録の再現がずれる）
  */
 
@@ -24,7 +25,7 @@ export function runCpuStep(game, seat) {
     const view = createGameView(game, seat, { since: game.logs.length, events: false });
     let command = null;
     try {
-        command = decideCommand(view);
+        command = decideCommand(view, game.options.level);
     } catch (error) {
         console.error(error);
     }
@@ -42,12 +43,19 @@ export function simplestCommand(view) {
     return { type: 'discard', tile: o.discards.includes(view.players[view.you].drawn) ? view.players[view.you].drawn : o.discards[0] };
 }
 
-export function decideCommand(view) {
+export function decideCommand(view, level = 'normal') {
     const o = view.options;
     if (!o) return null;
     if (o.type === 'next') return { type: 'next' };
-    if (o.type === 'call') return decideCall(view, o);
-    return decideTurn(view, o);
+    if (o.type === 'call') return level === 'easy' ? { type: o.ron ? 'ron' : 'pass' } : decideCall(view, o);
+    return decideTurn(view, o, level);
+}
+
+// ヒント：その席の人に、ふつうの CPU が選ぶ手を返す（操作する番だけ）。自分のビューだけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (!game.actors().includes(seat)) return null;
+    return decideCommand(createGameView(game, seat, { since: game.logs.length, events: false }), 'normal');
 }
 
 // ---- 見立て ----
@@ -140,7 +148,7 @@ function evaluateDiscards(view, tiles) {
     return results;
 }
 
-function decideTurn(view, o) {
+function decideTurn(view, o, level = 'normal') {
     const me = view.players[view.you];
     if (o.tsumo) return { type: 'tsumo' };
     const counts = handCounts(view);
@@ -173,6 +181,12 @@ function decideTurn(view, o) {
             const tile = o.riichi.find(id => kindOf(id) === pick.kind && !isRed(id)) ?? o.riichi.find(id => kindOf(id) === pick.kind);
             return { type: 'discard', tile, riichi: true };
         }
+    }
+
+    // やさしい：受け入れも危なさも見ず、向聴数と牌の惜しさだけで選ぶ
+    if (level === 'easy') {
+        options.sort((a, b) => a.shanten - b.shanten || a.keep - b.keep);
+        return { type: 'discard', tile: options[0].tile };
     }
 
     // 降りる：危ない相手がいて、手が遠い（1向聴でも、安全な牌が少ないとき）

@@ -4,6 +4,7 @@
 
 import Card from './card.js';
 import { ALL_CARDS } from './card-data.js';
+import { createRandom, createSeed } from './random.js';
 
 // プレイヤークラス
 class Player {
@@ -19,7 +20,7 @@ class Player {
         this.buys = 0;       // 購入数
         this._coins = 0;     // コイン数（coins で読み書きする。-1 財宝のトークンを反映するため）
         this.potions = 0;    // ポーション（錬金術。ポーションのコストのカードを購入するのに使う）
-        this.random = Math.random; // シャッフルに使う乱数（Game がシード付きの乱数に差し替える）
+        this.random = createRandom(createSeed()); // シャッフルに使う乱数（Game がゲームのシード付きの乱数に差し替える）
         this.merchantBonus = 0;      // このターンにプレイした商人の数（最初の銀貨で財宝+1ずつ）
         this.hasPlayedSilver = false; // このターンに銀貨をプレイしたか
         

@@ -90,6 +90,12 @@ export function fallbackCommands(view) {
     return result;
 }
 
+// ヒント：自分の番に、CPU（ふつう）が選ぶ操作。ビュー（自分に見えるもの）だけで決める
+export function suggest(view) {
+    if (!view?.actors?.includes(view.you)) return null;
+    return chooseCommand(view, 'normal');
+}
+
 export function chooseCommand(view, level = 'normal') {
     const ctx = makeContext(view, level);
     if (view.pending?.kind === 'keep') return { type: 'keep', animals: keepAnimals(ctx.me, view.pending.animals, level) };

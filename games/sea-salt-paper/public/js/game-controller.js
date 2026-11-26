@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 900;   // CPU の手番の最初（引く）は、動きが見えるように間を置いて1手ずつ
 const CPU_QUICK_DELAY_MS = 650;  // 引いた2枚から選ぶ・2枚組・カニ・手番の終わりなど、手番の続き
@@ -43,6 +43,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

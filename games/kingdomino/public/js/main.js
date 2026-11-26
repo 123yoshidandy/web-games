@@ -19,6 +19,7 @@ const app = {
     controller: null,
     view: null,
     place: { dir: 0, anchor: null, key: null }, // 置く向きと、置く場所（1つ目のマスの座標）
+    hint: null, // ヒントで示している手 { count, command }（その手番の間だけ）
     settings: { count: 2, level: 'normal', rules: { middleKingdom: false, harmony: false }, ...storage.load('settings', {}) }
 };
 
@@ -156,6 +157,9 @@ function render(view) {
     const rounds = view.round + (view.next ? 1 : 0) + view.deckCount / view.kings.length;
     $('#round-label').textContent = view.phase === 'end' ? '終了' : `ラウンド ${view.round}/${rounds}`;
     $('#result-button').hidden = view.phase !== 'end';
+    $('#hint').disabled = !myTurn(view);
+    if (app.hint && app.hint.count !== view.commandCount) app.hint = null;
+    if ($('#log-dialog').open) renderLog(view);
     renderOpponents(view);
     renderLines(view);
     renderMine(view);
@@ -185,7 +189,8 @@ function renderLines(view) {
             }
             const active = name === 'current' && view.activeIndex === i && view.phase === 'play';
             const live = pickable === name && slot.king === null;
-            cards.push(`<button type="button" class="card${active ? ' active' : ''}${live ? ' live' : ''}" data-line="${name}" data-index="${i}" data-domino="${slot.domino}">
+            const suggested = live && hinted('pick')?.index === i;
+            cards.push(`<button type="button" class="card${active ? ' active' : ''}${live ? ' live' : ''}${suggested ? ' suggested' : ''}" data-line="${name}" data-index="${i}" data-domino="${slot.domino}">
                 ${dominoHtml(slot.domino)}<span class="num">${slot.domino}</span>${slot.king !== null ? kingHtml(kings[slot.king]) : ''}
             </button>`);
         }
@@ -234,16 +239,47 @@ function renderMine(view) {
     if (placing) {
         if (view.placements.length === 0) {
             controls = `<span class="note">置ける場所がありません</span>
-                <button type="button" class="btn btn-danger" data-action="discard">捨てる</button>`;
+                <button type="button" class="btn btn-danger${hinted('discard') ? ' suggested' : ''}" data-action="discard">捨てる</button>`;
         } else {
             controls = `<span class="preview">${dominoHtml(view.activeDomino, app.place.dir)}</span>
                 <button type="button" class="icon-btn rotate" data-action="rotate" aria-label="回転" title="回転">
                     <svg class="line-icon" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/></svg>
                 </button>
-                <button type="button" class="btn btn-primary" data-action="place"${app.place.anchor ? '' : ' disabled'}>置く</button>`;
+                <button type="button" class="btn btn-primary${placeHinted() ? ' suggested' : ''}" data-action="place"${app.place.anchor ? '' : ' disabled'}>置く</button>`;
         }
     }
     $('#controls').innerHTML = controls;
+}
+
+// ===== ヒント・履歴 =====
+
+// ヒントで示している手のうち、種類が合うもの
+const hinted = type => (app.hint?.count === app.view?.commandCount && app.hint.command.type === type ? app.hint.command : null);
+
+// 選んでいる置き方が、ヒントの置き方と同じか
+function placeHinted() {
+    const c = hinted('place');
+    return !!c && app.place.anchor?.x === c.x && app.place.anchor?.y === c.y && app.place.dir === c.dir;
+}
+
+// おすすめの手を示す。置く番なら、その場所と向きを選んでおく（「置く」を押せば置ける）
+function showHint() {
+    const view = app.view;
+    if (!view || !app.controller || !myTurn(view)) return;
+    const command = app.controller.suggest();
+    if (!command) return;
+    app.hint = { count: view.commandCount, command };
+    if (command.type === 'place') {
+        app.place.anchor = { x: command.x, y: command.y };
+        app.place.dir = command.dir;
+    }
+    render(view);
+}
+
+function renderLog(view) {
+    $('#log').innerHTML = view.logs.length
+        ? view.logs.map(line => `<li>${escapeHtml(line)}</li>`).reverse().join('')
+        : '<li class="empty">まだ何も起きていません</li>';
 }
 
 // ===== 大きさ =====
@@ -476,6 +512,12 @@ function init() {
         const action = event.target.closest('[data-action]')?.dataset.action;
         if (action === 'home') goHome();
         if (action === 'help') openDialog($('#help-dialog'));
+        if (action === 'hint') showHint();
+        if (action === 'log' && app.view) {
+            renderLog(app.view);
+            openDialog($('#log-dialog'));
+        }
+        if (action === 'close-log') $('#log-dialog').close();
         if (action === 'close-help') $('#help-dialog').close();
         if (action === 'result') showResult();
         if (action === 'close-result') $('#result-dialog').close();
@@ -514,6 +556,7 @@ function init() {
 
     // 確認用（画面の確認スクリプトから状態を作る）
     window.__kd = app;
+    window.__app = app;
 }
 
 init();

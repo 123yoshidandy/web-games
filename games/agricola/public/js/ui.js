@@ -11,7 +11,7 @@ import {
 import { cookRates, bakeFood, maxBake, crafts } from './cooking.js';
 import { scoreBreakdown, SCORE_LABELS } from './scoring.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS, chooseCommand } from './cpu-player.js';
+import { CPU_LEVELS, chooseCommand, suggest } from './cpu-player.js';
 import { symbolsSvg, sym, amountHtml, majorIcon } from './art.js';
 import { farmHtml } from './farm-view.js';
 import { helpHtml, titleArtHtml } from './help.js';
@@ -77,7 +77,10 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
+                onUpdate: () => {
+                    this.hintSpace = null;
+                    this.render();
+                },
                 onError: (message) => this.toast(message)
             });
         } catch (error) {
@@ -143,6 +146,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
 
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
@@ -424,7 +428,7 @@ export default class UI {
         const legal = this.myTurn() ? v.legalSpaces : [];
         $('#board').innerHTML = v.spaces.map(s => {
             const cls = ['space', s.isRound ? 'round' : '', legal.includes(s.id) ? 'can' : '', this.sel?.space === s.id ? 'sel' : '',
-                this.info === s.id ? 'info' : '', s.by !== null ? 'taken' : ''].filter(Boolean).join(' ');
+                this.info === s.id ? 'info' : '', s.by !== null ? 'taken' : '', this.hintSpace === s.id && legal.includes(s.id) ? 'recommended' : ''].filter(Boolean).join(' ');
             const token = s.by !== null ? `<span class="tok" style="color:${COLORS[s.by]}">${sym('person')}</span>` : '';
             return `<button type="button" class="${cls}" data-space="${s.id}"><span class="sp-name">${SHORT[s.id]}</span><span class="sp-goods">${SPACES[s.id].take ? Object.entries(SPACES[s.id].take).map(([k, n]) => (n > 1 ? amountHtml(k, n) : sym(k))).join('') : goodsHtml(s.goods)}</span>${token}</button>`;
         }).join('');
@@ -728,6 +732,17 @@ export default class UI {
         $('#log').showModal();
         const list = $('#log-list');
         list.scrollTop = list.scrollHeight;
+    }
+
+    // ヒント：CPU（ふつう）が自分の番に選ぶ場所に印を付ける。CPU はこのビュー（自分に見えるもの）だけで決める
+    showHint() {
+        const v = this.view;
+        if (!v || !this.myTurn()) return this.toast('自分の番になったら、おすすめを出せます');
+        const command = suggest(v);
+        if (command?.type !== 'act') return this.toast('おすすめの内容を、最初から選んであります');
+        this.hintSpace = command.space;
+        this.render();
+        this.toast(`おすすめ：「${SHORT[command.space]}」に置く`);
     }
 
     renderLog() {

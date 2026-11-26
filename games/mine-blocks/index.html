@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#232a66">
     <!-- ブラウザのタブのアイコン（SVG に対応しないブラウザは PNG）と、スマホのホーム画面に追加したときのアイコン -->
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -11,7 +11,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <!-- safe-area の余白を取っていないので、画面をステータスバーの下に潜らせない -->
+    <!-- 画面をステータスバーの下に潜らせない（横向きのノッチなどの余白は style.css の safe-area-inset で取る） -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
     <meta name="apple-mobile-web-app-title" content="MINE BLOCKS">
     <title>MINE BLOCKS</title>
@@ -22,7 +22,7 @@
 </head>
 <body>
     <!-- トップ画面：開いたときに出る。遊び方（エンドレス・チャレンジ・オンライン対戦）を選ぶ -->
-    <section class="top-screen" id="topScreen" hidden>
+    <section class="top-screen" id="screen-title" hidden>
         <div class="top-inner">
             <div class="top-hero" id="topHero" aria-hidden="true">
                 <!-- 盤面を模した絵（JavaScriptで生成） -->
@@ -31,10 +31,17 @@
             <p class="top-catch">数字と地雷を手がかりに、<br>ピースで盤面を埋めるパズル</p>
 
             <div class="top-menu">
-                <button id="topEndless" class="top-button top-endless">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12c0-2 1.6-3.5 3.5-3.5 3.5 0 3.5 7 7 7 1.9 0 3.5-1.5 3.5-3.5s-1.6-3.5-3.5-3.5c-3.5 0-3.5 7-7 7C6.6 15.5 5 14 5 12z"/></svg>
-                    <span class="top-button-label">エンドレス<small id="topEndlessNote">1問ずつ、自分のペースで</small></span>
-                </button>
+                <!-- 続きから：エンドレスの解きかけの問題があるときだけ、エンドレスの横に出す（1画面に収めるため段を増やさない） -->
+                <div class="top-endless-row">
+                    <button id="topEndless" class="top-button top-endless">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12c0-2 1.6-3.5 3.5-3.5 3.5 0 3.5 7 7 7 1.9 0 3.5-1.5 3.5-3.5s-1.6-3.5-3.5-3.5c-3.5 0-3.5 7-7 7C6.6 15.5 5 14 5 12z"/></svg>
+                        <span class="top-button-label">エンドレス<small id="topEndlessNote">1問ずつ、自分のペースで</small></span>
+                    </button>
+                    <button id="topResume" class="top-button top-resume" hidden>
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10-6.5z"/></svg>
+                        <span class="top-button-label">続きから</span>
+                    </button>
+                </div>
                 <button id="topChallenge" class="top-button top-challenge">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13.5" r="7.5"/><polyline points="12 10 12 13.5 14.5 15.5"/><line x1="9.5" y1="2.5" x2="14.5" y2="2.5"/><line x1="12" y1="2.5" x2="12" y2="6"/></svg>
                     <span class="top-button-label">チャレンジ<small>60秒で何問解ける？</small></span>
@@ -46,7 +53,7 @@
             </div>
 
             <div class="top-links">
-                <button id="topHint" class="top-link">
+                <button id="open-help-title" class="top-link">
                     <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/><circle class="icon-dot" cx="12" cy="17" r="0.6"/></svg>
                     遊び方
                 </button>
@@ -56,6 +63,9 @@
                     <svg class="icon-done" viewBox="0 0 24 24" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"/></svg>
                     <span class="top-share-label">共有する</span>
                 </button>
+                <!-- ゲーム一覧に戻る。1画面に収めるため、丸いボタンにせず文字だけにする。
+                     ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す -->
+                <a class="top-portal portal-link" href="../">← ゲーム一覧</a>
             </div>
             <!-- 音の切り替え（設定はこの端末に保存する）と、ご意見・不具合の報告。1画面に収めるため1行に並べる -->
             <div class="top-sound">
@@ -86,7 +96,7 @@
             </h1>
             <div class="buttons">
                 <!-- ホームに戻る（ロゴと同じ。チャレンジや対戦の最中は確認してからやめる） -->
-                <button id="homeButton" class="icon-button" title="ホームに戻る" aria-label="ホームに戻る">
+                <button id="home" class="icon-button" title="ホームに戻る" aria-label="ホームに戻る">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M3.5 11 12 4l8.5 7"/>
                         <path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/>
@@ -118,7 +128,7 @@
                         <circle class="icon-dot" cx="12" cy="13" r="0.6"/>
                     </svg>
                 </button>
-                <button id="hint" class="icon-button" title="ヒント" aria-label="ヒント">
+                <button id="open-help-game" class="icon-button" title="遊び方" aria-label="遊び方">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <circle cx="12" cy="12" r="9"/>
                         <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6"/>
@@ -365,6 +375,7 @@
     <script src="js/challenge.js"></script>
     <script src="js/hint.js"></script>
     <script src="js/surrender.js"></script>
+    <script src="js/resume.js"></script>
     <script src="js/top.js"></script>
     <script src="js/feedback.js"></script>
     <script src="js/netplay/netplay-client.js"></script>

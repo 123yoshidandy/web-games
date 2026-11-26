@@ -52,6 +52,12 @@ export function nextCpuSeat(game) {
     return game.actors().find(seat => game.players[seat].isCPU) ?? null;
 }
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCommand(createGameView(game, seat, { since: game.logs.length, events: false }), 'normal');
+}
+
 // CPU の番なら1手打つ。CPU にはその席のビューだけを渡す。打った操作を返す（打てなければ null）
 export function runCpuStep(game) {
     const seat = nextCpuSeat(game);

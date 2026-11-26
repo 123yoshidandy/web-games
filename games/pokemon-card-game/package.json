@@ -8,9 +8,24 @@
     "build:server": "esbuild server/src/handler.js --bundle --platform=node --format=esm --target=node22 --external:@aws-sdk/* --outfile=server/dist/handler.mjs",
     "dev:server": "node server/dev-server.js",
     "fetch:cards": "node tools/fetch-cards.mjs",
-    "deploy:server": "npm run build:server && cd server && sam deploy"
+    "deploy:server": "npm run build:server && cd server && sam deploy",
+    "cpu-match": "node scripts/cpu-match.mjs"
   },
   "dependencies": {
     "netplay-kit": "*"
+  },
+  "portal": {
+    "original": "Pokémon Trading Card Game",
+    "genres": [
+      "カードゲーム"
+    ],
+    "players": [
+      2
+    ]
+  },
+  "standards": {
+    "skip": {
+      "undo": "山札・手札・サイドが隠れていて、引く・混ぜる・コインの乱数もあるので、戻すと有利になる"
+    }
   }
 }

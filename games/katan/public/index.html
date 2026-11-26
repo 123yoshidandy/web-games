@@ -24,6 +24,7 @@
     <main>
         <!-- 開始画面（ローカル対戦） -->
         <section id="screen-setup" class="screen title-screen">
+            <a class="portal-link" href="../">← ゲーム一覧</a>
             <div class="title-art" aria-hidden="true">
                 <svg id="title-board" viewBox="-130 -120 260 240"></svg>
             </div>
@@ -49,6 +50,7 @@
                     <div id="seat-list"></div>
                     <div class="buttons">
                         <button id="start-local" class="primary">ゲーム開始</button>
+                        <button id="resume" class="hidden">続きから</button>
                         <button id="open-online" class="online">オンラインで遊ぶ</button>
                     </div>
                     <div class="setup-footer">
@@ -66,6 +68,7 @@
                                 <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
                             </svg>
                         </button>
+                        <button class="small icon bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
                         <button class="small icon open-settings" aria-label="設定" title="設定">
                             <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                                 <circle cx="12" cy="12" r="3"/>
@@ -275,8 +278,16 @@
         </div>
         <div class="settings">
             <label class="setting"><span>効果音</span><input type="checkbox" id="set-sound"></label>
+            <label class="setting"><span>BGM</span><input type="checkbox" class="bgm-toggle" checked></label>
             <label class="setting"><span>アシスト（説明と★）</span><input type="checkbox" id="set-assist"></label>
             <label class="setting"><span>持っていない資源の交渉は、自動で断る</span><input type="checkbox" id="set-auto-reject"></label>
+            <!-- CPU の強さ（ローカル対戦だけ。オンライン対戦の CPU は、ふつう） -->
+            <div class="setting"><span>CPU の強さ</span>
+                <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                    <button type="button" role="radio" data-level="normal">ふつう</button>
+                    <button type="button" role="radio" data-level="strong">つよい</button>
+                </div>
+            </div>
         </div>
     </dialog>
 
@@ -438,6 +449,7 @@
 
     <div id="toast" class="toast hidden" role="alert"></div>
 
+    <script type="module" src="./js/music.js"></script>
     <script type="module" src="./js/main.js"></script>
 </body>
 </html>

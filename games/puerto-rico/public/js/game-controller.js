@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuToAct } from './cpu-player.js';
+import { runCpuStep, isCpuToAct, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 650;     // 何をしたか読める間
 const AFTER_ROLE_DELAY_MS = 1100;         // 役割を選んだ直後は、長めに見せる
@@ -25,6 +25,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.scheduleCpu();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

@@ -44,6 +44,7 @@ export default class UI {
     constructor() {
         this.settings = loadSettings();
         this.controller = null;
+        this.hintSq = null;
         this.view = null;
         this.lastSeq = 0;
         this.anim = null;       // 置いた石と返る石の演出 { sq, flips, color }
@@ -69,7 +70,11 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
+                onUpdate: () => {
+                    // ヒントを出している間は、今の場面のおすすめに出し直す
+                    if (this.hintSq !== null) this.hintSq = this.controller.hint()?.sq ?? null;
+                    this.render();
+                },
                 onError: (message) => this.toast(message)
             });
         } catch (error) {
@@ -100,6 +105,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
+        this.hintSq = null;
         clearTimeout(this.resultTimer);
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
@@ -127,6 +133,7 @@ export default class UI {
         $('#undo').addEventListener('click', () => this.undo());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
             dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
@@ -146,6 +153,7 @@ export default class UI {
 
     onCell(sq) {
         if (!this.myTurn() || !this.view.moves.includes(sq)) return;
+        this.hintSq = null;
         this.controller?.send({ type: 'move', sq });
     }
 
@@ -252,7 +260,8 @@ export default class UI {
                 disc = `<span class="disc ${cls}" ${style}>${stoneSvg(s, 'new')}${old}${last === sq ? '<span class="last"></span>' : ''}</span>`;
             }
             const hint = hints.has(sq) ? `<span class="hint c${hintColor}"></span>` : '';
-            cells.push(`<button class="cell" data-sq="${sq}" aria-label="${sqName(sq)}${s ? `（${COLOR_NAME[s]}）` : ''}">${disc}${hint}</button>`);
+            const best = hints.has(sq) && this.hintSq === sq ? ' recommended' : '';
+            cells.push(`<button class="cell${best}" data-sq="${sq}" aria-label="${sqName(sq)}${s ? `（${COLOR_NAME[s]}）` : ''}">${disc}${hint}</button>`);
         }
         const dots = [[25, 25], [75, 25], [25, 75], [75, 75]].map(([x, y]) => `<span style="left:${x}%;top:${y}%"></span>`).join('');
         $('#board').innerHTML = `${cells.join('')}<span class="dots" aria-hidden="true">${dots}</span>`;
@@ -292,6 +301,17 @@ export default class UI {
         const { black, white, empty } = v.counts;
         $('#result-text').innerHTML = `<span class="score">${stoneSvg(1)}${black}</span><span class="score">${stoneSvg(2)}${white}</span>${empty ? `<small>空き ${empty}</small>` : ''}`;
         $('#result').showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめのマスに印を付ける（画面だけ。記録には入れず、自分が打ったら消す）
+    showHint() {
+        const command = this.myTurn() ? this.controller?.hint() : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintSq = command.sq;
+        this.render();
+        this.toast(`おすすめ：${sqName(command.sq)}`);
     }
 
     toast(message) {

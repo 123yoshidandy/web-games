@@ -169,3 +169,11 @@ export function runCpuStep(game, seat = game.current, profile = PROFILES.normal)
     if (command && game.applyCommand(seat, command)) return true;
     return game.legalActions().some(a => game.applyCommand(seat, a));
 }
+
+// ヒント：人の番に、CPU が選ぶ手を返す（ふつうの読みで、揺れを入れない）。コリドールに隠れた情報はない
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+const HINT_PROFILE = { ...PROFILES.normal, noise: 0 };
+export function suggest(game, seat) {
+    if (game.isOver() || game.current !== seat) return null;
+    return chooseCpuCommand(game, seat, HINT_PROFILE);
+}

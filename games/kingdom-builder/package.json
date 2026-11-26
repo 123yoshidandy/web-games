@@ -9,5 +9,11 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Kingdom Builder",
+    "genres": [
+      "ボードゲーム"
+    ]
   }
 }

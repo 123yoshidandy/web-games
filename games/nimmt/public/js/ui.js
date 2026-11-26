@@ -144,6 +144,7 @@ export default class UI {
         $('#actions').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled) return;
+            if (button.dataset.act === 'hint') this.showHint();
             if (button.dataset.act === 'play' && this.picked !== null) this.playPicked();
         });
 
@@ -193,6 +194,27 @@ export default class UI {
 
     idle() {
         return this.queue.length === 0 && this.timer === null && !this.paused;
+    }
+
+    // おすすめの手を示す。出す手ならそのカードを選んでおき、列を引き取る手ならその列を光らせる
+    showHint() {
+        if (!this.canPlay() && !this.canChooseRow()) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.hint = command;
+        if (command.type === 'play') this.picked = command.card;
+        this.render();
+    }
+
+    renderHint() {
+        const active = this.canPlay() || this.canChooseRow();
+        const c = this.hint;
+        if (!active || !c || (c.type === 'play') !== this.canPlay()) {
+            this.hint = null;
+            return;
+        }
+        if (c.type === 'play' && this.picked === c.card) $('#actions [data-act="play"]')?.classList.add('suggested');
+        if (c.type === 'takeRow') $(`#rows [data-row="${c.row}"]`)?.classList.add('suggested');
     }
 
     pickCard(card) {
@@ -345,6 +367,7 @@ export default class UI {
         this.renderRows();
         this.renderHand();
         this.renderActions();
+        this.renderHint();
     }
 
     renderTop() {
@@ -426,6 +449,8 @@ export default class UI {
         } else if (d.chooser !== null && d.chooser !== view.you) {
             html = `<span class="act-label muted">${escapeHtml(view.players[d.chooser].name)}が引き取る列を選んでいます</span>`;
         }
+        // ヒントのボタン（自分が選ぶ番だけ出す）
+        if (this.canPlay() || this.canChooseRow()) html = `<button type="button" id="hint" class="icon-btn" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>${html}`;
         $('#actions').innerHTML = html;
     }
 

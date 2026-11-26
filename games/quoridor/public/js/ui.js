@@ -55,6 +55,8 @@ export default class UI {
         this.orientation = 'h';   // 見る人から見た向き
         this.drag = null;
         this.resultShown = false;
+        this.hint = null;         // ヒントで示している手 { seq, command }（その手番の間だけ）
+        this.log = [];            // 履歴の行（ビューの出来事から作る）
         this.buildBoard();
         this.bind();
         this.drawStaticArt();
@@ -105,6 +107,11 @@ export default class UI {
             if (saved) this.start(saved);
         });
         $('home').addEventListener('click', () => this.showTitle());
+        $('hint').addEventListener('click', () => this.showHint());
+        $('open-log').addEventListener('click', () => {
+            this.renderLog();
+            $('log-dialog').showModal();
+        });
         // 遊び方
         const help = $('help');
         $('open-help-title').addEventListener('click', () => help.showModal());
@@ -170,6 +177,8 @@ export default class UI {
             onError: (message) => this.toast(message)
         });
         this.resultShown = this.controller.game.isOver();
+        this.hint = null;
+        this.log = [];
         this.wallMode = false;
         this.preview = null;
         this.orientation = 'h';
@@ -194,6 +203,9 @@ export default class UI {
         const me = view.players[view.seat];
         this.rot = (4 - me.side) % 4;
         if (!this.myTurn) this.leaveWallMode(false);
+        if (this.hint && this.hint.seq !== view.eventSeq) this.hint = null;
+        $('hint').disabled = !this.myTurn;
+        this.collectLog(view);
         this.renderTurn();
         this.renderPanels();
         this.renderBoard(still);
@@ -279,6 +291,11 @@ export default class UI {
                 art.el('circle', { class: 'target-dot', cx: art.cellCenter(x), cy: art.cellCenter(y), r: 7 }, L.targets);
             });
         }
+        // ヒントの行き先
+        if (this.hint?.command.type === 'move' && this.myTurn && !this.wallMode) {
+            const [x, y] = repeat(rotCell, [this.hint.command.x, this.hint.command.y], this.rot);
+            art.el('rect', { class: 'suggested-cell', x: art.cellOrigin(x) + 2, y: art.cellOrigin(y) + 2, width: art.CELL - 4, height: art.CELL - 4, rx: 5 }, L.targets);
+        }
         this.renderPreview();
     }
 
@@ -324,7 +341,7 @@ export default class UI {
                 <button class="btn ghost square" data-act="rotate" aria-label="向きを変える" title="向きを変える">
                     <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.6-5.9M20 4v5h-5"/></svg>
                 </button>
-                <button class="btn primary small" data-act="place" ${c?.reason ? 'disabled' : ''}>置く</button>
+                <button class="btn primary small${this.wallHinted() ? ' suggested' : ''}" data-act="place" ${c?.reason ? 'disabled' : ''}>置く</button>
                 <button class="btn ghost square" data-act="cancel" aria-label="やめる" title="やめる">
                     <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
                 </button>`;
@@ -462,6 +479,50 @@ export default class UI {
         if (!this.drag || this.drag.id !== e.pointerId) return;
         if (this.drag.toggle && this.wallMode) this.setPreview({ ...this.preview, o: this.preview.o === 'h' ? 'v' : 'h' });
         this.drag = null;
+    }
+
+    // ---- ヒント・履歴 ----
+
+    // おすすめの手を示す。駒の手なら行き先のマスを光らせ、壁なら置く画面に入ってその壁を出しておく（「置く」を押せば置ける）
+    showHint() {
+        if (!this.myTurn) return;
+        const command = this.controller.suggest();
+        if (!command) return;
+        this.hint = { seq: this.view.eventSeq, command };
+        if (command.type === 'wall') this.enterWallMode(wallToView(command, this.rot));
+        else {
+            this.leaveWallMode(false);
+            this.render();
+        }
+        if (command.type === 'pass') this.toast('おすすめ：パス');
+    }
+
+    // 置こうとしている壁が、ヒントの壁と同じか
+    wallHinted() {
+        const c = this.hint?.command;
+        if (c?.type !== 'wall' || !this.preview) return false;
+        const w = wallToLogic(this.preview, this.rot);
+        return w.x === c.x && w.y === c.y && w.o === c.o;
+    }
+
+    // ビューの出来事から、履歴の行を足していく（同じ出来事は1度だけ）
+    collectLog(view) {
+        const last = this.log.at(-1)?.seq ?? 0;
+        for (const e of view.events) {
+            if (e.seq <= last) continue;
+            let text = null;
+            if (e.type === 'move') text = `${this.nameOf(e.seat)}：駒を動かした`;
+            else if (e.type === 'wall') text = `${this.nameOf(e.seat)}：壁を置いた`;
+            else if (e.type === 'pass') text = `${this.nameOf(e.seat)}：パス`;
+            else if (e.type === 'end') text = `${this.nameOf(e.winner)}の勝ち`;
+            if (text) this.log.push({ seq: e.seq, text });
+        }
+    }
+
+    renderLog() {
+        $('log').innerHTML = this.log.length
+            ? this.log.map(l => `<li>${escapeHtml(l.text)}</li>`).reverse().join('')
+            : '<li class="empty">まだ何も起きていません</li>';
     }
 
     // ---- 結果・知らせ ----

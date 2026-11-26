@@ -1,6 +1,7 @@
 import {
-    initRenderer, render, setVersusVisible, setFieldVisible, renderOpponent, showVersusResult, hideVersusResult
+    initRenderer, render, setVersusVisible, setFieldVisible, renderOpponent, showVersusResult, hideVersusResult, setBgmToggle
 } from './renderer.js';
+import { saveSettings } from './settings.js';
 import { initInput, pollInput } from './input.js';
 import { doLayout } from './layout.js';
 import { resetGame, updateGame, gameState, receiveGarbage, getSnapshot } from './game.js';
@@ -51,7 +52,7 @@ let resultTitle = null; // 表示中の勝敗（'WIN' など）
 function ensureSetup() {
     if (initialized) return;
     initialized = true;
-    const canvas = initRenderer({ onRematch: rematch, onBackToRoom: backToRoom, onHome: goHome, onHelp: openHelp });
+    const canvas = initRenderer({ onRematch: rematch, onBackToRoom: backToRoom, onHome: goHome, onBgm: toggleBgm, onHelp: openHelp });
     doLayout('solo');
     window.addEventListener('resize', () => doLayout());
     initInput(canvas);
@@ -60,6 +61,14 @@ function ensureSetup() {
 function applySoundSettings() {
     setSoundEnabled(settings.sound === 'on');
     setBgmEnabled(settings.bgm === 'on');
+    setBgmToggle(settings.bgm === 'on');
+}
+
+// プレイ中の「BGM」。ON/OFF を切り替えて、タイトルの設定にも残す
+function toggleBgm() {
+    settings.bgm = settings.bgm === 'on' ? 'off' : 'on';
+    saveSettings(settings);
+    applySoundSettings();
 }
 
 function openTitle() {
@@ -473,6 +482,16 @@ function enterRoom() {
 
 // iOS の Safari は touch-action・viewport だけではピンチで拡大するので、ジェスチャーを止める
 document.addEventListener('gesturestart', ev => ev.preventDefault());
+
+// ブラウザの開発者ツールやヘッドレス Chrome での確認用に、今の状態を見られるようにする
+window.__app = {
+    get scene() { return scene; },
+    get settings() { return settings; },
+    // 自分の盤面（CPU 対戦では cpuMatch.player、オンライン対戦では game.js の gameState）
+    get game() { return cpuMatch && (scene === 'playing' || scene === 'gameover') ? cpuMatch.player : gameState; },
+    get cpuMatch() { return cpuMatch; },
+    get lobby() { return lobby; }
+};
 
 openTitle();
 

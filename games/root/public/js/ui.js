@@ -47,12 +47,13 @@ const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
 function loadSettings() {
-    const fallback = { faction: 'marquise', cpus: 3 };
+    const fallback = { faction: 'marquise', cpus: 3, level: 'normal' };
     try {
         const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
         return {
             faction: FACTIONS.includes(saved.faction) ? saved.faction : fallback.faction,
-            cpus: Number.isInteger(saved.cpus) && saved.cpus >= 1 && saved.cpus <= 3 ? saved.cpus : fallback.cpus
+            cpus: Number.isInteger(saved.cpus) && saved.cpus >= 1 && saved.cpus <= 3 ? saved.cpus : fallback.cpus,
+            level: saved.level === 'easy' ? 'easy' : fallback.level
         };
     } catch {
         return fallback;
@@ -76,6 +77,7 @@ export default class UI {
         this.controller = null;
         this.view = null;
         this.sel = null;
+        this.hintCommand = null;
         this.discardPick = new Set();
         this.lastLegalKey = '';
         this.lastPeekKey = '';
@@ -113,15 +115,16 @@ export default class UI {
         $('#screen-game').hidden = false;
         this.board.reset();
         this.sel = null;
+        this.hintCommand = null;
         this.onUpdate();
         this.controller.scheduleCpu();
     }
 
     newGame() {
-        const { faction, cpus } = this.settings;
+        const { faction, cpus, level } = this.settings;
         const players = [{ name: 'あなた', faction, isCPU: false },
             ...opponentsFor(faction, cpus).map(f => ({ name: FACTION_INFO[f].name, faction: f, isCPU: true }))];
-        this.startGame({ players, options: {} });
+        this.startGame({ players, options: level === 'easy' ? { level } : {} });
     }
 
     stopGame() {
@@ -140,6 +143,10 @@ export default class UI {
         });
         $('#count-down').addEventListener('click', () => this.changeSetting({ cpus: this.settings.cpus - 1 }));
         $('#count-up').addEventListener('click', () => this.changeSetting({ cpus: this.settings.cpus + 1 }));
+        $('#level').addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-level]');
+            if (button) this.changeSetting({ level: button.dataset.level });
+        });
         $('#start').addEventListener('click', () => this.newGame());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
@@ -150,6 +157,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => this.openLog());
         $('#zoom-in').addEventListener('click', () => this.board.zoomBy(1.3));
         $('#zoom-out').addEventListener('click', () => this.board.zoomBy(1 / 1.3));
@@ -220,6 +228,7 @@ export default class UI {
         $('#count-value').textContent = `${cpus}人`;
         $('#count-down').disabled = cpus <= 1;
         $('#count-up').disabled = cpus >= 3;
+        document.querySelectorAll('#level [data-level]').forEach(b => b.setAttribute('aria-checked', String(b.dataset.level === this.settings.level)));
         $('#opponents').textContent = `相手：${opponentsFor(faction, cpus).map(f => FACTION_INFO[f].name).join('・')}`;
     }
 
@@ -232,6 +241,8 @@ export default class UI {
     onUpdate() {
         if (!this.controller) return;
         this.view = this.controller.getView();
+        // ヒントを出している間は、今の場面のおすすめに出し直す
+        if (this.hintCommand) this.hintCommand = this.myTurn() ? this.controller.hint() : null;
         const key = JSON.stringify(this.view.legal);
         if (key !== this.lastLegalKey) {
             // 取れる操作が変わったら、選んでいる途中の操作はやめる
@@ -304,6 +315,12 @@ export default class UI {
                 });
             }
             if (sel.fields.from !== undefined && sel.fields.from !== null) marks[sel.fields.from] = 'from';
+        } else if (this.myTurn() && this.hintCommand) {
+            // ヒントを出しているときは、おすすめの手の場所だけを光らせる
+            const c = this.hintCommand;
+            ['from', 'to', 'clearing'].forEach(k => { if (c[k] !== undefined && c[k] !== null) glow.clearings.add(c[k]); });
+            if (c.from !== undefined && c.from !== null) marks[c.from] = 'from';
+            if (c.type === 'forest' || (c.clearing === null && c.forest !== undefined)) glow.forests.add(c.forest);
         } else if (this.myTurn()) {
             // 何も選んでいないときは、操作できる空き地を光らせる
             this.view.legal.forEach(a => {
@@ -407,11 +424,13 @@ export default class UI {
     renderActions() {
         const v = this.view;
         const types = this.myTurn() ? this.mainTypes() : [];
-        $('#actions').innerHTML = types.map(t => `<button class="act${this.sel?.type === t ? ' on' : ''}" data-type="${t}">${TYPE_LABELS[t] ?? t}</button>`).join('');
+        const hinted = this.sel ? null : this.hintCommand?.type;
+        $('#actions').innerHTML = types.map(t => `<button class="act${this.sel?.type === t ? ' on' : ''}${hinted === t ? ' recommended' : ''}" data-type="${t}">${TYPE_LABELS[t] ?? t}</button>`).join('');
         const next = this.myTurn() && v.legal.some(a => a.type === 'next');
         const discard = this.myTurn() && v.legal.find(a => a.type === 'discard');
         const button = $('#next');
         button.hidden = !next && !discard;
+        button.classList.toggle('recommended', !this.sel && ['next', 'discard'].includes(this.hintCommand?.type));
         if (discard) {
             button.textContent = `捨てる ${this.discardPick.size}/${discard.count}`;
             button.disabled = this.discardPick.size !== discard.count;
@@ -440,14 +459,16 @@ export default class UI {
         const glowCards = new Set();
         if (sel?.asking === 'card' || sel?.asking === 'pay') this.fieldValues(sel.asking).forEach(id => glowCards.add(id));
         const discard = this.myTurn() && v.legal.some(a => a.type === 'discard');
+        const hintCards = new Set(this.sel ? [] : [this.hintCommand?.card, ...(this.hintCommand?.cards ?? [])].filter(id => id !== undefined && id !== null));
         $('#hand').innerHTML = hand.length === 0 ? '<p class="empty">手札なし</p>'
-            : hand.map(id => cardHtml(id, { cls: `${glowCards.has(id) ? 'glow' : ''}${discard && this.discardPick.has(id) ? ' picked' : ''}` })).join('');
+            : hand.map(id => cardHtml(id, { cls: `${glowCards.has(id) ? 'glow' : ''}${hintCards.has(id) ? ' recommended' : ''}${discard && this.discardPick.has(id) ? ' picked' : ''}` })).join('');
     }
 
     // ---- 選ぶ ----
 
     send(command) {
         this.sel = null;
+        this.hintCommand = null;
         if ($('#choice').open) {
             this.choiceKind = null;
             $('#choice').close();
@@ -800,6 +821,27 @@ export default class UI {
         $('#result-list').innerHTML = order.map(p => `<li class="${v.winners.includes(p.id) ? 'winner' : ''}${p.id === v.you ? ' mine' : ''}" style="--fc:${FACTION_COLORS[p.faction]}">
             ${emblemSvg(p.faction, 26)}<span class="r-name">${escapeHtml(p.name)}</span><span class="r-score">${p.dominance !== null ? '支配' : p.score}</span></li>`).join('');
         $('#result').showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、操作のボタン・地図・手札に印を付けて知らせる（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.myTurn() ? this.controller?.hint() : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.sel = null;
+        this.hintCommand = command;
+        this.render();
+        this.toast(`おすすめ：${this.hintText(command)}`);
+    }
+
+    hintText(c) {
+        if (c.type === 'next') return this.nextLabel();
+        if (c.type === 'discard') return `${c.cards.map(id => CARDS[id].name).join('・')}を捨てる`;
+        const places = ['from', 'to', 'clearing'].filter(k => c[k] !== undefined && c[k] !== null).map(k => c[k] + 1);
+        const where = places.length ? `（${places.join('→')}）` : '';
+        const card = c.card !== undefined && c.card !== null ? `・${CARDS[c.card].name}` : '';
+        return `${TYPE_LABELS[c.type] ?? c.type}${where}${card}`;
     }
 
     toast(message) {

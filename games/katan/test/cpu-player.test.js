@@ -101,3 +101,15 @@ describe('CPU', () => {
         expect(cpuActor(game)).toBe(game.currentPlayerIndex);
     });
 });
+
+describe('CPU の強さ', () => {
+    it('つよいは見落とさない手（アシストと同じ）を選び、最後まで進む', () => {
+        const game = new Game(cpus(3), { seed: 7 });
+        for (let i = 0; i < 3000 && game.phase !== 'end'; i++) {
+            const seat = cpuActor(game);
+            expect(chooseCpuCommand(game, seat, 'strong')).toEqual(chooseCommand(game, seat));
+            runCpuStep(game, seat, 'strong');
+        }
+        expect(game.phase).toBe('end');
+    });
+});

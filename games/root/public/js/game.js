@@ -61,7 +61,8 @@ export default class Game {
         const factions = players.map(p => p.faction);
         if (factions.some(f => !FACTIONS.includes(f)) || new Set(factions).size !== factions.length) throw new Error('陣営が正しくありません');
         const seed = (options.seed ?? Math.floor(Math.random() * 2 ** 32)) >>> 0;
-        this.options = { seed };
+        // level：CPU の強さ（'easy' のときだけ持つ。ふつうは省く）
+        this.options = { seed, ...(options.level === 'easy' ? { level: 'easy' } : {}) };
         this.random = createRandom(seed);
         this.players = players.map((p, id) => ({
             id, name: String(p.name ?? `プレイヤー${id + 1}`), isCPU: !!p.isCPU, faction: p.faction,

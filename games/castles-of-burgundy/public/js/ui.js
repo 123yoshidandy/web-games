@@ -183,6 +183,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
             if (dialog.id === 'result') {
@@ -230,6 +231,46 @@ export default class UI {
     }
 
     // ---- 判定 ----
+
+    // ヒント：CPU（ふつう）が選ぶ操作。使うダイスなどを選んだ状態にし、押すものに印を付ける
+    showHint() {
+        const command = this.myTurn() ? this.controller?.hint() : null;
+        if (!command) return this.toast('自分の番になったら、おすすめを出せます');
+        const view = this.view;
+        this.sel = { die: Number.isInteger(command.die) ? command.die : null, storage: null, buy: command.type === 'buy' };
+        if (command.type === 'place') this.sel.storage = command.tile;
+        if (['take', 'buy', 'ship'].includes(command.type)) this.tab = 'board';
+        if (command.type === 'place') this.tab = 'estate';
+        this.hint = { key: view.events.at(-1)?.seq ?? 0, command };
+        this.render();
+        const area = (d) => (d < 0 ? '黒の倉庫' : `区域${d + 1}`);
+        const text = {
+            take: () => {
+                const t = view.depots?.[command.depot]?.[command.slot]?.tile;
+                return `ダイス${command.die + 1}で${area(command.depot)}の${t === null || t === undefined ? 'タイル' : tileName(t)}を取る`;
+            },
+            place: () => `倉庫の${tileName(command.tile)}を光るマスに置く`,
+            sell: () => `${GOODS[command.goods].name}を売る`,
+            ship: () => `${command.depots.map(area).join('と')}の商品を取る`,
+            workers: () => '労働者をもらう',
+            buy: () => `銀貨で${area(command.depot)}のタイルを買う`,
+            skip: () => '使わない',
+            end: () => '手番を終える'
+        }[command.type]?.() ?? '光るところを押す';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const h = this.hint;
+        if (!h || !this.myTurn() || h.key !== (this.view.events.at(-1)?.seq ?? 0)) return;
+        const c = h.command;
+        const mark = (selector) => document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
+        if (c.type === 'take' || c.type === 'buy') mark(`[data-depot="${c.depot}"][data-slot="${c.slot}"]`);
+        if (c.type === 'place') mark(`[data-cell="${c.cell}"]`);
+        if (c.type === 'sell') mark(`[data-goods="${c.goods}"]`);
+        if (c.type === 'ship') c.depots.forEach(d => mark(`.depot [data-depot-goods="${d}"]`));
+        if (['workers', 'skip', 'end', 'buy'].includes(c.type)) mark(`#actions [data-act="${c.type}"]`);
+    }
 
     myTurn() {
         const v = this.view;
@@ -416,7 +457,9 @@ export default class UI {
             <h3>建物</h3>
             <ul class="help-list">${buildings}</ul>
             <h3>知識</h3>
-            <ul class="help-list k">${knowledge}</ul>`;
+            <ul class="help-list k">${knowledge}</ul>
+            <h3>ヒント</h3>
+            <p>上の電球のボタンを押すと、おすすめの操作（使うダイスと、取るタイル・置くマスなど）を選んで光らせます。</p>`;
     }
 
     // ---- ゲーム画面 ----
@@ -442,6 +485,7 @@ export default class UI {
         else this.renderEstate(view);
         this.renderMe(view);
         this.renderActions(view);
+        this.markHint();
         this.playEvents(view, prev);
         this.scheduleAutoEnd(view);
         if ($('#log').open) this.renderLog();

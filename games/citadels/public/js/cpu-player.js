@@ -135,6 +135,12 @@ export function guessHolders(view) {
 
 // ---- 手を選ぶ ----
 
+// ヒント：人が操作する番に、CPU（ふつう）が選ぶ操作。CPU と同じく、その人のビューだけで決める。手は打たない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCommand(game, seat, 'normal');
+}
+
 export function chooseCommand(game, seat, level = game.players[seat].cpuLevel ?? 'normal') {
     const view = createGameView(game, seat);
     const rand = cpuRandom(game, seat);

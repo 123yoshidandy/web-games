@@ -3,6 +3,7 @@
  * 画面はビューだけを見て描く。操作はコントローラーの send() に渡す
  */
 
+import { suggest } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CHARACTER_BY_ID, ROLE_NAMES, FACE_NAMES, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { installSymbols, faceSvg, icon, LINE_ICONS } from './art.js';
@@ -151,6 +152,7 @@ export default class UI {
             const seat = event.target.closest('.seat');
             if (seat) this.tapSeat(Number(seat.dataset.seat));
         });
+        $('hint').addEventListener('click', () => this.showHint());
         $('dice').addEventListener('click', event => {
             const die = event.target.closest('.die');
             if (die) this.tapDie(Number(die.dataset.die));
@@ -261,6 +263,47 @@ export default class UI {
         }
         if (action === 'kit-skip') return this.send({ type: 'kit', die: this.choice(this.view).die, target: null });
         if (action === 'bart' || action === 'pedro') return this.send({ type: action, arrows: Number(value) });
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作を、選んだ状態にするか、押すものに印を付けて見せる
+    showHint() {
+        const view = this.view;
+        const command = view && suggest(view);
+        if (!command) return this.toast('自分の番になったら、おすすめを出せます');
+        const nameOf = (seat) => (seat === view.you ? 'あなた' : view.players[seat].name);
+        const mark = (selector) => document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
+        let text = '';
+        if (command.type === 'roll' && view.turn.rolls > 0) {
+            this.reroll = new Set(command.dice);
+            this.render();
+            mark('#actions [data-act="roll"]');
+            text = '選んだダイスを振り直す';
+        } else if (command.type === 'roll') {
+            mark('#actions [data-act="roll"]');
+            text = '振る';
+        } else if (command.type === 'stop') {
+            this.reroll.clear();
+            this.render();
+            mark('#actions [data-act="stop"]');
+            text = 'このまま決定';
+        } else if (command.type === 'shoot') {
+            this.selectedDie = command.die;
+            this.double = command.double !== null && command.double !== undefined;
+            this.render();
+            mark(`#seats [data-seat="${command.target}"]`);
+            text = `${nameOf(command.target)}を撃つ${this.double ? '（ビールで2倍）' : ''}`;
+        } else if (command.type === 'bart' || command.type === 'pedro') {
+            mark(`#actions [data-act="${command.type}"][data-value="${command.arrows}"]`);
+            text = '光るボタンを押す';
+        } else if (command.target === null || command.target === undefined) {
+            mark('#actions [data-act="kit-skip"]');
+            text = '使わない';
+        } else {
+            mark(`#seats [data-seat="${command.target}"]`);
+            const verb = { beer: 'にビール', kit: 'に救急箱', sid: 'を回復' }[command.type] ?? 'を選ぶ';
+            text = `${nameOf(command.target)}${verb}`;
+        }
+        this.toast(`おすすめ：${text}`);
     }
 
     send(command) {

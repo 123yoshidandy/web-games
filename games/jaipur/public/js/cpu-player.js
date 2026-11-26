@@ -160,3 +160,10 @@ function subsets(items) {
     items.forEach(item => result.slice().forEach(s => result.push([...s, item])));
     return result;
 }
+
+// ヒント：人の番に、CPU（揺れのほとんどない強さ）が選ぶ手を返す。見るのはその席のビューだけ
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (!(game.phase === 'play' && game.current === seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.strong);
+}

@@ -1242,6 +1242,47 @@ function uniqueShadows(player) {
     });
 }
 
+// ヒント：人の番（その人への選択待ちを含む）に、CPU が最初に選ぶ操作。手は打たない
+// runCpuStepInContext と同じ順で決める（受け付けられなかったときの言い直しは含まない）。リアルタイムモードでは出さない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || (game.isRealtime?.() && game.contexts)) return null;
+    const prompt = game.pendingPrompt;
+    if (prompt) {
+        if (game.getController(prompt.player).id !== seat) return null;
+        return { type: 'answer', answer: choosePromptAnswer(prompt, game), promptId: prompt.id };
+    }
+    const player = game.getCurrentPlayer();
+    if (game.getController(player).id !== seat) return null;
+    if (game.phase === 'action') {
+        if (player.actions <= 0 && player.villagers > 0 && chooseActionCard({ ...player, actions: 1, hand: player.hand }, game) >= 0) {
+            return { type: 'villager', amount: 1 };
+        }
+        const shadows = uniqueShadows(player);
+        const withShadows = Object.create(player);
+        withShadows.hand = [...player.hand, ...shadows];
+        const index = chooseActionCard(shadows.length > 0 ? withShadows : player, game);
+        if (index < 0) return { type: 'buyPhase' };
+        return index >= player.hand.length ? { type: 'playShadow', cardId: shadows[index - player.hand.length].id } : { type: 'play', cardIndex: index };
+    }
+    if (game.phase === 'buy') {
+        const coffers = chooseCoffersToUse(player, game);
+        if (coffers > 0) return { type: 'coffers', amount: coffers };
+        const cardId = game.hasBuyLeft(player) && !game.missionTurn ? chooseCardToBuy(player, game) : null;
+        // 負債があると、返した後のコインで足りるときだけ買える
+        if (cardId && player.coins - (player.debt ?? 0) >= game.getCost(cardId)) return { type: 'buy', cardId };
+        const landscapeId = chooseLandscapeToBuy(player, game);
+        if (landscapeId) return { type: 'buyLandscape', landscapeId };
+        if (player.hand.some(card => card.isType(CARD_TYPES.NIGHT))) return { type: 'night' };
+        return { type: 'endTurn' };
+    }
+    if (game.phase === 'night') {
+        const index = NIGHT_PRIORITY.map(cardId => player.hand.findIndex(card => card.id === cardId)).find(i => i >= 0) ??
+            player.hand.findIndex(card => card.isType(CARD_TYPES.NIGHT));
+        return index >= 0 ? { type: 'play', cardIndex: index } : { type: 'endTurn' };
+    }
+    return null;
+}
+
 function runCpuStepInContext(game) {
     if (game.phase === 'end') return;
 

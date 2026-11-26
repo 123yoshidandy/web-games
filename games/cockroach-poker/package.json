@@ -9,5 +9,12 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Cockroach Poker",
+    "genres": [
+      "カードゲーム",
+      "正体隠し・ブラフ"
+    ]
   }
 }

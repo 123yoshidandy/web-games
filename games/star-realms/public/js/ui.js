@@ -132,6 +132,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => this.showLog());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（終わりの画面は、外側では閉じない）
@@ -230,6 +231,7 @@ export default class UI {
 
     send(command) {
         if (!this.controller) return false;
+        this.hintCommand = null;
         return this.controller.send(command);
     }
 
@@ -347,6 +349,8 @@ export default class UI {
         $('#ticker').textContent = last;
         this.syncPrompt(view);
         this.renderActions(view);
+        if (!this.canAct()) this.hintCommand = null;
+        this.markHint();
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer) {
             this.resultTimer = setTimeout(() => {
@@ -577,6 +581,38 @@ export default class UI {
 
     renderLog() {
         $('#log-list').innerHTML = this.view.logs.slice(-200).map(text => `<li>${escapeHtml(text)}</li>`).join('');
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、カードやボタンに印を付けて知らせる（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        if (command.type === 'choose') return this.toast('いまは選ぶ画面で答えてください');
+        this.hintCommand = command;
+        this.render();
+        const text = {
+            play: '白い枠のカードを出す',
+            buy: '白い枠のカードを獲得する',
+            scrap: '白い枠のカードを廃棄して使う',
+            attack: command.target === 'player' ? '相手を攻撃する' : '白い枠の基地を攻撃する',
+            end: '手番を終える'
+        }[command.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const selector = {
+            play: `#hand [data-zone="hand"][data-id="${c.card}"]`,
+            buy: `[data-zone="row"][data-id="${c.card}"]`,
+            scrap: `[data-zone="mine"][data-id="${c.card}"]`,
+            attack: c.target === 'player' ? '[data-act="attack"]' : `[data-zone="oppBase"][data-id="${c.target}"]`,
+            end: '[data-act="end"]'
+        }[c.type];
+        if (selector) document.querySelector(selector)?.classList.add('recommended');
     }
 
     toast(message) {

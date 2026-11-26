@@ -1253,7 +1253,9 @@ dialog::backdrop {
     line-height: 1;
 }
 
+/* 縦画面で指で押せるよう、高さを取る */
 .pick .minus {
+    min-height: 30px;
     padding: 1px 0;
     font-weight: 800;
 }
@@ -1278,6 +1280,12 @@ dialog::backdrop {
 .dev-info {
     display: flex;
     flex-direction: column;
+}
+
+/* 説明が長くても「使う」を折り返さない（縦画面の狭い幅で） */
+.dev-card button {
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .dev-info .hint {
@@ -1693,19 +1701,31 @@ dialog::backdrop {
 
     .title-art {
         height: auto;
-        width: min(80vw, 34dvh);
+        width: min(80vw, 30dvh);
     }
 
     .title-side {
         flex: none;
         width: min(360px, 100%);
     }
+
+    /* 「続きから」が出ても、開始のボタンを1行に並べる（2段にすると低い画面からはみ出す） */
+    .title-side .buttons {
+        flex-wrap: nowrap;
+        gap: 6px;
+    }
+
+    .title-side .buttons button {
+        padding: 8px 10px;
+        font-size: 0.88rem;
+        white-space: nowrap;
+    }
 }
 
 /* 低い縦画面では、タイトルの絵を小さくしてパネルを収める */
 @media (orientation: portrait) and (max-height: 600px) {
     .title-art {
-        width: min(80vw, 24dvh);
+        width: min(80vw, 20dvh);
     }
 
     /* ゲーム画面：手札とボタンを低い横画面と同じ高さに詰め、ログに2行分を残す。
@@ -1842,3 +1862,43 @@ dialog::backdrop {
         font-size: 0.76rem;
     }
 }
+
+/* ゲーム一覧へのリンク。開始画面の左上（盤の絵の外側）に置く。
+   ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-screen {
+    position: relative;
+}
+
+.portal-link {
+    position: absolute;
+    top: max(4px, env(safe-area-inset-top));
+    left: max(8px, env(safe-area-inset-left));
+    /* 盤の絵の箱が左上まで広がるので、その手前に出す */
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 8px;
+    color: #fff;
+    font-weight: 800;
+    font-size: 0.9rem;
+    text-decoration: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+.portal-link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link {
+        display: none;
+    }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }

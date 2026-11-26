@@ -14,9 +14,11 @@ const MAX_W = 900;
 
 // 高さ 375px の舞台を画面に合わせて拡大・縮小する。横に余裕があれば、舞台の横幅を広げる（最大 900px）
 // 縦持ちのスマホでは body が回っているので、body の縦横（回す前の大きさ）で測る
+// ノッチなどを避ける余白（body の padding）は除く
 function fit() {
-    const width = document.body.clientWidth;
-    const height = document.body.clientHeight;
+    const style = getComputedStyle(document.body);
+    const width = document.body.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    const height = document.body.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
     const scale = Math.min(height / BASE_H, width / BASE_W);
     const stageW = Math.min(MAX_W, Math.max(BASE_W, width / scale));
     document.documentElement.style.setProperty('--scale', String(scale));

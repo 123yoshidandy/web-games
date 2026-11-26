@@ -141,6 +141,12 @@ export function chooseCpuCommand(game, seat = game.current, profile = PROFILES.n
     return strip(noisy[0].m);
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ手（盤はすべて見えている）。手は打たない
+export function suggest(game, seat) {
+    if (game.isOver() || game.current !== seat) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 const strip = (m) => ({ type: 'move', cells: m.cells.slice(), dir: m.dir });
 
 // CPU の1手を進める。選んだ手が通らなければ、通る手を順に試す（止まらないように）

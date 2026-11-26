@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuSeats } from './cpu-player.js';
+import { runCpuStep, cpuSeats, suggest } from './cpu-player.js';
 
 const CPU_DELAY_MS = 350;   // CPU は同じカードを同時に描くので、間を短めにして1人ずつ
 const SAVE_KEY = 'cartographers.save';
@@ -37,6 +37,11 @@ export default class LocalGameController {
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
         this.cpuTimer = null;
         this.save();
+    }
+
+    // ヒント：人が描く番に、CPU（ふつう）が選ぶ描き方。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

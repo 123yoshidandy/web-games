@@ -70,6 +70,29 @@ export default class UI {
         $('#help-cards').innerHTML = [0, 20, 1].map(card => merchantHtml(card)).join('');
     }
 
+    // ヒント：CPU（ふつう）が選ぶ操作を、選んだ状態にして、押すボタンに印を付ける
+    showHint() {
+        const c = this.controller?.hint();
+        if (!c) return this.toast('自分の番になったら、おすすめを出せます');
+        this.clearSelection();
+        const text = { play: '選んだカードを使う', acquire: '選んだカードを取る', claim: '選んだ得点カードを買う', rest: '休んでカードを戻す', discard: '選んだ香辛料を戻す' }[c.type];
+        if (c.type === 'play') {
+            this.sel = { kind: 'hand', card: c.card };
+            this.times = c.times ?? 1;
+            this.steps = [...(c.steps ?? [])];
+        } else if (c.type === 'acquire') {
+            this.sel = { kind: 'market', index: c.index };
+            this.chosenPay = [...c.pay];
+        } else if (c.type === 'claim') {
+            this.sel = { kind: 'point', index: c.index };
+        } else if (c.type === 'discard') {
+            this.discard = [...c.spices];
+        }
+        this.hint = { key: this.lastSeq, act: c.type };
+        this.render();
+        this.toast(`おすすめ：${text ?? '光るボタンを押す'}`);
+    }
+
     clearSelection() {
         this.sel = null;       // { kind: 'hand', card } / { kind: 'market', index } / { kind: 'point', index }
         this.times = 1;        // 交換の回数
@@ -152,6 +175,7 @@ export default class UI {
             this.controller?.pause();
             $('#help').showModal();
         });
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => {
             this.controller?.pause();
             this.renderLog();
@@ -501,6 +525,7 @@ export default class UI {
             html = `<span class="act-log">${escapeHtml(view.logs.at(-1) ?? '')}</span>`;
         }
         $('#actions').innerHTML = html;
+        if (this.hint && this.hint.key === this.lastSeq) $(`#actions [data-act="${this.hint.act}"]`)?.classList.add('recommended');
     }
 
     selectionActions(me) {

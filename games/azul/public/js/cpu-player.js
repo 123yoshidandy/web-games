@@ -120,6 +120,12 @@ export function chooseMove(game, seat = game.current, style = CPU_STYLES.normal)
     return { type: 'take', source: best.source, color: best.color, line: best.line };
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ手（袋の中以外はすべて公開）。手は打たない
+export function suggest(game, seat) {
+    if (game.isOver || game.current !== seat) return null;
+    return chooseMove(game, seat, CPU_STYLES.normal);
+}
+
 export const isCpuTurn = game => game.phase === 'offer' && game.getCurrentPlayer().isCPU;
 
 // CPU の番なら1手進める。進めたら true

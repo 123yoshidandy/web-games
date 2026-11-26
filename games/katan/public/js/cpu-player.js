@@ -78,8 +78,13 @@ function casualMind(game, seat) {
     };
 }
 
-// 実際に打つ CPU の手（見落としあり）
-export const chooseCpuCommand = (game, seat) => chooseCommand(game, seat, casualMind(game, seat));
+// CPU の強さ（ローカル対戦のタイトル画面で選ぶ）。ふつう：見落とす（CASUAL）／つよい：見落とさない（SHARP）
+// オンライン対戦の CPU は、ふつう
+export const CPU_LEVELS = { normal: 'ふつう', strong: 'つよい' };
+const mindOf = (game, seat, level) => (level === 'strong' ? SHARP : casualMind(game, seat));
+
+// 実際に打つ CPU の手（強さが、ふつうなら見落としあり）
+export const chooseCpuCommand = (game, seat, level = 'normal') => chooseCommand(game, seat, mindOf(game, seat, level));
 
 // ===== リアルタイムモードの初期配置 =====
 // 早い者勝ちなので、CPU がすぐ置くと良い場所を先に取ってしまう。人間が場所を選ぶくらいの間を置いて、1つずつ置く
@@ -101,9 +106,9 @@ export function setupCpuDelay(game, seat) {
 }
 
 // CPU を1手進める（seat を省くと、操作が必要な CPU から選ぶ）。進めたら true
-export function runCpuStep(game, seat = cpuActor(game)) {
+export function runCpuStep(game, seat = cpuActor(game), level = 'normal') {
     if (seat === null) return false;
-    const command = chooseCpuCommand(game, seat);
+    const command = chooseCpuCommand(game, seat, level);
     if (game.applyCommand(seat, command)) return true;
     // 考えた手が通らなかったら、手番を進めて止まらないようにする
     if ((game.isRealtimePlay() || seat === game.currentPlayerIndex) && game.applyCommand(seat, { type: 'endTurn' })) return true;

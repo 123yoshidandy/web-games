@@ -115,6 +115,7 @@ export default class UI {
         $('#again').addEventListener('click', () => this.newGame());
         $('#result-board').addEventListener('click', () => $('#result').close());
         $('#home').addEventListener('click', () => this.showTitle());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
@@ -139,7 +140,22 @@ export default class UI {
         return !!v && !v.over && v.current === v.you;
     }
 
+    // おすすめの手を示す。駒と行き先を選んでおき、使うカードを光らせる（カードを押せば動く）
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.clearSelection();
+        if (command.type === 'move') {
+            this.selPiece = command.from;
+            this.pendingTo = command.to;
+        }
+        this.hint = command;
+        this.render();
+    }
+
     clearSelection() {
+        this.hint = null;
         this.selPiece = null;
         this.selCard = null;
         this.pendingTo = null;
@@ -154,6 +170,7 @@ export default class UI {
     onCell(sq) {
         const v = this.view;
         if (!this.myTurn() || v.mustPass) return;
+        this.hint = null;
         if (seatOf(v.board[sq]) === v.you) {
             this.selPiece = this.selPiece === sq ? null : sq;
             this.pendingTo = null;
@@ -229,6 +246,7 @@ export default class UI {
         const prev = this.view;
         this.view = view;
         if (!this.myTurn()) this.clearSelection();
+        $('#hint').disabled = !this.myTurn();
         this.playEvents(view, prev);
         this.renderStatus(view);
         this.renderBoard(view);
@@ -249,7 +267,7 @@ export default class UI {
         }
         if (!this.myTurn()) return '相手の番';
         if (view.mustPass) return '動けない。カードを1枚脇へ';
-        if (this.pendingTo !== null) return 'どちらのカードで動く？';
+        if (this.pendingTo !== null) return 'カードを選ぶ';
         return 'あなたの番';
     }
 
@@ -303,6 +321,7 @@ export default class UI {
                     else if (this.pendingTo !== null) {
                         if (view.moves.some(m => m.card === card && m.from === this.selPiece && m.to === this.pendingTo)) cls.push('choose');
                     } else if (this.selCard === card) cls.push('picked');
+                    if (this.hint?.card === card) cls.push('suggested');
                     else if (this.selCard) cls.push('dim');
                 }
                 return cardHtml(card, { flip: !bottom, cls: cls.join(' '), tag: bottom ? 'button' : 'div', attrs: bottom ? 'type="button"' : '' });

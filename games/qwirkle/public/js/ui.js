@@ -20,6 +20,8 @@ const escapeHtml = (text) => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp
 
 export const ICONS = {
     home: '<svg viewBox="0 0 24 24" class="line-icon"><path d="M4 11 12 4l8 7"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>',
+    hint: '<svg viewBox="0 0 24 24" class="line-icon"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>',
+    log: '<svg viewBox="0 0 24 24" class="line-icon"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r=".6" fill="currentColor"/><circle cx="4" cy="12" r=".6" fill="currentColor"/><circle cx="4" cy="18" r=".6" fill="currentColor"/></svg>',
     help: '<svg viewBox="0 0 24 24" class="line-icon"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>'
 };
 
@@ -55,6 +57,8 @@ export default class UI {
         $('defs').innerHTML = tileDefs();
         $('home').innerHTML = ICONS.home;
         $('open-help-game').innerHTML = ICONS.help;
+        $('hint').innerHTML = ICONS.hint;
+        $('open-log').innerHTML = ICONS.log;
         $('title-art').innerHTML = this.titleArt();
         this.bindTitle();
         this.bindGame();
@@ -145,6 +149,7 @@ export default class UI {
         this.pending = [];
         this.trading = false;
         this.tradeSet = new Set();
+        this.hinted = false; // ヒントで手を選んだ（決定を光らせる）
     }
 
     // ---- ゲーム ----
@@ -153,6 +158,7 @@ export default class UI {
         $('home').addEventListener('click', () => this.showTitle());
         $('open-help-game').addEventListener('click', () => this.openHelp());
         $('undo').addEventListener('click', () => {
+            this.hinted = false;
             if (this.trading) this.tradeSet.clear();
             else this.pending = [];
             this.selected = null;
@@ -167,6 +173,8 @@ export default class UI {
             this.render();
         });
         $('commit').addEventListener('click', () => this.commit());
+        $('hint').addEventListener('click', () => this.showHint());
+        $('open-log').addEventListener('click', () => this.openLog());
         $('board').addEventListener('click', event => {
             if (this.suppressClick) return;
             const cell = event.target.closest('[data-x]');
@@ -248,7 +256,9 @@ export default class UI {
         $('undo').disabled = !mine || (this.trading ? !this.tradeSet.size : !this.pending.length);
         $('trade').disabled = !mine || !!v.firstSize || v.bagCount === 0;
         $('trade').classList.toggle('on', this.trading);
+        $('hint').disabled = !mine;
         const commit = $('commit');
+        commit.classList.toggle('suggested', mine && this.hinted);
         if (this.trading) {
             commit.textContent = this.tradeSet.size ? `${this.tradeSet.size}枚を交換` : '交換';
             commit.disabled = !mine || !this.tradeSet.size || this.tradeSet.size > v.bagCount;
@@ -322,10 +332,46 @@ export default class UI {
         $('hand').innerHTML = slots.join('');
     }
 
+    // ---- ヒント・履歴 ----
+
+    // おすすめの手を、そのまま選んだ状態にする（置く手は仮置き、交換は交換するタイルを選ぶ）。「決定」を押せば打てる
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = this.controller.suggest();
+        if (!command) return;
+        this.resetTurn();
+        const hand = this.myHand();
+        const take = (tile, used) => {
+            const i = hand.findIndex((t, k) => t === tile && !used.has(k));
+            used.add(i);
+            return i;
+        };
+        if (command.type === 'play') {
+            const used = new Set();
+            this.pending = command.placements.map(p => ({ ...p, index: take(p.tile, used) }));
+        } else if (command.type === 'trade') {
+            this.trading = true;
+            const used = new Set();
+            command.tiles.forEach(t => take(t, used));
+            this.tradeSet = used;
+        }
+        this.hinted = true;
+        this.render();
+    }
+
+    openLog() {
+        const logs = this.view?.logs ?? [];
+        const html = logs.length
+            ? `<ol class="log-list">${[...logs].reverse().map(l => `<li${l.head ? ' class="head"' : ''}>${escapeHtml(l.text)}</li>`).join('')}</ol>`
+            : '<p class="sheet-text">まだ何も起きていません</p>';
+        this.openSheet({ title: '履歴', html, buttons: [{ label: '閉じる', primary: true, run: () => {} }] });
+    }
+
     // ---- 操作 ----
 
     tapHand(i) {
         if (!this.myTurn()) return;
+        this.hinted = false;
         if (this.pending.some(p => p.index === i)) return;
         if (this.trading) {
             if (this.tradeSet.has(i)) this.tradeSet.delete(i);
@@ -338,6 +384,7 @@ export default class UI {
 
     tapCell(x, y) {
         if (!this.myTurn() || this.trading) return;
+        this.hinted = false;
         // 置いている途中のタイルを押したら、手札に戻す
         const k = this.pending.findIndex(p => p.x === x && p.y === y);
         if (k >= 0) {

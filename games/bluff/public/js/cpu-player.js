@@ -119,6 +119,11 @@ function chooseEasy(view, rand) {
 
 // ---- 進める ----
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ操作。CPU と同じく、その人のビュー（見えるダイス）だけで決める。手は打たない
+export function suggest(game, seat) {
+    return chooseCommand(game, seat, 'normal');
+}
+
 export function nextCpuSeat(game) {
     return game.actors().find(seat => game.players[seat].isCPU) ?? null;
 }

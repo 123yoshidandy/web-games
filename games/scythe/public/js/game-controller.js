@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuActors, PROFILES } from './cpu-player.js';
+import { runCpuStep, cpuActors, PROFILES, suggest } from './cpu-player.js';
 
 const CPU_DELAY_MS = [550, 850];   // CPU が選ぶまでの間（毎回少しずつ違う）
 const CPU_AFTER_MOVE_MS = 500;     // 動かしたあとは、盤面を見せる分だけ長く待つ
@@ -44,6 +44,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

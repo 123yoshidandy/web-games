@@ -3,7 +3,7 @@
  * ゲームはコントローラー（ローカル対戦 / オンライン対戦）から getView() で受け取ったビューだけを見て描画する
  */
 
-import LocalGameController from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import OnlineGameController, { loadOnlineSession } from './online-controller.js';
 import { getServerUrl, hasServer } from './online-config.js';
 import Game, {
@@ -11,7 +11,7 @@ import Game, {
 } from './game.js';
 import { GEOMETRY } from './board.js';
 import { renderBoard, injectSymbols, resourceIcon, pieceIcon, vertexPips, PLAYER_COLORS } from './board-view.js';
-import { runCpuStep } from './cpu-player.js';
+import { runCpuStep, CPU_LEVELS } from './cpu-player.js';
 import { unlockSound, playEffect, toggleSound, isSoundOn, onSoundChange } from './sound.js';
 import NetplayClient from './netplay/netplay-client.mjs';
 import { renderCoach } from './coach.js';
@@ -21,6 +21,7 @@ import { playAnimations } from './animator.js';
 const SETUP_KEY = 'katan.setup'; // 開始画面で選んだ人数・名前・CPU
 const ASSIST_KEY = 'katan.assist'; // アシスト（おすすめの手・出やすさなど）の ON/OFF
 const AUTO_REJECT_KEY = 'katan.autoReject'; // 求められた資源を持っていない交渉を、自動で断るか
+const CPU_LEVEL_KEY = 'katan.cpuLevel'; // ローカル対戦の CPU の強さ（normal / strong）
 const TOAST_MS = 2500;
 const AUTO_ROLL_DELAY_MS = 700;  // サイコロを振るしかないとき、自動で振るまでの間
 const STAMP_MS = 2500;
@@ -50,7 +51,7 @@ function element(tag, { className, text, onClick, disabled, title } = {}, childr
 // 切り替えボタン（.segmented）の選択を描く
 function selectSegment(group, value) {
     group.querySelectorAll('button').forEach(button => {
-        const selected = (button.dataset.mode ?? button.dataset.count) === value;
+        const selected = (button.dataset.mode ?? button.dataset.count ?? button.dataset.level) === value;
         button.classList.toggle('selected', selected);
         button.setAttribute('aria-checked', String(selected));
     });
@@ -69,6 +70,15 @@ function saveSetup(setup) {
         localStorage.setItem(SETUP_KEY, JSON.stringify(setup));
     } catch {
         // 保存できなくても遊べる
+    }
+}
+
+function loadCpuLevel() {
+    try {
+        const level = localStorage.getItem(CPU_LEVEL_KEY);
+        return Object.hasOwn(CPU_LEVELS, level ?? '') ? level : 'normal';
+    } catch {
+        return 'normal';
     }
 }
 
@@ -115,6 +125,7 @@ export default class UI {
         this.robberHex = null;  // 奪う相手を選んでいる盗賊の行き先
         this.assist = loadSwitch(ASSIST_KEY);
         this.autoReject = loadSwitch(AUTO_REJECT_KEY);
+        this.cpuLevel = loadCpuLevel();
         this.autoRejectedTrade = null; // 自動で断った交渉の番号（同じ交渉に何度も送らない）
         injectSymbols();
         renderHelpPictures($('help-dialog'));
@@ -145,6 +156,7 @@ export default class UI {
         const setup = loadSetup() ?? { count: 3, seats: [] };
         this.setPlayerCount(setup.count, setup.seats);
         this.setGameMode(setup.mode ?? 'classic');
+        $('resume').classList.toggle('hidden', !loadSavedGame());
         this.showScreen('setup');
     }
 
@@ -199,6 +211,19 @@ export default class UI {
             if (button && this.online?.isHost()) this.online.setMode(button.dataset.mode);
         });
         $('start-local').addEventListener('click', () => this.startLocal());
+        $('resume').addEventListener('click', () => {
+            const saved = loadSavedGame();
+            if (!saved) return;
+            try {
+                this.startLocal(saved.players, saved);
+            } catch (error) {
+                // 古い版の記録などで再現できないときは、消して開始画面に戻る
+                console.warn(error);
+                clearSavedGame();
+                this.showSetup();
+                this.toast('前回の続きを開けませんでした');
+            }
+        });
         $('open-online').addEventListener('click', () => this.showOnlineMenu());
         $('back-to-setup').addEventListener('click', () => this.showSetup());
         $('create-room').addEventListener('click', () => this.createRoom());
@@ -246,6 +271,19 @@ export default class UI {
             if ($('set-sound').checked !== isSoundOn()) toggleSound();
         });
         $('set-assist').addEventListener('change', () => this.setAssist($('set-assist').checked));
+        $('cpu-level').addEventListener('click', (event) => {
+            const button = event.target.closest('button[data-level]');
+            if (!button) return;
+            this.cpuLevel = button.dataset.level;
+            try {
+                localStorage.setItem(CPU_LEVEL_KEY, this.cpuLevel);
+            } catch {
+                // 保存できなくても遊べる
+            }
+            // ゲーム中に変えたら、次の CPU の手から効かせる
+            if (this.controller instanceof LocalGameController) this.controller.level = this.cpuLevel;
+            this.renderSettings();
+        });
         $('set-auto-reject').addEventListener('change', () => {
             this.autoReject = $('set-auto-reject').checked;
             saveSwitch(AUTO_REJECT_KEY, this.autoReject);
@@ -356,6 +394,7 @@ export default class UI {
         $('set-sound').checked = isSoundOn();
         $('set-assist').checked = this.assist;
         $('set-auto-reject').checked = this.autoReject;
+        selectSegment($('cpu-level'), this.cpuLevel);
     }
 
     renderAssistButtons() {
@@ -436,7 +475,8 @@ export default class UI {
         selectSegment($('mode-select'), this.gameMode);
     }
 
-    startLocal(players = null) {
+    // saved（途中のローカル対戦）を渡すと、記録から再現して続きから遊ぶ
+    startLocal(players = null, saved = null) {
         if (!players) {
             players = this.readSeats();
             saveSetup({ count: players.length, seats: players, mode: this.gameMode });
@@ -447,6 +487,7 @@ export default class UI {
             }
             this.localMode = this.gameMode;
         }
+        if (saved) this.localMode = saved.options.mode ?? 'classic';
         this.controller?.stop?.();
         this.localPlayers = players;
         this.lastView = null;
@@ -455,7 +496,7 @@ export default class UI {
         this.controller = new LocalGameController(players, {
             onUpdate: () => this.renderGame(),
             onError: (message) => this.toast(message)
-        }, { mode: this.localMode });
+        }, { mode: this.localMode, saved, level: this.cpuLevel });
         $('stamp-button').classList.add('hidden');
         this.showScreen('game');
         this.renderGame();

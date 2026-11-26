@@ -9,5 +9,16 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Tigris & Euphrates",
+    "genres": [
+      "ボードゲーム"
+    ],
+    "players": [
+      2,
+      3,
+      4
+    ]
   }
 }

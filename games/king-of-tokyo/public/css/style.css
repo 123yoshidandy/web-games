@@ -346,3 +346,29 @@ dialog.sheet { margin-bottom: max(12px, env(safe-area-inset-bottom)); }
     .title-screen { flex-direction: row; gap: 20px; }
     .title-art { width: min(280px, 40vw); }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* 動きを減らす設定のときは、アニメーションと切り替えの動きを止める */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* ヒント（おすすめの手） */
+#hint:disabled { opacity: .35; }
+.suggested { outline: 3px solid #f5c542 !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(245, 197, 66, .35) !important; }
+.hint-button svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; margin-right: 2px; }
+.hint-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+.btn-row .hint-button { flex: none; }

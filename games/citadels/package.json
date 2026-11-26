@@ -9,5 +9,14 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Citadels",
+    "aliases": [
+      "あやつりにんぎょう"
+    ],
+    "genres": [
+      "カードゲーム"
+    ]
   }
 }

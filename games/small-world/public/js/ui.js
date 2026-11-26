@@ -110,6 +110,7 @@ export default class UI {
     }
 
     send(command) {
+        this.hintCommand = null;
         if (!this.controller) return false;
         clearTimeout(this.autoTimer);
         return this.controller.send(command);
@@ -141,6 +142,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-races').addEventListener('click', () => this.openRaces());
         $('#players').addEventListener('click', () => this.openRaces());
         $('#open-log').addEventListener('click', () => {
@@ -251,6 +253,8 @@ export default class UI {
         this.renderStatus();
         this.renderPlayers();
         this.renderPanel();
+        if (!this.isMine()) this.hintCommand = null;
+        this.markHint();
         this.showEvents(v);
         clearTimeout(this.autoTimer);
         if (this.isMine() && v.stage === 'pick' && this.pickShownAt !== v.commandCount && !document.querySelector('dialog[open]')) {
@@ -409,7 +413,8 @@ export default class UI {
         const canPick = this.isMine() && v.stage === 'pick';
         const row = v.row.map((c, i) => {
             const tokens = RACES[c.race].tokens + POWERS[c.power].tokens;
-            const pick = canPick ? `<button class="btn primary small" data-pick="${i}"${i > me.coins ? ' disabled' : ''}>選ぶ</button>` : '';
+            const best = this.hintCommand?.type === 'pick' && this.hintCommand.index === i ? ' recommended' : '';
+            const pick = canPick ? `<button class="btn primary small${best}" data-pick="${i}"${i > me.coins ? ' disabled' : ''}>選ぶ</button>` : '';
             return `<li class="combo">
                 <div class="c-top"><span class="c-cost">${coinIcon(13)}${i}</span><b class="c-name">${comboName(c.race, c.power)}</b><span class="c-tok">${tokenSvg(v.you, tokens, false, 20)}</span>${c.coins ? `<span class="c-bonus">+${c.coins}${coinIcon(12)}</span>` : ''}${pick}</div>
                 <div class="c-text"><span>${POWERS[c.power].name.replace(/の$/, '')}</span>${POWERS[c.power].text}</div>
@@ -457,6 +462,36 @@ export default class UI {
         $('#result-table').innerHTML = `<table><thead><tr><th></th><th>コイン</th><th>部隊</th></tr></thead><tbody>${order.map(p => `
             <tr class="${v.winners.includes(p.id) ? 'win' : ''}${p.id === v.you ? ' you' : ''}"><th><span class="dot" style="--c:${PLAYER_COLORS[p.id]}"></span>${escapeHtml(p.name)}</th><td class="total">${p.coins}</td><td>${p.tokens}</td></tr>`).join('')}</tbody></table>`;
         $('#result').showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、地域を選んだ状態にして、押すボタンに印を付ける（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.isMine() ? this.controller?.hint() : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        if (command.region !== undefined) this.selected = command.region;
+        this.render();
+        if (command.type === 'pick') {
+            this.openRaces();
+            $('#races-body .recommended')?.scrollIntoView({ block: 'nearest' });
+            return;
+        }
+        const text = {
+            conquer: '選んだ地域を征服する', dragon: '選んだ地域にドラゴンを送る', sorcery: '選んだ地域に魔術を使う', abandon: '選んだ地域を手放す',
+            roll: 'サイコロで征服を試す', decline: '衰退する', redeploy: '征服を終えて、再配置に移る',
+            place: '選んだ地域に部隊を足す', lift: '選んだ地域から部隊を戻す', hero: '選んだ地域に英雄を置く', camp: '選んだ地域に野営を置く',
+            uncamp: '選んだ地域の野営を外す', fort: '選んだ地域に砦を建てる', done: command.decline ? '番を終えて衰退する' : '番を終える'
+        }[command.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c || c.type === 'pick') return;
+        const act = c.type === 'done' && c.decline ? 'stout' : c.type;
+        document.querySelector(`#actions [data-act="${act}"]`)?.classList.add('recommended');
     }
 
     toast(message) {

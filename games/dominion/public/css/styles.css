@@ -2297,6 +2297,15 @@ button.primary.secondary {
     white-space: nowrap;
 }
 
+/* 「続きから」は、保存があるときだけ先頭に出す。小さい画面でも高さが変わらないよう、3つを1行に並べる */
+.title-buttons.has-resume {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.title-buttons.has-resume .online-suffix {
+    display: none;
+}
+
 /* ===== 使う拡張（トップ画面とロビーのボタン、選ぶ画面） ===== */
 
 .card-set-field {
@@ -2455,6 +2464,43 @@ button.primary.online {
     border: 1px solid rgba(230, 184, 79, 0.6);
     border-radius: 999px;
     cursor: pointer;
+}
+
+/* ===== ゲーム一覧へのリンク ===== */
+/* タイトル画面の「遊び方」の隣に置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+
+.title-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 12px;
+}
+
+.title-links .title-help-btn {
+    margin-top: 0;
+}
+
+.portal-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gold);
+    text-decoration: none;
+}
+
+.portal-link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link {
+        display: none;
+    }
 }
 
 /* ===== 遊び方 ===== */
@@ -2627,5 +2673,57 @@ button.primary.online {
 
     .title-logo {
         font-size: 34px;
+    }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+
+/* ===== 縦持ちのスマホ：横にするよう促す ===== */
+/* 画面は横向きで作っている。タブレットの縦向きは今の配置のままにし、スマホの幅だけで出す */
+.rotate-hint {
+    display: none;
+}
+
+@media (orientation: portrait) and (pointer: coarse) and (max-width: 599px) {
+    .rotate-hint {
+        position: fixed;
+        inset: 0;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+        color: var(--on-felt);
+        background: var(--felt-dark);
+        text-align: center;
+        font-size: 16px;
+    }
+
+    .rotate-hint p {
+        margin: 0;
+    }
+}
+
+/* ===== 動きを減らす設定 ===== */
+/* カードの移動などは、待ち時間（setTimeout）はそのままで、動きだけをすぐに終える */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ヒント：おすすめの印 */
+.recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+/* ヒントのボタンを足した分、狭い横画面ではロゴの文字を外して、手番の表示の幅を空ける */
+@media (orientation: landscape) and (max-height: 500px) and (max-width: 760px) {
+    #topbar h1 {
+        display: none;
     }
 }

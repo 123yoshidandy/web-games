@@ -111,6 +111,7 @@ export default class UI {
         $('#again').addEventListener('click', () => this.newGame());
         $('#result-home').addEventListener('click', () => this.showTitle());
         $('#home').addEventListener('click', () => this.showTitle());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#next-round').addEventListener('click', () => {
@@ -200,6 +201,28 @@ export default class UI {
         this.controller?.send({ type: 'play', card, to });
     }
 
+    // ---- ヒント ----
+
+    // おすすめの手を示す。出す手なら、そのカードを選んでおき、出し先のボタンを光らせる
+    showHint() {
+        if (!this.myTurn('play') && !this.myTurn('draw')) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.hint = { at: this.view.logCount, command };
+        if (command.type === 'play') this.picked = command.card;
+        this.render();
+    }
+
+    renderHint() {
+        const playing = this.myTurn('play') || this.myTurn('draw');
+        $('#hint').disabled = !playing;
+        if (this.hint && this.hint.at !== this.view.logCount) this.hint = null;
+        const c = this.hint?.command;
+        if (!c || !playing) return;
+        if (c.type === 'play' && this.picked === c.card) $(`#actions [data-act="${c.to}"]`)?.classList.add('suggested');
+        if (c.type === 'draw') (c.from === 'deck' ? $('#actions [data-act="deck"]') : $(`#discards [data-color="${c.from}"]`))?.classList.add('suggested');
+    }
+
     // ---- 描く ----
 
     render() {
@@ -215,6 +238,7 @@ export default class UI {
         this.renderDiscards();
         this.renderHand();
         this.renderActions();
+        this.renderHint();
 
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;

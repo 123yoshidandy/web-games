@@ -39,12 +39,12 @@ export const DRAW_REASONS = {
 export const roundName = (round) => `${ROUND_NAMES[round.wind]}${round.kyoku + 1}局`;
 
 export default class Game {
-    // players: [{ name, isCPU }] を4人。options: { seed, length: 'east' | 'south' }
+    // players: [{ name, isCPU }] を4人。options: { seed, length: 'east' | 'south', level: CPU の強さ 'easy' | 'normal'（ルールには関わらない） }
     constructor(players, options = {}) {
         if (players.length !== PLAYER_COUNT) throw new Error('4人で遊びます');
         const seed = (options.seed ?? Math.floor(Math.random() * 2 ** 32)) >>> 0;
         const length = LENGTHS[options.length] ? options.length : 'east';
-        this.options = { seed, length };
+        this.options = { seed, length, level: options.level === 'easy' ? 'easy' : 'normal' };
         this.random = createRandom(seed);
         this.players = players.map((p, id) => ({
             id, name: String(p.name ?? `プレイヤー${id + 1}`), isCPU: !!p.isCPU, score: START_SCORE

@@ -396,7 +396,7 @@ describe('ビュー', () => {
     });
 });
 
-describe('再現', () => {
+describe('記録からの再現', () => {
     it('操作の記録から同じゲームを再現できる', () => {
         const game = new Game(players(3).map(p => ({ ...p, isCPU: true })), { seed: 9 });
         for (let i = 0; i < 300 && game.phase !== 'end'; i++) runCpuStep(game);

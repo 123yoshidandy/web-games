@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuActors } from './cpu-player.js';
+import { runCpuStep, cpuActors, suggest } from './cpu-player.js';
 
 const CPU_TURN_MS = [520, 820];  // CPU が打牌するまでの間（毎回少しずつ違う）
 const CPU_CALL_MS = 380;         // 鳴くかどうかを答えるまでの間
@@ -40,6 +40,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.save();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

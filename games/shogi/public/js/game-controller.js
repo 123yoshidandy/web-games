@@ -8,7 +8,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_MOVE_MS = 450;    // 前の手が見えるように、少し待ってから考える
 const SAVE_KEY = 'shogi.save';
@@ -61,6 +61,12 @@ export default class LocalGameController {
         view.canUndo = this.undoLength() !== null;
         view.twoPlayers = this.twoPlayers;
         return view;
+    }
+
+    // ヒント：手番の人のおすすめの手（CPU の番なら null）
+    hint() {
+        const seat = this.game.current;
+        return this.humanSeats.includes(seat) ? suggest(this.game, seat) : null;
     }
 
     send(command) {

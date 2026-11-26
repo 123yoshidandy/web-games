@@ -225,6 +225,12 @@ export function runCpuStep(game, seat, profile = PROFILES.normal) {
     return !!card && game.applyCommand(seat, { type: 'pass', card: card.id });
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ操作。CPU と同じく、自分の手札と公開の盤から決める。手は打たない
+export function suggest(state, seat) {
+    if (currentSeat(state) !== seat) return null;
+    return chooseCommand(state, seat, PROFILES.normal);
+}
+
 // 画面で、捨てるカードの初期値に使う（残しておく値が一番低いカード）
 export function suggestDiscard(state, seat, ids = null) {
     return cheapestCard(state, seat, ids)?.id ?? null;

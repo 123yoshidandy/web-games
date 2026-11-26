@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_STEP_DELAY_MS = 800;   // CPU の手は、動きが見えるように間を置いて1手ずつ
 const CPU_QUICK_DELAY_MS = 450;  // 買った建物を置く・続けて買うなど、手番の続き
@@ -39,6 +39,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.save();
+    }
+
+    // ヒント：人の番に、CPU（ふつう）が選ぶ操作。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_TURN_START_MS = 1000;  // 手番を始める前は、ダイスの目が見えるように長めに待つ
 const CPU_STEP_MS = 650;         // 手番の中の操作
@@ -39,6 +39,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.save();
+    }
+
+    // ヒント：人が操作する番に、CPU（ふつう）が選ぶ操作。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

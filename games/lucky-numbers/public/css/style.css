@@ -1145,6 +1145,50 @@ button.link {
     font-size: 15px;
 }
 
+/* 「続きから」が出ているときは、3つのボタンを少し詰めて1行に収める */
+#screen-setup .buttons:has(#resume:not(.hidden)) {
+    flex-wrap: nowrap;
+    gap: 8px;
+}
+
+#screen-setup .buttons:has(#resume:not(.hidden)) button {
+    padding: 8px 10px;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+/* 見出しの行：左に「ゲームの準備」、右に CPU の強さ */
+.setup-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+#screen-setup .setup-head h2 {
+    margin: 0;
+}
+
+.level-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--muted);
+}
+
+/* 見出しと同じくらいの高さにして、行を高くしない */
+.level-row .segmented {
+    padding: 2px;
+}
+
+.level-row .segmented button {
+    padding: 1px 10px;
+    font-size: 13px;
+    line-height: 1.3;
+}
+
 #screen-setup button.link {
     font-size: 13px;
 }
@@ -1340,5 +1384,36 @@ button.link {
     .opponents {
         grid-template-columns: repeat(var(--count, 1), minmax(0, 88px));
         gap: 6px;
+    }
+}
+
+/* ゲーム一覧へのリンク。開始画面の「遊び方を見る」の隣に置く。
+   ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.footer-links {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.portal-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--green);
+    font-size: 13px;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    white-space: nowrap;
+}
+
+.portal-link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link {
+        display: none;
     }
 }

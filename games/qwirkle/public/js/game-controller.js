@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 900;   // CPU の手を目で追える間
 const SAVE_KEY = 'qwirkle.save';
@@ -37,6 +37,11 @@ export default class LocalGameController {
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
         this.cpuTimer = null;
         this.save();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

@@ -96,3 +96,10 @@ export function decide(view, random, profile = PROFILES.normal) {
     if (Math.abs(cost - limit) < 6 && random() < profile.blunder) take = !take;
     return { type: take ? 'take' : 'pass' };
 }
+
+// ヒント：人の番に、CPU（いちばん強い設定）が選ぶ手を返す。CPU と同じく、その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (!(game.phase === 'play' && game.turn === seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.strong);
+}

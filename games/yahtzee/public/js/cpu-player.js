@@ -191,8 +191,16 @@ function keepFlags(dice, counts) {
     });
 }
 
+// random を渡さないときの迷い。局面（得点表・ダイス・残りの振り直し）から作るので、同じ局面なら同じ手を選ぶ
+function stateRandom(state) {
+    const s = JSON.stringify(state);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
 // 期待値で、振り直すなら残し方を、振らないなら記入する欄を選ぶ
-export function planTurn(state, profile = PROFILES.strong, random = Math.random) {
+export function planTurn(state, profile = PROFILES.strong, random = stateRandom(state)) {
     const { hands, handIndex, keeps, subKeeps, full } = getTables();
     const valueOf = makeValuer(state.scores, profile, random);
     const scoreNow = hands.map(h => bestCategory(state.scores, h.dice, valueOf));

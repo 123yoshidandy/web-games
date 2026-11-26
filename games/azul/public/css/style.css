@@ -219,11 +219,42 @@ button {
     top: 8px;
     right: 8px;
 }
+/* ゲーム一覧へのリンク。遊び方と向かい合う左上に置く。
+   ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.portal-link {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 10px;
+    border-radius: 10px;
+    color: var(--ink-soft);
+    font-size: 14px;
+    font-weight: 800;
+    text-decoration: none;
+}
+.portal-link:active { background: rgba(255, 255, 255, 0.1); }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
 
 @media (max-height: 600px) {
     .logo { font-size: 50px; }
     .art-wall { --t: 26px; padding: 8px; }
     .title-inner { gap: 10px; }
+}
+/* スマホ横など低い画面：さらに詰め、収まらなければタイトルをスクロールさせる */
+#title-screen { overflow-y: auto; }
+.title-inner { flex: 1 0 auto; justify-content: safe center; }
+@media (max-height: 440px) {
+    .logo { font-size: 40px; }
+    .art-wall { --t: 18px; padding: 6px; }
+    .title-art { margin: 0; }
+    .title-inner { gap: 8px; padding: 10px 16px; }
 }
 
 /* ===== プレイ中 ===== */
@@ -666,3 +697,15 @@ body.landscape #my-board { grid-column: 2; grid-row: 1 / span 2; align-self: cen
 @media (prefers-reduced-motion: reduce) {
     .factory.live, #center.live, .line.droppable .slot, .cell.fresh .tile, .m.fresh, .round-toast { animation: none !important; }
 }
+
+/* BGM の ON/OFF（js/music.js）。タイトルでは遊び方の左に置く */
+.title-bgm { position: absolute; top: 8px; right: 52px; }
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント・記録 */
+.toast-note { margin: 0; font-weight: 800; font-size: 14px; }
+.log-list { margin: 8px 0 12px; padding-left: 1.6em; font-size: 13px; line-height: 1.6; }
+.line.recommended, .floor.recommended { outline: 3px solid #fff8d6; outline-offset: 1px; border-radius: 6px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75); }
+#log { width: min(360px, calc(100vw - 24px)); }

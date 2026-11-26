@@ -268,6 +268,12 @@ function randomDiscard(caravan, random) {
     return { type: 'discard', spices };
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ操作。CPU と同じく、その人のビューだけで決める。手は打たない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || game.current !== seat) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 export function chooseCpuCommand(game, seat = game.current, profile = PROFILES.normal) {
     const view = createGameView(game, seat);
     const random = cpuRandom(game, seat);

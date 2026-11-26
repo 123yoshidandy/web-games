@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn, cpuActor, PROFILES } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, cpuActor, PROFILES, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 800;   // CPU が伏せる・宣言するときは、動きが見えるように間を置く
 const CPU_QUICK_DELAY_MS = 250;         // ラウンドの始めに全員が1枚伏せる場面は早く
@@ -45,6 +45,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

@@ -193,6 +193,12 @@ export function scoreCandidates(game, seat, cfg = LEVELS.normal, random = cpuRan
     return candidates;
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ置き方。CPU と同じく、引いたタイルと公開の盤から決める。手は打たない
+export function suggest(game, seat) {
+    if (game.isOver() || game.phase !== 'play' || game.current !== seat) return null;
+    return chooseCommand(game, seat, 'normal');
+}
+
 export function chooseCommand(game, seat, level = 'normal') {
     const cfg = LEVELS[level] ?? LEVELS.normal;
     const candidates = scoreCandidates(game, seat, cfg);

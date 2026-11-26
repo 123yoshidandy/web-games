@@ -9,5 +9,14 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Tokaido",
+    "aliases": [
+      "とうかいどう"
+    ],
+    "genres": [
+      "ボードゲーム"
+    ]
   }
 }

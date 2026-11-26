@@ -44,6 +44,7 @@ export default class UI {
         this.settings = loadSettings();
         this.controller = null;
         this.view = null;
+        this.hintCommand = null;
         this.selected = [];         // 選んだ札（手札の並びの位置）
         this.chopsticks = false;    // 箸で2枚取るか
         this.shownRound = 0;        // 得点を見せたラウンド
@@ -69,7 +70,11 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
+                onUpdate: () => {
+                    // ほかの人が動いても、ヒントを出している間は、今の場面のおすすめに出し直す
+                    if (this.hintCommand) this.hintCommand = this.controller.hint();
+                    this.render();
+                },
                 onError: (message) => this.toast(message)
             });
         } catch (error) {
@@ -132,6 +137,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#round-ok').addEventListener('click', () => $('#round-result').close());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（終わりの画面は、外側では閉じない）
@@ -183,6 +189,7 @@ export default class UI {
         if (this.chopsticks && second) command.second = second;
         this.selected = [];
         this.chopsticks = false;
+        this.hintCommand = null;
         this.controller.send(command);
     }
 
@@ -286,6 +293,7 @@ export default class UI {
         const cols = hand.length >= 9 ? 5 : 4;
         $('#hand').style.setProperty('--cols', String(cols));
         $('#hand').style.setProperty('--rows', String(Math.max(1, Math.ceil(hand.length / cols))));
+        const hinted = this.hintIndexes(hand);
         $('#hand').innerHTML = hand.map((type, i) => {
             const order = this.selected.indexOf(i);
             let cls = can ? 'selectable' : '';
@@ -297,6 +305,7 @@ export default class UI {
                     cls += ' chosen';
                 } else cls += ' waiting';
             }
+            if (hinted.has(i)) cls += ' recommended';
             const mark = order >= 0 && this.chopsticks ? `<span class="order">${order + 1}</span>` : '';
             return cardHtml(type, { cls, attrs: `data-index="${i}"` }).replace('</div>', `${mark}</div>`);
         }).join('');
@@ -365,6 +374,33 @@ export default class UI {
 
     renderLog() {
         $('#log-list').innerHTML = this.view.logs.slice(-150).map(text => `<li>${escapeHtml(text)}</li>`).join('');
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの札に印を付ける（画面だけ。記録には入れず、自分が選んだら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) {
+            this.toast('いまは選ぶ札がありません');
+            return;
+        }
+        this.hintCommand = command;
+        this.render();
+        const names = [command.card, command.second].filter(Boolean).map(type => CARDS[type].name);
+        this.toast(`おすすめ：${names.join('と')}${command.second ? '（箸で2枚）' : ''}`);
+    }
+
+    // 手札の並びのうち、おすすめの札の位置
+    hintIndexes(hand) {
+        const marked = new Set();
+        const c = this.hintCommand;
+        if (!c) return marked;
+        for (const type of [c.card, c.second].filter(Boolean)) {
+            const i = hand.findIndex((t, j) => t === type && !marked.has(j));
+            if (i >= 0) marked.add(i);
+        }
+        return marked;
     }
 
     toast(message) {

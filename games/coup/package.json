@@ -9,5 +9,12 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Coup",
+    "genres": [
+      "カードゲーム",
+      "正体隠し・ブラフ"
+    ]
   }
 }

@@ -62,6 +62,7 @@ CPU 同士の結果（`scripts/cpu-match.mjs`。席を回して対戦）：
 node scripts/cpu-match.mjs 100 normal,easy
 node scripts/cpu-match.mjs 40 normal,easy,easy,easy
 ```
+上の帯の電球（ヒント）を押すと、ふつうの CPU が揺れなしで選ぶ手を示す（駒なら行き先のマスを光らせ、壁なら置く画面にその壁を出しておく）。上の帯の一覧のボタンで、最近の手の履歴を見られる。
 
 ## 開発
 

@@ -9,5 +9,12 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Stone Age",
+    "genres": [
+      "ボードゲーム",
+      "ダイス"
+    ]
   }
 }

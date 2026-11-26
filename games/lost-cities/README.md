@@ -40,6 +40,8 @@
 node scripts/cpu-match.mjs 400 normal strong
 ```
 
+自分の行の電球（ヒント）を押すと、揺れのほとんどない CPU が選ぶ手を示す（出す手はそのカードを選んでおき、出し先のボタンを光らせる。引く手は山札か捨て場を光らせる）。CPU と同じく、自分のビューだけで決める。
+
 ## 開発
 
 素の HTML / CSS / JavaScript（ES Modules）で、ビルドはない。

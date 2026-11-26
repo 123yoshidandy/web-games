@@ -79,6 +79,12 @@ function context(game, seat, profile) {
 }
 
 // 手番の CPU の操作を1つ決める
+// ヒント：人が描く番に、CPU（ふつう）が選ぶ描き方。CPU と同じく、公開のカードと地図から決める。手は打たない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || !game.pending.includes(seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 export function chooseCpuCommand(game, seat, profile = profileOf(game, seat)) {
     const random = cpuRandom(game, seat);
     if (game.phase === 'ambush') return chooseMonster(game, seat, random, profile);

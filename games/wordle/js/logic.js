@@ -79,8 +79,20 @@ export function trimBlanks(word) {
     return word.replaceAll(BLANK, '');
 }
 
-// 答えを選び、マスの数まで後ろを空白で埋める（random は 0 以上 1 未満を返す関数）
-export function pickAnswer(mode, random = Math.random) {
+// シードから決まる乱数（mulberry32）。0 以上 1 未満を返す関数を作る。同じシードなら同じ答えになる
+export function createRandom(seed) {
+    let a = seed >>> 0;
+    return () => {
+        a = (a + 0x6D2B79F5) >>> 0;
+        let t = a;
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+
+// 答えを選び、マスの数まで後ろを空白で埋める（random は 0 以上 1 未満を返す関数。1人プレイは createRandom(シード)、対戦はサーバーの乱数）
+export function pickAnswer(mode, random) {
     const answers = answerList(mode);
     const answer = answers[Math.floor(random() * answers.length)];
     return answer + BLANK.repeat(boardWidth(mode) - answer.length);

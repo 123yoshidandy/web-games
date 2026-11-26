@@ -4,7 +4,7 @@
  */
 
 import LocalGameController from './game-controller.js';
-import { canPlaceInLine, wallColor, FLOOR_PENALTIES, FIRST, BONUS } from './game.js';
+import { canPlaceInLine, wallColor, FLOOR_PENALTIES, FIRST, BONUS, COLOR_NAMES } from './game.js';
 import { measureBefore, playMove } from './motion.js';
 import * as storage from './storage.js';
 
@@ -86,7 +86,10 @@ function update() {
     const moved = previous && view.lastMove && view.commandCount === previous.commandCount + 1;
     const before = moved ? measureBefore(view.lastMove) : null;
 
-    if (previous && view.commandCount !== previous.commandCount) app.selection = null;
+    if (previous && view.commandCount !== previous.commandCount) {
+        app.selection = null;
+        app.hint = null;
+    }
     if (view.lastReport && (!previous || previous.lastReport?.round !== view.lastReport.round) && previous) {
         app.freshRound = view.lastReport.round;
         showRoundToast(view);
@@ -179,7 +182,8 @@ function boardHtml(view, player, { interactive = false, myTurn = false } = {}) {
             slots.push(filled ? `<span class="slot filled">${tileSvg(line.color)}</span>` : '<span class="slot"></span>');
         }
         const ok = sel && canPlaceInLine(player, row, sel.color);
-        return `<div class="line${ok ? ' droppable' : ''}" data-line="${row}">${slots.join('')}</div>`;
+        const best = sel && app.hint && app.hint.line === row ? ' recommended' : '';
+        return `<div class="line${ok ? ' droppable' : ''}${best}" data-line="${row}">${slots.join('')}</div>`;
     }).join('');
     const wall = player.wall.map((row, r) => row.map((filled, c) => {
         const color = wallColor(r, c);
@@ -199,7 +203,7 @@ function boardHtml(view, player, { interactive = false, myTurn = false } = {}) {
                 <div class="lines">${lines}</div>
                 <div class="wall">${wall}</div>
             </div>
-            <div class="floor${sel ? ' droppable' : ''}" data-line="floor">${floor}</div>
+            <div class="floor${sel ? ' droppable' : ''}${sel && app.hint?.line === 'floor' ? ' recommended' : ''}" data-line="floor">${floor}</div>
         </div>`;
 }
 
@@ -281,6 +285,7 @@ function onPlayClick(event) {
         const color = Number(pick.dataset.color);
         const same = app.selection && app.selection.source === source && app.selection.color === color;
         app.selection = same ? null : { source, color };
+        app.hint = null;
         render(view);
         return;
     }
@@ -291,6 +296,26 @@ function onPlayClick(event) {
         if (line !== 'floor' && !canPlaceInLine(me, line, app.selection.color)) return;
         app.controller.send({ type: 'take', source: app.selection.source, color: app.selection.color, line });
     }
+}
+
+// ヒント：CPU（ふつう）が自分の番に選ぶ手。取るタイルを選んだ状態にし、置く段を光らせる（すべて公開の情報で決まる）
+function showHint() {
+    const view = app.view;
+    if (!view || app.scene !== 'game') return;
+    const move = app.controller?.hint();
+    if (!move) return showNote('おすすめ', '自分の番になったら、おすすめを出せます');
+    app.selection = { source: move.source, color: move.color };
+    app.hint = move;
+    render(view);
+    const from = move.source === 'center' ? '中央' : `工房${move.source + 1}`;
+    showNote('おすすめ', `${from}の${COLOR_NAMES[move.color]}を、${move.line === 'floor' ? '床' : `${move.line + 1}段目`}へ`);
+}
+
+function showLog() {
+    const logs = app.view?.logs ?? [];
+    $('#log-list').innerHTML = logs.length ? logs.map(text => `<li>${escapeHtml(text)}</li>`).join('') : '<li>まだ記録はありません</li>';
+    openDialog($('#log'));
+    $('#log-list').scrollTop = $('#log-list').scrollHeight;
 }
 
 function openBoard(seat) {
@@ -320,6 +345,14 @@ function showRoundToast(view) {
     }).join('');
     const toast = $('#round-toast');
     toast.innerHTML = `<div class="toast-title">ラウンド ${report.round} の得点</div><ul>${rows}</ul>`;
+    toast.hidden = false;
+    clearTimeout(app.toastTimer);
+    app.toastTimer = setTimeout(hideToast, TOAST_MS);
+}
+
+function showNote(title, text) {
+    const toast = $('#round-toast');
+    toast.innerHTML = `<div class="toast-title">${escapeHtml(title)}</div><p class="toast-note">${escapeHtml(text)}</p>`;
     toast.hidden = false;
     clearTimeout(app.toastTimer);
     app.toastTimer = setTimeout(hideToast, TOAST_MS);
@@ -415,6 +448,9 @@ function init() {
         if (action === 'home') goHome();
         if (action === 'help') openDialog($('#help-dialog'));
         if (action === 'close-help') $('#help-dialog').close();
+        if (action === 'hint') showHint();
+        if (action === 'log') showLog();
+        if (action === 'close-log') $('#log').close();
         if (action === 'result') showResult();
         if (action === 'close-result') $('#result-dialog').close();
         if (action === 'rematch') {
@@ -456,6 +492,7 @@ function init() {
 
     // 確認用（画面の確認スクリプトから状態を作る）
     window.__azul = app;
+    window.__app = app;
 }
 
 init();

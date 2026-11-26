@@ -18,7 +18,7 @@ import {
     FLATTEN_WAIT_FRAMES, FLATTEN_SLIDE_FRAMES, FLATTEN_DROP_FRAMES, SHAKE_FRAMES
 } from './constants.js';
 import { DEFAULT_SETTINGS, getChoice } from './settings.js';
-import { createRandom } from './random.js';
+import { createRandom, createSeed } from './random.js';
 
 export const IDLE = 'idle';
 export const SWAP = 'swap';
@@ -31,8 +31,8 @@ export const THAW = 'thaw';
 export const createGameState = () => ({
     settings: DEFAULT_SETTINGS, // 難易度など（settings.js）
     mode: 'solo', // 'solo'（ひとりで動かすテスト用。お邪魔ブロックは降らない） | 'versus'（対戦）
-    random: Math.random, // パネルの並び用の乱数（対戦では相手と同じシード）
-    miscRandom: Math.random, // お邪魔ブロックの位置などその他の乱数
+    random: createRandom(0), // パネルの並び用の乱数（対戦では相手と同じシード）
+    miscRandom: createRandom(0), // お邪魔ブロックの位置などその他の乱数
     colorCount: 5,
     grid: [], // grid[y][x]: null | パネル | お邪魔ブロック
     next: [], // 次にせり上がってくる段の色
@@ -144,14 +144,14 @@ function fillStartingRows() {
     }
 }
 
-// ゲームを始める。対戦では mode: 'versus' と、相手と同じ seed を渡す
-export function resetGame(settings = gameState.settings, { mode = 'solo', seed } = {}) {
+// ゲームを始める。対戦では mode: 'versus' と、相手と同じ seed を渡す（渡さなければ、ここでシードを決める）
+export function resetGame(settings = gameState.settings, { mode = 'solo', seed = createSeed() } = {}) {
     const difficulty = getChoice(settings, 'difficulty');
     Object.assign(gameState, {
         settings,
         mode,
-        random: seed === undefined ? Math.random : createRandom(seed),
-        miscRandom: seed === undefined ? Math.random : createRandom(seed ^ 0x5bd1e995),
+        random: createRandom(seed),
+        miscRandom: createRandom(seed ^ 0x5bd1e995),
         colorCount: difficulty.colorCount,
         grid: Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(null)),
         next: Array(WIDTH).fill(0),

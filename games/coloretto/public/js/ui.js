@@ -136,6 +136,7 @@ export default class UI {
             dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
         });
 
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#rows').addEventListener('click', (event) => {
             const column = event.target.closest('[data-row]');
             if (!column || !this.view) return;
@@ -311,6 +312,22 @@ export default class UI {
             html = `<span class="act-log">${escapeHtml(view.logs.at(-1) ?? '')}</span>`;
         }
         $('#actions').innerHTML = html;
+        const h = this.hint;
+        if (h && h.key === view.logs.length) {
+            if (h.command.type === 'place') $(`#rows [data-row="${h.command.row}"]`)?.classList.add('recommended');
+            else $(`#actions [data-act="${h.command.type}"]`)?.classList.add('recommended');
+        }
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作。取る列は選んだ状態にし、押すものに印を付ける
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('自分の番になったら、おすすめを出せます');
+        if (command.type === 'take') this.selectedRow = command.row;
+        this.hint = { key: this.view.logs.length, command };
+        this.render();
+        const text = { place: '光る列に置く', take: 'この列を取る', draw: '山から引く' }[command.type];
+        this.toast(`おすすめ：${text}`);
     }
 
     // ---- 結果 ----

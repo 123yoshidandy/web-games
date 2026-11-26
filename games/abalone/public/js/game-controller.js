@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn, PROFILES } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest, PROFILES } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 600;   // CPU の手は、動きが見えるように間を置く（考える時間はこのあと）
 const SAVE_KEY = 'abalone.save';
@@ -64,6 +64,11 @@ export default class LocalGameController {
         }
         this.afterChange();
         return true;
+    }
+
+    // ヒント：人の番に、CPU（ふつう）が選ぶ手。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     afterChange() {

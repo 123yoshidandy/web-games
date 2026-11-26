@@ -5,7 +5,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 1400; // CPU の手は、前に出されたカードと結果が読める間を置いてから打つ
 const AFTER_TURN_DELAY_MS = 2200;      // 脱落やラウンドの終わりのあとは、何が起きたかを見る間を長めに取る
@@ -24,6 +24,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.scheduleCpu();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

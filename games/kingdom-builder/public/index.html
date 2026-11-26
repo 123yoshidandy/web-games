@@ -44,7 +44,11 @@
                     <button id="start" class="btn primary">ゲーム開始</button>
                     <button id="resume" class="btn secondary" hidden>続きから</button>
                 </div>
-                <button id="open-help-title" class="link">遊び方</button>
+                <div class="title-links">
+                    <button id="open-help-title" class="link">遊び方</button>
+                    <button type="button" class="link bgm-toggle" aria-pressed="true">BGM</button>
+                    <a class="link portal-link" href="../">← ゲーム一覧</a>
+                </div>
             </div>
         </section>
 
@@ -54,6 +58,7 @@
                 <button id="home" class="icon-btn" aria-label="ホーム" title="ホーム"><svg class="ico" aria-hidden="true"><use href="#i-home"/></svg></button>
                 <span id="status" class="status"></span>
                 <button id="open-log" class="icon-btn" aria-label="記録" title="記録"><svg class="ico" aria-hidden="true"><use href="#i-log"/></svg></button>
+                <button type="button" class="icon-btn bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
                 <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"><svg class="ico" aria-hidden="true"><use href="#i-help"/></svg></button>
             </header>
             <div class="map-wrap">
@@ -105,6 +110,7 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./js/music.js"></script>
     <script type="module" src="./js/main.js"></script>
 </body>
 </html>

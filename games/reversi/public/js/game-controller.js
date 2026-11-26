@@ -7,7 +7,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_MOVE_MS = 700;    // 前の手で石が返る動きが見えるように待つ
 const SAVE_KEY = 'reversi.save';
@@ -55,6 +55,12 @@ export default class LocalGameController {
         const view = createGameView(this.game, this.viewSeat());
         view.canUndo = this.undoLength() !== null;
         return view;
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        const seat = this.game.current;
+        return this.humanSeats.includes(seat) ? suggest(this.game, seat) : null;
     }
 
     send(command) {

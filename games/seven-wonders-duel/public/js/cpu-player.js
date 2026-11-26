@@ -266,6 +266,12 @@ export function isCpuTurn(game) {
     return !game.isOver() && nextCpuSeat(game) !== null;
 }
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断（公開された情報だけ）。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCommand(game, seat, 'normal');
+}
+
 // CPU の1手を打つ。思わぬ答えで断られたら、条件を満たす最小の答え（捨てる・最初の候補）で必ず進める
 export function runCpuStep(game, seat = nextCpuSeat(game), level) {
     if (seat === null) return null;

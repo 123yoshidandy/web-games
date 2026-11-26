@@ -150,6 +150,7 @@ export default class UI {
             const d = event.target.closest('[data-die]');
             if (d) this.tapDie(Number(d.dataset.die));
         });
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#actions').addEventListener('click', (event) => {
             const b = event.target.closest('button[data-act]');
             if (!b || b.disabled) return;
@@ -161,6 +162,21 @@ export default class UI {
             else if (b.dataset.act === 'next') this.send({ type: 'next' });
             else if (b.dataset.act === 'result') this.showResult();
         });
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作。宣言なら数と目（見せるダイスも）を選んだ状態にし、押すボタンに印を付ける
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('自分の番になったら、おすすめを出せます');
+        if (command.type === 'bid') {
+            this.pick = { qty: command.qty, face: command.face };
+            this.reveal = new Set(command.reveal ?? []);
+            this.render();
+            $('#actions [data-act="bid"]')?.classList.add('recommended');
+            return this.toast(`おすすめ：${command.face === STAR ? '★' : command.face}の目が${command.qty}個と宣言${this.reveal.size ? '（選んだダイスを見せて振り直す）' : ''}`);
+        }
+        $(`#actions [data-act="${command.type}"]`)?.classList.add('recommended');
+        this.toast(command.type === 'challenge' ? 'おすすめ：ブラフ！と言う' : 'おすすめ：次へ進む');
     }
 
     send(command) {
@@ -245,7 +261,9 @@ export default class UI {
             </ul>
             <p>正しかった側が、次のラウンドを始めます。</p>
             <h3>設定</h3>
-            <p>「失う数：1個」は Perudo（Dudo）風で、負けた側が1個だけ失います（ぴったりなら疑った人が1個）。「振り直し：なし」で、振り直しをなくせます。</p>`;
+            <p>「失う数：1個」は Perudo（Dudo）風で、負けた側が1個だけ失います（ぴったりなら疑った人が1個）。「振り直し：なし」で、振り直しをなくせます。</p>
+            <h3>ヒント</h3>
+            <p>上の電球のボタンを押すと、おすすめの宣言（数と目）を選び、押すボタンを光らせます。</p>`;
     }
 
     // ---- ゲーム画面 ----

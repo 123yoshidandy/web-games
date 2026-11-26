@@ -492,3 +492,23 @@ dialog.sheet .buttons { position: sticky; bottom: -14px; margin: 10px -16px -14p
     .ctext { font-size: 13px; margin: 4px 0 2px; }
 }
 dialog [tabindex="-1"]:focus { outline: none; }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント：おすすめの印 */
+.recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+#map .recommended { outline: none !important; box-shadow: none !important; filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 6px rgba(255, 214, 102, .95)); }
+#map .road-hit.recommended { stroke: rgba(255, 248, 214, .85); }
+#hand .hcard.recommended { outline: none !important; box-shadow: inset 0 0 0 4px #fff8d6, inset 0 0 16px 4px rgba(255, 214, 102, .9) !important; }

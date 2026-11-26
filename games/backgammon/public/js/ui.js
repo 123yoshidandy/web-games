@@ -103,6 +103,8 @@ export default class UI {
             help.showModal();
         });
         help.addEventListener('close', () => this.controller?.resume());
+        $('hint').addEventListener('click', () => this.showHint());
+        $('open-log').addEventListener('click', () => this.showLog());
         document.querySelectorAll('dialog').forEach(d => {
             d.querySelector('.close')?.addEventListener('click', () => d.close());
             if (d.id !== 'result') d.addEventListener('click', e => { if (e.target === d) d.close(); });
@@ -479,7 +481,8 @@ export default class UI {
     renderActions() {
         const v = this.view;
         const me = this.seat;
-        const button = (action, label, cls, disabled = false) => `<button class="btn small ${cls}" data-action="${action}"${disabled ? ' disabled' : ''}>${label}</button>`;
+        const best = this.hintAction && this.hintKey === `${v.gameNo}:${v.eventSeq}` ? this.hintAction : null;
+        const button = (action, label, cls, disabled = false) => `<button class="btn small ${cls}${action === best ? ' recommended' : ''}" data-action="${action}"${disabled ? ' disabled' : ''}>${label}</button>`;
         let html = '';
         if (!this.animating) {
             if (v.over) html = button('again', 'もう一度', 'primary');
@@ -565,6 +568,50 @@ export default class UI {
         $('result-next').hidden = matchOver;
         $('again').hidden = !matchOver;
         $('result').showModal();
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作。駒の動きは点の番号（自分から見た番号）で出し、ボタンの操作は印を付ける
+    showHint() {
+        const v = this.view;
+        const command = this.controller?.hint();
+        if (!v || !command) return this.toast('自分の番になったら、おすすめを出せます');
+        this.hintKey = `${v.gameNo}:${v.eventSeq}`;
+        this.hintAction = command.type === 'play' ? 'confirm' : command.type;
+        this.renderActions();
+        if (command.type !== 'play') {
+            const names = { roll: 'ロール', double: 'ダブルを提案する', take: '受ける', drop: '降りる' };
+            return this.toast(`おすすめ：${names[command.type] ?? command.type}`, 2600);
+        }
+        if (!command.steps.length) return this.toast('おすすめ：動かせないので決定', 2600);
+        const point = (p) => (p === 25 ? 'バー' : p <= 0 ? '上がり' : p);
+        const moves = command.steps.map(([from, die]) => `${point(from)}→${point(Math.max(0, from - die))}`).join('、');
+        const undo = this.turn?.steps.length ? '（取り消してから）' : '';
+        this.toast(`おすすめ${undo}：${moves}`, 4000);
+    }
+
+    showLog() {
+        const v = this.view;
+        if (!v) return;
+        const point = (p) => (p === 25 ? 'バー' : p <= 0 ? '上がり' : p);
+        const text = (e) => {
+            const who = escapeHtml(this.nameOf(e.seat));
+            switch (e.type) {
+                case 'newGame': return `第${e.gameNo}ゲーム${e.crawford ? '（クロフォード）' : ''}`;
+                case 'opening': return `最初の振り：${e.dice[0]}・${e.dice[1]}、${who}が先手`;
+                case 'roll': return `${who}：${e.dice[0]}・${e.dice[1]}`;
+                case 'noMove': return `${who}：動かせない`;
+                case 'play': return `${who}：${e.moves.map(m => `${point(m.from)}→${point(m.to)}${m.hit ? '（ヒット）' : ''}`).join('、')}`;
+                case 'double': return `${who}：ダブル（${e.value}点に）`;
+                case 'take': return `${who}：受ける`;
+                case 'drop': return `${who}：降りる`;
+                case 'gameEnd': return `${escapeHtml(this.nameOf(e.winner))}が${e.points}点`;
+                default: return '';
+            }
+        };
+        const items = v.events.map(text).filter(Boolean);
+        $('log-list').innerHTML = items.length ? items.map(t => `<li>${t}</li>`).join('') : '<li>まだ記録はありません</li>';
+        $('log').showModal();
+        $('log-list').scrollTop = $('log-list').scrollHeight;
     }
 
     toast(message, ms = 2000) {

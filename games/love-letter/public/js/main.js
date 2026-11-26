@@ -42,6 +42,7 @@ let ui = freshUi();
 let spotlightTimer = null;
 let roundTimer = null;
 let pendingRound = null; // ラウンドの終わりのイベント（結果のダイアログに出す）
+let hint = null; // ヒントで示している手 { key, command }（その手番の間だけ）
 
 function freshUi() {
     return { key: null, card: null, target: null, guess: null };
@@ -194,6 +195,24 @@ function openGuess() {
     openDialog('guess-dialog');
 }
 
+// おすすめの手を、そのまま選んだ状態にする（「出す」「残す」を押せば打てる）
+function showHint() {
+    if (!myTurn() || !controller) return;
+    const command = controller.suggest();
+    if (!command) return;
+    if (command.type === 'keep') ui = { ...freshUi(), key: ui.key, card: command.card };
+    else ui = { ...freshUi(), key: ui.key, card: command.card, target: command.target, guess: command.guess };
+    hint = { key: ui.key, command };
+    render();
+}
+
+// 選んでいる手が、ヒントの手と同じか
+function hinted() {
+    const c = hint?.key === ui.key ? hint.command : null;
+    if (!c || ui.card !== c.card) return false;
+    return c.type === 'keep' || ((c.target ?? null) === (legalOf(ui.card)?.targets.length ? ui.target : null) && (c.guess ?? null) === (legalOf(ui.card)?.needsGuess && ui.target !== null ? ui.guess : null));
+}
+
 function ready() {
     if (!myTurn() || ui.card === null) return false;
     if (view.phase === 'chancellor') return true;
@@ -281,6 +300,8 @@ function renderAction() {
     choices.innerHTML = '';
     button.textContent = view.phase === 'chancellor' ? '残す' : '出す';
     button.disabled = !ready();
+    $('hint').disabled = !myTurn();
+    button.classList.toggle('suggested', myTurn() && ready() && hinted());
     if (view.phase === 'end') {
         prompt.textContent = `${nameOf(view.winner)}の勝ち`;
         button.textContent = '結果';
@@ -434,6 +455,7 @@ function setup() {
         render();
     });
     $('confirm').addEventListener('click', () => (view?.phase === 'end' ? showRound() : confirm()));
+    $('hint').addEventListener('click', showHint);
     $('round-next').addEventListener('click', () => {
         pendingRound = null;
         $('round-dialog').close();

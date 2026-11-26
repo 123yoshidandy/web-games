@@ -213,3 +213,24 @@ dialog h2:focus-visible { outline: none; }
     .btn, .pawn { transition: none; }
     .wall.drop { animation: none; }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント（おすすめの手）と履歴 */
+.icon-btn:disabled { opacity: .35; }
+.suggested { outline: 3px solid #f5c542 !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(245, 197, 66, .35) !important; }
+.suggested-cell { fill: rgba(245, 197, 66, .55); stroke: #f5c542; stroke-width: 3; pointer-events: none; }
+.log-list { margin: 0; padding: 0 0 0 1.6em; overflow-y: auto; overscroll-behavior: contain; font-size: 14px; line-height: 1.6; }
+.log-list .empty { list-style: none; color: var(--muted); }

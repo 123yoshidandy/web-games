@@ -175,7 +175,8 @@ export default class UI {
             const b = event.target.closest('button[data-act]');
             if (!b || b.disabled) return;
             const act = b.dataset.act;
-            if (act === 'rotate') this.rotate();
+            if (act === 'hint') this.showHint();
+            else if (act === 'rotate') this.rotate();
             else if (act === 'place') this.confirm();
             else if (act === 'zoom-out') {
                 this.zoom = null;
@@ -186,6 +187,26 @@ export default class UI {
 
     send(command) {
         this.controller?.send(command);
+    }
+
+    // おすすめの手を示す。置く手は、タイルと向き・2マスを選んでおき「置く」を光らせる
+    showHint() {
+        const v = this.view;
+        const command = this.controller?.suggest();
+        if (!v || !command) return;
+        this.hint = { command };
+        if (command.type === 'place') {
+            const hand = v.players[v.you].hand;
+            const [a, b] = command.cells;
+            let index = hand.findIndex(t => t[0] === command.tile[0] && t[1] === command.tile[1]);
+            let flip = false;
+            if (index < 0) {
+                index = hand.findIndex(t => t[1] === command.tile[0] && t[0] === command.tile[1]);
+                flip = true;
+            }
+            this.sel = { index, flip, anchor: a, dir: NEIGHBORS[a].indexOf(b) };
+        }
+        this.render();
     }
 
     myTurn(phase) {
@@ -493,7 +514,13 @@ export default class UI {
         } else if (this.myTurn('swap')) {
             html = '<button class="btn primary small" data-act="swap">取り替え</button><button class="btn secondary small" data-act="keep">そのまま</button>';
         }
+        if (html) html = `<button type="button" id="hint" class="icon-btn" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>${html}`;
         $('#act').innerHTML = html;
+        // ヒント：同じ場面のうちだけ、選んだ手のボタンを光らせる
+        const c = this.hint?.command;
+        if (c && (c.type === 'place' ? this.myTurn('place') && this.pending()?.cells.join() === c.cells.join() && this.pending()?.colors.join() === c.tile.join() : this.myTurn('swap'))) {
+            $(`#act [data-act="${c.type}"]`)?.classList.add('suggested');
+        } else this.hint = null;
     }
 
     renderNote(view) {

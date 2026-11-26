@@ -81,7 +81,7 @@ export default class BoardView {
         this.bind();
     }
 
-    // state：盤面の情報（ビュー）、marks：{ hexes: [[q,r]], edges: [[a,b]], spots: [[q,r]], fresh: [[q,r]] }
+    // state：盤面の情報（ビュー）、marks：{ hexes: [[q,r]], edges: [[a,b]], spots: [[q,r]], fresh: [[q,r]], best: { hex: [q,r] } か { edge: [a,b] }（ヒント） }
     render(state, marks = {}) {
         let html = '<g class="world">';
         // 置ける場所（空き）
@@ -124,6 +124,15 @@ export default class BoardView {
             const data = `data-edge="${a.join(',')}|${b.join(',')}"`;
             html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="edge-cand"/>`;
             html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="edge-hit" ${data}/>`;
+        }
+        // ヒントのおすすめの場所（白い太枠。押す判定は下の候補に任せる）
+        if (marks.best?.hex) {
+            const [x, y] = hexCenter(...marks.best.hex);
+            html += `<polygon class="best" points="${hexPoints(x, y, R - 6)}"/>`;
+        }
+        if (marks.best?.edge) {
+            const [[x1, y1], [x2, y2]] = edgeEnds(...marks.best.edge);
+            html += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="best-edge"/>`;
         }
         // 庭師とパンダ（同じ区画なら少しずらす）
         const same = state.gardener[0] === state.panda[0] && state.gardener[1] === state.panda[1];

@@ -7,7 +7,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { chooseCpuTurn, runCpuStep, isCpuTurn, PROFILES } from './cpu-player.js';
+import { chooseCpuTurn, runCpuStep, isCpuTurn, PROFILES, suggest as suggestStep } from './cpu-player.js';
 import { stepKey } from './rules.js';
 
 export const CPU_STEP_DELAY_MS = 550;
@@ -45,6 +45,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの1歩（人の番でなければ null）
+    hint() {
+        return suggestStep(this.game, this.humanSeat);
     }
 
     send(command) {

@@ -108,6 +108,8 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .icon-btn { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border: none; border-radius: 10px; color: var(--muted); background: rgba(255, 255, 255, .08); cursor: pointer; }
 .icon-btn.big { width: 44px; height: 42px; color: var(--text); background: rgba(255, 255, 255, .12); }
 .icon-btn:disabled { opacity: .35; cursor: default; }
+/* ヒントのおすすめ：金の枠 */
+.btn.recommended { box-shadow: 0 4px 0 var(--accent-deep), 0 0 0 3px var(--accent); }
 .line-icon { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .link { border: none; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px; }
 
@@ -134,7 +136,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .topbar { display: flex; align-items: center; gap: 6px; flex: none; height: 36px; }
 .round { font-size: 14px; color: var(--muted); white-space: nowrap; }
 .round b { font-size: 18px; color: var(--text); }
-.others { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.others { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; text-align: right; font-size: 12px; color: var(--muted); white-space: nowrap; }
 
 /* ダイス（今ラウンドの4つの目） */
 .tray { flex: none; display: flex; justify-content: center; gap: 8px; height: 54px; }
@@ -249,3 +251,17 @@ dialog h2:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) {
     .btn { transition: none; }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }

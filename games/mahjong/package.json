@@ -9,5 +9,15 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Riichi Mahjong",
+    "aliases": [
+      "まーじゃん",
+      "りーちまーじゃん"
+    ],
+    "genres": [
+      "伝統ゲーム"
+    ]
   }
 }

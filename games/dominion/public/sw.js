@@ -7,7 +7,25 @@ const CACHE = 'dominion-v1';
 // 同じサイトにほかのゲームも並ぶので、消すのはこのゲームの古い版のキャッシュだけにする
 const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
-const PRECACHE = ['./', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png'];
+const PRECACHE = [
+    './', 'index.html', 'manifest.webmanifest', 'css/styles.css', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png',
+    'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'js/card-animations.js', 'js/card-art-adventures.js',
+    'js/card-art-alchemy.js', 'js/card-art-allies.js', 'js/card-art-cornucopia-guilds.js', 'js/card-art-dark-ages.js',
+    'js/card-art-empires.js', 'js/card-art-helpers.js', 'js/card-art-hinterlands.js', 'js/card-art-intrigue.js',
+    'js/card-art-menagerie.js', 'js/card-art-nocturne.js', 'js/card-art-plunder.js', 'js/card-art-prosperity.js',
+    'js/card-art-renaissance.js', 'js/card-art-rising-sun.js', 'js/card-art.js', 'js/card-data-adventures.js',
+    'js/card-data-alchemy.js', 'js/card-data-allies.js', 'js/card-data-cornucopia-guilds.js',
+    'js/card-data-dark-ages.js', 'js/card-data-empires.js', 'js/card-data-hinterlands.js', 'js/card-data-intrigue.js',
+    'js/card-data-menagerie.js', 'js/card-data-nocturne.js', 'js/card-data-plunder.js', 'js/card-data-prosperity.js',
+    'js/card-data-renaissance.js', 'js/card-data-rising-sun.js', 'js/card-data-seaside.js', 'js/card-data.js',
+    'js/card-helpers.js', 'js/card-types.js', 'js/card.js', 'js/cpu-player.js', 'js/game-allies.js',
+    'js/game-controller.js', 'js/game-landscapes.js', 'js/game-menagerie.js', 'js/game-nocturne.js',
+    'js/game-plunder.js', 'js/game-realtime.js', 'js/game-rising-sun.js', 'js/game-view.js', 'js/game.js',
+    'js/main.js', 'js/music.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs',
+    'js/online-config.js', 'js/online-controller.js', 'js/player.js', 'js/press-handler.js', 'js/random.js',
+    'js/sound/bgm.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/ui-controller.js', 'js/ui-event-handler.js',
+    'js/ui-modal.js', 'js/ui-view.js'
+];
 
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));

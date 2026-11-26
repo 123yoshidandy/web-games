@@ -15,10 +15,15 @@ const TOP_HERO_COLORS = { a: 0, b: 3, c: 1 }; // PIECE_COLORS の番号
 function setupTop() {
     renderTopHero();
 
-    // エンドレスは、トップ画面から始めるたびに新しい問題にする（前の問題は引き継がない）
+    // エンドレスは、トップ画面から始めるたびに新しい問題にする（解きかけの問題は「続きから」で戻る）
     elements.topEndless.addEventListener('click', () => {
         hideTop();
+        clearSavedProgress();
         generateGame(createRandomSeed());
+    });
+    elements.topResume.addEventListener('click', () => {
+        hideTop();
+        if (!resumeSavedGame()) generateGame(createRandomSeed());
     });
     elements.topChallenge.addEventListener('click', () => {
         hideTop();
@@ -37,9 +42,17 @@ function setupTop() {
 }
 
 function showTop() {
+    updateResumeButton();
     elements.topScreen.hidden = false;
     document.body.classList.add('is-top');
     layoutTopHero();
+}
+
+// 解きかけのエンドレスがあるときだけ「続きから」を出し、エンドレスは新しい問題から始めることを示す
+function updateResumeButton() {
+    const saved = hasSavedProgress();
+    elements.topResume.hidden = !saved;
+    elements.topEndlessNote.textContent = saved ? '新しい問題から' : '1問ずつ、自分のペースで';
 }
 
 function hideTop() {

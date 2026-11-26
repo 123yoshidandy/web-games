@@ -169,3 +169,19 @@ export function tradePick(hand, bagCount, all) {
     });
     return out.slice(0, bagCount);
 }
+
+// ヒント：人の番に、ふつうの CPU が選ぶ手を返す。見るのは盤・自分の手札・袋と手札の枚数だけ（隠れた情報はのぞかない）
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.isOver() || game.current !== seat) return null;
+    const me = game.players[seat];
+    const had = Object.hasOwn(me, 'level');
+    const level = me.level;
+    me.level = 'normal'; // 人の席にやさしいの印があっても、ふつうの判断で出す
+    try {
+        return decide(game, seat);
+    } finally {
+        if (had) me.level = level;
+        else delete me.level;
+    }
+}

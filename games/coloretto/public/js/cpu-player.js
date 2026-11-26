@@ -42,6 +42,12 @@ export function gainOf(player, cards, table) {
     return bestScore(counts, jokers, plus2, table).score - before;
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ操作。CPU と同じく、その人のビューだけで決める。手は打たない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || game.current !== seat) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 export function chooseCpuCommand(game, seat = game.current, profile = PROFILES.normal) {
     const view = createGameView(game, seat, { since: game.logs.length, events: false });
     const random = cpuRandom(game, seat);

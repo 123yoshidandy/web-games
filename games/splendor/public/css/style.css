@@ -599,6 +599,13 @@ dialog h2:focus-visible { outline: none; }
     .card, .btn { transition: none; }
 }
 
+/* スマホ横など低い画面では、宝石の列が場より高くなり上の欄に重なるので、2列×3段にする */
+@media (max-height: 500px) {
+    .bank { width: auto; display: grid; grid-template-columns: repeat(2, 44px); align-content: center; gap: 3px; }
+    .bank-chip { height: 40px; }
+    .bank-chip .chip { --size: 34px; }
+}
+
 /* 高さに余裕のある画面では、相手と自分の欄を少し大きく */
 @media (min-height: 720px) {
     .opp { height: 32px; }
@@ -611,3 +618,20 @@ dialog h2:focus-visible { outline: none; }
     .me .gc { width: 38px; }
     .actions { height: 54px; }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒントのおすすめ：金の枠 */
+.recommended { outline: 3px solid var(--gold); outline-offset: 2px; }

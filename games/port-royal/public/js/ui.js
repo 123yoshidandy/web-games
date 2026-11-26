@@ -123,6 +123,7 @@ export default class UI {
             });
         });
         $('#buttons').addEventListener('click', (event) => {
+            if (event.target.closest('#hint')) return this.showHint();
             const button = event.target.closest('button[data-command]');
             if (button && !button.disabled) this.controller.send({ type: button.dataset.command });
         });
@@ -266,7 +267,36 @@ export default class UI {
         } else if (mine && v.phase === 'trade') {
             buttons = `<button class="btn secondary wide" data-command="pass">${v.current === v.you ? '取り終える' : '取らない'}</button>`;
         }
+        // ヒントのボタン（自分の番だけ）
+        if (mine && v.phase !== 'end') buttons = `<button type="button" id="hint" class="icon-btn" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>${buttons}`;
         $('#buttons').innerHTML = buttons;
+        this.renderHint();
+    }
+
+    hintKey() {
+        const v = this.view;
+        return `${v.phase}:${v.actors.join(',')}:${v.events.at(-1)?.seq ?? 0}`;
+    }
+
+    // おすすめの手を光らせる（ボタンか、取る港のカード・果たす遠征のカード）
+    showHint() {
+        const v = this.view;
+        if (!v?.actors.includes(v.you)) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.hint = { at: this.hintKey(), command };
+        this.renderHint();
+    }
+
+    renderHint() {
+        const c = this.hint?.at === this.hintKey() ? this.hint.command : null;
+        if (!c) {
+            this.hint = null;
+            return;
+        }
+        if (c.type === 'take') $(`#harbor [data-card="${c.card}"]`)?.classList.add('suggested');
+        else if (c.type === 'claim') $(`#table [data-card="${c.card}"]`)?.classList.add('suggested');
+        else $(`#buttons [data-command="${c.type}"]`)?.classList.add('suggested');
     }
 
     // コインの増減を浮かべる

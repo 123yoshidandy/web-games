@@ -59,6 +59,12 @@ export function decide(view, level = 'normal') {
     return sq === null ? null : { type: 'move', sq };
 }
 
+// 人の席のおすすめの手（ヒント）。CPU（つよい）と同じ読みを、その席のビューで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || game.current !== seat) return null;
+    return decide(createGameView(game, seat), 'strong');
+}
+
 // CPU の番なら1手打つ。打てたら true
 export function runCpuStep(game) {
     if (!isCpuTurn(game)) return false;

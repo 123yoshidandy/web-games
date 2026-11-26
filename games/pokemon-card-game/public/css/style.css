@@ -184,6 +184,26 @@ button { font: inherit; color: inherit; }
     left: calc(8px + var(--safe-l));
 }
 
+/* ゲーム一覧へのリンク。左上の角に、右上のアイコンと縦の中心をそろえて置く。
+   ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.portal-link {
+    position: fixed;
+    top: 1px;
+    left: calc(2px + var(--safe-l));
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 6px;
+    color: var(--ink-dim);
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
+}
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
 /* ===== オンラインの入口・ロビー ===== */
 
 #online-screen, #lobby-screen {
@@ -1192,12 +1212,6 @@ dialog button:focus { outline: none; }
 .result-title { font-size: 30px !important; color: var(--gold); }
 .result .sheet-actions { justify-content: center; }
 .rules { width: min(640px, calc(var(--app-w) - 24px)); }
-.games { width: min(600px, calc(var(--app-w) - 24px)); }
-.sheet-body .game-links { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
-.game-links a { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.06); color: var(--ink); text-decoration: none; }
-.game-links a:hover, .game-links a:focus-visible { background: rgba(255, 255, 255, 0.12); }
-.game-links b { font-size: 15px; }
-.game-links span { font-size: 12px; color: var(--ink-dim); }
 
 /* ===== 低い横画面 ===== */
 
@@ -1524,3 +1538,9 @@ dialog button:focus { outline: none; }
 
 /* 山札をすべて見るときの、選べないカード */
 .pick-locked { opacity: 0.45; cursor: default; }
+
+/* BGM の ON/OFF（js/music.js）。タイトルでは遊び方の左に置く */
+.title-bgm { right: calc(8px + 30px + 6px + var(--safe-r)); }
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }

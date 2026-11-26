@@ -47,7 +47,15 @@ function fallbackCommand(game, seat, action) {
     return command;
 }
 
-export function chooseCpuCommand(game, seat) {
+// 人の席のおすすめの手（ヒント）。CPU と同じ判断（公開された情報と自分の手札だけを見る）。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver?.() || !game.actors().includes(seat)) return null;
+    return chooseCpuCommand(game, seat, 'normal');
+}
+
+// level：'easy' は判断の揺れを大きくして、ときどき甘い手を選ぶ
+export function chooseCpuCommand(game, seat, level = game.options.level ?? 'normal') {
+    const noise = level === 'easy' ? 3 : 0.05;
     const legal = game.legalActions(seat);
     if (legal.length === 0) return null;
     const random = cpuRandom(game, seat);
@@ -58,7 +66,7 @@ export function chooseCpuCommand(game, seat) {
     legal.forEach(action => {
         const scored = ctx.evaluate(action);
         if (!scored) return;
-        const value = scored.value + random() * 0.05;
+        const value = scored.value + random() * noise;
         if (value > bestValue) {
             bestValue = value;
             best = scored.command;

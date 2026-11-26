@@ -34,6 +34,42 @@ let seenSeq = 0;
 let resultShown = false;
 let summaryTimer = null;
 
+// ヒント：おすすめの手 { key, command }（その場面の間だけ）
+let hint = null;
+const HINT_BUTTON = '<button type="button" id="hint" class="chip hint-button" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>ヒント</button>';
+
+// おすすめの手を、選んだ状態にして光らせる
+function showHint() {
+    if (!mine() || !controller) return;
+    const c = controller.suggest();
+    if (!c) return;
+    if (c.type === 'role') ui.role = c.role;
+    if (c.type === 'mayor') ui.mayor = { island: [...c.island], city: [...c.city] };
+    if (c.type === 'build') ui.building = c.building;
+    if (c.type === 'store') ui.store = { warehouse: [...(c.warehouse ?? [])], single: c.single ?? null };
+    hint = { key: ui.key, command: c };
+    render();
+}
+
+function renderHint() {
+    const c = hint?.key === ui.key && mine() ? hint.command : null;
+    if (!c) {
+        hint = null;
+        return;
+    }
+    let target = null;
+    if (c.type === 'role') target = '[data-act="role"]';
+    if (c.type === 'hacienda') target = '[data-act="hacienda"]';
+    if (c.type === 'settle') target = c.take === null ? '[data-act="settlePass"]' : `[data-take="${c.take}"]`;
+    if (c.type === 'mayor') target = '[data-act="mayor"]';
+    if (c.type === 'build') target = c.building ? '[data-act="build"]' : '[data-act="buildPass"]';
+    if (c.type === 'privilege') target = `[data-good="${c.good}"]`;
+    if (c.type === 'sell') target = c.good ? `[data-sell="${c.good}"]` : '[data-act="sellPass"]';
+    if (c.type === 'ship') target = c.pass ? '[data-act="shipPass"]' : `[data-load="${view.decision.options.findIndex(o => o.good === c.good && o.ship === c.ship)}"]`;
+    if (c.type === 'store') target = '[data-act="store"]';
+    if (target) $('panel').querySelector(target)?.classList.add('suggested');
+}
+
 function freshUi(key = null) {
     return { key, role: null, building: null, mayor: null, store: { warehouse: [], single: null } };
 }
@@ -212,7 +248,10 @@ function renderPanel() {
     if (view.phase === 'end') body = '<div class="prompt">ゲーム終了</div><div class="btn-row"><button class="primary" data-act="result">結果</button></div>';
     else if (!mine()) body = `<div class="prompt muted">${d ? `${esc(nameOf(d.seat))}が${{ role: '役割を選んでいます', settle: '農園を選んでいます', mayor: '入植者を並べています', build: '建物を選んでいます', privilege: '品を選んでいます', sell: '売る品を選んでいます', ship: '船に積んでいます', store: 'とっておく品を選んでいます' }[d.kind]}` : ''}</div>`;
     else body = ({ role: roleHtml, settle: settleHtml, mayor: mayorHtml, build: buildHtml, privilege: privilegeHtml, sell: sellHtml, ship: shipHtml, store: storeHtml })[d.kind]();
+    // ヒントのボタン（自分が選ぶ番だけ。案内文の右端）
+    if (mine() && view.phase !== 'end') body = body.replace('<div class="prompt">', `<div class="prompt">${HINT_BUTTON}`);
     $('panel').innerHTML = feedLine() + body;
+    renderHint();
 }
 
 function roleHtml() {
@@ -410,6 +449,7 @@ function onMayorCity(i) {
 function onAct(act) {
     const d = view.decision;
     switch (act) {
+        case 'hint': return showHint();
         case 'role': return send({ type: 'role', role: ui.role });
         case 'hacienda': return send({ type: 'hacienda' });
         case 'settlePass': return send({ type: 'settle', take: null });

@@ -22,6 +22,8 @@ const SHEET_DELAY_MS = 650; // 爆発や最後の1つを見せてから、シー
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const percent = (x) => `${Math.round(x * 100)}%`;
+// ヒントのボタン（鍋の操作の欄と、選ぶシートに出す）
+const hintButton = (attr) => `<button type="button" id="hint" class="btn hint-button" ${attr} aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>`;
 
 function loadSettings() {
     const fallback = { count: 4, level: 'normal' };
@@ -169,6 +171,7 @@ export default class UI {
         $('#actions').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled) return;
+            if (button.dataset.act === 'hint') return this.showHint();
             this.send({ type: button.dataset.act });
         });
 
@@ -357,7 +360,10 @@ export default class UI {
         } else if (view.phase === 'shop' && !me.shopping) {
             html = '<span class="act-label">ほかの人が買い物をしています</span>';
         }
+        // 自分が引く番だけ、ヒントのボタンを出す
+        if (view.phase === 'brew' && p.brew && !p.brew.done && !$('#sheet').open) html = hintButton('data-act="hint"') + html;
         $('#actions').innerHTML = html;
+        this.markHint();
     }
 
     animate(events, me) {
@@ -459,12 +465,48 @@ export default class UI {
             result: () => this.resultHtml(),
             bag: () => this.bagHtml()
         }[kind]?.() ?? '';
-        body.innerHTML = html;
+        // 自分が選ぶシートには、ヒントのボタンを足す
+        body.innerHTML = ['prompt', 'pick', 'shop'].includes(kind) || (kind === 'fortune' && this.view.me.prompt) ? html.replace('<div class="options">', `<div class="options">${hintButton('data-sheet="hint"')}`) : html;
+        this.markHint();
+    }
+
+    // ヒントが指す場面（手を打つと変わる）
+    hintKey() {
+        const v = this.view;
+        const me = v.me;
+        return JSON.stringify([v.logCount, v.phase, v.round, v.players[v.you].pot?.length ?? 0, !!me.prompt, !!me.pending, !!me.shopping]);
+    }
+
+    // おすすめの手を、選んだ状態にして光らせる（引く・止める、選択肢、買い物）
+    showHint() {
+        const command = this.controller?.suggest();
+        if (!command || !this.view) return;
+        this.hint = { at: this.hintKey(), command };
+        if (command.type === 'shop') this.shopSel = { buy: [...command.buy], droplet: command.droplet, refill: command.refill };
+        if ($('#sheet').open && this.sheetKey) this.renderSheet(this.sheetKey);
+        this.renderActions();
+    }
+
+    markHint() {
+        if (!this.view || this.hint?.at !== this.hintKey()) {
+            this.hint = null;
+            return;
+        }
+        const c = this.hint.command;
+        const target = {
+            choose: `#sheet [data-sheet="choose"][data-value="${c.option}"]`, pick: `#sheet [data-sheet="pick"][data-value="${c.index}"]`,
+            shop: '#sheet [data-sheet="shop-ok"]'
+        }[c.type] ?? `#actions [data-act="${c.type}"]`;
+        $(target)?.classList.add('suggested');
     }
 
     onSheetButton(button) {
         const action = button.dataset.sheet;
         const value = button.dataset.value;
+        if (action === 'hint') {
+            this.showHint();
+            return;
+        }
         if (action === 'choose') {
             if (this.view.phase === 'fortune') this.fortuneSeen = this.view.round;
             this.controller?.send({ type: 'choose', option: value });

@@ -7,7 +7,7 @@
  */
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS, decide } from './cpu-player.js';
+import { CPU_LEVELS, decide, suggest } from './cpu-player.js';
 import { REASONS } from './game.js';
 import { symbolsSvg, pieceSvg, PIECE_NAME, COLOR_NAME } from './art.js';
 
@@ -190,6 +190,7 @@ export default class UI {
             this.render();
         });
         $('#offer-draw').addEventListener('click', () => this.offerDraw());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#resign').addEventListener('click', () => {
             if (this.view && !this.view.over) $('#confirm-resign').showModal();
         });
@@ -223,6 +224,18 @@ export default class UI {
     }
 
     // ---- 操作 ----
+
+    // ヒント：CPU（ふつう）が選ぶ手の駒を選び、動かす先の升を光らせる
+    showHint() {
+        const v = this.view;
+        const command = v && !v.over && v.myTurn ? suggest(v) : null;
+        if (!command) return this.toast('自分の番になったら、おすすめを出せます');
+        if (command.type !== 'move') return this.toast(command.type === 'acceptDraw' ? 'おすすめ：引き分けを受ける' : 'おすすめ：引き分けを断る');
+        this.selected = command.from;
+        this.hint = { ply: v.ply, to: command.to };
+        this.renderBoard(v);
+        this.toast(`おすすめ：${command.from} → ${command.to}`);
+    }
 
     canMove() {
         const v = this.view;
@@ -337,7 +350,7 @@ export default class UI {
             <p>キングが攻撃されている状態をチェックといい、すぐに外さなければなりません。指せる手がなく、チェックもされていないときは<strong>ステイルメイト</strong>で引き分けです。</p>
             <p>ほかに、同じ局面が3回現れたとき、50手ずつポーンを動かさず駒も取らなかったとき、どちらもメイトできない駒しか残っていないとき（キング同士など）、引き分けの提案を受けたときも引き分けです。投了するとその場で負けです。</p>
             <h3>操作</h3>
-            <p>自分の駒を押すと動ける升が光ります。光る升を押すと動かします。上のボタンは左から、ホーム・盤の向きを変える・待った（CPU 戦では自分の手と CPU の手をまとめて戻す）・引き分けの提案・投了・遊び方です。</p>
+            <p>自分の駒を押すと動ける升が光ります。光る升を押すと動かします。上のボタンは左から、ホーム・盤の向きを変える・待った（CPU 戦では自分の手と CPU の手をまとめて戻す）・引き分けの提案・投了・遊び方です。電球のボタンを押すと、おすすめの手の駒を選び、動かす先の升を光らせます。</p>
             <h3>CPU の強さ</h3>
             <p>やさしい・ふつう・つよい・とてもつよい の4つ。強いほど先の手まで読みます。引き分けの提案は、CPU が形勢を読んで受けるか決めます。</p>`;
     }
@@ -439,6 +452,7 @@ export default class UI {
                 const cls = ['cell', dark ? 'dark' : 'light'];
                 if (last && (last.from === sq || last.to === sq)) cls.push('last');
                 if (sq === this.selected) cls.push('selected');
+                if (this.hint?.ply === view.ply && this.hint.to === sq) cls.push('recommended');
                 if (view.check === sq) cls.push('check');
                 if (movable.has(sq)) cls.push('movable');
                 let piece = '';

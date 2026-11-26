@@ -2,11 +2,33 @@
  * ドミニオンのゲームコントローラー（ローカル対戦）
  * 画面には getView() でプレイヤーから見た状態だけを渡し、操作は send() で受け取る
  * オンライン対戦のコントローラーも同じ形にして、画面からは区別なく使えるようにする
+ * 状態が変わるたびに { players, options, commands } を保存し、「続きから」で記録から再現する
+ * （オンライン対戦は online-controller.js を使うので、ここには保存されない）
  */
 
 import Game from './game.js';
 import { createGameView, hydrateGameView } from './game-view.js';
-import { runCpuStep, isCpuToMove } from './cpu-player.js';
+import { runCpuStep, isCpuToMove, suggest } from './cpu-player.js';
+import { createSeed } from './random.js';
+
+const SAVE_KEY = 'dominion.save';
+
+// 保存したローカル対戦の途中経過。なければ null
+export function loadSavedGame() {
+    try {
+        const saved = JSON.parse(localStorage.getItem(SAVE_KEY) ?? 'null');
+        if (!Array.isArray(saved?.players) || !saved.options || !Array.isArray(saved.commands)) return null;
+        return saved;
+    } catch {
+        return null;
+    }
+}
+
+export function clearSavedGame() {
+    try {
+        localStorage.removeItem(SAVE_KEY);
+    } catch { /* 保存できない環境でも遊べるようにする */ }
+}
 
 class GameController {
     constructor() {
@@ -15,21 +37,48 @@ class GameController {
         this.viewerId = null; // 画面に表示しているプレイヤー
     }
 
-    // ゲームを初期化
-    initGame(playerNames, options) {
-        this.game = new Game(playerNames, options);
+    // ゲームを初期化（シードを決めておき、記録と一緒に保存する）
+    initGame(playerNames, options = {}) {
+        this.setup = { players: playerNames, options: { ...options, seed: options.seed ?? createSeed() } };
+        this.game = new Game(this.setup.players, this.setup.options);
+        this.game.setup();
+        this.attach();
+        this.save();
+        return this.game;
+    }
 
-        // ゲーム状態が変わったら画面を描き直す
+    // 保存した途中経過を、操作の記録から再現して続ける。再現できなければ保存を消して false を返す
+    resumeGame(saved) {
+        try {
+            this.game = Game.replay(saved.players, saved.options, saved.commands);
+        } catch (error) {
+            console.error(error);
+            clearSavedGame();
+            return false;
+        }
+        this.setup = { players: saved.players, options: saved.options };
+        this.attach();
+        return true;
+    }
+
+    // ゲーム状態が変わったら画面を描き直す
+    // （状態が変わったと知らせるのは、操作を記録に積む前なので、保存は send・runCpuStep の後で行う）
+    attach() {
+        this.viewerId = null;
         this.game.setCallback('onStateChanged', () => {
             if (this.uiController) {
                 this.uiController.updateGameView();
             }
         });
+    }
 
-        this.game.setup();
-        this.viewerId = null;
-
-        return this.game;
+    // 終わったゲームは「続きから」に出さない
+    save() {
+        if (!this.game) return;
+        try {
+            if (this.game.phase === 'end') localStorage.removeItem(SAVE_KEY);
+            else localStorage.setItem(SAVE_KEY, JSON.stringify({ ...this.setup, commands: this.game.commands }));
+        } catch { /* 保存できない環境でも遊べるようにする */ }
     }
 
     // ゲームをやめる（ホームに戻るとき）
@@ -68,6 +117,11 @@ class GameController {
         return this.viewerId;
     }
 
+    // ヒント：画面に表示している人の番に、CPU が選ぶ操作。手は打たず、記録にも入れない
+    hint() {
+        return this.game ? suggest(this.game, this.getViewerId()) : null;
+    }
+
     // 画面に表示するプレイヤーから見たゲームの状態
     getView() {
         if (!this.game) return null;
@@ -77,7 +131,9 @@ class GameController {
     // 画面に表示しているプレイヤーの操作を送る。受け付けられたかを返す
     send(command) {
         if (!this.game) return false;
-        return this.game.applyCommand(this.getViewerId(), command);
+        const accepted = this.game.applyCommand(this.getViewerId(), command);
+        if (accepted) this.save();
+        return accepted;
     }
 
     // CPUがやることがあるか（CPUの手番、または人間の手番中にCPUが答える選択待ちがある）
@@ -95,6 +151,7 @@ class GameController {
     runCpuStep() {
         if (!this.game) return;
         runCpuStep(this.game);
+        this.save();
     }
 }
 

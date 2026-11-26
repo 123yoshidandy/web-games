@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BLANK, baseKana, boardWidth, checkGuess, cycleVariant, evaluateGuess, pickAnswer, toHiragana, toKatakana, trimBlanks, usesBlank } from '../js/logic.js';
+import { BLANK, baseKana, boardWidth, checkGuess, createRandom, cycleVariant, evaluateGuess, pickAnswer, toHiragana, toKatakana, trimBlanks, usesBlank } from '../js/logic.js';
 import { ANSWER_WORDS } from '../js/words.js';
 import { POKEMON_NAMES } from '../js/pokemon-names.js';
 
@@ -116,6 +116,18 @@ describe('文字の変換と答え', () => {
     it('答えは各モードの一覧から選ぶ', () => {
         expect(POKEMON_NAMES).toContain(trimBlanks(pickAnswer('pokemon', () => 0.5)));
         expect(ANSWER_WORDS).toContain(pickAnswer('word', () => 0.5));
+    });
+
+    it('同じシードなら同じ答えになる（続きからで答えを作り直せる）', () => {
+        for (const mode of ['word', 'pokemon']) {
+            const seeds = [1, 42, 123456789, 4294967295];
+            seeds.forEach(seed => {
+                expect(pickAnswer(mode, createRandom(seed))).toBe(pickAnswer(mode, createRandom(seed)));
+            });
+        }
+        // 続いたシードでも、答えがばらける
+        const answers = new Set(Array.from({ length: 50 }, (_, seed) => pickAnswer('pokemon', createRandom(seed))));
+        expect(answers.size).toBeGreaterThan(30);
     });
 
     it('ことばの答えは5文字のひらがな、ポケモンの名前はカタカナと ー だけ', () => {

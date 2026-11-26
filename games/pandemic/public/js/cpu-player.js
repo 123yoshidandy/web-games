@@ -510,3 +510,10 @@ function forecastOrder(game) {
     };
     return top.map((c, i) => ({ i, d: danger(c) })).sort((a, b) => a.d - b.d || a.i - b.i).map(x => x.i);
 }
+
+// ヒント：その席の人に、CPU が選ぶ手を返す（操作する番か、使いたいイベントがあるときだけ）
+// 協力ゲームで手札は公開の情報。山の並びはのぞかない。状態は変えず、ゲームの乱数も使わない
+export function suggest(game, seat) {
+    if (game.isOver()) return null;
+    return decide(game, [seat])?.command ?? null;
+}

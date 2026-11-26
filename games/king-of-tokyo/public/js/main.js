@@ -36,6 +36,44 @@ let view = null;
 let ui = freshUi();
 let resultShown = false;
 
+// ヒント：おすすめの手 { key, command }（その場面の間だけ）
+let hint = null;
+const HINT_BUTTON = '<button type="button" id="hint" class="chip hint-button" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>ヒント</button>';
+const hintKey = () => `${view.turnNo}:${view.decision?.kind}:${view.events.at(-1)?.seq ?? 0}`;
+
+// おすすめの手を、選んだ状態にして光らせる（残すダイス・買うカード・ダイアログの答え）
+function showHint() {
+    if (!mine() || !controller) return;
+    const c = controller.suggest();
+    if (!c) return;
+    hint = { key: hintKey(), command: c };
+    if (c.type === 'reroll') ui.kept = new Set(view.dice.map((_, i) => i).filter(i => !c.dice.includes(i)));
+    if (c.type === 'buy') ui.card = c.card;
+    if (c.type === 'resolve' || c.type === 'endBuy' || c.type === 'sweep') ui.card = null;
+    render();
+}
+
+function renderHint() {
+    const c = hint?.key === hintKey() && mine() ? hint.command : null;
+    if (!c) {
+        hint = null;
+        return;
+    }
+    const d = view.decision;
+    const target = {
+        reroll: '#actions [data-act="reroll"]', resolve: '#actions [data-act="resolve"]', change: `#actions [data-change="${c.card}"]`,
+        buy: '#actions [data-act="buy"]', sweep: '#actions [data-act="sweep"]', endBuy: '#actions [data-act="endBuy"]',
+        buyTop: '#actions [data-act="otherBuys"]', buyFrom: '#actions [data-act="otherBuys"]',
+        yield: `[data-answer="${c.yes ? 'yield' : 'stay'}"]`, wings: `[data-answer="${c.yes ? 'yes' : 'no'}"]`,
+        probe: c.index === null || c.index === undefined ? '[data-answer="noProbe"]' : `[data-probe="${c.index}"]`,
+        opportunist: c.card ? `#decide-body .pick[data-card="${c.card}"]` : '[data-answer="noBuy"]',
+        mimic: c.target ? `[data-mimic="${d.targets.findIndex(t => t.seat === c.target.seat && t.card === c.target.card)}"]` : '[data-answer="noMimic"]',
+        metamorph: '[data-answer="metamorph"]', healingRay: '[data-answer="ray"]'
+    }[c.type];
+    if (target) document.querySelector(target)?.classList.add('suggested');
+    if (c.type === 'buy') $('market').querySelector(`[data-card="${c.card}"]`)?.classList.add('suggested');
+}
+
 function freshUi() {
     return { key: null, kept: new Set(), card: null, change: null };
 }
@@ -132,6 +170,7 @@ function render() {
     renderTable();
     renderMyCards();
     renderDecision();
+    renderHint();
     if (view.phase === 'end' && !resultShown) {
         resultShown = true;
         setTimeout(showResult, 900);
@@ -235,6 +274,7 @@ function renderActions() {
         el.innerHTML = `
             ${changeCards.length ? `<div class="change-row">${changeCards.map(([k, l]) => `<button class="chip" data-change="${k}">${l}</button>`).join('')}</div>` : ''}
             <div class="btn-row">
+                ${HINT_BUTTON}
                 <button class="secondary" data-act="reroll" ${o.canReroll || o.dweller ? '' : 'disabled'} ${rerollable(view.dice) ? '' : 'disabled'}>振り直す<small>${extra}</small></button>
                 <button class="primary" data-act="resolve">決定</button>
             </div>`;
@@ -246,6 +286,7 @@ function renderActions() {
         const others = (o.fromOthers?.length || o.top) ? '<button class="chip" data-act="otherBuys">ほかの買い方</button>' : '';
         const canBuy = ui.card && view.market.includes(ui.card) && o.costs[ui.card] <= me.energy;
         el.innerHTML = `${sel}<div class="btn-row">
+            ${HINT_BUTTON}
             <button class="primary" data-act="buy" ${canBuy ? '' : 'disabled'}>買う</button>
             <button class="secondary" data-act="sweep" ${o.canSweep ? '' : 'disabled'}>流す<small>2⚡</small></button>
             <button class="tertiary" data-act="endBuy">終える</button>
@@ -321,7 +362,7 @@ function renderDecision() {
             break;
     }
     $('decide-title').textContent = title;
-    $('decide-body').innerHTML = body;
+    $('decide-body').innerHTML = `${body}<div class="hint-row">${HINT_BUTTON}</div>`;
     if (!dialog.open) {
         controller?.pause();
         dialog.showModal();
@@ -475,6 +516,7 @@ function setup() {
         }
         const act = e.target.closest('[data-act]')?.dataset.act;
         if (!act) return;
+        if (act === 'hint') return showHint();
         if (act === 'reroll') {
             const dice = view.dice.map((_, i) => i).filter(i => !ui.kept.has(i));
             send({ type: 'reroll', dice });
@@ -509,6 +551,7 @@ function setup() {
             row.querySelector('b').textContent = next;
             return;
         }
+        if (e.target.closest('[data-act="hint"]')) return showHint();
         const b = e.target.closest('[data-answer], [data-probe], [data-mimic], .pick');
         if (b) answerDecision(b);
     });

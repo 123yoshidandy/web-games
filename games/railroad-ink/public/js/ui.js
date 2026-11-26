@@ -52,6 +52,7 @@ export default class UI {
         this.resultShown = false;
         $('home').innerHTML = LINE_ICONS.home;
         $('open-help-game').innerHTML = LINE_ICONS.help;
+        $('hint').innerHTML = LINE_ICONS.hint;
         $('open-others').innerHTML = LINE_ICONS.people;
         $('rotate').innerHTML = LINE_ICONS.rotate;
         $('flip').innerHTML = LINE_ICONS.flip;
@@ -149,6 +150,7 @@ export default class UI {
         $('home').addEventListener('click', () => this.showTitle());
         $('open-help-game').addEventListener('click', () => this.openDialog('help'));
         $('open-others').addEventListener('click', () => this.showOthers());
+        $('hint').addEventListener('click', () => this.showHint());
         $('tray').addEventListener('click', event => {
             const b = event.target.closest('[data-source]');
             if (b && !b.disabled) this.selectSource(b.dataset.source);
@@ -266,8 +268,25 @@ export default class UI {
         }
     }
 
+    // ヒント：おすすめの手を、選んだ状態（ダイス・マス・向き）にして見せる。決めるのは人（記録には入れない）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまは描く番ではありません');
+        if (command.type === 'end') {
+            this.sel = { source: null, o: 0, cell: null };
+            this.hintEnd = true;
+            this.render();
+            return this.toast('おすすめ：このラウンドは終える（次へ）');
+        }
+        this.sel = { source: command.source, o: command.o, cell: command.y * SIZE + command.x };
+        this.hintEnd = false;
+        this.render();
+        this.toast('おすすめ：この形をここに描く');
+    }
+
     send(command) {
         if (!this.controller) return false;
+        this.hintEnd = false;
         return this.controller.send(command);
     }
 
@@ -385,6 +404,7 @@ export default class UI {
         $('place').disabled = !mine || !this.previewOk();
         $('end').disabled = !mine || pending.length > 0;
         $('end').textContent = view.round >= ROUNDS ? '終える' : '次へ';
+        $('end').classList.toggle('recommended', Boolean(this.hintEnd) && mine);
     }
 
     showOthers() {

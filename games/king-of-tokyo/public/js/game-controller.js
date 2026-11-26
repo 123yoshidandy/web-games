@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuToAct } from './cpu-player.js';
+import { runCpuStep, isCpuToAct, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 750;     // ダイスや結果が読める間
 const AFTER_ATTACK_DELAY_MS = 1300;       // 攻撃・体力が 0・番の替わり目のあとは、長めに見せる
@@ -25,6 +25,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.scheduleCpu();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

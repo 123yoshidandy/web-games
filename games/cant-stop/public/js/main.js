@@ -41,6 +41,7 @@ let rolling = false;      // 振ったばかり（ダイスを転がす演出）
 let autoTimer = null;
 let resultTimer = null;
 let bannerTimer = null;
+let hint = null;          // ヒント { key: 記録の長さ, command }（同じ場面の間だけ、描き直しても印を付ける）
 let boardView = null;
 
 // ---------- 画面の切り替え ----------
@@ -186,6 +187,26 @@ function chooseOption(index) {
     if (option) send({ type: 'move', pair: option.pair, sums: option.sums });
 }
 
+// ヒント：CPU（ふつう）が選ぶ操作に印を付ける
+function showHint() {
+    const command = mine() ? controller?.hint() : null;
+    if (!command) return showBanner('自分の番になったら、おすすめを出せます', 'info');
+    hint = { key: controller.game.commands.length, command };
+    markHint();
+    if (command.type === 'move') return showBanner(`おすすめ：${command.sums.join('と')}の列を進める`, 'info');
+    showBanner(command.type === 'stop' ? 'おすすめ：止めて確定する' : 'おすすめ：続けて振る', 'info');
+}
+
+function markHint() {
+    $('roll').classList.remove('recommended');
+    $('stop').classList.remove('recommended');
+    if (!hint || hint.key !== controller?.game.commands.length) return;
+    const command = hint.command;
+    if (command.type !== 'move') return $(command.type).classList.add('recommended');
+    const index = view.options.findIndex(o => o.pair === command.pair && o.sums.join() === command.sums.join());
+    document.querySelector(`#pairs [data-option="${index}"]`)?.classList.add('recommended');
+}
+
 // できることが 1 つだけなら、少し間を置いて自動で行う（手番の初めに振る、進め方が 1 つだけ）
 function scheduleAuto() {
     clearTimeout(autoTimer);
@@ -237,6 +258,7 @@ function renderPanel() {
     $('dice-area').hidden = choosing;
     if (choosing) renderPairs(my);
     else renderDice(my, playing);
+    markHint();
 }
 
 // 3 通りの分け方。押せる所だけをボタンにする
@@ -380,6 +402,7 @@ function setup() {
     $('resume').addEventListener('click', () => startGame(store.load(KEYS.save) ?? newSetup()));
     $('open-help-title').addEventListener('click', () => openDialog('help-dialog'));
     $('open-help').addEventListener('click', () => openDialog('help-dialog'));
+    $('hint').addEventListener('click', showHint);
     $('home').addEventListener('click', goHome);
     $('roll').addEventListener('click', () => (view?.phase === 'end' ? showResult() : roll()));
     $('stop').addEventListener('click', stop);

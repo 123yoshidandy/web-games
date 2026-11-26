@@ -8,7 +8,7 @@
  */
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS, bestRotation } from './cpu-player.js';
+import { CPU_LEVELS, bestRotation, suggest } from './cpu-player.js';
 import { TILES } from './tiles.js';
 import { CARD_IDS, scoreEnv } from './scoring.js';
 import { CARD_TEXT, CARD_TITLES } from './cards.js';
@@ -126,7 +126,32 @@ export default class UI {
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
+    // ヒント：CPU（ふつう）が選ぶ組・場所・向き・トークンの置き場を、選んだ状態にする
+    showHint() {
+        const v = this.view;
+        const command = v && this.isMyTurn() ? suggest(v) : null;
+        if (!command || command.type !== 'place') return this.toast('自分の番になったら、おすすめを出せます');
+        this.clearSelection();
+        this.viewSeat = v.you;
+        this.sel = { tile: command.tile, token: command.token };
+        this.draft = { q: command.q, r: command.r, rot: command.rot };
+        this.tokenAt = command.at ? [...command.at] : null;
+        this.hint = command;
+        this.render();
+        this.toast(command.at ? 'おすすめ：この置き方で「決定」' : 'おすすめ：この置き方で「決定」（トークンは戻す）');
+    }
+
+    // 選んだ置き方がヒントのままか
+    followsHint() {
+        const h = this.hint;
+        const d = this.draft;
+        if (!h || !d || !this.sel || this.sel.tile !== h.tile || this.sel.token !== h.token) return false;
+        const at = this.tokenAt ?? null;
+        return d.q === h.q && d.r === h.r && d.rot === h.rot && JSON.stringify(at) === JSON.stringify(h.at ?? null);
+    }
+
     clearSelection() {
+        this.hint = null;
         this.sel = null;
         this.draft = null;
         this.tokenAt = undefined;
@@ -162,6 +187,7 @@ export default class UI {
             this.renderEnv();
         });
         $('#rotate').addEventListener('click', () => this.rotateDraft());
+        $('#hint').addEventListener('click', () => this.showHint());
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.addEventListener('click', (event) => {
                 if (event.target === dialog || event.target.closest('[data-close]')) dialog.close();
@@ -524,7 +550,7 @@ export default class UI {
             const back = this.tokenAt === null;
             buttons = `<button class="btn small secondary" data-act="cancel">やめる</button>
                 <button class="btn small secondary" data-act="bag" ${this.draft ? '' : 'disabled'} aria-pressed="${back}">${back ? 'トークンを置く' : '袋へ'}</button>
-                <button class="btn small primary" data-act="place" ${this.draft && this.tokenAt !== undefined ? '' : 'disabled'}>${'<svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>'}決定</button>`;
+                <button class="btn small primary${this.followsHint() ? ' recommended' : ''}" data-act="place" ${this.draft && this.tokenAt !== undefined ? '' : 'disabled'}>${'<svg class="ico" aria-hidden="true"><use href="#i-check"/></svg>'}決定</button>`;
         } else if (mine) {
             if (v.canReplace3) buttons += '<button class="btn small secondary" data-act="replace3">3つ流す</button>';
             if (me.nature > 0) buttons += '<button class="btn small secondary" data-act="wipe">自然トークンで流す</button>';
@@ -672,7 +698,7 @@ export default class UI {
             <h3>得点</h3>
             <p>動物は、各動物の得点カード（A〜D のどれか）の形に並べると点になります（右上のカードのボタンで確かめられます）。地形は、それぞれの<strong>いちばん大きいつながり</strong>のタイル数が点になり、その大きさで勝った人にボーナスがあります（2人：+2、同じなら +1ずつ。3〜4人：1番 +3、2番 +1）。</p>
             <h3>操作</h3>
-            <p>場の組を押して選び、自分の地の光るマスを押すとタイルが出ます。同じマスをもう一度押すか ${'<svg class="ico" style="--ico:16px" aria-hidden="true"><use href="#i-rotate"/></svg>'} で回します。光るタイルを押してトークンを置き、「決定」。別の組のトークンを押すと、自然トークンを使って別々に取れます。地は指で動かし、2本指で広げられます。相手の名前を押すと、相手の地が見られます。</p>`;
+            <p>場の組を押して選び、自分の地の光るマスを押すとタイルが出ます。同じマスをもう一度押すか ${'<svg class="ico" style="--ico:16px" aria-hidden="true"><use href="#i-rotate"/></svg>'} で回します。光るタイルを押してトークンを置き、「決定」。別の組のトークンを押すと、自然トークンを使って別々に取れます。地は指で動かし、2本指で広げられます。相手の名前を押すと、相手の地が見られます。電球のボタンを押すと、おすすめの置き方を選んだ状態にします。</p>`;
     }
 
     toast(message) {

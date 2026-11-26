@@ -174,6 +174,31 @@ function buildChoices(build) {
     return list;
 }
 
+// ---------- ヒント ----------
+
+const samePay = (a, b) => a.left === b.left && a.right === b.right;
+
+// おすすめの手を、カード・払い方を選んだ状態にして、押すボタンに印を付ける（画面だけ。記録には入れない）
+function showHint() {
+    const command = choosing() ? controller?.hint() : null;
+    if (command?.type !== 'play') return;
+    const option = optionOf(command.card);
+    if (!option) return;
+    ui.card = command.card;
+    ui.hint = command;
+    ui.buildPay = command.action === 'build' ? Math.max(0, buildChoices(option.build).findIndex(c => c.free === (command.free ?? null) && samePay(c.pay, command.pay))) : 0;
+    ui.wonderPay = command.action === 'wonder' ? Math.max(0, option.wonder.findIndex(p => samePay(p, command.pay))) : 0;
+    render();
+}
+
+function markHint() {
+    $('hint').disabled = !choosing();
+    const h = ui.hint;
+    if (!h || !choosing()) return;
+    document.querySelector(`#hand [data-card="${h.card}"]`)?.classList.add('recommended');
+    if (ui.card === h.card) document.querySelector(`#action [data-act="${h.action}"]`)?.classList.add('recommended');
+}
+
 const payLabel = pay => (pay.left + pay.right === 0 ? '払わない' : [pay.left ? `左に${pay.left}` : '', pay.right ? `右に${pay.right}` : ''].filter(Boolean).join('・'));
 
 // ---------- 描画 ----------
@@ -184,11 +209,12 @@ function render() {
     if (ui.key !== key) ui = { card: null, buildPay: 0, wonderPay: 0, key };
     const dir = view.direction === 'left' ? '左へ' : '右へ';
     $('age-info').innerHTML = view.phase === 'end' ? '<b>ゲーム終了</b>'
-        : `<b>第${view.age}時代</b><span>${Math.min(view.turn, 6)}/6</span><span class="dir">${view.direction === 'left' ? '◀' : '▶'} ${dir}渡す</span>`;
+        : `<b>第${view.age}時代</b><span>${Math.min(view.turn, 6)}/6</span><span class="dir">${view.direction === 'left' ? '◀' : '▶'} ${dir}<span class="dir-verb">渡す</span></span>`;
     renderNeighbors();
     renderMyCity();
     renderHand();
     renderAction();
+    markHint();
     if (view.phase === 'discardBuild' && view.discardPile && !$('discard-dialog').open) openDiscard();
 }
 
@@ -430,6 +456,7 @@ function setup() {
     $('resume').addEventListener('click', () => startGame(store.load(KEYS.save) ?? newSetup()));
     $('open-help-title').addEventListener('click', () => openDialog('help-dialog'));
     $('open-help').addEventListener('click', () => openDialog('help-dialog'));
+    $('hint').addEventListener('click', showHint);
     $('open-cities').addEventListener('click', () => openCities());
     $('home').addEventListener('click', goHome);
     $('neighbors').addEventListener('click', e => {

@@ -9,7 +9,8 @@ const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const PRECACHE = [
     './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'css/style.css',
     'js/main.js', 'js/ui.js', 'js/map-view.js', 'js/art.js', 'js/geo.js', 'js/map.js', 'js/cards.js', 'js/game-controller.js',
-    'js/game.js', 'js/scoring.js', 'js/game-view.js', 'js/cpu-player.js', 'js/random.js', 'js/help.js'
+    'js/game.js', 'js/scoring.js', 'js/game-view.js', 'js/cpu-player.js', 'js/random.js', 'js/help.js',
+    'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js'
 ];
 
 self.addEventListener('install', event => {

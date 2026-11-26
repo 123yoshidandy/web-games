@@ -14,7 +14,7 @@ vi.mock('../public/js/cpu-player.js', async (importOriginal) => {
     };
 });
 
-const { default: LocalGameController, simpleCommands } = await import('../public/js/game-controller.js');
+const { default: LocalGameController, simpleCommands, loadSavedGame, clearSavedGame } = await import('../public/js/game-controller.js');
 
 afterEach(() => {
     broken = false;
@@ -80,5 +80,53 @@ describe('ローカル対戦のコントローラー', () => {
             { type: 'discard', cards: { wood: 1, brick: 0, sheep: 2, wheat: 0, ore: 0 } },
             { type: 'endTurn' }
         ]);
+    });
+});
+
+describe('続きから', () => {
+    function stubStorage() {
+        const store = new Map();
+        vi.stubGlobal('localStorage', {
+            getItem: key => store.get(key) ?? null,
+            setItem: (key, value) => store.set(key, String(value)),
+            removeItem: key => store.delete(key)
+        });
+    }
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('操作のたびに保存し、記録から同じ局面に戻る', () => {
+        stubStorage();
+        const players = [{ name: 'あなた', isCPU: false }, { name: 'CPU1', isCPU: true }, { name: 'CPU2', isCPU: true }];
+        const controller = new LocalGameController(players);
+        controller.stop();
+        const game = controller.game;
+        for (let i = 0; i < 60 && game.phase !== 'end'; i++) real.runCpuStep(game, game.actors()[0]);
+        controller.save();
+
+        const saved = loadSavedGame();
+        expect(saved.commands.length).toBe(game.commands.length);
+        const resumed = new LocalGameController(null, {}, { saved });
+        resumed.stop();
+        expect(resumed.game.seed).toBe(game.seed);
+        expect(resumed.game.buildings).toEqual(game.buildings);
+        expect(resumed.game.roads).toEqual(game.roads);
+        expect(resumed.game.players.map(p => p.hand)).toEqual(game.players.map(p => p.hand));
+    });
+
+    it('終わったゲームは保存を消す', () => {
+        stubStorage();
+        const controller = new LocalGameController([{ name: 'A', isCPU: true }, { name: 'B', isCPU: true }]);
+        controller.stop();
+        expect(loadSavedGame()).not.toBeNull();
+        controller.game.phase = 'end';
+        controller.save();
+        expect(loadSavedGame()).toBeNull();
+        clearSavedGame();
+    });
+
+    it('保存がなければ null', () => {
+        stubStorage();
+        expect(loadSavedGame()).toBeNull();
     });
 });

@@ -179,6 +179,12 @@ export function cpuSeatsToAct(game) {
     return game.waiting.filter(s => game.players[s].isCPU && !game.pending?.[s]);
 }
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.waiting.includes(seat) || game.pending?.[seat]) return null;
+    return chooseCommand(createGameView(game, seat), LEVELS.normal);
+}
+
 // CPU の席 seat が 1 手選ぶ。選べたら true（CPU には自分のビューだけを渡す）
 export function runCpuStep(game, seat, levelOf = () => 'normal') {
     if (!cpuSeatsToAct(game).includes(seat)) return false;

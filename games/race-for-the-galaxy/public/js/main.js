@@ -35,6 +35,46 @@ let seenSeq = 0;
 let resultShown = false;
 let revealTimer = null;
 
+// ヒント：おすすめの手 { key, command }（その場面の間だけ）
+let hint = null;
+const HINT_BUTTON = '<button type="button" id="hint" class="chip hint-button" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg>ヒント</button>';
+
+// おすすめの手を、選んだ状態にして光らせる
+function showHint() {
+    const d = decision();
+    if (!d || !controller) return;
+    const c = controller.suggest();
+    if (!c) return;
+    if (c.type === 'startDiscard' || c.type === 'discard') ui.sel = [...c.cards];
+    if (c.type === 'action') ui.actions = [...c.actions];
+    if (c.type === 'explore') ui.keep = [...c.keep];
+    if ((c.type === 'develop' || c.type === 'settle') && c.card) {
+        Object.assign(ui, { place: c.card, sel: [...c.pay], tactics: [...(c.tactics ?? [])], colonyShip: !!c.colonyShip, payMilitary: !!c.payMilitary });
+    }
+    if (c.type === 'trade') ui.goods = [c.good];
+    if (c.type === 'windfall') ui.goods = [c.world];
+    if (c.type === 'consume' && !c.done) {
+        Object.assign(ui, { use: d.options.findIndex(o => o.use === c.use), sel: [...(c.cards ?? [])], goods: [...(c.goods ?? [])], number: c.number ?? null });
+    }
+    hint = { key: ui.key, command: c };
+    render();
+}
+
+function renderHint() {
+    const c = hint?.key === ui.key && decision() ? hint.command : null;
+    if (!c) {
+        hint = null;
+        return;
+    }
+    let target = {
+        startDiscard: '[data-act="discard"]', discard: '[data-act="discard"]', action: '[data-act="chooseAction"]', explore: '#explore-ok',
+        trade: '[data-act="trade"]', windfall: '[data-act="windfall"]'
+    }[c.type];
+    if (c.type === 'develop' || c.type === 'settle') target = c.card ? '[data-act="place"]' : '[data-act="pass"]';
+    if (c.type === 'consume') target = c.done ? '[data-act="consumeDone"]' : '[data-act="consumeUse"]';
+    if (target) document.querySelector(target)?.classList.add('suggested');
+}
+
 function freshUi(key = null) {
     return { key, sel: [], place: null, goods: [], use: null, tactics: [], colonyShip: false, payMilitary: false, focus: null, actions: [], keep: [] };
 }
@@ -128,6 +168,7 @@ function render() {
     renderHand();
     renderPanel();
     renderExplore();
+    renderHint();
     checkReveal();
     if (view.phase === 'end' && !resultShown) {
         resultShown = true;
@@ -238,6 +279,8 @@ function renderPanel() {
         startDiscard: discardHtml, discard: discardHtml, action: actionHtml, explore: () => '<div class="prompt">引いたカードから残すカードを選ぶ</div><div class="btn-row"><button class="primary" data-act="openExplore">カードを見る</button></div>',
         develop: placeHtml, settle: placeHtml, trade: tradeHtml, consume: consumeHtml, windfall: windfallHtml
     })[d.kind]();
+    // ヒントのボタン（自分が選ぶ番だけ。案内文の右端）
+    if (d && view.phase !== 'end') body = body.replace('<div class="prompt">', `<div class="prompt">${HINT_BUTTON}`);
     $('panel').innerHTML = feedLine() + body + focusLine();
 }
 
@@ -507,6 +550,7 @@ function onTableau(id) {
 function onAct(act) {
     const d = decision();
     switch (act) {
+        case 'hint': return showHint();
         case 'discard': return send({ type: d.kind, cards: ui.sel });
         case 'chooseAction': return send({ type: 'action', actions: ui.actions });
         case 'openExplore': ui.exploreOpen = true; return openDialog('explore-dialog');

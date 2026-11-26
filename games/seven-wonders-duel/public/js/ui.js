@@ -91,7 +91,11 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
+                onUpdate: () => {
+                    // ヒントを出している間は、自分の番が続くなら今の場面のおすすめに出し直し、相手の番になれば消す
+                    if (this.hintCommand) this.hintCommand = this.controller.hint();
+                    this.render();
+                },
                 onError: (message) => this.toast(message)
             });
         } catch (error) {
@@ -141,6 +145,7 @@ export default class UI {
         $('#again').addEventListener('click', () => this.newGame());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => this.openLog());
         $('#status').addEventListener('click', () => this.reopenPrompt() || this.openLog());
         document.querySelectorAll('dialog').forEach(dialog => {
@@ -226,6 +231,7 @@ export default class UI {
         this.renderCity($('#city-1'), 1 - me);
         this.renderMilitary();
         this.renderStructure();
+        this.markHint();
         this.renderStatus();
         this.playEvents(previous);
         this.refreshOpenDialogs();
@@ -475,6 +481,7 @@ export default class UI {
             buttons += '<button class="btn secondary" data-action="close">閉じる</button>';
         }
         $('#card-detail-buttons').innerHTML = buttons;
+        this.markDetailHint();
         $('#card-detail').showModal();
     }
 
@@ -488,6 +495,7 @@ export default class UI {
         $('#card-detail-buttons').innerHTML = mine
             ? `<button class="btn primary" data-action="pickWonder" data-wonder="${key}">これを選ぶ</button><button class="btn secondary" data-action="close">閉じる</button>`
             : '<button class="btn secondary" data-action="close">閉じる</button>';
+        this.markDetailHint();
         $('#card-detail').showModal();
     }
 
@@ -555,6 +563,46 @@ export default class UI {
             + rows.map(([k, label]) => `<tr class="${k}"><td>${label}</td>${order.map(s => `<td>${v.players[s].score[k]}</td>`).join('')}</tr>`).join('');
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('#result').showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、札・驚異に印を付けて知らせる（画面だけ。記録には入れない）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        this.render();
+        const card = command.slot !== undefined ? `「${CARDS[this.view.structure[command.slot].key].name}」` : '';
+        const text = {
+            pickWonder: () => `驚異「${WONDERS[command.wonder].name}」を選ぶ`,
+            build: () => `${card}を建てる`,
+            discard: () => `${card}を捨ててコインにする`,
+            wonder: () => `${card}で驚異「${WONDERS[command.wonder].name}」を建てる`,
+            progress: () => `進歩トークン「${TOKENS[command.token].name}」を取る`,
+            destroy: () => `相手の「${CARDS[command.card].name}」を壊す`,
+            revive: () => `捨て札の「${CARDS[command.card].name}」を建てる`,
+            starter: () => '自分が先手になる'
+        }[command.type]?.() ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const selector = c.type === 'pickWonder' ? `[data-pick-wonder="${c.wonder}"]`
+            : c.slot !== undefined ? `#structure [data-slot="${c.slot}"]`
+            : c.token ? `#board-info [data-token="${c.token}"]` : null;
+        if (selector) document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
+    }
+
+    // 開いた札の詳しい画面で、おすすめのボタンに印を付ける
+    markDetailHint() {
+        const c = this.hintCommand;
+        if (!c || !['pickWonder', 'build', 'discard', 'wonder'].includes(c.type)) return;
+        if (c.slot !== undefined && c.slot !== this.detailSlot) return;
+        const wonder = c.wonder ? `[data-wonder="${c.wonder}"]` : '';
+        document.querySelector(`#card-detail-buttons [data-action="${c.type}"]${wonder}`)?.classList.add('recommended');
     }
 
     toast(message) {

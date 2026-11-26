@@ -113,6 +113,12 @@ export function suspicions(view) {
 
 // ---- 手の候補 ----
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.phase !== 'play' || seat !== game.current) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 export function chooseCpuCommand(game, seat = game.current, profile = PROFILES.normal) {
     const view = createGameView(game, seat, { since: game.logs.length });
     const random = cpuRandom(game, seat);

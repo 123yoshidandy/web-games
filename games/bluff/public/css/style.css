@@ -218,7 +218,19 @@ dialog .buttons { flex: none; display: flex; justify-content: center; gap: 12px;
     .field { height: 27px; font-size: 13px; }
     .seat-body { height: 28px; }
     .die.big { --d: 42px; }
+    /* タイトルは、左に絵とロゴ、右に設定の2列にする */
+    #screen-title {
+        display: grid; grid-template-columns: auto auto;
+        grid-template-areas: "art setup" "logo setup" "sub setup";
+        align-content: safe center; justify-content: center; align-items: center; column-gap: 40px;
+    }
+    #screen-title .title-art { grid-area: art; width: 200px; align-self: end; }
+    #screen-title .logo { grid-area: logo; text-align: center; }
+    #screen-title .subtitle { grid-area: sub; text-align: center; align-self: start; }
+    #screen-title .setup { grid-area: setup; }
 }
+/* 収まらない画面では、タイトルをスクロールさせる */
+#screen-title { overflow-y: auto; justify-content: safe center; }
 @media (min-width: 1000px) and (min-height: 700px) {
     .field { height: 46px; font-size: 18px; }
     .die.big { --d: 60px; }
@@ -231,4 +243,26 @@ dialog .buttons { flex: none; display: flex; justify-content: center; gap: 12px;
     .bid-line .bid { font-size: 22px; }
     .seat { padding: 8px 10px; }
     .seat-head { font-size: 15px; }
+}
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント：おすすめの印 */
+.recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+
+/* 動きを減らす設定のときは、動きを止める */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }

@@ -106,6 +106,14 @@ export function shouldContinue(game, seat, cfg = LEVELS.normal, random = cpuRand
     return (1 - p) * gain > p * atRisk * caution;
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ操作（盤はすべて見えている）。手は打たない
+export function suggest(game, seat) {
+    if (game.isOver() || game.current !== seat) return null;
+    if (game.phase === 'roll') return { type: 'roll' };
+    if (game.phase === 'choose') return chooseMove(game, seat, LEVELS.normal);
+    return { type: shouldContinue(game, seat, LEVELS.normal) ? 'roll' : 'stop' };
+}
+
 // CPU の番なら 1 手打つ。打てたら true
 export function runCpuStep(game, levelOf = () => 'normal') {
     if (game.isOver()) return false;

@@ -141,6 +141,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#score-button').addEventListener('click', () => this.showProjection());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#players').addEventListener('click', (event) => {
             const chip = event.target.closest('[data-player]');
             if (chip) this.showPlayer(chip.dataset.player);
@@ -525,6 +526,39 @@ export default class UI {
             html = `<span class="act-label"><span class="act-hint">${hint}</span></span>${view.canEnd ? '<button class="btn small secondary" data-act="end">手番を終える</button>' : ''}`;
         }
         $('#actions').innerHTML = html;
+        if (this.hint && this.hint.key === this.lastSeq) $(`#actions [data-act="${this.hint.act}"]`)?.classList.add('recommended');
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作を、選んだ状態にして、押すボタンに印を付ける
+    showHint() {
+        const c = this.controller?.hint();
+        if (!c) return this.toast('自分の番になったら、おすすめを出せます');
+        this.sel = null;
+        this.target = null;
+        let act = c.type;
+        let text;
+        if (c.type === 'take') {
+            this.sel = { kind: 'money', slots: [...c.slots].sort() };
+            text = 'お金を取る';
+        } else if (c.type === 'buy') {
+            this.sel = { kind: 'buy', slot: c.slot, cards: [...c.cards] };
+            text = `${CURRENCY_NAMES[CURRENCIES[c.slot]] ?? ''}の建物を買う`;
+        } else if (c.type === 'place') {
+            this.placeIndex = Math.max(0, this.view.toPlace.indexOf(c.tile));
+            if (c.to === 'alhambra') this.target = { x: c.x, y: c.y };
+            act = c.to === 'alhambra' ? 'place' : c.to;
+            text = c.to === 'alhambra' ? '光る場所に置く' : c.to === 'reserve' ? '予備へ置く' : 'ダークへ渡す';
+        } else if (c.type === 'redesign') {
+            this.sel = { kind: 'reserve', tile: c.tile };
+            this.target = { x: c.x, y: c.y };
+            act = 'add';
+            text = '予備の建物を光る場所に足す';
+        } else {
+            text = '手番を終える';
+        }
+        this.hint = { key: this.lastSeq, act };
+        this.render();
+        this.toast(`おすすめ：${text}`);
     }
 
     // 置いたときの、次の得点の見込みの増え方

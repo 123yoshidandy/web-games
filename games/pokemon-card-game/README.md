@@ -16,7 +16,7 @@
 - 公開先は https://123yoshidandy.github.io/web-games/pokemon-card-game/ になる予定。サーバーの自動デプロイ（GitHub Actions）は、web-games の直下にまとめる予定で、今はない。サーバーを1つにまとめる計画は `docs/server-merge.md`
 - 下の説明のうち、リポジトリ単体のときの手順（`.github/workflows/`・GitHub Pages への公開など）は、もとのリポジトリでの話
 
-## ルール
+## 遊び方
 
 公式の基本ルールに沿っています。
 
@@ -100,6 +100,15 @@ node tools/list-unsupported.mjs attacks|abilities|trainers   # まだ動かな�
 
 接続が切れても、同じ端末で開き直せば同じ席に戻れます。対戦中に部屋を出ると、その人の番は CPU が代わりに打ちます。
 
+## CPU
+
+CPU の強さは1つだけです（`public/js/cpu-player.js`）。人間と同じ操作を返し、判断に乱数を使わないので、記録から同じ対戦を再現できます。
+
+- ワザ・ワザの前の操作（ボスの指令・入れ替え・にげる・エネルギーなど）・自分の番に出た選択は、ゲームの写しの上で試して、結果の点数で比べる（先読み）。写しでは、見えないカード（自分の山札とサイド、相手の山札・サイド・手札）を混ぜなおし、知らないはずのことを使わない
+- ベンチ・進化・山札を探す・エネルギーの育て先・手札を捨てる順は、決まりで選ぶ
+- 1手を決めるあいだに試す操作の数に上限があり、スマホでも重くならない
+- `npm run cpu-match -w games/pokemon-card-game` で、構築済みデッキの総当たりを CPU 同士で戦わせ、デッキごとの勝率と、止まらずに決着するかを確かめられる（引数は1組あたりの試合数・デッキのID・最初のシード）
+
 ## 開発
 
 必要なもの：Node.js 22 以上、Python 3（画面を手元で配信するため）、AWS SAM CLI（サーバーをデプロイするとき）
@@ -107,6 +116,7 @@ node tools/list-unsupported.mjs attacks|abilities|trainers   # まだ動かな�
 ```bash
 npm install
 npm test                                   # ルール・CPU・オンライン対戦のテスト
+npm run cpu-match                          # CPU 同士で、構築済みデッキの総当たり
 python3 -m http.server 8080 --directory public   # http://localhost:8080/ で遊ぶ
 npm run dev:server                         # 手元のオンライン対戦のサーバー（ws://localhost:8787。PORT で変えられる）
 npm run deploy:server                      # AWS にデプロイ（スタック pokemon-card-game-online）
@@ -125,6 +135,7 @@ npm run deploy:server                      # AWS にデプロイ（スタック 
 | `public/js/decks.js` | 構築済みデッキ |
 | `public/js/game-view.js` | そのプレイヤーから見てよい情報だけのビュー（相手の手札・山札・サイドは枚数だけ） |
 | `public/js/cpu-player.js` | CPU。人間と同じ操作を返す。乱数は使わない |
+| `scripts/cpu-match.mjs` | CPU 同士で、構築済みデッキの総当たりを戦わせ、デッキごとの勝率を数える |
 | `public/js/game-controller.js` | CPU 対戦のコントローラー（`getView()` と `send()`） |
 | `public/js/ui/` | 画面（盤面・手札・ダイアログ・カードの描き方） |
 | `public/js/main.js` | 起動と画面の切り替え |

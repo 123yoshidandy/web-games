@@ -141,6 +141,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#next-round').addEventListener('click', () => {
             $('#round-result').close();
             if (this.view?.phase === 'roundEnd') this.send({ type: 'nextRound' });
@@ -241,8 +242,52 @@ export default class UI {
         return this.view.players[this.view.you];
     }
 
+    // ---- ヒント ----
+
+    // おすすめの手を、カードを選んだ状態にして印を付ける（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.clearChoices();
+        this.hintCommand = command;
+        if (command.type === 'keep') this.keepCard = command.card;
+        if (command.type === 'duo') this.selected = [...command.cards];
+        this.render();
+        const target = command.target !== undefined ? `（${this.view.players[command.target].name}から）` : '';
+        const text = {
+            drawDeck: '山札から2枚引く',
+            takeDiscard: '白い枠の捨て札を取る',
+            keep: '選んだカードを残し、もう1枚を白い枠の捨て札へ',
+            crabLook: '白い枠の捨て札を見る',
+            crabTake: '白い枠のカードを取る',
+            duo: `選んだ2枚組を出す${target}`,
+            endTurn: 'ターンを終える',
+            stop: 'ストップを宣言する',
+            lastChance: 'ラストチャンスを宣言する'
+        }[command.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const list = {
+            drawDeck: ['#table [data-deck]'],
+            takeDiscard: [`#table [data-pile="${c.pile}"]`],
+            keep: [`[data-drawn="${c.card}"]`, `#table [data-pile="${c.pile}"]`],
+            crabLook: [`#table [data-pile="${c.pile}"]`],
+            crabTake: [`#crab-cards .card[data-card="${c.card}"]`],
+            duo: ['#actions [data-act="duo"]', ...(c.target !== undefined ? [`#opponents [data-player="${c.target}"]`] : [])],
+            endTurn: ['#actions [data-act="endTurn"]'],
+            stop: ['#actions [data-act="stop"]'],
+            lastChance: ['#actions [data-act="lastChance"]']
+        }[c.type] ?? [];
+        list.forEach(s => document.querySelectorAll(s).forEach(el => el.classList.add('recommended')));
+    }
+
     send(command) {
         this.clearChoices();
+        this.hintCommand = null;
         this.controller?.send(command);
     }
 
@@ -320,6 +365,8 @@ export default class UI {
         this.renderHand();
         this.renderActions();
         this.renderCrab();
+        if (this.view.phase === 'end' || this.view.current !== this.view.you) this.hintCommand = null;
+        this.markHint();
 
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;

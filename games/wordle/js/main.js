@@ -3,10 +3,11 @@
  * 判定は logic.js、部屋と通信は online.js が行う
  */
 
-import { BLANK, MAX_ROWS, baseKana, boardWidth, checkGuess, cycleVariant, evaluateGuess, normalizeLetter, pickAnswer, trimBlanks, usesBlank } from './logic.js';
+import { BLANK, MAX_ROWS, baseKana, boardWidth, checkGuess, createRandom, cycleVariant, evaluateGuess, normalizeLetter, pickAnswer, trimBlanks, usesBlank } from './logic.js';
 import { resultMessage, setupOnline } from './online.js';
 
 const MODE_STORAGE_KEY = 'wordle-mode';
+const GAME_STORAGE_KEY = 'wordle-game'; // 1人プレイの途中経過（モード・シード・入れた単語）
 const RESULT_DELAY_MS = 1500; // 最後の行をめくり終えてから結果を出すまで
 const STATUS_RANK = { absent: 1, present: 2, correct: 3 };
 
@@ -24,7 +25,10 @@ const BACKSPACE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 
 // ゲームの状態
 const state = {
     mode: loadMode(),
+    screen: 'title', // title・game
     secret: '',
+    seed: 0,
+    words: [], // 1人プレイで決定した単語（続きからで並べ直す）
     length: 5,
     grid: [],
     currentRow: 0,
@@ -48,6 +52,41 @@ function saveMode(mode) {
     } catch (e) {
         // 保存できなくても遊べるので無視する
     }
+}
+
+// 1人プレイの途中経過。答えはシードから作り直す
+function saveGame() {
+    try {
+        if (state.gameOver) localStorage.removeItem(GAME_STORAGE_KEY);
+        else localStorage.setItem(GAME_STORAGE_KEY, JSON.stringify({ mode: state.mode, seed: state.seed, words: state.words }));
+    } catch (e) {
+        // 保存できなくても遊べるので無視する
+    }
+}
+
+// 続きから遊べる途中のゲーム（1つも決定していなければ、続きとみなさない）
+function loadGame() {
+    try {
+        const game = JSON.parse(localStorage.getItem(GAME_STORAGE_KEY));
+        if (!game || !['word', 'pokemon'].includes(game.mode) || !Number.isInteger(game.seed) || !Array.isArray(game.words)) return null;
+        return game.words.length > 0 && game.words.length < MAX_ROWS ? game : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+// ===== 画面の切り替え =====
+
+function showScreen(name) {
+    state.screen = name;
+    document.getElementById('screen-title').classList.toggle('hidden', name !== 'title');
+    document.getElementById('screen-game').classList.toggle('hidden', name !== 'game');
+    if (name === 'title') document.getElementById('resume').classList.toggle('hidden', !loadGame());
+}
+
+// タイトルへ戻る（途中のゲームは保存してあるので、「続きから」で再開できる）
+function showTitle() {
+    showScreen('title');
 }
 
 // ===== 盤面 =====
@@ -161,7 +200,7 @@ function updateCurrentRowFocus() {
 // ===== 入力 =====
 
 function canType() {
-    return !state.gameOver && !state.online?.waiting;
+    return state.screen === 'game' && !state.gameOver && !state.online?.waiting;
 }
 
 // キーボードを組み立てる
@@ -241,7 +280,7 @@ function handleModifier() {
 
 // キーボード入力の処理（入力欄に書いているときと、ダイアログを開いているときは受け付けない）
 function handleKeyDown(e) {
-    if (e.target.closest?.('input') || document.querySelector('.modal:not(.hidden)')) return;
+    if (state.screen !== 'game' || e.target.closest?.('input') || document.querySelector('.modal:not(.hidden)')) return;
 
     if (e.key === 'Enter') {
         handleEnterKey();
@@ -313,8 +352,10 @@ function handleEnterKey() {
     flipRow(state.currentRow, word, evaluateGuess(word, state.secret));
     state.currentRow++;
     state.currentCol = 0;
+    state.words.push(word);
     setTimeout(updateCurrentRowFocus, 800);
     checkGameEnd(word);
+    saveGame();
 }
 
 // ===== 1人プレイ =====
@@ -340,11 +381,36 @@ function checkGameEnd(word) {
 // 新しいゲームを開始（ページを開いたときは、開始の案内を出さない）
 // 答えの文字数は伏せる。マスの数はモードで一番長い答えに合わせ、短い答えは後ろが空白になる
 function startNewGame(announce = true) {
-    state.secret = pickAnswer(state.mode);
+    state.seed = Math.floor(Math.random() * 2 ** 32); // 答えはこの seed から決まる
+    state.secret = pickAnswer(state.mode, createRandom(state.seed));
     state.length = boardWidth(state.mode);
+    state.words = [];
     resetBoard();
+    saveGame();
 
     if (announce) showMessage('新しいゲームを開始しました');
+}
+
+// 保存した途中のゲームを並べ直す
+function resumeGame() {
+    const game = loadGame();
+    if (!game) return false;
+    state.mode = game.mode;
+    saveMode(state.mode);
+    applyMode();
+    state.seed = game.seed;
+    state.secret = pickAnswer(state.mode, createRandom(state.seed));
+    state.length = boardWidth(state.mode);
+    state.words = [];
+    resetBoard();
+    game.words.forEach(word => {
+        fillRow(state.currentRow, word);
+        flipRow(state.currentRow, word, evaluateGuess(word, state.secret));
+        state.currentRow++;
+        state.words.push(word);
+    });
+    setTimeout(updateCurrentRowFocus, 800);
+    return true;
 }
 
 // モードに合わせて表示を切り替える
@@ -354,6 +420,7 @@ function applyMode() {
     });
 
     const width = boardWidth(state.mode);
+    document.getElementById('mode-label').textContent = state.mode === 'pokemon' ? 'ポケモン' : 'ことば';
     document.getElementById('rule-text').textContent = state.mode === 'pokemon'
         ? `ポケモンの名前をカタカナで当ててください。文字数は伏せてあり、${width}文字より短い名前は、後ろを空白で埋めた形が答えです。図鑑にある名前だけ入力できます。10回まで挑戦できます。`
         : `${width}文字のひらがなの単語を当ててください。10回まで挑戦できます。`;
@@ -362,17 +429,28 @@ function applyMode() {
     updateKeyboardLabels();
 }
 
-// モード切り替え
+// モード切り替え（タイトル画面で選ぶ。選んだモードは次に開いたときも残る）
 function setupModeToggle() {
     document.querySelectorAll('.mode-button[data-mode]').forEach(button => {
         button.addEventListener('click', () => {
-            if (button.dataset.mode === state.mode) return;
             state.mode = button.dataset.mode;
             saveMode(state.mode);
             applyMode();
-            startNewGame();
         });
     });
+}
+
+// タイトル画面のボタン
+function setupTitle() {
+    document.getElementById('start').addEventListener('click', () => {
+        startNewGame(false);
+        showScreen('game');
+    });
+    document.getElementById('resume').addEventListener('click', () => {
+        if (!resumeGame()) startNewGame(false);
+        showScreen('game');
+    });
+    document.getElementById('home').addEventListener('click', showTitle);
 }
 
 // ===== オンライン対戦 =====
@@ -402,6 +480,7 @@ function markPending() {
 // サーバーから届いたビューを盤面に映す（届くたびに呼ぶ。同じビューが続いても崩れない）
 function applyOnlineView({ view, seat, matchId }) {
     document.body.classList.add('is-online');
+    if (state.screen !== 'game') showScreen('game');
 
     // 新しい対戦なら盤面を作り直す
     if (state.online?.matchId !== matchId) {
@@ -521,7 +600,7 @@ function openPlayerBoard(s) {
     document.getElementById('player-modal').classList.remove('hidden');
 }
 
-// 部屋を出たら、1人プレイに戻る
+// 部屋を出たら、タイトル画面に戻る
 function exitOnline() {
     if (!state.online && !document.body.classList.contains('is-online')) return;
     state.online = null;
@@ -529,7 +608,7 @@ function exitOnline() {
     document.getElementById('opponents').classList.add('hidden');
     state.mode = loadMode();
     applyMode();
-    startNewGame();
+    showTitle();
 }
 
 // ===== メッセージとダイアログ =====
@@ -547,12 +626,12 @@ function showMessage(msg) {
 }
 
 // ダイアログ（外側のタップ・×・Esc で閉じる）
-function setupModal(modalId, closeId, openButtonId) {
+function setupModal(modalId, closeId, ...openButtonIds) {
     const modal = document.getElementById(modalId);
     const close = () => modal.classList.add('hidden');
-    if (openButtonId) {
-        document.getElementById(openButtonId).addEventListener('click', () => modal.classList.remove('hidden'));
-    }
+    openButtonIds.forEach(id => {
+        document.getElementById(id).addEventListener('click', () => modal.classList.remove('hidden'));
+    });
     document.getElementById(closeId).addEventListener('click', close);
     modal.addEventListener('click', (e) => {
         if (e.target === modal) close();
@@ -571,10 +650,11 @@ document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.getElementById('new-game').addEventListener('click', startNewGame);
 setupKeyboard();
 setupModeToggle();
-setupModal('info-modal', 'close-info', 'info-button');
+setupTitle();
+setupModal('info-modal', 'close-info', 'open-help-title', 'open-help-game');
 setupModal('player-modal', 'player-close');
 applyMode();
-startNewGame(false);
+showTitle();
 online.init();
 
 // ホーム画面に置いて、オフラインでも開けるようにする（PWA）

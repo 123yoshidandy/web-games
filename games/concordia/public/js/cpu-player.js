@@ -34,6 +34,13 @@ export function fallbackCommands(game, seat) {
     ]);
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ操作。CPU と同じく、自分の手札と公開の盤から決める。手は打たない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || game.current !== seat) return null;
+    if (game.phase === 'architect') return architectStep(game, seat, PROFILES.normal);
+    return chooseCommand(game, seat, PROFILES.normal);
+}
+
 export function runCpuStep(game, seat = game.current, profile = PROFILES[game.players[seat].cpuLevel] ?? PROFILES.normal) {
     if (game.phase === 'architect') {
         return game.applyCommand(seat, architectStep(game, seat, profile));

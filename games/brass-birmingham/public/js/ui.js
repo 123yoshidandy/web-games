@@ -157,6 +157,7 @@ export default class UI {
         $('#again').addEventListener('click', () => this.newGame());
         $('#result-home').addEventListener('click', () => this.showTitle());
         $('#home').addEventListener('click', () => this.showTitle());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-help-title').addEventListener('click', () => this.openDialog('#help'));
         $('#open-help-game').addEventListener('click', () => this.openDialog('#help'));
         $('#open-log').addEventListener('click', () => this.showLog());
@@ -201,6 +202,24 @@ export default class UI {
             `<button data-count="${n}" role="radio" aria-checked="${n === count}" class="${n === count ? 'on' : ''}">${n}人</button>`).join('');
         $('#level').innerHTML = Object.entries(LEVELS).map(([key, name]) =>
             `<button data-level="${key}" role="radio" aria-checked="${key === level}" class="${key === level ? 'on' : ''}">${name}</button>`).join('');
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ行動のボタンに印を付け、行き先を文で出す
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('自分の番になったら、おすすめを出せます');
+        if (this.mode) {
+            this.mode = null;
+            this.render();
+        }
+        document.querySelector(`[data-act="mode"][data-arg="${command.type}"]`)?.classList.add('recommended');
+        const name = ACTIONS.find(([type]) => type === command.type)?.[1] ?? command.type;
+        let detail = '';
+        if (command.type === 'build') detail = `：${placeName(slotLoc(command.slot))}に${INDUSTRIES[command.industry].name}`;
+        if (command.type === 'network') detail = `：${command.links.map(linkName).join('、')}`;
+        if (command.type === 'sell') detail = `：${command.sales.map(s => placeName(slotLoc(s.slot))).join('、')}`;
+        if (command.type === 'develop') detail = `：${command.industries.map(i => INDUSTRIES[i].name).join('、')}`;
+        this.toast(`おすすめ：${name}${detail}`, 4000);
     }
 
     toast(message, ms = 2400) {

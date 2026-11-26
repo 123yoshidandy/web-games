@@ -87,6 +87,8 @@ export default class UI {
             help.showModal();
         });
         help.addEventListener('close', () => this.controller?.resume());
+        $('hint').addEventListener('click', () => this.showHint());
+        $('open-log').addEventListener('click', () => this.showLog());
         document.querySelectorAll('dialog').forEach(d => {
             d.querySelector('.close')?.addEventListener('click', () => d.close());
             if (d.id !== 'result') d.addEventListener('click', e => { if (e.target === d) d.close(); });
@@ -186,6 +188,7 @@ export default class UI {
         this.view = view;
         this.flip = this.myColor === WHITE;
         if (!this.myTurn) this.selection = [];
+        if (this.hintMove && keyOf(this.hintMove.cells) !== keyOf(this.selection)) this.hintMove = null;
         this.selection = this.selection.filter(c => view.board[c] === this.myColor);
         this.renderTurn();
         this.renderPanels(still);
@@ -201,8 +204,9 @@ export default class UI {
         const v = this.view;
         $('turn-info').textContent = v.over ? `${this.nameOf(v.winner)}の勝ち`
             : !this.myTurn ? `${this.nameOf(v.current)}の番`
-            : this.selection.length ? '矢印で動かす' : '玉を選ぶ（一列に3個まで）';
+            : this.selection.length ? '矢印で動かす' : '玉を選ぶ（3個まで）';
         $('clear').hidden = !this.selection.length;
+        $('hint').disabled = !this.myTurn;
     }
 
     panelHtml(p, still) {
@@ -309,7 +313,8 @@ export default class UI {
             const [dx, dy] = art.dirXY(vd);
             const inline = axis === -1 || axis === m.dir % 3;
             const dist = inline ? ((sel.length - 1) / 2 + 1) * art.S : art.S * 0.95;
-            art.drawArrow(L.arrows, cx + dx * dist, cy + dy * dist, m.dir, m.push, vd);
+            const arrow = art.drawArrow(L.arrows, cx + dx * dist, cy + dy * dist, m.dir, m.push, vd);
+            if (this.hintMove?.dir === m.dir) arrow.classList.add('recommended');
         });
     }
 
@@ -350,6 +355,30 @@ export default class UI {
         const cells = this.selection.slice().sort((a, b) => a - b);
         this.selection = [];
         this.controller.send({ type: 'move', cells, dir });
+    }
+
+    // おすすめの手の玉を選び、その矢印を金色で囲む
+    showHint() {
+        if (!this.myTurn) return;
+        const move = this.controller.hint();
+        if (!move) return this.toast('今はおすすめの手がありません');
+        this.selection = move.cells.slice();
+        this.hintMove = move;
+        this.render();
+        this.toast('おすすめ：光る矢印の向きへ動かす');
+    }
+
+    showLog() {
+        const v = this.view;
+        const moves = v.events.filter(e => e.type === 'move');
+        const items = moves.map(e => {
+            const out = e.pushed.filter(([, to]) => to === -1).length;
+            const pushed = e.pushed.length ? `・${e.pushed.length}個を押す${out ? '（押し出し）' : ''}` : '';
+            return `<li>${escapeHtml(this.nameOf(e.seat))}（${COLOR_NAMES[e.color]}）：${e.cells.length}個を動かす${pushed}</li>`;
+        });
+        $('log-list').innerHTML = items.length ? items.join('') : '<li>まだ手はありません</li>';
+        $('log').showModal();
+        $('log-list').scrollTop = $('log-list').scrollHeight;
     }
 
     // ---- 結果・知らせ ----

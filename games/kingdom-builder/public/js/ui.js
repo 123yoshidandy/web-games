@@ -147,6 +147,7 @@ export default class UI {
             const tile = event.target.closest('[data-tile]');
             if (tile) return this.pressTile(tile.dataset.tile);
             if (event.target.closest('#end-turn')) return this.send({ type: 'end' });
+            if (event.target.closest('#hint')) return this.showHint();
             if (event.target.closest('#undo')) {
                 clearTimeout(this.endTimer);
                 this.mode = null;
@@ -194,6 +195,22 @@ export default class UI {
         this.mode = this.mode?.tile === type ? null : { tile: type, from: -1 };
         if (this.mode) this.toast(`${info.name}：${info.text}`);
         this.render();
+    }
+
+    // おすすめの手を示す。建てるマスか、使う場所タイルと動かす家・行き先を選んでおき、盤のマスを光らせる
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.hint = { at: this.view.commandCount, command };
+        if (command.type === 'tile') this.mode = { tile: command.tile, from: command.from ?? -1 };
+        this.render();
+    }
+
+    // ヒントの手（今の手番の、今の手数のときだけ）
+    hinted(view) {
+        if (this.hint && (this.hint.at !== view.commandCount || !this.myTurn(view))) this.hint = null;
+        return this.hint?.command ?? null;
     }
 
     // 盤で選べるマスと、その意味
@@ -263,6 +280,7 @@ export default class UI {
             pick,
             picking: kind === 'source' ? 'source' : null,
             selected: this.mode?.from ?? -1,
+            suggested: ['build', 'tile'].includes(this.hinted(view)?.type) ? this.hint.command.cell : -1,
             recent: [...this.recent]
         });
         this.renderStatus(view, kind);
@@ -354,10 +372,14 @@ export default class UI {
         }).join('') || '<span class="none">場所タイルなし</span>';
         const canUndo = my && this.controller.canUndo();
         const endBtn = my ? `<button id="end-turn" class="btn primary"${view.mandatoryDone ? '' : ' disabled'}>番を終える</button>` : '';
+        const hint = this.hinted(view);
+        const hintBtn = my ? `<button type="button" id="hint" class="icon-btn" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>` : '';
         $('#mine').innerHTML = `
             <div class="mine-top">${card}${progress}
-                <button id="undo" class="icon-btn" aria-label="1手戻す" title="1手戻す"${canUndo ? '' : ' disabled'}>${icon('undo')}</button>${endBtn}</div>
+                ${hintBtn}<button id="undo" class="icon-btn" aria-label="1手戻す" title="1手戻す"${canUndo ? '' : ' disabled'}>${icon('undo')}</button>${endBtn}</div>
             <div class="tiles">${tiles}</div>`;
+        if (hint?.type === 'end') $('#end-turn')?.classList.add('suggested');
+        if (hint?.type === 'tile') $(`#mine [data-tile="${hint.tile}"]`)?.classList.add('suggested');
     }
 
     // 3軒建て終えて、使える場所タイルもなければ、少し待って番を終える

@@ -53,8 +53,15 @@ export function setSoundEnabled(value) {
     enabled = value;
 }
 
+// 流している途中で切り替えたときは、その場で止める・流し直す
 export function setBgmEnabled(value) {
     bgmEnabled = value;
+    if (!value && bgmSource) {
+        stopBgm();
+        bgmWanted = true; // ON に戻したら流し直す
+    } else if (value && bgmWanted && !bgmSource) {
+        startBgm();
+    }
 }
 
 // BGM をループ再生する（読み込み中なら読み込み後に始まる）

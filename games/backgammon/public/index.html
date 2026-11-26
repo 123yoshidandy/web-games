@@ -50,7 +50,11 @@
                     <button id="start" class="btn primary">ゲーム開始</button>
                     <button id="resume" class="btn secondary" hidden>続きから</button>
                 </div>
-                <button id="open-help-title" class="link">遊び方</button>
+                <div class="title-links">
+                    <button id="open-help-title" class="link">遊び方</button>
+                    <button type="button" class="link bgm-toggle" aria-pressed="true">BGM</button>
+                    <a class="link portal-link" href="../">← ゲーム一覧</a>
+                </div>
             </div>
         </section>
 
@@ -62,6 +66,9 @@
                 </button>
                 <span id="match-info" class="match-info"></span>
                 <span id="turn-info" class="turn-info"></span>
+                <button type="button" class="icon-btn bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
+                <button id="hint" type="button" class="icon-btn" aria-label="ヒント" title="ヒント"><svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>
+                <button id="open-log" class="icon-btn" aria-label="記録" title="記録"><svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg></button>
                 <button id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方">
                     <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17.2v.1"/></svg>
                 </button>
@@ -88,6 +95,13 @@
         <div class="buttons"><button id="result-home" class="link">ホーム</button></div>
     </dialog>
 
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <h2 tabindex="-1" autofocus>記録</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <div class="buttons"><button class="btn secondary close">閉じる</button></div>
+    </dialog>
+
     <!-- 遊び方 -->
     <dialog id="help" class="sheet help">
         <div class="help-body">
@@ -110,13 +124,14 @@
             <h3>ダブリングキューブとマッチ</h3>
             <p>決めた点数を先に取った人がマッチの勝ちです。自分の番のダイスを振る前に<strong>ダブル</strong>を提案できます。相手は<strong>受ける</strong>（ゲームの点が2倍になり、次にダブルできるのは受けた人）か、<strong>降りる</strong>（今の点で負け）を選びます。どちらかが初めてマッチの1点前になった次のゲームは、ダブルできません（クロフォード・ルール）。</p>
             <h3>画面</h3>
-            <p>動かせる駒の上の輪が光ります。駒を押すと、行き先に<strong>使う目の数</strong>が出るので、押して動かします。「取り消し」でその番の動きを1つずつ戻し、「決定」で番を終えます。下の数字は<strong>ピップ数</strong>（ベアオフまでに要る目の合計）です。</p>
+            <p>動かせる駒の上の輪が光ります。駒を押すと、行き先に<strong>使う目の数</strong>が出るので、押して動かします。「取り消し」でその番の動きを1つずつ戻し、「決定」で番を終えます。下の数字は<strong>ピップ数</strong>（ベアオフまでに要る目の合計）です。電球のボタンで、おすすめの手（動かす駒の点の番号と行き先）が出ます。一覧のボタンで、これまでの記録を見られます。</p>
         </div>
         <div class="buttons"><button class="btn secondary close">閉じる</button></div>
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+    <script type="module" src="./js/music.js"></script>
     <script type="module" src="./js/main.js"></script>
 </body>
 </html>

@@ -133,6 +133,12 @@ function toolOptions(view, me, pattern, context) {
 
 // ---- 手を選ぶ ----
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver()) return null;
+    return chooseCommand(game, seat, 'normal');
+}
+
 export function chooseCommand(game, seat, level = game.players[seat].cpuLevel ?? 'normal') {
     const view = createGameView(game, seat);
     if (!view.actors.includes(seat)) return null;

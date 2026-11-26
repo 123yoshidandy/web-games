@@ -7,9 +7,28 @@
     "test:watch": "vitest",
     "build:server": "esbuild server/src/handler.js --bundle --platform=node --format=esm --target=node22 --external:@aws-sdk/* --outfile=server/dist/handler.mjs",
     "dev:server": "node server/dev-server.js",
-    "deploy:server": "npm run build:server && cd server && sam deploy"
+    "deploy:server": "npm run build:server && cd server && sam deploy",
+    "cpu-match": "node scripts/cpu-match.mjs"
   },
   "dependencies": {
     "netplay-kit": "*"
+  },
+  "portal": {
+    "original": "Lucky Numbers",
+    "aliases": [
+      "らっきーなんばー"
+    ],
+    "genres": [
+      "タイル配置"
+    ]
+  },
+  "standards": {
+    "skip": {
+      "bgm": "独自の音（js/sound.js）を使い、packages/sound のエンジンは使わない（packages/sound/README.md の決まり）",
+      "undo": "伏せたタイルを山から引くゲームで、1手戻すと引いて見えたタイルの情報を使えてしまう"
+    }
+  },
+  "layoutCheck": {
+    "bgmToggle": ".sound-toggle[data-kind=\"bgm\"]"
   }
 }

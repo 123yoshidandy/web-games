@@ -1,7 +1,7 @@
 /**
  * CPU 同士の試合を多数回まわして、試合が終わること（固まらない）と、試合時間・勝率・連鎖を集計する
- * 使い方: node scripts/cpu-matches.mjs [試合数] [難易度] [自分の側の CPU の強さ]
- *   例: node scripts/cpu-matches.mjs 200 normal normal
+ * 使い方: node scripts/cpu-match.mjs [試合数] [難易度] [自分の側の CPU の強さ]
+ *   例: node scripts/cpu-match.mjs 200 normal normal
  * 時間切れ（MAX_FRAMES まで決着しない）の試合があれば、終了コード1にする
  */
 

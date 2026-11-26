@@ -160,6 +160,7 @@ export default class UI {
             if (card) this.pickHand(Number(card.dataset.hand));
         });
         $('#board').addEventListener('click', (event) => this.pickBoard(event));
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#actions').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled) return;
@@ -193,6 +194,7 @@ export default class UI {
 
     send(command) {
         this.resetSelection();
+        this.hintCommand = null;
         this.controller?.send(command);
     }
 
@@ -387,6 +389,8 @@ export default class UI {
         this.renderStrip('#me', this.me());
         this.renderHand();
         this.renderActions();
+        if (!['play', 'claim', 'recruit'].some(phase => this.myTurn(phase))) this.hintCommand = null;
+        this.markHint();
         playEvents(fresh, before, { you: view.you });
         this.scheduleAutoEnd();
         if (view.phase === 'end' && fresh.some(e => e.type === 'end')) {
@@ -506,6 +510,53 @@ export default class UI {
         $('#result-note').textContent = view.winReason === 'adjacent' ? '隣り合う3つの石を取りました'
             : view.winReason === 'count' ? `5つの石を取りました${counts}` : `これ以上進まないので、取った石の数で決めました${counts}`;
         if (!$('#result').open) $('#result').showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、カードを選んだ状態にして、出す石・ボタンに印を付ける（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.resetSelection();
+        this.hintCommand = command;
+        const hand = this.me().hand;
+        if (command.type === 'play' && command.card !== 'recruiter') {
+            this.selCard = hand.indexOf(command.card);
+            this.target = command.target && command.card !== 'banshee' ? command.target : command.from ?? null;
+        }
+        if (command.type === 'return') this.returnSel = command.cards.map(card => hand.indexOf(card));
+        this.render();
+        const text = {
+            play: () => (command.card === 'recruiter' ? '新兵募集を使う'
+                : command.to === null ? `${cardLabel(command.card)}で、選んだカードを捨てる`
+                : `${cardLabel(command.card)}を金の枠の石に出す`),
+            claim: () => '金の枠の石を主張する',
+            end: () => (command.draw === 'tactic' ? '戦術カードを引いて番を終える' : '氏族カードを引いて番を終える'),
+            return: () => '選んだ2枚を山札の下に戻す',
+            pass: () => 'パスする'
+        }[command.type]?.() ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const hand = this.me().hand;
+        const list = [];
+        if (c.type === 'play') {
+            list.push(`#hand [data-hand="${hand.indexOf(c.card)}"]`);
+            const stone = c.stone ?? c.to;
+            if (stone !== undefined && stone !== null) list.push(`.col[data-stone="${stone}"]`);
+            if (c.to === null) list.push('#actions [data-act="discard"]');
+            if (c.card === 'recruiter') list.push('#actions [data-act="recruit"]');
+            if (c.card === 'banshee') list.push(`[data-owner="op"][data-stone="${c.target.stone}"][data-index="${c.target.index}"]`);
+        }
+        if (c.type === 'claim') list.push(`[data-claim="${c.stone}"]`);
+        if (c.type === 'end') list.push(`#actions [data-act="end-${c.draw}"]`);
+        if (c.type === 'return') list.push('#actions [data-act="return"]');
+        if (c.type === 'pass') list.push('#actions [data-act="pass"]');
+        list.forEach(s => document.querySelectorAll(s).forEach(el => el.classList.add('recommended')));
     }
 
     toast(message) {

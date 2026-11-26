@@ -9,5 +9,16 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Go (Igo / Weiqi / Baduk)",
+    "aliases": [
+      "いご",
+      "ご"
+    ],
+    "genres": [
+      "アブストラクト",
+      "伝統ゲーム"
+    ]
   }
 }

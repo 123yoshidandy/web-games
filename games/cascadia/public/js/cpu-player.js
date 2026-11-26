@@ -270,7 +270,20 @@ function chooseEasy(view, seat, rand) {
     return { type: 'place', tile: t, token: t, q, r, rot, at };
 }
 
-export function chooseCommand(view, level = 'normal', rand = Math.random) {
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
+// ヒント：自分の番に、CPU（ふつう）が選ぶ置き方。ビュー（自分に見えるもの）だけで決める
+export function suggest(view) {
+    return chooseCommand(view, 'normal');
+}
+
+export function chooseCommand(view, level = 'normal', rand = viewRandom(view)) {
     const seat = view.you;
     if (view.phase === 'end' || view.current !== seat) return null;
     if (level === 'easy') return chooseEasy(view, seat, rand);

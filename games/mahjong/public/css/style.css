@@ -7,6 +7,11 @@
 :root {
     --app-w: 100vw;
     --app-h: 100dvh;
+    /* ノッチなどを避ける余白（body の上・右・下・左。縦持ちで回すときは入れ替える） */
+    --sa-t: env(safe-area-inset-top, 0px);
+    --sa-r: env(safe-area-inset-right, 0px);
+    --sa-b: env(safe-area-inset-bottom, 0px);
+    --sa-l: env(safe-area-inset-left, 0px);
     --stage-w: 667px;
     --scale: 1;
     --bg: #0c211b;
@@ -50,6 +55,7 @@ body {
     margin: 0;
     width: var(--app-w);
     height: var(--app-h);
+    padding: var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);
     overflow: hidden;
     overscroll-behavior: none;
     color: var(--text);
@@ -68,8 +74,9 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 
 .stage {
     position: absolute;
-    left: 50%;
-    top: 50%;
+    /* 余白を除いた領域の中央に置く */
+    left: calc(50% + (var(--sa-l) - var(--sa-r)) / 2);
+    top: calc(50% + (var(--sa-t) - var(--sa-b)) / 2);
     width: var(--stage-w);
     height: 375px;
     transform: translate(-50%, -50%) scale(var(--scale));
@@ -518,6 +525,11 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
     :root {
         --app-w: 100dvh;
         --app-h: 100vw;
+        /* 右に90度回すので、body の左は画面の上、上は右、右は下、下は左になる */
+        --sa-t: env(safe-area-inset-right, 0px);
+        --sa-r: env(safe-area-inset-bottom, 0px);
+        --sa-b: env(safe-area-inset-left, 0px);
+        --sa-l: env(safe-area-inset-top, 0px);
     }
     body {
         position: fixed;
@@ -527,3 +539,22 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
         transform: translateX(100vw) rotate(90deg);
     }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント（おすすめの手） */
+#hint:disabled { opacity: .35; }
+.suggested { outline: 3px solid #f5c542 !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(245, 197, 66, .35) !important; }
+.hint-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }

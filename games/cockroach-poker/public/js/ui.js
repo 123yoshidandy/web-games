@@ -5,7 +5,7 @@
 
 import { KINDS, KIND_ORDER } from './kinds.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS } from './cpu-player.js';
+import { CPU_LEVELS, suggest } from './cpu-player.js';
 import { symbolsSvg, cardHtml, backHtml, kindTag, critter, icon } from './art.js';
 
 const SETTINGS_KEY = 'cockroach-poker.settings';
@@ -126,6 +126,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（終わりは、外側では閉じない）
         document.querySelectorAll('dialog').forEach(dialog => {
@@ -163,6 +164,27 @@ export default class UI {
 
     send(command) {
         this.controller?.send(command);
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作。渡すカードと相手を選んだ状態にし、押すボタンに印を付ける
+    showHint() {
+        const v = this.view;
+        const c = v && suggest(v);
+        if (!c) return this.toast('自分の番になったら、おすすめを出せます');
+        const name = (seat) => (seat === v.you ? 'あなた' : v.players[seat].name);
+        let text;
+        if (c.type === 'give' || c.type === 'pass') {
+            this.pick = { card: c.type === 'give' ? c.card : this.pick.card, target: c.target };
+            text = `${name(c.target)}に「${KINDS[c.claim].name}」と言って${c.type === 'give' ? '渡す' : '回す'}`;
+        } else if (c.type === 'peek') {
+            text = '見て回す';
+        } else {
+            text = `「${c.truth ? '本当' : 'うそ'}」と答える`;
+        }
+        const mark = c.type === 'give' || c.type === 'pass' ? `[data-claim="${c.claim}"]` : `[data-answer="${c.type === 'peek' ? 'peek' : String(c.truth)}"]`;
+        this.hint = { key: this.pickKey, mark };
+        this.render();
+        this.toast(`おすすめ：${text}`);
     }
 
     // 自分が操作する番か
@@ -342,6 +364,7 @@ export default class UI {
             </div>`;
         }
         $('#actions').innerHTML = html;
+        if (this.hint && this.hint.key === this.pickKey) $(`#actions ${this.hint.mark}`)?.classList.add('recommended');
     }
 
     // ---- 記録・終わり ----

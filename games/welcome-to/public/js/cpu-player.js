@@ -137,8 +137,16 @@ function contextOf(view, me, conf) {
     return { conf, plans, solo: view.solo, progress: Math.min(1, builtCount(me.sheet) / 30) };
 }
 
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
 // ビューから、次の操作を1つ決める（手を終えていれば null）
-export function chooseCommand(view, level = 'normal', random = Math.random) {
+export function chooseCommand(view, level = 'normal', random = viewRandom(view)) {
     if (view.phase === 'end' || !view.actors.includes(view.you)) return null;
     const conf = LEVELS[level] ?? LEVELS.normal;
     const me = view.players[view.you];

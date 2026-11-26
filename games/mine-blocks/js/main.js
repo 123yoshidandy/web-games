@@ -53,6 +53,15 @@ function initGame() {
 // DOMContentLoaded イベントでゲームを初期化
 document.addEventListener('DOMContentLoaded', initGame);
 
+// ヘッドレス Chrome での確認用に、状態と主な操作を外から触れるようにする
+window.__app = {
+    gameState,
+    challengeState,
+    loadSavedProgress,
+    resumeSavedGame,
+    generateGame
+};
+
 // 画面を拡大させない（ふつうは style.css の touch-action で止まる。iOS は viewport の user-scalable を無視するので、2本指の操作を止める）
 // document 全体の touchmove は止めない（passive でない touchmove があると、スクロールの始まりが遅れるため）
 document.addEventListener('gesturestart', event => event.preventDefault());

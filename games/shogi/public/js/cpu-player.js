@@ -85,6 +85,12 @@ export function decide(game, level = 'normal') {
     return m === null ? null : toCommand(m);
 }
 
+// 人の番のおすすめの手（ヒント）。CPU（つよい）と同じ読み。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || game.current !== seat) return null;
+    return decide(game, 'strong');
+}
+
 // CPU の番なら1手指す。指せたら true
 export function runCpuStep(game) {
     if (!isCpuTurn(game)) return false;

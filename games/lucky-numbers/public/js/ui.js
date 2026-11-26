@@ -3,7 +3,8 @@
  * ゲームはコントローラー（ローカル対戦 / オンライン対戦）から getView() で受け取ったビューだけを見て描画する
  */
 
-import LocalGameController from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import { isLevel, DEFAULT_LEVEL } from './cpu-level.js';
 import OnlineGameController, { loadOnlineSession } from './online-controller.js';
 import { getServerUrl } from './online-config.js';
 import { SIZE, MIN_PLAYERS, MAX_PLAYERS, canPlace } from './game.js';
@@ -12,7 +13,7 @@ import { captureLayout, detectChanges, animateChanges, FLY_MS, SECOND_DELAY_MS }
 import { unlockSound, playEffect, toggleSound, getSoundSettings, onSoundSettingsChange } from './sound.js';
 import NetplayClient from './netplay/netplay-client.mjs';
 
-const SETUP_KEY = 'lucky-numbers.setup'; // 開始画面で選んだ人数・名前・CPU
+const SETUP_KEY = 'lucky-numbers.setup'; // 開始画面で選んだ人数・名前・CPU・CPU の強さ
 const TOAST_MS = 2500;
 const AUTO_DRAW_DELAY_MS = 600; // 自動で山札を引くまでの間（自分の番が来たことを見せる）
 
@@ -80,6 +81,9 @@ export default class UI {
     showSetup() {
         const setup = loadSetup() ?? { count: 2, seats: [] };
         this.setPlayerCount(setup.count, setup.seats);
+        this.setLevel(setup.level);
+        // 途中のローカル対戦があれば「続きから」を出す
+        $('resume').classList.toggle('hidden', !loadSavedGame());
         this.showScreen('setup');
     }
 
@@ -161,18 +165,50 @@ export default class UI {
         }));
     }
 
+    // CPU の強さを選ぶ
+    setLevel(level) {
+        this.level = isLevel(level) ? level : DEFAULT_LEVEL;
+        $('level-select').querySelectorAll('button').forEach(button => {
+            const selected = button.dataset.level === this.level;
+            button.classList.toggle('selected', selected);
+            button.setAttribute('aria-checked', String(selected));
+        });
+    }
+
     startLocal(players = null) {
         if (!players) {
             players = this.readSeats();
-            saveSetup({ count: players.length, seats: players });
+            saveSetup({ count: players.length, seats: players, level: this.level });
         }
+        this.playLocal({ players, level: this.level });
+    }
+
+    // 保存した途中のゲームを、記録から再現して続ける
+    resumeLocal() {
+        const saved = loadSavedGame();
+        if (!saved) return this.showSetup();
+        try {
+            this.playLocal(saved);
+        } catch {
+            // 再現できない記録（古い版の記録など）は捨てる
+            clearSavedGame();
+            this.toast('続きを読み込めませんでした');
+            this.showSetup();
+        }
+    }
+
+    // setup: { players, level } か、保存した { players, options, commands, level }
+    playLocal(setup) {
         this.controller?.stop?.();
+        this.controller = null;
         this.resetBoardMemory();
-        this.localPlayers = players;
-        this.controller = new LocalGameController(players, {
+        const controller = new LocalGameController(setup, {
             onUpdate: () => this.renderGame(),
             onError: (message) => this.toast(message)
         });
+        this.controller = controller;
+        this.localPlayers = setup.players;
+        this.level = controller.level;
         this.showScreen('game');
         this.renderGame();
     }
@@ -595,7 +631,11 @@ export default class UI {
         $('player-count').querySelectorAll('button').forEach(button => {
             button.addEventListener('click', () => this.setPlayerCount(button.dataset.count));
         });
+        $('level-select').querySelectorAll('button').forEach(button => {
+            button.addEventListener('click', () => this.setLevel(button.dataset.level));
+        });
         $('start-local').addEventListener('click', () => this.startLocal());
+        $('resume').addEventListener('click', () => this.resumeLocal());
         $('open-online').addEventListener('click', () => this.showOnlineMenu());
         $('back-to-setup').addEventListener('click', () => {
             clearRoomUrl();

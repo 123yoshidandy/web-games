@@ -7,7 +7,7 @@
  */
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS } from './cpu-player.js';
+import { CPU_LEVELS, suggest } from './cpu-player.js';
 import { TILES, CATS, GOALS, COLORS, PATTERNS } from './data.js';
 import { BORDER, GOAL_CELLS, OPEN_CELLS, CELL_COUNT, cellCenter } from './board.js';
 import { patchAt, awardsFor, scorePlayer, goalResult } from './scoring.js';
@@ -214,6 +214,7 @@ export default class UI {
             this.send({ type: 'take', market: Number(button.dataset.market) });
         });
         $('#confirm').addEventListener('click', () => this.confirmPlace());
+        $('#hint').addEventListener('click', () => this.showHint());
     }
 
     // ---- タイトル ----
@@ -253,6 +254,7 @@ export default class UI {
 
     render() {
         if (!this.controller) return;
+        $('#confirm').classList.remove('recommended');
         const view = this.controller.getView();
         const prev = this.view;
         this.view = view;
@@ -438,6 +440,27 @@ export default class UI {
             : `${who}：${tileName(last.tile)}を取る`;
     }
 
+    // ヒント：CPU（ふつう）が選ぶ操作。置くならパッチと場所を選んだ状態にし、押すものに印を付ける
+    showHint() {
+        const command = this.view && suggest(this.view);
+        if (!command) return this.toast('自分の番になったら、おすすめを出せます');
+        if (command.type === 'goals') {
+            this.goalPicks = [...command.pick];
+            this.renderGoalDialog();
+            return this.toast('おすすめ：選んだ3枚の目標タイル');
+        }
+        if (command.type === 'take') {
+            document.querySelector(`#market [data-market="${command.market}"]`)?.classList.add('recommended');
+            return this.toast('おすすめ：光るパッチを市場から取る');
+        }
+        this.viewSeat = this.view.you;
+        this.sel = command.hand;
+        this.draft = command.cell;
+        this.render();
+        $('#confirm').classList.add('recommended');
+        this.toast('おすすめ：この場所に置いて決定');
+    }
+
     send(command) {
         if (!this.controller) return;
         if (!this.controller.send(command)) this.render();
@@ -561,7 +584,9 @@ export default class UI {
             <h3>準備</h3>
             <p>「はじめて」は、猫がミリー・ティビット・ココナッツ、目標が ≠・AA-BB-CC・AAA-BBB。「ふつう」は、猫を札の・の数ごとに1匹ずつ選び、目標は配られた4枚から3枚を選んで置きます。</p>
             <h3>終わり</h3>
-            <p>全員のキルトが埋まったら終わり。同点なら猫が多い人、次にボタンが多い人の勝ちです。1人用は、市場から取るたびに、いちばん右のパッチを捨てて詰めます。</p>`;
+            <p>全員のキルトが埋まったら終わり。同点なら猫が多い人、次にボタンが多い人の勝ちです。1人用は、市場から取るたびに、いちばん右のパッチを捨てて詰めます。</p>
+            <h3>ヒント</h3>
+            <p>上の電球のボタンを押すと、おすすめの置き方（パッチと場所）を選んだ状態にするか、取るパッチを光らせます。</p>`;
     }
 
     toast(message) {

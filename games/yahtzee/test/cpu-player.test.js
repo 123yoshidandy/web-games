@@ -3,6 +3,7 @@ import Game, { emptyScores } from '../public/js/game.js';
 import { planTurn, decide, runCpuStep, cpuActors, bonusChance, PROFILES } from '../public/js/cpu-player.js';
 import { runMatches } from '../scripts/cpu-match.mjs';
 import { players, snapshot } from './helpers.js';
+import { createRandom } from '../public/js/random.js';
 
 const state = (dice, rollsLeft, filled = {}) => ({ scores: { ...emptyScores(), ...filled }, dice, rollsLeft, rolled: true });
 const fixed = () => 0.5;
@@ -49,8 +50,13 @@ describe('CPU の判断', () => {
         const game = new Game(players(2, true), { seed: 4 });
         game.applyCommand(0, { type: 'roll', keep: [false, false, false, false, false] });
         const before = snapshot(game);
-        decide({ scores: { ...game.players[0].scores }, dice: [...game.dice], rollsLeft: game.rollsLeft, rolled: true }, Math.random, PROFILES.normal);
+        decide({ scores: { ...game.players[0].scores }, dice: [...game.dice], rollsLeft: game.rollsLeft, rolled: true }, createRandom(1), PROFILES.normal);
         expect(snapshot(game)).toBe(before);
+    });
+
+    it('乱数を渡さなくても、同じ局面なら同じ手を選ぶ（Math.random を使わない）', () => {
+        const plan = planTurn(state([1, 2, 2, 4, 6], 2), PROFILES.normal);
+        expect(planTurn(state([1, 2, 2, 4, 6], 2), PROFILES.normal)).toEqual(plan);
     });
 
     it('どの強さでも、CPU だけのゲームが最後まで進む', () => {

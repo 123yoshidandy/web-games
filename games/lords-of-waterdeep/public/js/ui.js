@@ -33,6 +33,9 @@ const SPECIAL_GAIN = { palace: '大使', zoar: '他の場所', stone: '<i class=
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
+// ヒントのボタン（操作の欄と、決めるダイアログに出す）
+const HINT_BUTTON = '<button type="button" id="hint" class="icon-btn" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>';
+
 function loadSettings() {
     try {
         const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
@@ -257,6 +260,7 @@ export default class UI {
         $('#actions').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled) return;
+            if (button.dataset.act === 'hint') return this.showHint();
             if (button.dataset.act === 'place' && this.sel) this.send({ type: 'place', space: this.sel });
             if (button.dataset.act === 'decide') {
                 this.dismissedKey = null;
@@ -266,6 +270,7 @@ export default class UI {
         $('#decide').addEventListener('click', (event) => {
             const button = event.target.closest('[data-act]');
             if (!button || button.disabled) return;
+            if (button.dataset.act === 'hint') return this.showHint();
             this.decideButton(button.dataset.act, button.dataset);
         });
     }
@@ -292,6 +297,41 @@ export default class UI {
             this.info = this.info === `s:${space}` ? null : `s:${space}`;
         }
         this.render();
+    }
+
+    // おすすめの手を、選んだ状態にして光らせる（置く場所か、決めるダイアログの答え）
+    showHint() {
+        const v = this.view;
+        if (!v || !(this.myPlacement() || v.pending?.seat === v.you)) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.hint = { at: v.commandCount, command };
+        if (command.type === 'place') {
+            this.sel = command.space;
+            this.info = null;
+        }
+        if (command.type === 'pick') this.form = { cubes: { f: 0, r: 0, w: 0, c: 0, ...command.cubes } };
+        if ($('#decide').open) this.renderDecideBody(v);
+        this.render();
+    }
+
+    markHint() {
+        const v = this.view;
+        if (this.hint?.at !== v.commandCount) this.hint = null;
+        const c = this.hint?.command;
+        if (!c) return;
+        const mark = (selector) => document.querySelector(selector)?.classList.add('suggested');
+        if (c.type === 'place') {
+            if (this.sel === c.space) mark('#actions [data-act="place"]');
+            return;
+        }
+        const target = {
+            pick: '[data-act="pick"]', quest: `[data-act="quest"][data-index="${c.index}"]`, buy: `[data-act="buy"][data-building="${c.building}"]`,
+            intrigue: `[data-act="intrigue"][data-index="${c.index}"]`, opponent: `[data-act="opponent"][data-seat="${c.seat}"]`,
+            option: `[data-act="option"][data-index="${c.index}"]`, target: `[data-act="target"][data-space="${c.space}"]`,
+            complete: c.quest ? `[data-act="complete"][data-quest="${c.quest}"]` : '#decide-buttons [data-act="complete"]'
+        }[c.type];
+        if (target) mark(`#decide ${target}`);
     }
 
     tapInfo(key) {
@@ -451,7 +491,9 @@ export default class UI {
             news = true;
             desc = v.logs.slice(-2).map(l => escapeHtml(l.text)).join('<br>');
         }
-        $('#actions').innerHTML = `<div class="desc${news ? ' news' : ''}">${desc}</div>${button}`;
+        const hint = this.myPlacement() && !this.info ? HINT_BUTTON : '';
+        $('#actions').innerHTML = `<div class="desc${news ? ' news' : ''}">${desc}</div>${hint}${button}`;
+        this.markHint();
     }
 
     infoText(v, key) {
@@ -536,7 +578,8 @@ export default class UI {
                 break;
         }
         $('#decide-body').innerHTML = body;
-        $('#decide-buttons').innerHTML = buttons;
+        $('#decide-buttons').innerHTML = HINT_BUTTON + buttons;
+        this.markHint();
     }
 
     // ---- ほかの画面 ----

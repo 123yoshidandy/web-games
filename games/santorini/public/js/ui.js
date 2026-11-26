@@ -113,6 +113,7 @@ export default class UI {
             if (saved) this.start(saved);
         });
         $('home').addEventListener('click', () => this.showTitle());
+        $('hint').addEventListener('click', () => this.showHint());
         const help = $('help');
         $('open-help-title').addEventListener('click', () => help.showModal());
         $('open-help-game').addEventListener('click', () => {
@@ -184,10 +185,15 @@ export default class UI {
     start(setup) {
         this.controller?.stop();
         this.controller = new LocalGameController(setup, {
-            onUpdate: () => this.render(),
+            onUpdate: () => {
+                // ヒントを出している間は、今の場面のおすすめに出し直す（自分の番でなくなれば消す）
+                if (this.hintCommand) this.applyHint(this.controller.hint());
+                this.render();
+            },
             onError: (message) => this.toast(message)
         });
         this.resultShown = this.controller.game.isOver();
+        this.hintCommand = null;
         this.turnKey = null;
         this.seenSeq = this.controller.game.eventSeq;
         this.layers.workers.replaceChildren();
@@ -333,6 +339,7 @@ export default class UI {
         const actors = mine && v.phase === 'turn' ? new Set(this.actors()) : new Set();
         const places = mine && v.phase === 'place' ? new Set(this.groups().place.map(a => a.to)) : new Set();
         const last = this.lastTurnCells();
+        const hinted = mine ? this.hintCell() : null;
         L.scene.replaceChildren();
         L.hits.replaceChildren();
         for (let y = 0; y < N; y++) {
@@ -344,10 +351,11 @@ export default class UI {
                     if (targets.has(c)) art.drawMark(L.scene, x, y, h, 'build');
                     continue;
                 }
-                if (places.has(c)) art.drawMark(L.scene, x, y, h, 'move');
+                if (places.has(c)) art.drawMark(L.scene, x, y, h, 'move').classList.toggle('recommended', c === hinted);
                 else if (targets.has(c)) {
                     const m = art.drawMark(L.scene, x, y, h, this.mode === 'move' ? 'move' : 'build');
                     if (this.domeMode) m.classList.add('dome-mode');
+                    m.classList.toggle('recommended', c === hinted);
                 } else if (c === this.selected) art.drawMark(L.scene, x, y, h, 'select');
                 else if (actors.has(c)) art.drawMark(L.scene, x, y, h, 'can');
                 else if (last.has(c)) art.drawMark(L.scene, x, y, h, 'last');
@@ -404,7 +412,7 @@ export default class UI {
         if (this.mode === 'build' && g.build.some(a => a.dome)) {
             parts.push(`<button type="button" class="toggle" data-act="dome" aria-pressed="${this.domeMode}">ドーム</button>`);
         }
-        if (g.end) parts.push('<button type="button" class="btn secondary small" data-act="end">終える</button>');
+        if (g.end) parts.push(`<button type="button" class="btn secondary small${this.hintCommand?.type === 'end' ? ' recommended' : ''}" data-act="end">終える</button>`);
         actions.innerHTML = parts.join('');
     }
 
@@ -472,6 +480,40 @@ export default class UI {
             : reason === 'pan' ? '2段以上下りました（パン）'
             : won ? 'ほかの人が動けなくなりました' : v.players[v.seat].alive ? '' : 'あなたは動けなくなりました';
         $('result').showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの1歩を、職人と行き先を選んだ状態にして印を付ける（画面だけ。記録には入れない）
+    showHint() {
+        const command = this.myTurn ? this.controller?.hint() : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.applyHint(command);
+        this.render();
+        const text = { place: '白い枠のマスに職人を置く', move: '白い枠のマスへ動く', build: command.dome ? '白い枠のマスにドームを建てる' : '白い枠のマスに建てる', end: '番を終える' }[command.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    applyHint(command) {
+        this.hintCommand = command;
+        if (command?.type === 'move') {
+            this.mode = 'move';
+            this.selected = command.from;
+        } else if (command?.type === 'build') {
+            this.mode = 'build';
+            this.selected = command.by;
+            this.domeMode = !!command.dome;
+        }
+    }
+
+    // おすすめの行き先のマス（選んでいる職人がおすすめと同じときだけ）
+    hintCell() {
+        const c = this.hintCommand;
+        if (!c) return null;
+        if (c.type === 'place') return c.to;
+        if (c.type === 'move' && this.mode === 'move' && this.selected === c.from) return c.to;
+        if (c.type === 'build' && this.mode === 'build' && this.selected === c.by) return c.at;
+        return null;
     }
 
     toast(message) {

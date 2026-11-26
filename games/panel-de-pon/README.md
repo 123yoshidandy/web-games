@@ -40,6 +40,13 @@
 3. 部屋を作った人が「対戦スタート」を押す
 4. 勝敗がついたら、2人とも「再戦」を押すと次の対戦が始まる。「部屋に戻る」で部屋の画面に戻る
 
+## CPU
+
+- 隣の盤面で、人と同じ操作（パネルをつかむ・ドラッグ・離す）で遊ぶ。入れ替えで消せる手を探し、ときどき、いちばん良い手ではない手を選ぶ
+- 強さはタイトル画面の難易度で決まる（練習／ノーマル／ハード）。手を決めるまでの間・カーソルの速さ・手を探す範囲・誤る割合・連鎖を見込むか・せり上げるかが変わる（`js/cpu.js` の `CPU_LEVELS`）
+- 先の連鎖を組む手は探さない（強すぎないように）
+- 乱数はゲームと分け、シードから作った CPU 専用のものを使う。同じシードなら同じ試合になる
+
 ## 開発
 
 必要なもの：Node.js 22 以上、Python 3（画面を手元で配信するため）
@@ -54,7 +61,7 @@ python3 -m http.server 8000
 npm test
 
 # CPU 同士の試合を回して、決着することと、試合時間・勝率を集計する（試合数・難易度・自分の側の CPU の強さ）
-node scripts/cpu-matches.mjs 200 normal normal
+npm run cpu-match -- 200 normal normal
 ```
 
 ### オンライン対戦を手元で試す
@@ -70,7 +77,9 @@ URLに `?server=wss://...` を付けると、接続先のサーバーを変え�
 ## 構成
 
 ```
-index.html css/ sounds/ icons/   画面（GitHub Pages でそのまま公開する）
+index.html css/ sounds/   画面（GitHub Pages でそのまま公開する）
+favicon.svg favicon.png apple-touch-icon.png icon-*.png  アイコン（ほかのゲームと同じ置き場所）
+icons/             manifest が読むアイコン（直下と同じもの）
 sw.js              オフラインで開くためのキャッシュ（自分のファイルはネットワークを先に使う）
 manifest.webmanifest ホーム画面に追加したときの名前・アイコン・全画面と縦向きの設定
 js/
@@ -92,7 +101,7 @@ server/            オンライン対戦のサーバー
   dev-server.js        手元で試すためのテスト用サーバー
   template.yaml        AWS SAM のテンプレート
 test/              テスト（Vitest）
-scripts/cpu-matches.mjs  CPU 同士の試合の集計
+scripts/cpu-match.mjs  CPU 同士の試合の集計
 ```
 
 ### オンライン対戦のしくみ

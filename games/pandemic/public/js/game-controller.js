@@ -9,7 +9,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { suggest, runCpuStep, isCpuTurn } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 650;
 export const AUTO_DELAY_MS = 700;      // 「引く」「感染」を自動で進めるまでの間
@@ -60,6 +60,16 @@ export default class LocalGameController {
     }
 
     // 操作を待っている人（自分が動かせる人）の番を、CPU に1手打たせる
+    // ヒント：画面から動かせる席のうち、手のある席のおすすめ { seat, command }。状態は変えない
+    suggest() {
+        for (const p of this.game.players) {
+            if (!this.canControl(p.id)) continue;
+            const command = suggest(this.game, p.id);
+            if (command) return { seat: p.id, command };
+        }
+        return null;
+    }
+
     assist() {
         const seat = this.game.actors().find(s => this.canControl(s));
         if (seat === undefined) return false;

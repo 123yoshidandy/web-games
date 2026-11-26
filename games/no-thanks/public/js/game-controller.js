@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuActors, PROFILES } from './cpu-player.js';
+import { runCpuStep, cpuActors, PROFILES, suggest } from './cpu-player.js';
 
 const CPU_DELAY_MS = [650, 1050];   // CPU が選ぶまでの間（毎回少しずつ違う）
 const CPU_AFTER_TAKE_MS = 450;      // 取ったあと、めくったカードを見せる分だけ長く待つ
@@ -40,6 +40,11 @@ export default class LocalGameController {
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
         this.cpuTimer = null;
         this.save();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

@@ -9,5 +9,12 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Bluff (Liar's Dice)",
+    "genres": [
+      "ダイス",
+      "正体隠し・ブラフ"
+    ]
   }
 }

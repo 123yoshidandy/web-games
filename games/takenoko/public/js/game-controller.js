@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { chooseCommand, isCpuTurn, CPU_STYLES } from './cpu-player.js';
+import { chooseCommand, isCpuTurn, CPU_STYLES, suggest } from './cpu-player.js';
 import { createSeed } from './random.js';
 import * as storage from './storage.js';
 
@@ -45,6 +45,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

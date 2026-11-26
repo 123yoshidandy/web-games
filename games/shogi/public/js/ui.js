@@ -8,7 +8,7 @@
  */
 
 import { SIZE, SENTE, GOTE, HAND_TYPES, PROMOTE, sideOf, typeOf } from './rules.js';
-import { SIDE_MARK, SIDE_NAME, KAN, PIECE_NAME } from './notation.js';
+import { SIDE_MARK, SIDE_NAME, KAN, PIECE_NAME, squareName } from './notation.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, pieceHtml } from './art.js';
@@ -141,6 +141,7 @@ export default class UI {
         });
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#promote-yes').addEventListener('click', () => this.answerPromote(true));
         $('#promote-no').addEventListener('click', () => this.answerPromote(false));
         $('#promote').addEventListener('close', () => {
@@ -204,6 +205,7 @@ export default class UI {
 
     play(m) {
         this.selected = null;
+        this.hintCommand = null;
         this.controller?.send(m.drop
             ? { type: 'drop', piece: m.drop, to: m.to }
             : { type: 'move', from: m.from, to: m.to, promote: m.promote });
@@ -349,6 +351,7 @@ export default class UI {
     renderBoard(view) {
         const flip = this.bottomSide() === GOTE;
         const targets = new Map();
+        const hinted = this.hintTarget();
         this.movesFor(this.myTurn() ? this.selected : null).forEach(m => targets.set(m.to, m));
         const last = view.lastMove;
         const checkSq = view.check ? view.kings[view.current] : -1;
@@ -367,6 +370,7 @@ export default class UI {
                 if (sq === checkSq) cls.push('check');
                 const target = targets.get(sq);
                 if (target) cls.push(p ? 'target capture' : 'target');
+                if (hinted === sq) cls.push('recommended');
                 const piece = p ? pieceHtml(sideOf(p), typeOf(p), { flipped: sideOf(p) !== this.bottomSide(), cls: this.placed === sq ? 'placed' : '' }) : '';
                 parts.push(`<button class="${cls.join(' ')}" data-sq="${sq}" aria-label="${this.squareLabel(sq, p)}">${piece}</button>`);
             }
@@ -431,6 +435,27 @@ export default class UI {
                 : reason;
         $('#result-text').innerHTML = `${escapeHtml(detail)}<small>まで${v.ply}手</small>`;
         $('#result').showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手の駒を選んだ状態にし、行き先に印を付ける（画面だけ。記録には入れず、指したら消す）
+    showHint() {
+        const command = this.myTurn() ? this.controller?.hint() : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        this.selected = command.type === 'drop' ? { drop: command.piece } : { from: command.from };
+        this.render();
+        const name = command.type === 'drop' ? `${PIECE_NAME[command.piece]}打` : `${PIECE_NAME[typeOf(this.view.board[command.from])]}${command.promote ? '成' : ''}`;
+        this.toast(`おすすめ：${squareName(command.to)}${name}`);
+    }
+
+    // 選んでいる駒がおすすめと同じときの、おすすめの行き先
+    hintTarget() {
+        const c = this.hintCommand;
+        if (!c || !this.myTurn() || !this.selected) return null;
+        const same = c.type === 'drop' ? this.selected.drop === c.piece : this.selected.from === c.from;
+        return same ? c.to : null;
     }
 
     toast(message) {

@@ -31,6 +31,7 @@ function surrender() {
 
     selectBlock(-1);
     clearHoverPreview();
+    clearSavedProgress(); // 想定解を見た問題は続きからに残さない
 
     renderSolutionBoard(elements.solutionBoard);
     elements.surrenderModal.classList.add('active');

@@ -186,11 +186,13 @@ export default class UI {
         $('#actions').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled) return;
+            if (button.dataset.act === 'hint') return this.showHint();
             this.act(button.dataset.act);
         });
     }
 
     send(command) {
+        this.hint = null;
         this.controller?.send(command);
     }
 
@@ -318,7 +320,37 @@ export default class UI {
         } else if (view.phase === 'build') {
             buttons = '<button class="btn ghost wide" data-act="pass">建てない</button>';
         }
-        $('#actions').innerHTML = `${coins}<div class="act-buttons">${buttons}</div>`;
+        // ヒントのボタン（自分の番だけ）
+        const hint = this.myTurn() ? '<button type="button" id="hint" class="icon-btn" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>' : '';
+        $('#actions').innerHTML = `${coins}${hint}<div class="act-buttons">${buttons}</div>`;
+        this.renderHint(view);
+    }
+
+    // おすすめの手を示す。テレビ局とビジネスセンターは、開いて相手や取り替えを選んでおく
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.hint = { at: `${this.view.turn}:${this.view.phase}:${this.view.logs.length}`, command };
+        if (command.type === 'trade') {
+            this.tradePick = { give: command.give, take: `${command.target}:${command.take}` };
+            this.openTrade();
+        } else if (command.type === 'tv') this.openTv();
+        this.render();
+    }
+
+    renderHint(view) {
+        const c = this.hint?.at === `${view.turn}:${view.phase}:${view.logs.length}` && this.myTurn() ? this.hint.command : null;
+        if (!c) {
+            this.hint = null;
+            return;
+        }
+        const act = { roll: `roll${c.dice}`, reroll: 'reroll', keep: 'keep', pass: 'pass', tv: 'tv', trade: 'trade', skipTrade: 'trade' }[c.type];
+        if (act) $(`#actions [data-act="${act}"]`)?.classList.add('suggested');
+        if (c.type === 'build') $(`#market [data-card="${c.card}"], #my-landmarks [data-card="${c.card}"]`)?.classList.add('suggested');
+        if (c.type === 'tv') $(`#tv-players [data-player="${c.target}"]`)?.classList.add('suggested');
+        if (c.type === 'trade') $('#trade-ok')?.classList.add('suggested');
+        if (c.type === 'skipTrade') $('#trade-skip')?.classList.add('suggested');
     }
 
     // テレビ局とビジネスセンターは、その選択になったら一度だけ自動で開く

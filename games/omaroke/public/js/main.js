@@ -192,7 +192,44 @@ function useCard() {
     send(command);
 }
 
+// おすすめの手を、選んだ状態にして光らせる（カードと相手、押すボタン）
+let hint = null; // { key, command }
+function showHint() {
+    if (!view?.myAction || !controller) return;
+    const c = controller.suggest();
+    if (!c) return;
+    ui = { ...freshUi(), key: ui.key, choose: ui.choose };
+    if (c.type === 'choose') ui.choose = [...c.picks];
+    if (c.type === 'play') {
+        ui.card = c.card;
+        if (c.targets) ui.picks = [...c.targets];
+    }
+    if (c.type === 'band') ui = { ...ui, band: true, picks: [...c.discards] };
+    if (c.type === 'respond' && c.discards) ui.picks = [...c.discards];
+    hint = { key: ui.key, command: c };
+    render();
+}
+
+function renderHint() {
+    const hintButton = $('hint');
+    if (hintButton) hintButton.disabled = !view.myAction;
+    const c = hint?.key === ui.key && view.myAction ? hint.command : null;
+    if (!c) return;
+    const mark = selector => document.querySelectorAll(selector).forEach(el => el.classList.add('suggested'));
+    if (c.type === 'choose') mark('#choose [data-act="choose"]');
+    if (c.type === 'play') {
+        if (ui.card !== c.card) return;
+        if (c.target !== undefined) mark(`[data-seat="${c.target}"]`);
+        else mark('#action [data-act="use"]');
+    }
+    if (c.type === 'band') mark(`[data-seat="${c.target}"]`);
+    if (c.type === 'respond') mark(c.discards ? '#action [data-act="trim"]' : `[data-act="${c.choice}"]`);
+    if (c.type === 'end') mark(`#action [data-act="${c.evolve !== undefined ? 'evolve' : 'end'}"]`);
+    if (c.type === 'switch') mark('[data-act="switch"]');
+}
+
 function act(name) {
+    if (name === 'hint') return showHint();
     const pr = view.prompt;
     switch (name) {
         case 'use': useCard(); break;
@@ -229,6 +266,7 @@ function render() {
     renderAction();
     renderHand();
     renderChoose();
+    renderHint();
 }
 
 function renderTop() {
@@ -350,8 +388,12 @@ function renderAction() {
     } else {
         text = view.waitingOn !== null ? `${nameOf(view.waitingOn)}が考えています` : 'ほかの人の答えを待っています';
     }
-    el.innerHTML = `<div class="prompt">${text}</div><div class="buttons">${buttons(list)}</div>`;
+    // ヒントのボタン（自分が答える番だけ）
+    const hintButton = view.myAction && view.phase !== 'end' && view.phase !== 'choose' ? HINT_BUTTON : '';
+    el.innerHTML = `<div class="prompt">${text}</div><div class="buttons">${hintButton}${buttons(list)}</div>`;
 }
+
+const HINT_BUTTON = '<button type="button" id="hint" class="icon-button" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>';
 
 // 答え待ちの案内で使う、イベントの短い呼び名
 const EVENT_SHORT = { mewtwo: 'ミュウツー', zapdos: 'サンダー', moltres: 'ファイヤー', mrMime: 'バリヤード', farfetchd: 'カモネギ', jigglypuff: 'プリン', rival: 'ライバル' };
@@ -470,7 +512,7 @@ function renderChoose() {
                 <span class="offer-ability">${d.ability ? ABILITIES[d.ability].name : TYPES[d.type]}</span>
             </button>`;
         }).join('')}</div>
-        <div class="buttons">${buttons([['choose', '決定', 'primary', ui.choose.length !== view.pick]])}</div>
+        <div class="buttons">${view.myAction ? HINT_BUTTON : ''}${buttons([['choose', '決定', 'primary', ui.choose.length !== view.pick]])}</div>
     </div>`;
 }
 

@@ -217,3 +217,10 @@ export function runCpuStep(game, seat = game.current, level) {
     return null;
 }
 
+
+// ヒント：人の番に、CPU（いちばん強い設定）が選ぶ手を返す。CPU と同じく、その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (!(!game.isOver() && game.current === seat)) return null;
+    return chooseCommand(game, seat, 'normal');
+}

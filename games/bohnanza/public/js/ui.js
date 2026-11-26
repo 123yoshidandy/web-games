@@ -5,7 +5,7 @@
 
 import { BEANS, coinsFor, legalFieldsFor, canHarvestField, FIELD_PRICE } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS, pickHand } from './cpu-player.js';
+import { CPU_LEVELS, pickHand, suggest } from './cpu-player.js';
 import { symbolsSvg, sym, amountHtml, beanCard, fieldHtml } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
 
@@ -154,6 +154,7 @@ export default class UI {
             const field = event.target.closest('[data-field]');
             if (field) this.tapField(Number(field.dataset.field));
         });
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#toplant').addEventListener('click', (event) => {
             const card = event.target.closest('[data-pick]');
             if (!card) return;
@@ -183,6 +184,60 @@ export default class UI {
 
     me() {
         return this.view.players[this.view.you];
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作。押す畑やボタンに印を付ける
+    showHint() {
+        const v = this.view;
+        const command = v && suggest(v);
+        if (!command) return this.toast('自分が操作する番になったら、おすすめを出せます');
+        const mark = (selector) => document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
+        const me = this.me();
+        let text;
+        switch (command.type) {
+            case 'plant':
+                mark(`#fields [data-field="${command.field}"]`);
+                text = `${BEANS[me.hand[0]].name}を${command.field + 1}番目の畑に植える`;
+                break;
+            case 'plantPending':
+                this.pick = command.index;
+                this.render();
+                mark(`#fields [data-field="${command.field}"]`);
+                text = `${BEANS[me.toPlant[command.index]].name}を${command.field + 1}番目の畑に植える`;
+                break;
+            case 'harvest':
+                mark(`#fields [data-sell="${command.field}"]`);
+                text = `${command.field + 1}番目の畑を売る`;
+                break;
+            case 'buyField':
+                mark('#fields [data-buy]');
+                text = '3つ目の畑を買う';
+                break;
+            case 'next':
+                mark('#actions [data-act="next"]');
+                text = '表をめくる';
+                break;
+            case 'endTrade':
+                mark('#actions [data-act="end-trade"]');
+                text = '取引をおえる';
+                break;
+            case 'pass':
+                mark('#actions [data-act="pass"]');
+                text = '取引しない';
+                break;
+            case 'offer':
+                mark('#actions [data-act="propose"]');
+                text = '取引を提案する';
+                break;
+            case 'respond':
+                mark('#actions [data-act="answer"]');
+                mark(`#decide [data-act="${command.accept ? 'accept' : 'decline'}"]`);
+                text = !command.accept ? '提案を断る' : command.hand.length ? `提案を受ける（${names(command.hand.map(i => me.hand[i]))}を渡す）` : '提案を受ける';
+                break;
+            default:
+                text = '光るところを押す';
+        }
+        this.toast(`おすすめ：${text}`);
     }
 
     // 植える：手番の初めは手札の一番前、もらった豆は選んだもの

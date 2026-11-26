@@ -8,7 +8,11 @@ import UIModal from './ui-modal.js';
 import UIEventHandler from './ui-event-handler.js';
 import { ALL_CARDS, CARD_SETS, LANDSCAPES, BOONS } from './card-data.js';
 import OnlineGameController from './online-controller.js';
+
+// ヒントを出した場面か（ログ・フェーズ・手札・残りの行動などが同じ間だけ、印を付け直す）
+const hintKey = (view) => [view.logsFrom + view.logs.length, view.phase, view.me?.hand?.length, view.me?.actions, view.me?.buys, view.me?.coffers].join(':');
 import { getServerUrl } from './online-config.js';
+import { loadSavedGame } from './game-controller.js';
 
 // 表示設定はブラウザに保存し、次回以降も引き継ぐ
 const SETTINGS_KEY = 'dominion.settings';
@@ -83,6 +87,7 @@ class UIController {
         this.elements.helpBtn.addEventListener('click', () => {
             this.modal.showHelp({ onClose: () => this.restoreGameScreen() });
         });
+        document.getElementById('hint').addEventListener('click', () => this.showHint());
         
         // 設定ボタンのイベントを設定
         this.elements.settingsBtn.addEventListener('click', () => {
@@ -135,6 +140,20 @@ class UIController {
     // ゲーム開始処理
     startGame() {
         this.eventHandler.startGame();
+    }
+
+    // 保存したローカル対戦を、記録から再現して続ける
+    resumeGame() {
+        const saved = loadSavedGame();
+        this.useController(this.localController);
+        this.resetForNewGame();
+        if (!saved || !this.localController.resumeGame(saved)) {
+            this.showGameSetup();
+            this.showToast('続きを読み込めませんでした');
+            return;
+        }
+        this.modal.closeModal();
+        this.updateGameView();
     }
     
     // 画面が使うコントローラー（ローカル対戦／オンライン対戦）を切り替える
@@ -278,6 +297,47 @@ class UIController {
         this.showGameSetup();
     }
     
+    // ヒント：CPU が選ぶ操作に印を付ける（ローカル対戦だけ）
+    showHint() {
+        const view = this.gameController.getView?.();
+        const command = this.gameController.hint?.();
+        if (!view || !command) {
+            return this.showToast(this.gameController.hint ? '自分の番になったら、おすすめを出せます' : 'オンライン対戦では、おすすめは出せません');
+        }
+        this.hint = { key: hintKey(view), command };
+        this.markHint(view);
+        const name = (id) => ALL_CARDS[id.toUpperCase()]?.name ?? id;
+        const text = {
+            play: () => `「${view.me.hand[command.cardIndex]?.name ?? 'カード'}」を使う`,
+            playShadow: () => '影のカードを使う',
+            villager: () => '村人を使う',
+            buyPhase: () => '購入へ進む',
+            coffers: () => `財源を${command.amount}使う`,
+            buy: () => `「${name(command.cardId)}」を買う`,
+            buyLandscape: () => '光るイベントを買う',
+            night: () => '夜へ進む',
+            endTurn: () => 'ターンを終える',
+            answer: () => (typeof command.answer === 'boolean' ? (command.answer ? '「はい」と答える' : '「いいえ」と答える') : '選択肢から選ぶ')
+        }[command.type]?.() ?? '光るところを押す';
+        this.showToast(`おすすめ：${text}`);
+    }
+
+    markHint(view) {
+        const h = this.hint;
+        if (!h || h.key !== hintKey(view)) return;
+        const c = h.command;
+        const mark = (el) => el?.classList.add('recommended');
+        if (c.type === 'play') {
+            const id = view.me.hand[c.cardIndex]?.id;
+            mark([...document.querySelectorAll('#hand-cards [data-card-index]')].find(el => view.me.hand[Number(el.dataset.cardIndex)]?.id === id));
+        }
+        if (c.type === 'playShadow') mark(document.querySelector(`[data-shadow-id="${c.cardId}"]`));
+        if (c.type === 'buy') mark(document.querySelector(`#supply-piles [data-card-id="${c.cardId}"]`));
+        if (c.type === 'buyLandscape') mark(document.querySelector(`[data-landscape-id="${c.landscapeId}"]`));
+        const buttons = { buyPhase: 'buy-phase-btn', coffers: 'coffers-btn', villager: 'villager-btn', night: 'night-btn', endTurn: 'end-turn-btn' };
+        if (buttons[c.type]) mark(document.getElementById(buttons[c.type]));
+    }
+
     // 画面の下に短いお知らせを出す
     showToast(message) {
         let toast = document.getElementById('toast');
@@ -315,6 +375,7 @@ class UIController {
         
         this.eventHandler.clearPendingActions();
         this.view.updateGameView(view);
+        this.markHint(view);
         this.syncLogs(view);
         this.syncPrompt(view);
         this.syncResult(view);

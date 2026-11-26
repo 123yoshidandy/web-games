@@ -29,6 +29,7 @@ const app = {
     cloudKind: null,   // 雲で置く改良
     moveFrom: null,    // 雲で動かす改良の区画
     autoEnd: null,
+    hint: null,        // ヒントのおすすめの手（画面だけ。記録には入れない）
     settings: { count: 2, level: 'normal', ...storage.load('settings', {}) }
 };
 
@@ -139,6 +140,7 @@ function resetModes() {
     app.plotChoice = 0;
     app.cloudKind = null;
     app.moveFrom = null;
+    app.hint = null;
 }
 
 // ===== 描画 =====
@@ -207,6 +209,9 @@ function boardMarks(view) {
     else if (app.mode === 'irrigation') marks.edges = o.irrigationSpots;
     else if (app.mode === 'gardener') marks.hexes = o.gardener;
     else if (app.mode === 'panda') marks.hexes = o.panda;
+    const h = app.hint;
+    if (h?.type === 'irrigate') marks.best = { edge: [h.a, h.b] };
+    else if (h && h.q !== undefined) marks.best = { hex: [h.q, h.r] };
     return marks;
 }
 
@@ -224,8 +229,8 @@ function renderBoard(view) {
         else if (app.mode === 'gardener') hint = '庭師の行き先を選ぶ';
         else if (app.mode === 'panda') hint = 'パンダの行き先を選ぶ';
     }
-    $('#hint').hidden = !hint;
-    $('#hint').textContent = hint;
+    $('#guide').hidden = !hint;
+    $('#guide').textContent = hint;
 }
 
 function renderMe(view) {
@@ -279,12 +284,77 @@ function renderActionbar(view) {
         }
     }
     $('#actionbar').innerHTML = html;
+    markHint();
 }
 
 const hexPts = size => Array.from({ length: 6 }, (_, i) => {
     const a = Math.PI / 180 * (60 * i - 30);
     return `${(size * Math.cos(a)).toFixed(1)},${(size * Math.sin(a)).toFixed(1)}`;
 }).join(' ');
+
+// ===== ヒント =====
+
+const HINT_TEXT = {
+    weather: h => `天気「${WEATHER_NAMES[h.weather]}」を選ぶ`,
+    rain: () => '白い枠の区画の竹を伸ばす',
+    storm: () => '白い枠の区画にパンダを動かす',
+    skip: () => '使わない',
+    improve: h => (h.improvement ? `白い枠の区画に${IMPROVEMENT_NAMES[h.improvement]}を置く` : '改良を白い枠の区画へ動かす'),
+    placePlot: () => '選んだ区画を白い枠の場所に置く',
+    gardener: () => '庭師を白い枠の区画へ動かす',
+    panda: () => 'パンダを白い枠の区画へ動かす',
+    irrigate: () => '白い線の所に水路を置く',
+    drawPlots: () => '区画を引く',
+    drawObjective: h => `${CARD_TYPE_NAMES[h.kind]}の目標を引く`,
+    complete: () => '白い枠の目標を達成する',
+    endTurn: () => '手番を終える'
+};
+
+// おすすめの手を、選んだ状態にして盤とボタンに印を付ける（画面だけ。記録には入れず、次の操作で消える）
+function showHint() {
+    const view = app.view;
+    const command = view && myTurn(view) ? app.controller?.hint() : null;
+    if (!command) return toast('いまはあなたの番ではありません');
+    resetModes();
+    app.hint = command;
+    if (command.type === 'improve') {
+        if (command.improvement) app.cloudKind = command.improvement;
+        else app.moveFrom = command.from;
+    }
+    if (command.type === 'placePlot') app.plotChoice = command.choice;
+    if (command.type === 'gardener' || command.type === 'panda') app.mode = command.type;
+    if (command.type === 'irrigate') app.mode = 'irrigation';
+    if (command.type === 'drawObjective') app.mode = 'objective';
+    render(view);
+    toast(`おすすめ：${HINT_TEXT[command.type]?.(command) ?? ''}`);
+}
+
+function markHint() {
+    const h = app.hint;
+    if (!h) return;
+    const selector = {
+        weather: `[data-weather="${h.weather}"]`,
+        skip: '[data-action="skip"]',
+        improve: h.improvement ? `[data-improvement="${h.improvement}"]` : null,
+        placePlot: `[data-plot="${h.choice}"]`,
+        gardener: '[data-act="gardener"]',
+        panda: '[data-act="panda"]',
+        irrigate: '[data-act="irrigation"]',
+        drawPlots: '[data-act="plot"]',
+        drawObjective: `[data-kind="${h.kind}"]`,
+        complete: `#me .obj[data-card="${h.card}"]`,
+        endTurn: '[data-action="end-turn"]'
+    }[h.type];
+    if (selector) document.querySelector(selector)?.classList.add('recommended');
+}
+
+function toast(message) {
+    const el = $('#toast');
+    el.textContent = message;
+    el.classList.add('show');
+    clearTimeout(app.toastTimer);
+    app.toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+}
 
 // 行動を使い切り、達成できる目標もなければ、少し待って手番を終える
 function scheduleAutoEnd(view) {
@@ -392,7 +462,7 @@ function openPlayer(seat) {
 function openLog() {
     const view = app.view;
     if (!view) return;
-    $('#info-body').innerHTML = `<h2 class="sheet-title">記録</h2><ol class="log-list">${[...view.logs].reverse().map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ol>`;
+    $('#info-body').innerHTML = `<h2 class="sheet-title">履歴</h2><ol class="log-list">${[...view.logs].reverse().map(l => `<li>${escapeHtml(l)}</li>`).join('')}</ol>`;
     openDialog($('#info-dialog'));
 }
 
@@ -457,6 +527,7 @@ function init() {
         if (saved) startGame(saved);
     });
     $('#play').addEventListener('click', onPlayClick);
+    $('#hint').addEventListener('click', showHint);
 
     document.addEventListener('click', event => {
         const action = event.target.closest('[data-action]')?.dataset.action;
@@ -503,6 +574,7 @@ function init() {
     }
 
     // 確認用（画面の確認スクリプトから状態を作る）
+    window.__app = app;
     window.__tk = app;
 }
 

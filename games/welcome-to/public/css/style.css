@@ -155,7 +155,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .turn b { margin: 0 2px; font-size: 17px; color: var(--text); }
 .total { margin-left: 6px; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .total b { margin: 0 2px; font-size: 17px; color: var(--accent); }
-.others { margin-left: auto; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.others { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--muted); white-space: nowrap; }
 
 /* カード（3つの組み合わせ。1人のときは3枚） */
 .cards { flex: none; display: flex; justify-content: center; gap: 8px; height: 62px; }
@@ -319,3 +319,17 @@ dialog h2:focus-visible { outline: none; }
     .btn { transition: none; }
     .s-house.target .s-body, .s-fence-hint, .plan.ready, .estate.target { animation: none; }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }

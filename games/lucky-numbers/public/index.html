@@ -83,7 +83,16 @@
             <p class="tagline">クローバーを並べて<strong>庭を埋めよう！</strong></p>
 
             <div class="panel">
-            <h2>ゲームの準備</h2>
+            <!-- CPU の強さは見出しの行の右に置く（画面の高さを増やさない） -->
+            <div class="setup-head">
+                <h2>ゲームの準備</h2>
+                <div class="level-row">CPU
+                    <div id="level-select" class="segmented" role="radiogroup" aria-label="CPUの強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                    </div>
+                </div>
+            </div>
             <!-- 人数は切り替えボタンで選ぶ（ブラウザのプルダウンは出る位置を決められないため） -->
             <div class="row">人数
                 <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
@@ -94,12 +103,17 @@
             </div>
             <div id="seat-list"></div>
             <div class="buttons">
+                <!-- 途中のローカル対戦があるときだけ出す -->
+                <button id="resume" class="primary hidden">続きから</button>
                 <button id="start-local" class="primary">ゲーム開始</button>
                 <button id="open-online">オンラインで遊ぶ</button>
             </div>
             <!-- 遊び方と、効果音・BGM の切り替えは同じ行に並べる（画面の高さを増やさない） -->
             <div class="setup-footer">
-                <button id="open-help" class="link">📖 遊び方を見る</button>
+                <div class="footer-links">
+                    <button id="open-help" class="link">📖 遊び方を見る</button>
+                    <a class="portal-link" href="../">← ゲーム一覧</a>
+                </div>
                 <div class="title-sound">
                     <button class="small icon sound-toggle" data-kind="effects" aria-label="効果音">
                         <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">

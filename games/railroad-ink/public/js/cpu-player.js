@@ -67,8 +67,16 @@ export function evaluate(cells, round, level = 'normal') {
     return value;
 }
 
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
 // ビューから、次の操作を1つ決める（描き終えていれば null）
-export function chooseCommand(view, level = 'normal', random = Math.random) {
+export function chooseCommand(view, level = 'normal', random = viewRandom(view)) {
     const me = view.players[view.you];
     if (view.phase === 'end' || !view.actors.includes(view.you)) return null;
     const conf = LEVELS[level] ?? LEVELS.normal;
@@ -130,6 +138,17 @@ export function cpuActor(game) {
 
 export function isCpuTurn(game) {
     return cpuActor(game) !== undefined;
+}
+
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (!game.actors().includes(seat)) return null;
+    const view = createGameView(game, seat, { events: false, since: Infinity, scores: false });
+    const random = createRandom((game.options.seed ^ Math.imul(game.commands.length + 1, 0x9E3779B1) ^ seat) >>> 0);
+    const command = chooseCommand(view, 'normal', random);
+    if (!command) return { type: 'end' };
+    const { value, ...clean } = command;
+    return clean;
 }
 
 // CPU に1手打たせる。決めた手が通らなければ、ラウンドを終える。進めたら true

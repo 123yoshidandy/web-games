@@ -9,7 +9,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuActors, PROFILES } from './cpu-player.js';
+import { runCpuStep, cpuActors, PROFILES, suggest } from './cpu-player.js';
 
 const CPU_BREW_MS = 330;     // CPU が1つ引く間隔
 const CPU_CHOICE_MS = 160;   // 占い・買い物などの選択
@@ -43,6 +43,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stuck = 0;
         this.save();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

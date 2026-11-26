@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuActors, PROFILES } from './cpu-player.js';
+import { runCpuStep, cpuActors, PROFILES, suggest } from './cpu-player.js';
 
 const CPU_DELAY_MS = [550, 900];   // CPU がアクションを選ぶまでの間（毎回少しずつ違う）
 const SAVE_KEY = 'brass-birmingham.save';
@@ -39,6 +39,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.speed = 1;
         this.save();
+    }
+
+    // ヒント：人の番に、CPU（ふつう）が選ぶ操作。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game.state, this.humanSeat);
     }
 
     getView() {

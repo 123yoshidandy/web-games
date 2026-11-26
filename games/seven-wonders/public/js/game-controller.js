@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuSeatsToAct } from './cpu-player.js';
+import { runCpuStep, cpuSeatsToAct, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 450;
 const STALL_LIMIT = 3;
@@ -37,6 +37,11 @@ export default class LocalGameController {
             commands: this.game.commands,
             level: this.level
         };
+    }
+
+    // ヒント：人のおすすめの手（人が選ぶ番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

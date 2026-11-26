@@ -2,11 +2,19 @@
 // 自分のファイルはネットワークを先に使い（更新がすぐ届く）、つながらないときだけキャッシュから返す。
 // 文字（Google Fonts）は変わらないので、キャッシュを先に使う。
 // オンライン対戦の WebSocket は fetch を通らないので、ここでは扱わない。
+// キャッシュの名前は、直すたびに変えない（変えると、古い版が入れた分が消えて、かえってオフラインに弱くなる）
 const CACHE = 'katan-v1';
 // 同じサイトにほかのゲームも並ぶので、消すのはこのゲームの古い版のキャッシュだけにする
 const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
-const PRECACHE = ['./', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png'];
+const PRECACHE = [
+    './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png',
+    'css/style.css', 'css/animations.css', 'css/coach.css',
+    'js/main.js', 'js/ui.js', 'js/board-view.js', 'js/board.js', 'js/game-controller.js', 'js/online-controller.js',
+    'js/online-config.js', 'js/game.js', 'js/game-view.js', 'js/cpu-player.js', 'js/coach.js', 'js/animator.js',
+    'js/help-pictures.js', 'js/random.js', 'js/sound.js', 'js/netplay/netplay-client.mjs',
+    'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js'
+];
 
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));

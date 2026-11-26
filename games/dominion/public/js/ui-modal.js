@@ -4,6 +4,7 @@
  */
 
 import { loadOnlineSession } from './online-controller.js';
+import { loadSavedGame } from './game-controller.js';
 import NetplayClient from './netplay/netplay-client.mjs';
 import { CARD_SETS, CARD_SET_LABELS, LANDSCAPE_KIND_LABELS } from './card-types.js';
 import { ALL_CARDS } from './card-data.js';
@@ -62,6 +63,7 @@ class UIModal {
         // タイトル画面（左にタイトルと絵、右に設定）として全画面に表示する
         this.elements.modalTitle.textContent = '';
         const cardSets = this.uiController.settings.cardSets.split('+');
+        const hasSave = Boolean(loadSavedGame());
 
         const setupHtml = `
             <div class="title-screen">
@@ -84,9 +86,10 @@ class UIModal {
                         ${this.createRealtimeToggleHtml('setup-realtime', this.uiController.settings.realtime, 'リアルタイム（同時に進める）')}
                     </div>
 
-                    <div class="title-buttons">
+                    <div class="title-buttons${hasSave ? ' has-resume' : ''}">
+                        ${hasSave ? '<button id="resume-btn" class="primary resume">続きから</button>' : ''}
                         <button id="start-game-btn" class="primary">ゲーム開始</button>
-                        <button id="online-btn" class="primary online">オンラインで遊ぶ</button>
+                        <button id="online-btn" class="primary online">オンライン<span class="online-suffix">で遊ぶ</span></button>
                     </div>
                 </div>
             </div>
@@ -118,6 +121,7 @@ class UIModal {
             }
         }));
 
+        document.getElementById('resume-btn')?.addEventListener('click', () => this.uiController.resumeGame());
         document.getElementById('start-game-btn').addEventListener('click', () => this.uiController.startGame());
         document.getElementById('online-btn').addEventListener('click', () => this.showOnlineMenu());
         document.getElementById('title-help-btn').addEventListener('click', () => this.showHelp({ backdrop: 'title', onClose: () => this.showGameSetup() }));
@@ -142,7 +146,11 @@ class UIModal {
                 </div>
                 <h1 class="title-logo">DOMINION</h1>
                 <p class="title-sub">デッキ構築型カードゲーム</p>
-                <button id="title-help-btn" class="title-help-btn">？ 遊び方</button>
+                <div class="title-links">
+                    <button id="title-help-btn" class="title-help-btn">？ 遊び方</button>
+                    <button type="button" class="title-help-btn bgm-toggle" aria-pressed="true">♪ BGM</button>
+                    <a class="portal-link" href="../">← ゲーム一覧</a>
+                </div>
             </div>
         `;
     }

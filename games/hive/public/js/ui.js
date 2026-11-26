@@ -160,6 +160,7 @@ export default class UI {
         $('#look').addEventListener('click', () => $('#result').close());
         $('#result-home').addEventListener('click', () => this.showTitle());
         $('#home').addEventListener('click', () => this.showTitle());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         // 遊び方・記録を開いている間は、CPU を止める
         $('#open-help-game').addEventListener('click', () => {
@@ -209,6 +210,7 @@ export default class UI {
                 this.inspect = null;
                 this.render();
             } else if (act === 'pass') this.send({ type: 'pass' });
+            else if (act === 'hint') this.showHint();
             else if (act === 'result') this.showResult();
             else if (act === 'again') this.newGame();
         });
@@ -373,6 +375,28 @@ export default class UI {
 
     // ---- 状態 ----
 
+    // ヒントが指す場面（手を打つと変わる）
+    hintKey() {
+        return `${this.view.current}:${this.view.players.map(p => p.turns).join(',')}`;
+    }
+
+    // おすすめの手を示す。動かす駒（手持ちか盤の上）を選んでおき、行き先を光らせる（押せば動く）
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.hint = { at: this.hintKey(), command };
+        this.inspect = null;
+        if (command.type === 'place') this.sel = { kind: 'hand', piece: command.kind };
+        if (command.type === 'move') this.sel = { kind: 'board', cell: command.from };
+        this.render();
+    }
+
+    hinted() {
+        if (this.hint && (this.hint.at !== this.hintKey() || !this.myTurn())) this.hint = null;
+        return this.hint?.command ?? null;
+    }
+
     myTurn() {
         const view = this.view;
         return !!view && !view.over && view.current === view.seat;
@@ -427,6 +451,7 @@ export default class UI {
         const view = this.controller.getView();
         this.view = view;
         if (!this.myTurn()) this.sel = null;
+        $('#hint').disabled = !this.myTurn();
         if (this.sel?.kind === 'board' && !this.movableCells().has(this.sel.cell)) this.sel = null;
         if (this.inspect && !(view.board[this.inspect]?.length > 1)) this.inspect = null;
 
@@ -518,11 +543,13 @@ export default class UI {
             const badge = h > 1 ? `<g class="height"><circle cx="${HEX_R * 0.62}" cy="${-HEX_R * 0.62}" r="9"/><text x="${HEX_R * 0.62}" y="${-HEX_R * 0.62 + 4}">${h}</text></g>` : '';
             parts.push(`<g class="${classes}" data-cell="${cell}" transform="translate(${c.x} ${c.y})">${layers}<polygon class="ring" points="${hexPoints(HEX_R - 1)}"/>${badge}</g>`);
         }
-        // 置ける場所・動かせる先（駒の上に乗る先は、輪で示す）
+        // 置ける場所・動かせる先（駒の上に乗る先は、輪で示す）。ヒントの行き先は金色にする
+        const hint = this.hinted();
         for (const [cell, action] of targets) {
             const c = cellCenter(cell);
             const climb = !!view.board[cell];
-            parts.push(`<g class="target ${action.via ? 'via' : ''} ${climb ? 'climb' : ''}" data-cell="${cell}" data-target="" transform="translate(${c.x} ${c.y})">
+            const suggested = hint && hint.to === cell && (hint.type === 'place' ? this.sel?.kind === 'hand' && this.sel.piece === hint.kind : this.sel?.cell === hint.from);
+            parts.push(`<g class="target ${action.via ? 'via' : ''} ${climb ? 'climb' : ''} ${suggested ? 'suggested-target' : ''}" data-cell="${cell}" data-target="" transform="translate(${c.x} ${c.y})">
                 <polygon points="${hexPoints(HEX_R - 3)}"/>${climb ? '' : '<circle r="5"/>'}</g>`);
         }
         $('#world').innerHTML = parts.join('');
@@ -554,6 +581,7 @@ export default class UI {
             html = `<span class="hint muted">${escapeHtml(view.logs.at(-1) ?? '')}</span>`;
         }
         $('#actions').innerHTML = html;
+        if (this.hinted()?.type === 'pass') $('#actions [data-act="pass"]')?.classList.add('suggested');
     }
 
     // 置いた駒は浮き出るように、動かした駒は元のマスから滑らせる

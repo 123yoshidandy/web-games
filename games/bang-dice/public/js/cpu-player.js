@@ -124,8 +124,21 @@ export function shotTargets(view, seat, face) {
 
 // ---- 判断 ----
 
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
 // ビューから、次の操作を1つ決める（操作する番でなければ null）
-export function chooseCommand(view, level = 'normal', random = Math.random) {
+// ヒント：自分の番に、CPU（ふつう）が選ぶ操作。ビュー（自分に見えるもの）だけで決めるので、隠れた役は使わない
+export function suggest(view) {
+    return chooseCommand(view, 'normal');
+}
+
+export function chooseCommand(view, level = 'normal', random = viewRandom(view)) {
     const me = view.you;
     if (view.phase === 'end' || !view.actors.includes(me)) return null;
     const conf = LEVELS[level] ?? LEVELS.normal;

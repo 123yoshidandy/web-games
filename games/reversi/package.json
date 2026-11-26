@@ -9,5 +9,15 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Reversi (Othello)",
+    "aliases": [
+      "おせろ"
+    ],
+    "genres": [
+      "アブストラクト",
+      "伝統ゲーム"
+    ]
   }
 }

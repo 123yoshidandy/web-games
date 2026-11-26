@@ -49,6 +49,7 @@ export default class UI {
         this.controller = null;
         this.view = null;
         this.picked = null;       // 手札から選んだカード
+        this.hintCommand = null;  // ヒントのおすすめの手（画面だけ）
         this.rotated = false;     // 道を回して置くか
         this.repairTarget = null; // 2種類を直せるカードで、直す道具を選んでいる相手
         this.lastSeq = 0;
@@ -181,6 +182,7 @@ export default class UI {
             }
         });
         $('#zoom-in').addEventListener('click', () => this.zoomBy(1.25));
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#zoom-out').addEventListener('click', () => this.zoomBy(0.8));
         $('#zoom-fit').addEventListener('click', () => this.fitBoard());
 
@@ -209,6 +211,7 @@ export default class UI {
 
     send(command) {
         this.resetSelection();
+        this.hintCommand = null;
         this.controller?.send(command);
     }
 
@@ -386,6 +389,8 @@ export default class UI {
         this.renderMe();
         this.renderHand();
         this.renderActions();
+        if (!this.myTurn()) this.hintCommand = null;
+        this.markHint();
 
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
@@ -550,6 +555,44 @@ export default class UI {
         if (!$('#round-result').open) $('#round-result').showModal();
         this.roundShown = this.view.round;
         this.fitBoard();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめのカードを選んだ状態にし、置き場所・相手・ボタンに印を付ける（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.myTurn() ? this.controller?.hint() : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        this.picked = command.card;
+        this.rotated = !!command.rotated;
+        this.repairTarget = null;
+        this.render();
+        const name = (seat) => (seat === this.view.you ? '自分' : this.view.players[seat].name);
+        const text = {
+            path: () => '光る場所に、この道を置く',
+            discard: () => 'このカードを捨てる',
+            break: () => `${name(command.target)}の道具を壊す`,
+            repair: () => `${name(command.target)}の道具を直す`,
+            map: () => '地図で、光るゴールを見る',
+            rockfall: () => '落盤で、光る道を崩す'
+        }[command.type]?.() ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c || this.picked !== c.card) return;
+        const at = `[data-x="${c.x}"][data-y="${c.y}"]`;
+        const selector = {
+            path: `.cell.target${at}[data-rot="${c.rotated ? 1 : 0}"]`,
+            rockfall: `.cell${at}`,
+            map: `.cell[data-goal="${c.goal}"]`,
+            discard: '#actions [data-act="discard"]',
+            break: `[data-player="${c.target}"]`,
+            repair: c.target === this.view.you ? '#me' : `[data-player="${c.target}"]`
+        }[c.type];
+        if (selector) document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
     }
 
     toast(message) {

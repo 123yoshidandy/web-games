@@ -3,7 +3,7 @@ import { gameState, resetGame, updateGame, loadRows, getSnapshot } from '../js/g
 // gameState は withGame で切り替わる（ここでは切り替えないので、いつも同じ状態を指す）
 import { createCpu } from '../js/cpu.js';
 import { createCpuMatch } from '../js/cpu-match.js';
-import { playMatch } from '../scripts/cpu-matches.mjs';
+import { playMatch } from '../scripts/cpu-match.mjs';
 import { WIDTH, HEIGHT } from '../js/constants.js';
 
 const PRACTICE = { difficulty: 'practice', sound: 'off', bgm: 'off' };

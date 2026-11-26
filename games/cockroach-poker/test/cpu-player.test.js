@@ -4,6 +4,7 @@ import { chooseCommand, truthChance, honesty, saysTrueRate, danger, isCpuTurn, u
 import { createGameView } from '../public/js/game-view.js';
 import { playMatch, runMatches, MAX_STEPS } from '../scripts/cpu-match.mjs';
 import { setHand } from './helpers.js';
+import { createRandom } from '../public/js/random.js';
 
 const cpuGame = (n, seed = 1) => new Game([{ name: 'A' }, ...Array.from({ length: n - 1 }, (_, i) => ({ name: `C${i}`, isCPU: true, cpuLevel: 'normal' }))], { seed, startPlayer: 0 });
 const fixed = (x) => () => x;
@@ -65,8 +66,9 @@ describe('CPU の見込み', () => {
         view.history = Array.from({ length: 10 }, () => ({ card: 'rat', chain: [{ from: 1, to: 0, claim: 'rat' }], answerer: 0, said: true, correct: true, taker: 1 }));
         expect(saysTrueRate(view, 0)).toBeGreaterThan(0.8);
         let lies = 0;
+        const random = createRandom(1);
         for (let i = 0; i < 200; i++) {
-            const c = chooseCommand(view, 'normal', Math.random);
+            const c = chooseCommand(view, 'normal', random);
             if (c.claim !== c.card) lies++;
         }
         expect(lies).toBeGreaterThan(120);

@@ -5,7 +5,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 1000; // CPU の手は、引いたタイルが見える間を置いてから打つ
 const STALL_LIMIT = 3; // CPU の手が進まないことがこの回数続いたら、コマを置かずに最初の場所へ置く
@@ -24,6 +24,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.scheduleCpu();
+    }
+
+    // ヒント：人の番に、CPU（ふつう）が選ぶ置き方。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

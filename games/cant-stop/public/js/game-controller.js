@@ -5,7 +5,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 850; // CPU の手は、ダイスの目が見える間を置いてから打つ
 const AFTER_TURN_DELAY_MS = 1700;     // バーストや止めたあと（手番が替わった直後）は、何が起きたかを見る間を取る
@@ -24,6 +24,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.scheduleCpu();
+    }
+
+    // ヒント：人の番に、CPU（ふつう）が選ぶ操作。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

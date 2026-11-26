@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_DELAY_MS = 650;  // CPU が置く前に、前の手が見えるように待つ
 const SAVE_KEY = 'blokus.save';
@@ -38,6 +38,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.save();
+    }
+
+    // ヒント：人の番に、CPU（ふつう）が選ぶ置き方。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

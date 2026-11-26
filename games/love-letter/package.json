@@ -6,5 +6,11 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "sim": "node scripts/cpu-sim.mjs"
+  },
+  "portal": {
+    "original": "Love Letter",
+    "genres": [
+      "カードゲーム"
+    ]
   }
 }

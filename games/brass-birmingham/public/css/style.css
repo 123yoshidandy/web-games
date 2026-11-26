@@ -418,3 +418,32 @@ dialog h2 { margin: 0; font-size: 18px; color: var(--brass); outline: none; disp
     .action-grid { height: auto; grid-template-columns: repeat(4, 1fr); }
     .act-btn { min-height: 44px; }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント：おすすめの印 */
+.recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+@media (max-width: 400px) {
+    .topbar { gap: 4px; padding: 0 4px; }
+    .topbar > .icon-btn { width: 30px; }
+    .era-info { overflow: hidden; }
+    .era-info b, .era-info span { overflow: hidden; text-overflow: ellipsis; }
+    .market-info { gap: 3px; font-size: 11px; }
+    .market-info .mk { padding: 3px 3px; gap: 1px; }
+    .market-info .mk b { font-size: 12px; }
+    .market-info .mk small { margin-left: 0; }
+    .era-info b { font-size: 13px; }
+    .era-info span { font-size: 11px; }
+}

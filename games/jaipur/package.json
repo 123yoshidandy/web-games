@@ -6,5 +6,14 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "portal": {
+    "original": "Jaipur",
+    "genres": [
+      "カードゲーム"
+    ],
+    "players": [
+      2
+    ]
   }
 }

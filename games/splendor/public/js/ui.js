@@ -4,6 +4,7 @@
  */
 
 import { CARDS, NOBLES, COLORS, GOLD, TOKEN_COLORS, LEVELS, RESERVE_LIMIT, canAfford, countTokens } from './game.js';
+import { COLOR_NAMES } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { gemSymbolsSvg, tokenChip, cardHtml, cardBackHtml, nobleHtml, gemIcon } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
@@ -124,6 +125,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（結果と貴族の選択は、外側では閉じない）
         document.querySelectorAll('dialog').forEach(dialog => {
@@ -252,6 +254,7 @@ export default class UI {
         const sel = this.selection;
         const send = (command) => {
             this.selection = null;
+            this.hintCommand = null;
             this.controller?.send(command);
         };
         if (action === 'cancel') {
@@ -270,6 +273,7 @@ export default class UI {
         } else if (action === 'discard') {
             const tokens = { ...this.discardPick };
             this.discardPick = {};
+            this.hintCommand = null;
             this.controller?.send({ type: 'discard', tokens });
         }
     }
@@ -291,6 +295,8 @@ export default class UI {
         this.renderBank();
         this.renderMe();
         this.renderActions();
+        if (this.view.phase === 'end' || this.view.current !== this.view.you) this.hintCommand = null;
+        this.markHint();
 
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
@@ -462,7 +468,8 @@ export default class UI {
     // ---- ダイアログ ----
 
     showNobleChoice(choices) {
-        $('#noble-options').innerHTML = choices.map(id => `<button class="noble-pick" data-noble="${id}">${nobleHtml(id)}</button>`).join('');
+        const best = this.hintCommand?.type === 'noble' ? this.hintCommand.noble : null;
+        $('#noble-options').innerHTML = choices.map(id => `<button class="noble-pick${id === best ? ' recommended' : ''}" data-noble="${id}">${nobleHtml(id)}</button>`).join('');
         if (!$('#noble-choice').open) $('#noble-choice').showModal();
     }
 
@@ -491,6 +498,41 @@ export default class UI {
             <span class="r-name">${escapeHtml(p.name)}</span><span class="r-pts"><b>${p.points}</b>点</span>
             <span class="r-sub">カード${p.cards.length}枚・貴族${p.nobles.length}</span></li>`).join('');
         $('#result').showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、宝石・カードを選んだ状態にして、押すボタンに印を付ける（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        const me = this.view.players[this.view.you];
+        if (command.type === 'take') this.selection = { kind: 'tokens', tokens: { ...command.tokens } };
+        if (command.type === 'buy' || (command.type === 'reserve' && command.card !== undefined)) {
+            this.selection = { kind: 'card', card: command.card, reserved: me.reserved.some(r => r.id === command.card) };
+        }
+        if (command.type === 'reserve' && command.level !== undefined) this.selection = { kind: 'deck', level: command.level };
+        if (command.type === 'discard') this.discardPick = { ...command.tokens };
+        this.render();
+        if (command.type === 'noble' && $('#noble-choice').open) this.showNobleChoice([...$('#noble-options').querySelectorAll('[data-noble]')].map(b => Number(b.dataset.noble)));
+        const gems = (tokens) => Object.entries(tokens).map(([c, n]) => `${COLOR_NAMES[c]}${n > 1 ? `×${n}` : ''}`).join('・');
+        const text = {
+            take: () => `宝石を取る（${gems(command.tokens)}）`,
+            buy: () => '選んだカードを買う',
+            reserve: () => (command.level !== undefined ? `レベル${command.level}の山札から予約する` : '選んだカードを予約する'),
+            discard: () => `宝石を返す（${gems(command.tokens)}）`,
+            noble: () => '金の枠の貴族を迎える',
+            pass: () => 'パスする'
+        }[command.type]?.() ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const act = { take: 'take', buy: 'buy', reserve: c.level !== undefined ? 'reserve-deck' : 'reserve', discard: 'discard' }[c.type];
+        if (act) document.querySelector(`#actions [data-act="${act}"]`)?.classList.add('recommended');
     }
 
     toast(message) {

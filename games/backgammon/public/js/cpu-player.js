@@ -207,6 +207,12 @@ export function chooseCpuCommand(game, seat = game.actors()[0], profile = PROFIL
     return { type: 'play', steps: noisy[0].steps };
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ操作（盤はすべて見えている）。手は打たない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat) || game.state.phase === 'between') return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 // CPU の1手を進める。選んだ手が通らなければ、いちばん単純な手で進める（止まらないように）
 export function runCpuStep(game, seat = game.actors()[0], profile = PROFILES.normal) {
     if (game.isOver() || !game.actors().includes(seat)) return false;

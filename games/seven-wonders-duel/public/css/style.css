@@ -605,3 +605,28 @@ dialog h2:focus-visible { outline: none; }
     .structure .slot.glow { animation: none; }
     .float { animation: none; }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒントのおすすめ：金の枠 */
+.recommended { outline: 3px solid var(--gold); outline-offset: 2px; }
+#hint svg { fill: none; stroke: currentColor; }
+/* 狭い縦画面では、上の帯のボタンを少し小さくして、場の情報（進歩トークン・捨て札）を収める */
+@media (max-width: 400px) {
+    .bar { gap: 4px; }
+    .bar .icon-btn { width: 32px; }
+    .board-info { gap: 4px; }
+    .board-info .token { width: 22px; height: 22px; }
+}

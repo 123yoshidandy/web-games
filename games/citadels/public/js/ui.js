@@ -131,6 +131,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（終わりと残す札は、外側では閉じない）
         document.querySelectorAll('dialog').forEach(dialog => {
@@ -225,6 +226,7 @@ export default class UI {
             <h3>手番</h3>
             <p>役割を番号の順に呼び、その役割の人が手番を行います。</p>
             <p><strong>行動</strong>：2金を取るか、地区カードを2枚引いて1枚を残す。<br><strong>建てる</strong>：行動のあと、費用を払って地区を1つ（建築家は3つまで）。同じ名前の地区は建てられません。<br><strong>収入と能力</strong>：手番の中でいつでも1回。収入は、役割の色の地区1つにつき1金（取らずに終えると自動で受け取る）。</p>
+            <p>上の電球のボタンを押すと、おすすめの操作を選んだ状態にし、押すボタンを光らせます。</p>
             <h3>終わりと得点</h3>
             <p>地区の費用の合計（大学と竜の門は8点）。5色そろえば+3。最初に8地区にした人は+4、ほかに8地区にした人は+2。同点なら、地区の費用の合計が多い人、それも同じなら金の多い人が上です。</p>
             <h3>役割</h3>
@@ -398,6 +400,43 @@ export default class UI {
             html = `<div class="act-row">${buttons.join('')}</div>`;
         }
         $('#actions').innerHTML = html;
+        if (this.hint && this.hint.key === this.lastSeq) $(`#actions [data-act="${this.hint.act}"]`)?.classList.add('recommended');
+    }
+
+    // ヒント：CPU（ふつう）が選ぶ操作。役割や地区を選んだ状態にし、押すボタンに印を付ける
+    showHint() {
+        const c = this.controller?.hint();
+        if (!c) return this.toast('自分の番になったら、おすすめを出せます');
+        const name = (ch) => CHARACTERS[ch]?.name ?? '';
+        let act = c.type;
+        let text;
+        switch (c.type) {
+            case 'pick': case 'discard':
+                this.selected = { kind: 'character', character: c.character };
+                text = `${name(c.character)}を${c.type === 'pick' ? '選ぶ' : '伏せる'}`;
+                break;
+            case 'build':
+                this.selected = { kind: 'card', card: c.card };
+                text = `${DISTRICTS[cardType(c.card)]?.name ?? '地区'}を建てる`;
+                break;
+            case 'graveyard':
+                act = c.take ? 'grave-take' : 'grave-skip';
+                text = c.take ? '墓場の地区を拾う' : '拾わない';
+                break;
+            case 'gold': text = '2金を取る'; break;
+            case 'draw': text = 'カードを引く'; break;
+            case 'income': text = '収入を受け取る'; break;
+            case 'smithy': text = '鍛冶屋を使う'; break;
+            case 'lab': text = '研究所を使う'; break;
+            case 'end': text = '手番を終える'; break;
+            case 'keep': text = '残すカードを選ぶ'; break;
+            case 'assassinate': act = 'ability'; text = `${name(c.character)}を暗殺する`; break;
+            case 'steal': act = 'ability'; text = `${name(c.character)}から盗む`; break;
+            default: act = 'ability'; text = '能力を使う';
+        }
+        this.hint = { key: this.lastSeq, act };
+        this.render();
+        this.toast(`おすすめ：${text}`);
     }
 
     onAction({ act }) {

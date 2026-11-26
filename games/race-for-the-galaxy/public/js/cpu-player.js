@@ -270,3 +270,10 @@ export function runCpuStep(game, seat, levelOf = () => 'normal') {
     const fallback = FALLBACK[game.pending[seat].kind];
     return !!fallback && game.applyCommand(seat, fallback);
 }
+
+// ヒント：人の番に、CPU（いちばん強い設定）が選ぶ手を返す。CPU と同じく、その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (!(!game.isOver() && !!game.pending[seat])) return null;
+    return chooseCommand(createGameView(game, seat), LEVELS.strong);
+}

@@ -126,6 +126,11 @@ export default class BoardView {
             const { x, y } = CENTERS[cell];
             marks.append(el('polygon', { points: HEX_POINTS, transform: `translate(${x} ${y}) scale(.86)`, class: state.picking === 'source' ? 'pick source' : 'pick' }));
         });
+        // ヒントで示すマス
+        if (state.suggested >= 0) {
+            const { x, y } = CENTERS[state.suggested];
+            marks.append(el('polygon', { points: HEX_POINTS, transform: `translate(${x} ${y}) scale(.9)`, class: 'suggested-cell' }));
+        }
         if (state.selected >= 0) {
             const { x, y } = CENTERS[state.selected];
             marks.append(el('polygon', { points: HEX_POINTS, transform: `translate(${x} ${y}) scale(.9)`, class: 'selected' }));

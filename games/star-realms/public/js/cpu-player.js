@@ -92,7 +92,15 @@ function answerPrompt(view, level, rand) {
 
 // ---- 手番 ----
 
-export function chooseCommand(view, level = 'normal', rand = Math.random) {
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
+export function chooseCommand(view, level = 'normal', rand = viewRandom(view)) {
     const me = view.players[view.you];
     const opp = view.players[1 - view.you];
     if (view.phase === 'end' || !view.answering.includes(view.you)) return null;
@@ -159,6 +167,12 @@ export function nextCpuSeat(game) {
 
 export function isCpuTurn(game) {
     return !game.isOver() && nextCpuSeat(game) !== null;
+}
+
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCommand(createGameView(game, seat), 'normal', cpuRandom(game, seat));
 }
 
 // 操作を待っている CPU に1手打たせる。通らなければ、いちばん単純な手で進める

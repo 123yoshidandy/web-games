@@ -103,7 +103,8 @@ function chooseSettle(view, d, cfg, random) {
 // ---------- 市長 ----------
 
 // 置き場の候補に値打ちを付け、高い順に入植者を置く（生産の組は農園と建物を 2 人で 1 組）
-export function arrangeColonists(p, total, noise = 0, random = Math.random) {
+// random を渡さないとき（画面の「おまかせ」など）も、決まった乱数を使う
+export function arrangeColonists(p, total, noise = 0, random = createRandom(total)) {
     const island = p.island.map(() => false);
     const city = p.city.map(() => 0);
     let left = total;
@@ -233,4 +234,11 @@ export function runCpuStep(game, levelOf = () => 'normal') {
         if (retry && game.applyCommand(seat, retry)) return true;
     }
     return false;
+}
+
+// ヒント：人の番に、CPU（いちばん強い設定）が選ぶ手を返す。CPU と同じく、その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (!(!game.isOver() && game.decision?.seat === seat)) return null;
+    return chooseCommand(createGameView(game, seat), LEVELS.strong);
 }

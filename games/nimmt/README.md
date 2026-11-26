@@ -38,6 +38,8 @@ CPU 同士の対戦で、勝率と試合の長さを測れる。
 node scripts/cpu-match.mjs 400 4 normal,normal,normal,strong
 ```
 
+選ぶ番に操作の欄に出る電球（ヒント）を押すと、いちばん強い CPU が選ぶ手を示す（出すカードを選んでおくか、引き取る列を光らせる）。CPU と同じく、自分のビューだけで決める。
+
 ## 開発
 
 素の HTML / CSS / JavaScript（ES Modules）で、ビルドはない。

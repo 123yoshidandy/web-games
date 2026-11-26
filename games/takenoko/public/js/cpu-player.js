@@ -250,6 +250,12 @@ function cloudsCommand(game, seat) {
 
 export const isCpuTurn = game => game.phase !== 'end' && game.players[game.current].isCPU;
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断（自分の手札と公開された情報だけ）。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.phase !== 'play' || game.current !== seat) return null;
+    return chooseCommand(game, seat, CPU_STYLES.normal);
+}
+
 // CPU の番なら1つ進める。進めたら true
 export function runCpuStep(game, style = CPU_STYLES.normal) {
     if (!isCpuTurn(game)) return false;

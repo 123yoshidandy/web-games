@@ -135,6 +135,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（結果は外側では閉じない）
         // 能力の選択は、閉じても選択は残る（盤を見てから、操作の欄の「選ぶ」で出し直す）
@@ -315,6 +316,7 @@ export default class UI {
 
     sendCommand(command) {
         this.selection = null;
+        this.hintCommand = null;
         this.controller?.send(command);
     }
 
@@ -339,6 +341,7 @@ export default class UI {
         } else if (action === 'discard') {
             const tokens = { ...this.discardPick };
             this.discardPick = {};
+            this.hintCommand = null;
             this.controller?.send({ type: 'discard', tokens });
         }
     }
@@ -359,6 +362,8 @@ export default class UI {
         this.renderBoard();
         this.renderMe();
         this.renderActions();
+        if (this.view.phase === 'end' || this.view.current !== this.view.you) this.hintCommand = null;
+        this.markHint();
 
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
@@ -603,7 +608,51 @@ export default class UI {
                     <span>${royal.points}点${royal.ability ? `<br>${ABILITY_NAMES[royal.ability]}` : ''}</span></button>`;
             }).join('');
         }
+        this.markHint();
         dialog.showModal();
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、トークン・カードを選んだ状態にして、押すボタンに印を付ける（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        if (command.type === 'take') this.selection = { kind: 'cells', cells: [...command.cells] };
+        if (command.type === 'privilege') this.selection = { kind: 'cells', cells: [command.cell] };
+        if (command.type === 'buy' || (command.type === 'reserve' && command.card !== undefined)) {
+            this.selection = { kind: 'card', card: command.card, reserved: this.me.reserved.some(r => r.id === command.card) };
+        }
+        if (command.type === 'reserve' && command.level !== undefined) this.selection = { kind: 'deck', level: command.level };
+        if (command.type === 'replenish') this.selection = { kind: 'replenish' };
+        if (command.type === 'discard') this.discardPick = { ...command.tokens };
+        this.render();
+        const text = {
+            take: () => `選んだトークン${command.cells.length}個を取る`,
+            privilege: () => '特権で、選んだトークンを取る',
+            buy: () => '選んだカードを買う',
+            reserve: () => (command.level !== undefined ? `レベル${command.level}の山札から予約する` : '選んだカードを予約する'),
+            replenish: () => '盤を補充する',
+            discard: () => 'トークンを返す',
+            wild: () => `${COLOR_NAMES[command.color]}として置く`,
+            steal: () => `${COLOR_NAMES[command.color]}をもらう`,
+            royal: () => '金の枠の王族を迎える',
+            token: () => '金の枠のトークンを取る',
+            pass: () => 'パスする'
+        }[command.type]?.() ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const act = { take: 'take', privilege: 'privilege', buy: 'buy', reserve: c.level !== undefined ? 'reserve-deck' : 'reserve', replenish: 'replenish', discard: 'discard' }[c.type];
+        const list = act ? [`#actions [data-act="${act}"]`] : [];
+        if (c.type === 'reserve' && this.selection?.kind === 'gold') list.push(`#board [data-cell="${c.gold}"]`);
+        if (c.type === 'token') list.push(`#board [data-cell="${c.cell}"]`);
+        if (['wild', 'steal', 'royal'].includes(c.type)) list.push(`#choice-options [data-option="${c.color ?? c.royal}"]`);
+        list.forEach(s => document.querySelector(s)?.classList.add('recommended'));
     }
 
     showPlayerDetail(seat) {

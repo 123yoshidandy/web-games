@@ -55,6 +55,8 @@ CPU 同士の対戦（各 1000 試合）：
 node scripts/cpu-match.mjs 1000 4 normal,easy,easy,easy
 ```
 
+上の帯の電球（ヒント）を押すと、いちばん強い CPU が選ぶ手（ノーサンキューか取るか）のボタンを光らせる。CPU と同じく、自分のビューだけで決める。
+
 ## 開発
 
 素の HTML / CSS / JavaScript（ES Modules）で、ビルドはない。

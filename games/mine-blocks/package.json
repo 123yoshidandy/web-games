@@ -10,5 +10,32 @@
   },
   "dependencies": {
     "netplay-kit": "*"
+  },
+  "portal": {
+    "original": "MINE BLOCKS",
+    "aliases": [
+      "まいんぶろっくす"
+    ],
+    "genres": [
+      "パズル"
+    ],
+    "players": [
+      1,
+      2,
+      3,
+      4
+    ]
+  },
+  "standards": {
+    "skip": {
+      "cpu": "1人で解くパズルで、競う相手はオンラインの人だけ（CPU の相手がいない）",
+      "replay": "生成した問題を解くパズルで、局面は問題と置いたピースの盤面そのもの。手番の操作を記録して再現する作りが当てはまらない",
+      "bgm": "独自の音（js/sound.js）を使い、packages/sound のエンジンは使わない（packages/sound/README.md の決まり）",
+      "undo": "置いたピースはいつでもタップで外して置き場に戻せる（どのピースも戻せるので、1手戻す操作は要らない）"
+    }
+  },
+  "layoutCheck": {
+    "start": "#topEndless",
+    "bgmToggle": "#topBgm, #soundButton"
   }
 }

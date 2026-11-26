@@ -317,3 +317,23 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
         transform: translateX(100vw) rotate(90deg);
     }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント（おすすめの手） */
+#hint:disabled { opacity: .35; }
+.suggested { outline: 3px solid #f5c542 !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(245, 197, 66, .35) !important; }
+#hint svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+#map .suggested { outline: none !important; box-shadow: none !important; filter: drop-shadow(0 0 4px #f5c542) drop-shadow(0 0 2px #f5c542); }

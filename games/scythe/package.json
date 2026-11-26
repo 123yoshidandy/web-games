@@ -9,5 +9,14 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Scythe",
+    "aliases": [
+      "おおがませんえき"
+    ],
+    "genres": [
+      "ボードゲーム"
+    ]
   }
 }

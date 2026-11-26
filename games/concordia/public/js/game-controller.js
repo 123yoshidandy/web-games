@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn, fallbackCommands } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, fallbackCommands, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 1100;  // CPU がカードを使う前は、何をしたか追えるように間を置く
 const CPU_QUICK_DELAY_MS = 450;          // 建築家の移動と建築の続き
@@ -40,6 +40,11 @@ export default class LocalGameController {
         this.stalls = 0;
         this.paused = false;
         this.save();
+    }
+
+    // ヒント：人の番に、CPU（ふつう）が選ぶ操作。手は打たず、記録にも入れない
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

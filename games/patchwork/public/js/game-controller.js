@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn, CPU_STYLES } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, CPU_STYLES, suggest } from './cpu-player.js';
 import { createSeed } from './random.js';
 import * as storage from './storage.js';
 
@@ -51,6 +51,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

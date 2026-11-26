@@ -43,6 +43,12 @@ const PLACE_TEXTS = {
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const sum2 = (dice) => dice[0] + dice[1];
+// 操作を、項目の順に関係なく比べられる文字列にする
+const canonical = (value) => (value && typeof value === 'object'
+    ? `{${Object.keys(value).sort().map(k => `${k}:${canonical(value[k])}`).join(',')}}`
+    : JSON.stringify(value));
+// ヒントのボタン（案内の欄の先頭に置く）
+const HINT_BUTTON = '<button type="button" id="hint" class="pbtn hint-button" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>';
 // 2つのサイコロで n 以上が出る確率
 const chanceAtLeast = (n) => {
     let hit = 0;
@@ -229,6 +235,7 @@ export default class UI {
         this.renderBoard();
         this.renderPrompt();
         this.renderMe();
+        this.markHint();
     }
 
     colorOf(seat) {
@@ -445,8 +452,44 @@ export default class UI {
     setPrompt(text, buttons = []) {
         $('#prompt-text').innerHTML = text;
         const box = $('#prompt-buttons');
-        box.innerHTML = buttons.map((b, i) => `<button class="pbtn ${b.cls ?? ''}" data-i="${i}" ${b.disabled ? 'disabled' : ''}>${b.label}</button>`).join('');
+        // 自分の番には、ヒントのボタンを先に置く
+        const hint = this.view?.phase !== 'end' && this.view && this.myTurn() ? HINT_BUTTON : '';
+        box.innerHTML = hint + buttons.map((b, i) => `<button class="pbtn ${b.cls ?? ''}" data-i="${i}" ${b.disabled ? 'disabled' : ''}>${b.label}</button>`).join('');
         this.promptActions = buttons.map(b => b.onClick);
+        this.promptCommands = buttons.map(b => b.command ?? null);
+    }
+
+    // ヒントが指す場面（手を打つと変わる）
+    hintKey() {
+        const v = this.view;
+        return JSON.stringify([v.round, v.turn, v.step, this.controller?.game.commands.length]);
+    }
+
+    // おすすめの手を光らせる（行き先の場所か、案内の欄のボタン）
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = this.controller?.suggest();
+        if (!command) return;
+        this.hint = { at: this.hintKey(), command };
+        if (command.type === 'move') this.moveCard = command.card ?? null;
+        this.render();
+    }
+
+    markHint() {
+        if (!this.hint || this.hint.at !== this.hintKey()) {
+            this.hint = null;
+            return;
+        }
+        const c = this.hint.command;
+        if ((c.type === 'move' || (c.type === 'act' && c.to !== undefined)) && this.boardTargets().has(c.to)) {
+            $(`#board [data-place="${c.to}"]`)?.classList.add('suggested');
+            return;
+        }
+        // 同じ操作のボタン。なければ（品物を選ぶシートなど）、同じ種類の操作のボタン
+        const same = (a, b) => canonical(a) === canonical(b);
+        let index = this.promptCommands.findIndex(x => x && same(x, c));
+        if (index < 0) index = this.promptCommands.findIndex((x, i) => x?.type === c.type || (c.type === 'act' && !x && this.promptActions[i]));
+        if (index >= 0) $(`#prompt-buttons [data-i="${index}"]`)?.classList.add('suggested');
     }
 
     renderPrompt() {
@@ -482,31 +525,31 @@ export default class UI {
             case 'pay': {
                 const cost = step.payCost;
                 this.setPrompt(`ほかの商人に<b>${cost}リラ</b>払って行動しますか`, [
-                    { label: `${cost}リラ払う`, cls: 'primary', disabled: me.lira < cost, onClick: () => this.send({ type: 'pay', accept: true }) },
-                    { label: '払わずに番を終える', onClick: () => this.send({ type: 'pay', accept: false }) }
+                    { label: `${cost}リラ払う`, cls: 'primary', disabled: me.lira < cost, command: { type: 'pay', accept: true }, onClick: () => this.send({ type: 'pay', accept: true }) },
+                    { label: '払わずに番を終える', command: { type: 'pay', accept: false }, onClick: () => this.send({ type: 'pay', accept: false }) }
                 ]);
                 return;
             }
             case 'action': this.actionPrompt(); return;
             case 'caravan': {
-                const buttons = [{ label: '山札から', cls: 'primary', disabled: view.deckCount + view.discardCount === 0, onClick: () => this.send({ type: 'draw', from: 'deck' }) }];
-                if (view.discardTop) buttons.push({ label: `捨て札の「${BONUS_CARDS[view.discardTop].name}」`, onClick: () => this.send({ type: 'draw', from: 'discard' }) });
+                const buttons = [{ label: '山札から', cls: 'primary', disabled: view.deckCount + view.discardCount === 0, command: { type: 'draw', from: 'deck' }, onClick: () => this.send({ type: 'draw', from: 'deck' }) }];
+                if (view.discardTop) buttons.push({ label: `捨て札の「${BONUS_CARDS[view.discardTop].name}」`, command: { type: 'draw', from: 'discard' }, onClick: () => this.send({ type: 'draw', from: 'discard' }) });
                 this.setPrompt(`隊商宿：カードを引きます（あと${step.draws}枚）`, buttons);
                 return;
             }
             case 'caravanDiscard':
                 this.setPrompt('隊商宿：捨てるカードを1枚選んでください', me.cards.map((card, index) => ({
-                    label: BONUS_CARDS[card].name, onClick: () => this.send({ type: 'discard', index })
+                    label: BONUS_CARDS[card].name, command: { type: 'discard', index }, onClick: () => this.send({ type: 'discard', index })
                 })));
                 return;
             case 'dice': {
                 const [a, b] = step.dice;
                 const what = step.diceFor === 'tea' ? `${step.bet}に賭けて` : '闇市で';
                 this.setPrompt(`${what}<b>${a}・${b}</b>（合計${a + b}）。赤のタイルで直せます`, [
-                    { label: 'このまま', cls: 'primary', onClick: () => this.send({ type: 'dice', mode: 'keep' }) },
-                    { label: '振り直す', onClick: () => this.send({ type: 'dice', mode: 'reroll' }) },
-                    { label: `${a}を4に`, disabled: a === 4, onClick: () => this.send({ type: 'dice', mode: 'four', die: 0 }) },
-                    { label: `${b}を4に`, disabled: b === 4, onClick: () => this.send({ type: 'dice', mode: 'four', die: 1 }) }
+                    { label: 'このまま', cls: 'primary', command: { type: 'dice', mode: 'keep' }, onClick: () => this.send({ type: 'dice', mode: 'keep' }) },
+                    { label: '振り直す', command: { type: 'dice', mode: 'reroll' }, onClick: () => this.send({ type: 'dice', mode: 'reroll' }) },
+                    { label: `${a}を4に`, disabled: a === 4, command: { type: 'dice', mode: 'four', die: 0 }, onClick: () => this.send({ type: 'dice', mode: 'four', die: 0 }) },
+                    { label: `${b}を4に`, disabled: b === 4, command: { type: 'dice', mode: 'four', die: 1 }, onClick: () => this.send({ type: 'dice', mode: 'four', die: 1 }) }
                 ]);
                 return;
             }
@@ -515,15 +558,15 @@ export default class UI {
                 const dice = step.dice;
                 this.setPrompt(`闇市：<b>${dice[0]}・${dice[1]}</b>で宝石${blackMarketJewels(sum2(dice))}つ。品物を1つ選んでください`,
                     ['red', 'green', 'yellow'].map(g => ({
-                        label: `${goodIcon(g, 'ic s')}${GOOD_NAMES[g]}`, disabled: me.goods[g] >= cap, onClick: () => this.send({ type: 'good', good: g })
+                        label: `${goodIcon(g, 'ic s')}${GOOD_NAMES[g]}`, disabled: me.goods[g] >= cap, command: { type: 'good', good: g }, onClick: () => this.send({ type: 'good', good: g })
                     })));
                 return;
             }
             case 'after': {
                 const names = { sultan2: '宮殿でもう1回', post2: '郵便局でもう1回', gem2: '宝石商でもう1回' };
                 const buttons = Object.entries(names).filter(([card]) => me.cards.includes(card) && this.doubleUsable(card))
-                    .map(([card, label]) => ({ label, cls: 'primary', onClick: () => this.send({ type: 'bonus', card }) }));
-                buttons.push({ label: '次へ', onClick: () => this.send({ type: 'end' }) });
+                    .map(([card, label]) => ({ label, cls: 'primary', command: { type: 'bonus', card }, onClick: () => this.send({ type: 'bonus', card }) }));
+                buttons.push({ label: '次へ', command: { type: 'end' }, onClick: () => this.send({ type: 'end' }) });
                 this.setPrompt('カードで、もう1回行動できます', buttons);
                 return;
             }
@@ -542,17 +585,17 @@ export default class UI {
         const me = this.me();
         const place = view.step.actPlace;
         const cap = capacityOf(me);
-        const skip = { label: '行動しない', onClick: () => this.send({ type: 'skip' }) };
+        const skip = { label: '行動しない', command: { type: 'skip' }, onClick: () => this.send({ type: 'skip' }) };
         const act = (params = {}) => this.send({ type: 'act', ...params });
         const head = `<b>${PLACES[place].name}</b>${view.step.via === 'family' ? '（家族で）' : ''}：`;
         switch (place) {
             case 1:
                 this.setPrompt(`${head}7リラで広げると、品物ごとに${cap + 1}つまで積めます${me.ext === MAX_EXTENSIONS - 1 ? '（ルビーも）' : ''}`, [
-                    { label: '広げる', cls: 'primary', disabled: me.lira < EXTENSION_COST || me.ext >= MAX_EXTENSIONS, onClick: () => act() }, skip]);
+                    { label: '広げる', cls: 'primary', disabled: me.lira < EXTENSION_COST || me.ext >= MAX_EXTENSIONS, command: { type: 'act' }, onClick: () => act() }, skip]);
                 return;
             case 2: case 3: case 4: {
                 const good = PLACES[place].good;
-                const buttons = [{ label: `${GOOD_NAMES[good]}を積む`, cls: 'primary', onClick: () => act() }];
+                const buttons = [{ label: `${GOOD_NAMES[good]}を積む`, cls: 'primary', command: { type: 'act' }, onClick: () => act() }];
                 if (me.tiles.includes('green') && me.lira >= 2) buttons.push({ label: '積む＋2リラで1つ', onClick: () => this.openExtraSheet(good) });
                 buttons.push(skip);
                 this.setPrompt(`${head}${GOOD_NAMES[good]}を${cap}つまで積みます（今${me.goods[good]}）`, buttons);
@@ -560,28 +603,28 @@ export default class UI {
             }
             case 5: {
                 const rewards = postRewards(view.post).map(r => (r.lira ? `${r.lira}リラ` : GOOD_NAMES[r.good])).join('・');
-                this.setPrompt(`${head}${rewards}`, [{ label: '受け取る', cls: 'primary', onClick: () => act() }, skip]);
+                this.setPrompt(`${head}${rewards}`, [{ label: '受け取る', cls: 'primary', command: { type: 'act' }, onClick: () => act() }, skip]);
                 return;
             }
-            case 6: this.setPrompt(`${head}カードを2枚引いて、1枚捨てます`, [{ label: 'カードを引く', cls: 'primary', onClick: () => act() }, skip]); return;
+            case 6: this.setPrompt(`${head}カードを2枚引いて、1枚捨てます`, [{ label: 'カードを引く', cls: 'primary', command: { type: 'act' }, onClick: () => act() }, skip]); return;
             case 7: this.setPrompt(`${head}置いた助手${me.assistants.length}人を呼び戻します`, [
-                { label: '全員戻す', cls: 'primary', disabled: me.assistants.length === 0, onClick: () => act() }, skip]);
+                { label: '全員戻す', cls: 'primary', disabled: me.assistants.length === 0, command: { type: 'act' }, onClick: () => act() }, skip]);
                 return;
-            case 8: this.setPrompt(`${head}サイコロを振って宝石、そのあと品物を1つ`, [{ label: 'サイコロを振る', cls: 'primary', onClick: () => act() }, skip]); return;
+            case 8: this.setPrompt(`${head}サイコロを振って宝石、そのあと品物を1つ`, [{ label: 'サイコロを振る', cls: 'primary', command: { type: 'act' }, onClick: () => act() }, skip]); return;
             case 9: this.setPrompt(`${head}数を決めてサイコロを振ります`, [{ label: '賭ける', cls: 'primary', onClick: () => this.openTeaSheet() }, skip]); return;
             case 10: case 11: this.setPrompt(`${head}需要の品物を売ります`, [{ label: '売る', cls: 'primary', onClick: () => this.openMarketSheet(place) }, skip]); return;
             case 12: this.setPrompt(`${head}家族を送る場所を、盤から選んでください`, [skip]); return;
             case 13: {
                 const need = view.sultanNeed;
                 const picks = need && GOODS.every(g => me.goods[g] >= need[g]) ? autoSultanAny(me.goods, need) : null;
-                this.setPrompt(`${head}品物を納めてルビーを1つもらいます`, [{ label: '納める', cls: 'primary', disabled: !picks, onClick: () => act() }, skip]);
+                this.setPrompt(`${head}品物を納めてルビーを1つもらいます`, [{ label: '納める', cls: 'primary', disabled: !picks, command: { type: 'act' }, onClick: () => act() }, skip]);
                 return;
             }
             case 14: case 15: {
                 const buttons = MOSQUE_TILES[place].map(c => {
                     const top = view.mosqueTiles[c][0];
                     const ok = top !== undefined && !me.tiles.includes(c) && me.goods[c] >= top;
-                    return { label: `${goodIcon(c, 'ic s')}${TILE_NAMES[c]}`, cls: ok ? 'primary' : '', disabled: !ok, onClick: () => act({ tile: c }) };
+                    return { label: `${goodIcon(c, 'ic s')}${TILE_NAMES[c]}`, cls: ok ? 'primary' : '', disabled: !ok, command: { type: 'act', ...{ tile: c } }, onClick: () => act({ tile: c }) };
                 });
                 buttons.push(skip);
                 this.setPrompt(`${head}タイルを取って、その品物を1つ払います`, buttons);
@@ -589,7 +632,7 @@ export default class UI {
             }
             case 16:
                 this.setPrompt(`${head}${view.gemPrice}リラでルビーを買います`, [
-                    { label: '買う', cls: 'primary', disabled: view.gemPrice > GEM_MAX || me.lira < view.gemPrice, onClick: () => act() }, skip]);
+                    { label: '買う', cls: 'primary', disabled: view.gemPrice > GEM_MAX || me.lira < view.gemPrice, command: { type: 'act' }, onClick: () => act() }, skip]);
                 return;
             default: this.setPrompt(head, [skip]);
         }
@@ -602,20 +645,20 @@ export default class UI {
         if (encounter.kind === 'family') {
             const name = escapeHtml(view.players[encounter.seat].name);
             this.setPrompt(`${name}の家族を警察署へ送ります。ごほうびは？`, [
-                { label: '3リラ', cls: 'primary', onClick: () => this.send({ type: 'catch', reward: 'lira' }) },
-                { label: 'カード1枚', disabled: view.deckCount + view.discardCount === 0, onClick: () => this.send({ type: 'catch', reward: 'card' }) }
+                { label: '3リラ', cls: 'primary', command: { type: 'catch', reward: 'lira' }, onClick: () => this.send({ type: 'catch', reward: 'lira' }) },
+                { label: 'カード1枚', disabled: view.deckCount + view.discardCount === 0, command: { type: 'catch', reward: 'card' }, onClick: () => this.send({ type: 'catch', reward: 'card' }) }
             ]);
         } else if (encounter.kind === 'governor') {
             const none = view.deckCount + view.discardCount === 0;
             this.setPrompt('総督：カードを1枚もらえます（2リラか手札1枚を払う）', [
-                { label: '2リラ払う', cls: 'primary', disabled: none || me.lira < 2, onClick: () => this.send({ type: 'governor', use: true, pay: 'lira' }) },
+                { label: '2リラ払う', cls: 'primary', disabled: none || me.lira < 2, command: { type: 'governor', use: true, pay: 'lira' }, onClick: () => this.send({ type: 'governor', use: true, pay: 'lira' }) },
                 { label: '手札と交換', disabled: none || me.cards.length === 0, onClick: () => this.openGovernorSheet() },
-                { label: 'もらわない', onClick: () => this.send({ type: 'governor', use: false }) }
+                { label: 'もらわない', command: { type: 'governor', use: false }, onClick: () => this.send({ type: 'governor', use: false }) }
             ]);
         } else {
             this.setPrompt('密輸人：好きな品物を1つもらえます（2リラか品物1つを払う）', [
                 { label: 'もらう', cls: 'primary', onClick: () => this.openSmugglerSheet() },
-                { label: 'もらわない', onClick: () => this.send({ type: 'smuggler', use: false }) }
+                { label: 'もらわない', command: { type: 'smuggler', use: false }, onClick: () => this.send({ type: 'smuggler', use: false }) }
             ]);
         }
     }
@@ -644,6 +687,7 @@ export default class UI {
 
     bindPanels() {
         $('#prompt-buttons').addEventListener('click', (event) => {
+            if (event.target.closest('#hint')) return this.showHint();
             const button = event.target.closest('button[data-i]');
             if (button && !button.disabled) this.promptActions?.[Number(button.dataset.i)]?.();
         });
@@ -717,7 +761,7 @@ export default class UI {
                     ${canAny ? `<label class="any-toggle"><input type="checkbox" id="any-goods" ${state.any ? 'checked' : ''}> 「何でも売る」のカードを使う</label>` : ''}
                     <p class="m-total">${n}個で <b>${marketPay(place, n)}リラ</b></p></div>`,
                 buttons: [
-                    { label: '売る', cls: 'primary', disabled: n === 0, onClick: () => this.send({ type: 'act', sell: { ...state.sell }, ...(state.any ? { card: 'market' } : {}) }) },
+                    { label: '売る', cls: 'primary', disabled: n === 0, command: { type: 'act', sell: { ...state.sell }, ...(state.any ? { card: 'market' } : {}) }, onClick: () => this.send({ type: 'act', sell: { ...state.sell }, ...(state.any ? { card: 'market' } : {}) }) },
                     { label: 'やめる', cls: 'secondary' }
                 ],
                 bind: (body) => {
@@ -777,7 +821,7 @@ export default class UI {
                 body: `<p class="muted">もらう品物</p>${this.choiceRow('good', GOODS.map(g => ({ value: g, label: `${goodIcon(g, 'ic s')}${GOOD_NAMES[g]}`, disabled: me.goods[g] >= cap })), state.good)}
                     <p class="muted">払うもの</p>${this.choiceRow('pay', payItems, state.pay)}`,
                 buttons: [
-                    { label: 'もらう', cls: 'primary', disabled: !state.pay, onClick: () => this.send({ type: 'smuggler', use: true, good: state.good, pay: state.pay }) },
+                    { label: 'もらう', cls: 'primary', disabled: !state.pay, command: { type: 'smuggler', use: true, good: state.good, pay: state.pay }, onClick: () => this.send({ type: 'smuggler', use: true, good: state.good, pay: state.pay }) },
                     { label: 'やめる', cls: 'secondary' }
                 ],
                 bind: (body) => body.querySelectorAll('.chip').forEach(button => button.addEventListener('click', () => {

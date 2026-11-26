@@ -136,3 +136,10 @@ export function runCpuStep(game, style = CPU_STYLES.normal) {
     if (game.pendingLeather) return game.applyCommand(seat, { type: 'leather', ...chooseLeather(game.players[seat].quilt) });
     return game.applyCommand(seat, { type: 'advance' });
 }
+
+// ヒント：人の番に、CPU（見落としもぶれもない強さ）が選ぶ手を返す。パッチワークに隠れた情報はない
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || game.current !== seat) return null;
+    return chooseCommand(game, seat, CPU_STYLES.strong);
+}

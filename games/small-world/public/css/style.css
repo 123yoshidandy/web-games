@@ -187,3 +187,20 @@ dialog h2:focus-visible { outline: none; }
 .toast { position: fixed; left: 50%; bottom: 128px; z-index: 80; width: max-content; max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 10px; background: rgba(4, 12, 10, .92); color: #fff; font-size: 14px; line-height: 1.5; white-space: pre-line; transform: translateX(-50%); opacity: 0; pointer-events: none; transition: opacity .2s; }
 .toast.show { opacity: 1; }
 @media (prefers-reduced-motion: reduce) { .board .target { animation: none; } }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒントのおすすめ：金の枠 */
+.recommended { outline: 3px solid var(--gold); outline-offset: 2px; }

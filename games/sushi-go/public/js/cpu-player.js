@@ -128,6 +128,14 @@ export function chooseCommand(game, seat, level = game.players[seat].cpuLevel ??
     return command;
 }
 
+// ---- ヒント ----
+
+// 人の席のおすすめの手。CPU（ふつう）と同じ判断を、その席のビューだけで出す。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCommand(game, seat, 'normal');
+}
+
 // ---- 進める ----
 
 export function nextCpuSeat(game) {

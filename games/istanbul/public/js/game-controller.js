@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuActors, PROFILES, LEVELS } from './cpu-player.js';
+import { runCpuStep, cpuActors, PROFILES, LEVELS, suggest } from './cpu-player.js';
 
 const CPU_MOVE_MS = [600, 900];  // CPU が行き先を決めるまでの間（毎回少しずつ違う）
 const CPU_STEP_MS = 420;         // 行動や支払いなど、番の中の続きの間
@@ -39,6 +39,11 @@ export default class LocalGameController {
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
         this.cpuTimer = null;
         this.save();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

@@ -120,7 +120,15 @@ function opportunity(view, board) {
 
 // ---- 手を選ぶ（ビューだけを見る） ----
 
-export function chooseCommand(view, level = 'normal', rand = Math.random) {
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
+export function chooseCommand(view, level = 'normal', rand = viewRandom(view)) {
     if (view.phase === 'swap') {
         const swap = level === 'easy' ? rand() < 0.5 : true;
         return { type: swap ? 'swap' : 'keep' };
@@ -197,4 +205,11 @@ export function runCpuStep(game, seat = nextCpuSeat(game), level) {
     const [cells] = placements(view, seat);
     const fallback = { type: 'place', tile: game.players[seat].hand[0], cells };
     return game.applyCommand(seat, fallback) ? fallback : null;
+}
+
+// ヒント：人の番に、CPU（いちばん強い設定）が選ぶ手を返す。CPU と同じく、その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (!(!game.isOver() && game.actors().includes(seat))) return null;
+    return chooseCommand(createGameView(game, seat), 'normal', cpuRandom(game, seat));
 }

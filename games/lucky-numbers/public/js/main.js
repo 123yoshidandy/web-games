@@ -11,6 +11,7 @@ document.addEventListener('gesturestart', event => event.preventDefault());
 
 document.addEventListener('DOMContentLoaded', async () => {
     const ui = new UI();
+    window.__app = ui; // ヘッドレス Chrome での確認用（状態を見る口）
 
     // 招待のURL（?room=部屋番号）で開いたら、その部屋に参加する
     const roomCode = NetplayClient.inviteRoomCode();

@@ -167,8 +167,16 @@ function chooseDraw(view, me, needs, conf, random) {
     return list.length ? { type: 'draw', slot: list[0].slot } : null;
 }
 
+// rand を渡さないときの迷い。見えている局面から作るので、同じ局面なら同じ手を選ぶ
+function viewRandom(view) {
+    const s = JSON.stringify(view);
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+    return createRandom(h >>> 0);
+}
+
 // ビューから、次の操作を1つ決める（手番でなければ null）
-export function chooseCommand(view, level = 'normal', random = Math.random) {
+export function chooseCommand(view, level = 'normal', random = viewRandom(view)) {
     if (view.phase === 'end' || !view.actors.includes(view.you)) return null;
     const conf = LEVELS[level] ?? LEVELS.normal;
     const me = view.players[view.you];

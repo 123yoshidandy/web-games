@@ -127,6 +127,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（終わりと交換は、外側では閉じない）
         document.querySelectorAll('dialog').forEach(dialog => {
@@ -180,6 +181,37 @@ export default class UI {
         this.controller?.send(command);
     }
 
+    // ヒント：CPU（ふつう）が選ぶ操作に印を付ける（相手を選ぶ行動は、行動を選んだ状態にして相手に印）
+    showHint() {
+        const c = this.controller?.hint();
+        if (!c) return this.toast('自分の番になったら、おすすめを出せます');
+        const v = this.view;
+        const name = (seat) => v.players[seat].name;
+        if (c.type === 'action' && ACTIONS[c.action].target) this.selecting = c.action;
+        this.hint = { key: v.events.at(-1)?.seq ?? 0, command: c };
+        this.render();
+        const text = {
+            action: () => (ACTIONS[c.action].target ? `${ACTIONS[c.action].name}（${name(c.target)}に）` : ACTIONS[c.action].name),
+            allow: () => '通す',
+            challenge: () => 'チャレンジする',
+            block: () => `${ROLES[c.role].name}でブロックする`,
+            lose: () => `${ROLES[c.role].name}を失う`,
+            exchange: () => '残すカードを選ぶ'
+        }[c.type]?.() ?? '光るところを押す';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint(view) {
+        const h = this.hint;
+        if (!h || h.key !== (view.events.at(-1)?.seq ?? 0)) return;
+        const c = h.command;
+        const mark = (selector) => document.querySelector(selector)?.classList.add('recommended');
+        if (c.type === 'action') mark(ACTIONS[c.action].target ? `#opponents [data-player="${c.target}"]` : `#actions [data-action="${c.action}"]`);
+        if (c.type === 'allow' || c.type === 'challenge') mark(`#actions [data-answer="${c.type}"]`);
+        if (c.type === 'block') mark(`#actions [data-answer="block"][data-role="${c.role}"]`);
+        if (c.type === 'lose') mark(`#me .card.pick[data-role="${c.role}"]`);
+    }
+
     // 自分が答える番か
     myPrompt(phase) {
         const v = this.view;
@@ -230,6 +262,7 @@ export default class UI {
         this.renderStage(view);
         this.renderMe(view);
         this.renderActions(view);
+        this.markHint(view);
         this.updateExchange(view);
         this.playEvents(view, prev);
         if ($('#log').open) this.renderLog();

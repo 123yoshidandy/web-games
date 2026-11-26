@@ -88,6 +88,7 @@ export default class UI {
         $('#again').addEventListener('click', () => this.newGame());
         $('#result-home').addEventListener('click', () => this.showTitle());
         $('#home').addEventListener('click', () => this.showTitle());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#next-round').addEventListener('click', () => {
@@ -118,6 +119,7 @@ export default class UI {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled) return;
             if (button.dataset.act === 'cancel') {
+                this.hinted = false;
                 this.sel = emptySelection();
                 this.render();
             } else if (button.dataset.act === 'camels') {
@@ -135,6 +137,7 @@ export default class UI {
     }
 
     send(command) {
+        this.hinted = false;
         this.sel = emptySelection();
         this.controller?.send(command);
     }
@@ -166,6 +169,7 @@ export default class UI {
 
     pickMarket(index) {
         if (!this.myTurn()) return;
+        this.hinted = false;
         const card = this.view.market[index];
         if (card === CAMEL) {
             // ラクダは全部まとめて取るので、ラクダを押したら「ラクダを全部取る」だけにする
@@ -180,6 +184,7 @@ export default class UI {
 
     pickHand(index) {
         if (!this.myTurn()) return;
+        this.hinted = false;
         const hand = this.me().hand;
         const sel = this.sel;
         sel.camels = false;
@@ -198,6 +203,7 @@ export default class UI {
 
     pickHerd() {
         if (!this.myTurn() || this.sel.market.length === 0) return;
+        this.hinted = false;
         // 押すたびに返すラクダを1頭ずつ増やし、群れの数を超えたら0に戻す
         const herd = this.me().herd;
         this.sel.giveCamels = this.sel.giveCamels >= herd ? 0 : this.sel.giveCamels + 1;
@@ -248,6 +254,28 @@ export default class UI {
         return null;
     }
 
+    // おすすめの手を、そのまま選んだ状態にする（操作の欄のボタンを押せば打てる）
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = this.controller.suggest();
+        if (!command) return;
+        const hand = this.me().hand;
+        const sel = emptySelection();
+        if (command.type === 'camels') sel.camels = true;
+        else if (command.type === 'take') sel.market = [command.index];
+        else if (command.type === 'sell') sel.hand = hand.map((t, i) => (t === command.good ? i : -1)).filter(i => i >= 0);
+        else if (command.type === 'exchange') {
+            sel.market = [...command.take];
+            Object.entries(command.give).forEach(([type, n]) => {
+                if (type === CAMEL) sel.giveCamels = n;
+                else hand.forEach((t, i) => { if (t === type && sel.hand.filter(k => hand[k] === type).length < n) sel.hand.push(i); });
+            });
+        }
+        this.sel = sel;
+        this.hinted = true;
+        this.render();
+    }
+
     // ---- 描く ----
 
     render() {
@@ -255,7 +283,11 @@ export default class UI {
         const view = this.controller.getView();
         const before = captureAnchors();
         this.view = view;
-        if (!this.myTurn()) this.sel = emptySelection();
+        if (!this.myTurn()) {
+            this.sel = emptySelection();
+            this.hinted = false;
+        }
+        $('#hint').disabled = !this.myTurn();
         this.validateSelection();
 
         this.renderTop();
@@ -373,7 +405,7 @@ export default class UI {
                     : `<span class="act-log">${escapeHtml(view.logs.at(-1) ?? '')}</span>`;
             } else {
                 const note = action.ok ? (action.note ? `<span class="act-note">${action.note}</span>` : '') : (action.reason ? `<span class="act-reason">${action.reason}</span>` : '');
-                html = `${note}<button class="btn small primary" data-act="go" ${action.ok ? '' : 'disabled'}>${action.label}</button>${cancel}`;
+                html = `${note}<button class="btn small primary${this.hinted && action.ok ? ' suggested' : ''}" data-act="go" ${action.ok ? '' : 'disabled'}>${action.label}</button>${cancel}`;
             }
         }
         $('#actions').innerHTML = html;

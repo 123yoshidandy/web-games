@@ -90,6 +90,11 @@ export function chooseCommand(game, seat, level = game.players[seat].cpuLevel ??
     return command(best);
 }
 
+// ヒント：人の番に、CPU（ふつう）が選ぶ置き方（盤はすべて見えている）。手は打たない
+export function suggest(game, seat) {
+    return chooseCommand(game, seat, 'normal');
+}
+
 export function nextCpuSeat(game) {
     const seat = game.actors()[0];
     return seat !== undefined && game.players[seat].isCPU ? seat : null;

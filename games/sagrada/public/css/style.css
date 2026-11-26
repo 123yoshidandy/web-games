@@ -334,7 +334,19 @@ dialog .buttons { flex: none; display: flex; justify-content: center; gap: 12px;
     .bar { height: 38px; }
     .opponents { min-height: 66px; }
     .pool .die { --d: 30px; }
+    /* タイトルは、左に絵とロゴ、右に設定の2列にする */
+    #screen-title {
+        display: grid; grid-template-columns: auto auto;
+        grid-template-areas: "art setup" "logo setup" "sub setup";
+        align-content: safe center; justify-content: center; align-items: center; column-gap: 40px;
+    }
+    #screen-title .title-art { grid-area: art; width: 160px; align-self: end; justify-self: center; }
+    #screen-title .logo { grid-area: logo; text-align: center; }
+    #screen-title .subtitle { grid-area: sub; text-align: center; align-self: start; }
+    #screen-title .setup { grid-area: setup; }
 }
+/* 収まらない画面では、タイトルをスクロールさせる */
+#screen-title { overflow-y: auto; justify-content: safe center; }
 @media (min-width: 1000px) and (min-height: 700px) {
     .pool .die { --d: 50px; }
     .pool { gap: 8px; }
@@ -350,3 +362,20 @@ dialog .buttons { flex: none; display: flex; justify-content: center; gap: 12px;
 @media (prefers-reduced-motion: reduce) {
     .cell.can::after { animation: none; }
 }
+
+/* ---- ゲーム一覧へのリンク ----
+   タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.portal-link { display: inline-flex; align-items: center; min-height: 44px; }
+.portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link { display: none; }
+}
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒントのおすすめ：金の枠 */
+.recommended { outline: 3px solid var(--gold); outline-offset: 1px; }

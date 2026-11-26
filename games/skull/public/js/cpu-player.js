@@ -186,6 +186,12 @@ export function chooseCpuCommand(game, seat, profile = PROFILES.normal) {
     return null;
 }
 
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断（自分の札と公開された情報だけ）。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 // CPU の1手を進める。選んだ手が通らなければ、単純な手で進める（止まらないように）
 export function runCpuStep(game, seat = cpuActor(game), profile = PROFILES.normal) {
     if (seat === null || game.isOver() || !game.actors().includes(seat)) return false;

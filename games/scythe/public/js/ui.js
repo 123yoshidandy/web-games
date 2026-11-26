@@ -72,6 +72,7 @@ export default class UI {
         this.lastSeq = 0;
         this.sel = null;
         this.selKey = null;
+        this.hintCommand = null;
         this.resultTimer = null;
         this.toastTimer = null;
         this.dialogKey = null;
@@ -97,6 +98,7 @@ export default class UI {
             this.showTitle();
         });
         ['#open-help-title', '#open-help-game'].forEach(id => $(id).addEventListener('click', () => $('#help').showModal()));
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#last-log').addEventListener('click', () => this.openLog());
         document.querySelectorAll('dialog .close').forEach(btn => btn.addEventListener('click', () => btn.closest('dialog').close()));
         document.querySelectorAll('dialog').forEach(d => d.addEventListener('click', (event) => {
@@ -180,6 +182,7 @@ export default class UI {
         this.lastSeq = this.controller.game.eventSeq;
         this.sel = null;
         this.selKey = null;
+        this.hintCommand = null;
         this.dialogKey = null;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
@@ -199,6 +202,8 @@ export default class UI {
         if (key !== this.selKey) {
             this.selKey = key;
             this.sel = this.freshSelection();
+            // 手順が変わったら、ヒントは今の手順のおすすめに出し直す（自分の番でなければ消す）
+            if (this.hintCommand) this.hintCommand = this.controller.hint();
         }
         this.handleEvents();
         this.render();
@@ -339,6 +344,7 @@ export default class UI {
         row.innerHTML = sections.join('');
         row.classList.toggle('five', sections.length === 5);
         row.querySelectorAll('.sec').forEach(b => b.addEventListener('click', () => this.send({ type: 'section', index: Number(b.dataset.index) })));
+        if (this.hintCommand?.type === 'section') row.querySelector(`.sec[data-index="${this.hintCommand.index}"]`)?.classList.add('recommended');
     }
 
     // ---- パネル（今の手順の選択） ----
@@ -680,6 +686,13 @@ export default class UI {
                 if (this.sel.hex !== null) marks.chosen.add(this.sel.hex);
             }
         }
+        // ヒント：まだ何も選んでいなければ、おすすめの手の場所を選んだ印で見せる
+        const h = this.hintCommand;
+        if (h && marks.chosen.size === 0) {
+            (h.moves ?? []).forEach(m => marks.chosen.add(m.to));
+            (h.hexes ?? []).forEach(x => marks.chosen.add(x));
+            if (h.hex !== undefined && h.hex !== null) marks.chosen.add(h.hex);
+        }
         this.board.render(state, marks);
     }
 
@@ -687,7 +700,39 @@ export default class UI {
 
     send(command) {
         if (!this.controller) return;
+        this.hintCommand = null;
         this.controller.send(command);
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、区画と地図の印・文で知らせる（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        this.render();
+        this.toast(`おすすめ：${this.hintText(command)}`);
+    }
+
+    hintText(c) {
+        const res = (r) => Object.entries(r ?? {}).filter(([, n]) => n > 0).map(([k, n]) => `${RESOURCE_NAMES[k]}${n}`).join('・');
+        switch (c.type) {
+            case 'section': return '金の枠の区画を選ぶ';
+            case 'skip': return 'とばす';
+            case 'gain': return '金をもらう';
+            case 'move': return `移動（${c.moves.length}体。行き先に印）`;
+            case 'factoryMove': return `工場カードで移動（${c.moves.length}体）`;
+            case 'produce': return `生産（${c.hexes.length}か所。印の場所）`;
+            case 'trade': return c.mode === 'popularity' ? '取引で人気を上げる' : `取引で${res(c.res)}をもらう`;
+            case 'bolster': return c.choice === 'power' ? '増強で力を上げる' : '増強でカードをもらう';
+            case 'factoryTop': return '工場カードの上段を行う';
+            case 'upgrade': case 'deploy': case 'build': case 'enlist': return `${BOTTOM_INFO[c.type].name}${c.hex !== undefined ? '（印の場所）' : ''}`;
+            case 'combat': return `力${c.power}${c.cards.length ? `＋戦闘カード${c.cards.join('・')}` : ''}で戦う`;
+            case 'encounter': return `選択肢${c.options.map(i => i + 1).join('と')}`;
+            case 'factory': return '工場カードを選ぶ';
+            default: return '';
+        }
     }
 
     // ---- ダイアログ（戦闘・遭遇・工場） ----

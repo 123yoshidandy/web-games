@@ -9,5 +9,11 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Agricola",
+    "genres": [
+      "ボードゲーム"
+    ]
   }
 }

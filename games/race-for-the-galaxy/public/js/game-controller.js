@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuSeatsToAct } from './cpu-player.js';
+import { runCpuStep, cpuSeatsToAct, suggest } from './cpu-player.js';
 
 export const CPU_STEP_DELAY_MS = 350;
 const STALL_LIMIT = 3;
@@ -24,6 +24,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.stalls = 0;
         this.scheduleCpu();
+    }
+
+    // ヒント：人の番なら、おすすめの手（操作）を返す。状態は変えない
+    suggest() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

@@ -7,7 +7,16 @@ const CACHE = 'lucky-numbers-v1';
 // 同じサイトにほかのゲームも並ぶので、消すのはこのゲームの古い版のキャッシュだけにする
 const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
-const PRECACHE = ['./', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png'];
+// 初めて開いたあとすぐオフラインになっても遊べるよう、画面に要るファイルはすべて先読みする
+const PRECACHE = [
+    './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png',
+    'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
+    'css/style.css',
+    'js/main.js', 'js/ui.js', 'js/game.js', 'js/game-view.js', 'js/game-controller.js',
+    'js/cpu-player.js', 'js/cpu-level.js', 'js/random.js', 'js/tiles.js', 'js/tile-motion.js', 'js/sound.js',
+    'js/online-controller.js', 'js/online-config.js',
+    'js/netplay/netplay-client.mjs', 'js/netplay/netplay-client.js'
+];
 
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));

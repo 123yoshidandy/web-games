@@ -53,6 +53,8 @@
 node scripts/cpu-match.mjs 400 normal strong
 ```
 
+自分の欄の電球（ヒント）を押すと、揺れのほとんどない CPU が選ぶ手を、そのまま選んだ状態にする（操作の欄のボタンが光り、押せば打てる）。CPU と同じく、自分のビューだけで決める。
+
 ## 開発
 
 素の HTML / CSS / JavaScript（ES Modules）で、ビルドはない。

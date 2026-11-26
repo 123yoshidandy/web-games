@@ -9,5 +9,14 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Star Realms",
+    "genres": [
+      "カードゲーム"
+    ],
+    "players": [
+      2
+    ]
   }
 }

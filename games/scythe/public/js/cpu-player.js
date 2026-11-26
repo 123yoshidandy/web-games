@@ -477,6 +477,12 @@ export function decide(game, seat, prof = PROFILES.normal) {
 }
 
 // 1手進める。進めたら true。決めた手が断られたら、いちばん単純な手で抜ける
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断（自分から見える情報だけ）。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.phase !== 'play' || !game.actors().includes(seat)) return null;
+    return decide(game, seat, PROFILES.normal);
+}
+
 export function runCpuStep(game, seat, prof = PROFILES.normal) {
     const command = decide(game, seat, prof);
     if (command && game.applyCommand(seat, command)) return true;

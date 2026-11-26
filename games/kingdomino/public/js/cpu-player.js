@@ -170,3 +170,10 @@ export function runCpuStep(game, style = CPU_STYLES.normal) {
     const [first] = game.getLegalPlacements();
     return game.applyCommand(seat, first ? { type: 'place', ...first } : { type: 'discard' });
 }
+
+// ヒント：人の番に、CPU（見落としもぶれもない強さ）が選ぶ手を返す。見るのは公開の情報だけ（山の並びは見ない）
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || game.currentSeat !== seat) return null;
+    return chooseCommand(game, seat, CPU_STYLES.strong);
+}

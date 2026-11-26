@@ -23,9 +23,9 @@ const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&am
 function loadSettings() {
     try {
         const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
-        return { length: saved.length === 'south' ? 'south' : 'east', calls: saved.calls !== false };
+        return { length: saved.length === 'south' ? 'south' : 'east', level: saved.level === 'easy' ? 'easy' : 'normal', calls: saved.calls !== false };
     } catch {
-        return { length: 'east', calls: true };
+        return { length: 'east', level: 'normal', calls: true };
     }
 }
 
@@ -63,6 +63,13 @@ export default class UI {
             saveSettings(this.settings);
             this.renderSetup();
         });
+        $('level').addEventListener('click', event => {
+            const button = event.target.closest('button[data-level]');
+            if (!button) return;
+            this.settings.level = button.dataset.level;
+            saveSettings(this.settings);
+            this.renderSetup();
+        });
         $('start').addEventListener('click', () => this.startGame(null));
         $('resume').addEventListener('click', () => {
             const saved = loadSavedGame();
@@ -87,6 +94,7 @@ export default class UI {
         });
         $('actions').addEventListener('click', event => {
             const button = event.target.closest('button[data-act]');
+            if (button?.dataset.act === 'hint') return this.showHint();
             if (button) this.onAction(button.dataset.act, button.dataset.arg);
         });
         $('result-buttons').addEventListener('click', event => {
@@ -112,6 +120,9 @@ export default class UI {
         document.querySelectorAll('#length button').forEach(button => {
             button.setAttribute('aria-checked', String(button.dataset.length === this.settings.length));
         });
+        document.querySelectorAll('#level button').forEach(button => {
+            button.setAttribute('aria-checked', String(button.dataset.level === this.settings.level));
+        });
         $('resume').hidden = !loadSavedGame();
     }
 
@@ -127,7 +138,7 @@ export default class UI {
         if (!saved) clearSavedGame();
         const setup = saved ?? {
             players: NAMES.map((name, i) => ({ name, isCPU: i !== 0 })),
-            options: { length: this.settings.length }
+            options: { length: this.settings.length, level: this.settings.level }
         };
         try {
             this.controller = new LocalGameController(setup, {
@@ -140,7 +151,7 @@ export default class UI {
             clearSavedGame();
             this.controller = new LocalGameController({
                 players: NAMES.map((name, i) => ({ name, isCPU: i !== 0 })),
-                options: { length: this.settings.length }
+                options: { length: this.settings.length, level: this.settings.level }
             }, { onUpdate: () => this.render(), onError: (message) => this.toast(message) });
         }
         this.selected = null;
@@ -179,6 +190,36 @@ export default class UI {
         el.classList.add('show');
         clearTimeout(this.timers.toast);
         this.timers.toast = setTimeout(() => el.classList.remove('show'), 1800);
+    }
+
+    // ---- ヒント ----
+
+    hintKey(view) {
+        return `${view.handNo}:${view.wallCount}:${view.options?.type}:${view.call?.tile ?? ''}`;
+    }
+
+    // おすすめの手を示す。捨てる牌は選んでおき（もう一度押すと捨てる）、リーチは宣言牌を選んでおく。ほかはボタンを光らせる
+    showHint() {
+        const view = this.view;
+        const command = this.controller?.suggest();
+        if (!view || !command) return;
+        this.hint = { at: this.hintKey(view), command };
+        if (command.type === 'discard') {
+            this.riichiMode = !!command.riichi;
+            this.selected = command.tile;
+        }
+        this.render();
+    }
+
+    markHint(view) {
+        if (this.hint?.at !== this.hintKey(view)) this.hint = null;
+        const c = this.hint?.command;
+        if (!c) return;
+        const mark = (selector) => document.querySelector(selector)?.classList.add('suggested');
+        if (c.type === 'discard') mark(`#hand [data-id="${c.tile}"]`);
+        else if (c.type === 'kan') mark(`#actions [data-act="kan"][data-arg="${c.kind}"]`);
+        else if (c.type === 'pon') mark('#actions [data-act="pon"]');
+        else mark(`#actions [data-act="${c.type}"]`);
     }
 
     // ---- 操作 ----
@@ -401,7 +442,10 @@ export default class UI {
                 rows.push(button('pass', 'スキップ', 'skip'));
             }
         }
+        // 打牌と鳴きの場面には、ヒントのボタンを出す
+        if (!this.chiOpen && !this.riichiMode) rows.unshift('<button type="button" id="hint" class="act hint-button" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>');
         el.innerHTML = rows.length ? `${prompt}<div class="action-row">${rows.join('')}</div>` : '';
+        this.markHint(view);
     }
 
     renderBubbles(view) {

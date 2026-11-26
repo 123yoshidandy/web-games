@@ -170,7 +170,9 @@ function placeBlock(startRow, startCol, block) {
     // 操作できないようにする（念のため）
     blockElement.style.pointerEvents = 'none';
 
-    playSound('place');
+    // 続きからで置き直すときは、音を鳴らさない
+    if (!restoringSave) playSound('place');
+    saveProgress();
 }
 
 // 配置済みのブロックを盤面から外し、置き場に戻す
@@ -199,6 +201,7 @@ function removeBlock(blockIndex) {
     blockElement.style.pointerEvents = '';
 
     playSound('remove');
+    saveProgress();
 }
 
 // 盤面に置いたピースの絵（ピース1つを1つの SVG にして、マスの上に重ねる）
@@ -334,6 +337,9 @@ function checkBoardCompletion() {
             onChallengePuzzleSolved();
             return;
         }
+
+        // 解けた問題は続きからに残さない
+        clearSavedProgress();
 
         // クリア回数をカウントアップ
         gameState.clearedCount++;

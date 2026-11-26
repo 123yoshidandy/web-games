@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- 赤いパネル（js/panel-art.js の描き方と同じ寸法・色） -->
+  <defs>
+    <clipPath id="slab"><rect width="64" height="64" rx="5.12"/></clipPath>
+    <linearGradient id="face" x1="0" y1="5.12" x2="0" y2="58.88" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c1202f"/>
+      <stop offset="0.5" stop-color="#b3101f"/>
+      <stop offset="1" stop-color="#9d0c1a"/>
+    </linearGradient>
+    <linearGradient id="gloss" x1="7.04" y1="7.04" x2="36.99" y2="36.99" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.55"/>
+      <stop offset="0.45" stop-color="#fff" stop-opacity="0.1"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <path id="heart" d="M32 53.22C0.8 33.25 12.03 5.79 32 22.02C51.97 5.79 63.2 33.25 32 53.22Z"/>
+    <clipPath id="heart-clip"><use href="#heart"/></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="5.12" fill="#5c0009"/>
+  <rect width="58.88" height="58.88" fill="#ff6b78" clip-path="url(#slab)"/>
+  <rect x="5.12" y="5.12" width="53.76" height="53.76" rx="3.07" fill="url(#face)"/>
+  <use href="#heart" fill="#ff2a3c" stroke="#5c0009" stroke-width="3.2" stroke-linejoin="round" paint-order="stroke fill"/>
+  <rect width="64" height="64" fill="url(#gloss)" clip-path="url(#heart-clip)"/>
+</svg>

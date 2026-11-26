@@ -205,6 +205,12 @@ export function chooseCommand(game, seat = game.current, profile = profileOf(gam
 }
 
 // CPU に1手打たせる。思わぬ理由で断られたら、いちばん単純な手で進める
+// 人の席のおすすめの手（ヒント）。CPU（ふつう）と同じ判断（見える情報だけ）。画面に出すだけで、記録には入れない
+export function suggest(game, seat) {
+    if (game.phase !== 'play' || game.current !== seat) return null;
+    return chooseCommand(game, seat, PROFILES.normal);
+}
+
 export function runCpuStep(game, seat = game.current, profile = profileOf(game, seat)) {
     if (game.phase !== 'play' || game.current !== seat) return false;
     const command = chooseCommand(game, seat, profile);

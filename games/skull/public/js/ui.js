@@ -96,6 +96,7 @@ export default class UI {
     send(command) {
         // 受け付けられたら、コントローラーが描き直す（ここでもう一度描くと、めくる動きが消える）
         if (this.controller) this.bidding = null;
+        this.hintCommand = null;
         const ok = this.controller?.send(command);
         if (!ok) this.render();
         return ok;
@@ -126,6 +127,7 @@ export default class UI {
         $('#again').addEventListener('click', () => this.newGame());
         $('#result-home').addEventListener('click', () => this.showTitle());
         $('#home').addEventListener('click', () => this.showTitle());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         // 遊び方・記録を開いている間は、CPU を止める
         $('#open-help-game').addEventListener('click', () => {
@@ -205,6 +207,47 @@ export default class UI {
         return view.phase === phase && view.current === view.seat;
     }
 
+    // ---- ヒント ----
+
+    // おすすめの手を、札・山・ボタンに印を付けて知らせる（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        if (command.type === 'challenge' || command.type === 'raise') this.bidding = command.bid;
+        this.render();
+        const name = (seat) => (seat === this.view.seat ? '自分' : this.view.players[seat].name);
+        const disc = (d) => (d === SKULL ? 'ドクロ' : '花');
+        const text = {
+            place: () => `${disc(command.disc)}を伏せる`,
+            challenge: () => `${command.bid}枚で挑戦する`,
+            raise: () => `${command.bid}枚に上げる`,
+            pass: () => 'パスする',
+            flip: () => `${name(command.target)}の山をめくる`,
+            lose: () => `${disc(command.disc)}を手放す`
+        }[command.type]?.() ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        if (!this.myTurn(this.view.phase)) {
+            this.hintCommand = null;
+            return;
+        }
+        const list = {
+            place: [`#me [data-disc="${c.disc}"]`],
+            challenge: ['#actions [data-act="challenge"]', '#actions [data-act="open-bid"]'],
+            raise: ['#actions [data-act="raise"]'],
+            pass: ['#actions [data-act="pass"]'],
+            flip: [c.target === this.view.seat ? '#actions [data-act="flip-own"]' : `#opponents .mat[data-seat="${c.target}"]`],
+            lose: [`#actions [data-act="lose"][data-disc="${c.disc}"]`]
+        }[c.type] ?? [];
+        // 同じ札が並ぶので、印はそれぞれ最初の1つにだけ付ける
+        list.forEach(s => document.querySelector(s)?.classList.add('recommended'));
+    }
+
     flip(target) {
         if (!this.myTurn('reveal')) return;
         const me = this.view.players[this.view.seat];
@@ -252,6 +295,7 @@ export default class UI {
         this.renderCenter(fresh);
         this.renderMe();
         this.renderActions();
+        this.markHint();
         this.animate(fresh);
         if (view.phase === 'end' && !$('#result').open) setTimeout(() => this.showResult(), 1600);
     }

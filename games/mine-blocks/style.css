@@ -74,6 +74,9 @@ body {
     color: var(--text);
     line-height: 1.6;
     min-height: 100vh;
+    min-height: 100dvh; /* スマホのアドレスバーの分を除いた高さ（対応しないブラウザは上の 100vh） */
+    /* 横向きのノッチやホームバーに、盤面とボタンが掛からないようにする（viewport-fit=cover のとき） */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     -webkit-tap-highlight-color: transparent;
 }
 
@@ -1414,7 +1417,7 @@ button:focus-visible {
 .toast {
     position: fixed;
     left: 50%;
-    bottom: 24px;
+    bottom: calc(24px + env(safe-area-inset-bottom));
     z-index: 1200;
     transform: translateX(-50%);
     max-width: calc(100% - 32px);
@@ -1679,6 +1682,9 @@ body.is-top {
     justify-content: center;
     overflow-y: auto;
     padding: 24px 16px;
+    /* 画面いっぱいに固定するので、body の余白が効かない。safe-area の分は透明な枠で空ける（背景は枠の下まで塗る） */
+    border: solid transparent;
+    border-width: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     background: var(--page-bg);
 }
 
@@ -1847,6 +1853,45 @@ body.is-top {
     opacity: 0.9;
 }
 
+/* エンドレスと続きからを1行に並べる（続きからが隠れているときは、エンドレスが幅いっぱいになる） */
+.top-endless-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.top-endless-row .top-endless {
+    flex: 1;
+    min-width: 0;
+}
+
+.top-resume {
+    --button-color: #7c5cf0;
+    --button-edge: #5b3fc9;
+    flex: none;
+    width: auto;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 8px 14px;
+    text-align: center;
+}
+
+.top-resume[hidden] {
+    display: none;
+}
+
+.top-resume svg {
+    width: 24px;
+    height: 24px;
+    fill: currentColor;
+}
+
+.top-resume .top-button-label {
+    font-size: 1rem;
+    white-space: nowrap;
+}
+
 .top-challenge {
     --button-color: #f08c1a;
     --button-edge: #c56a06;
@@ -1901,6 +1946,42 @@ body.is-top {
     fill: currentColor;
 }
 
+/* ゲーム一覧へのリンク（トップ画面だけに置く。見た目は「ご意見・不具合の報告」にそろえる） */
+/* 360px 幅の画面でも、丸いボタン2つと1行に収まるように詰める */
+.top-links {
+    align-items: center;
+    gap: 8px;
+}
+
+.top-portal {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 2px;
+    color: var(--on-page-sub);
+    font-size: 0.8rem;
+    font-weight: 700;
+    white-space: nowrap;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.top-portal:hover {
+    color: var(--on-page);
+}
+
+.portal-link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link {
+        display: none;
+    }
+}
+
 .top-share.copied {
     color: #6ee7b7;
 }
@@ -1923,20 +2004,24 @@ body.is-top {
 /* 背の低い画面では、絵と余白を小さくして1画面に収める */
 @media (max-height: 740px) {
     .top-hero {
-        --hero-cell: 44px;
+        --hero-cell: 40px;
     }
 
     .top-title {
-        margin-top: 18px;
+        margin-top: 14px;
         font-size: 2.2rem;
     }
 
     .top-catch {
-        margin: 8px 0 18px;
+        margin: 6px 0 14px;
     }
 
     .top-menu {
-        gap: 12px;
+        gap: 10px;
+    }
+
+    .top-sound {
+        margin-top: 12px;
     }
 
     .top-button {

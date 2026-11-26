@@ -9,5 +9,15 @@
   },
   "devDependencies": {
     "test-kit": "*"
+  },
+  "portal": {
+    "original": "Shogi",
+    "aliases": [
+      "しょうぎ"
+    ],
+    "genres": [
+      "アブストラクト",
+      "伝統ゲーム"
+    ]
   }
 }

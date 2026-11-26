@@ -118,6 +118,7 @@ export default class UI {
         $('#again').addEventListener('click', () => this.newGame());
         $('#result-home').addEventListener('click', () => this.showTitle());
         $('#home').addEventListener('click', () => this.showTitle());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
 
@@ -134,6 +135,7 @@ export default class UI {
         $('#actions').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled || !this.myTurn()) return;
+            this.hint = null;
             this.controller?.send({ type: button.dataset.act });
         });
 
@@ -256,8 +258,17 @@ export default class UI {
 
     // ---- 描く ----
 
+    // おすすめの手（ノーサンキューか取るか）のボタンを光らせる
+    showHint() {
+        if (!this.myTurn()) return;
+        this.hint = this.controller?.suggest()?.type ?? null;
+        this.renderActions();
+    }
+
     render() {
         if (!this.view) return;
+        if (!this.myTurn()) this.hint = null;
+        $('#hint').disabled = !this.myTurn();
         this.renderTop();
         this.renderPlayers();
         this.renderStage();
@@ -346,6 +357,7 @@ export default class UI {
             html = `<span class="act-label muted">${escapeHtml(view.players[view.turn].name)}の番</span>`;
         }
         $('#actions').innerHTML = html;
+        if (this.hint) $(`#actions [data-act="${this.hint}"]`)?.classList.add('suggested');
     }
 
     // ---- 結果 ----

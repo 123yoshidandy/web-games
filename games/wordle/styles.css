@@ -171,6 +171,119 @@ body.in-room .solo-only {
     display: none !important;
 }
 
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+/* ===== タイトル画面 ===== */
+
+.title-screen {
+    height: 100vh;
+    height: 100dvh;
+    max-width: 500px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    padding: max(6px, env(safe-area-inset-top)) 16px max(10px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+}
+
+.title-top .icon-button {
+    width: 44px;
+    height: 44px;
+}
+
+.title-top {
+    flex: none;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+.title-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding-bottom: 20px;
+}
+
+.title-art {
+    display: flex;
+    gap: 6px;
+}
+
+.title-tile {
+    width: 46px;
+    height: 46px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 800;
+}
+
+.title-tile.correct { background: var(--correct); box-shadow: 0 3px 0 var(--correct-edge); }
+.title-tile.present { background: var(--present); box-shadow: 0 3px 0 var(--present-edge); }
+.title-tile.absent { background: var(--absent); box-shadow: 0 3px 0 var(--absent-edge); }
+
+.title-name {
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.1;
+}
+
+.title-sub {
+    margin-top: -8px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.title-mode .mode-button {
+    height: 40px;
+    font-size: 15px;
+}
+
+.title-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(100%, 280px);
+}
+
+.title-button {
+    min-height: 48px;
+    font-size: 17px;
+}
+
+.title-row {
+    display: flex;
+    gap: 10px;
+}
+
+.title-row > * {
+    flex: 1;
+    justify-content: center;
+    min-height: 44px;
+}
+
+/* 横持ちのスマホ（高さが低い）では、絵と名前を小さくする */
+@media (max-height: 500px) {
+    .title-main { gap: 8px; padding-bottom: 0; }
+    .title-tile { width: 32px; height: 32px; font-size: 17px; }
+    .title-name { font-size: 28px; }
+    .title-sub { display: none; }
+    .title-button { min-height: 44px; }
+}
+
 /* ヘッダーの下：1人プレイではモード、対戦中は相手の進み具合 */
 .subbar {
     flex: none;
@@ -178,6 +291,12 @@ body.in-room .solo-only {
     display: flex;
     align-items: center;
     justify-content: center;
+}
+
+.mode-label {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 700;
 }
 
 .mode-toggle {
@@ -615,6 +734,31 @@ body.in-room .solo-only {
     font-size: 13px;
 }
 
+/* ゲーム一覧へのリンク。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
+.portal-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.portal-link:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+@media (display-mode: standalone), (display-mode: fullscreen) {
+    .portal-link {
+        display: none;
+    }
+}
+
 /* 部屋の画面 */
 #online-entry {
     display: flex;
@@ -779,3 +923,8 @@ body.in-room .solo-only {
         animation: none;
     }
 }
+
+/* BGM の ON/OFF（js/music.js） */
+.bgm-toggle[aria-pressed="false"] { opacity: .5; }
+.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
+.bgm-toggle svg { fill: none; stroke: currentColor; }

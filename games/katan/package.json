@@ -7,9 +7,24 @@
     "test:watch": "vitest",
     "build:server": "esbuild server/src/handler.js --bundle --platform=node --format=esm --target=node22 --external:@aws-sdk/* --outfile=server/dist/handler.mjs",
     "dev:server": "node server/dev-server.js",
-    "deploy:server": "npm run build:server && cd server && sam deploy"
+    "deploy:server": "npm run build:server && cd server && sam deploy",
+    "cpu-match": "node scripts/cpu-match.mjs"
   },
   "dependencies": {
     "netplay-kit": "*"
+  },
+  "portal": {
+    "original": "Catan",
+    "aliases": [
+      "かたん"
+    ],
+    "genres": [
+      "ボードゲーム"
+    ]
+  },
+  "standards": {
+    "skip": {
+      "undo": "サイコロ・発展カードの山札・奪うカードの乱数と、相手の手札という隠れた情報があり、戻すと有利になる"
+    }
   }
 }

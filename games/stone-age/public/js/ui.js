@@ -139,6 +139,7 @@ export default class UI {
     }
 
     send(command) {
+        this.hintCommand = null;
         if (!this.controller) return false;
         return this.controller.send(command);
     }
@@ -168,6 +169,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => this.showLog());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（終わりの画面は、外側では閉じない）
@@ -299,6 +301,8 @@ export default class UI {
         this.renderMe(v);
         this.syncDecide(v);
         this.renderActions(v);
+        if (!this.myTurn()) this.hintCommand = null;
+        this.markHint();
         if ($('#log').open) this.renderLog();
         this.scheduleAuto(v);
         if (v.phase === 'end' && !$('#result').open && !this.resultTimer) {
@@ -695,6 +699,38 @@ export default class UI {
 
     renderLog() {
         $('#log-list').innerHTML = this.view.logs.slice(-200).map(text => `<li>${escapeHtml(text)}</li>`).join('');
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、場所を選んだ状態にして、押すボタンに印を付ける（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        const v = this.view;
+        if (command.type === 'place') this.sel = { place: command.place, count: command.count };
+        if (command.type === 'resolve') this.sel = { place: command.place, count: v.placed[v.you][command.place] };
+        this.render();
+        const res = (pay) => Object.entries(pay ?? {}).filter(([, n]) => n > 0).map(([r, n]) => `${RESOURCE_NAME[r]}${n}`).join('・');
+        const used = (command.tools?.length ?? 0) + (command.oneUse?.length ?? 0);
+        const text = {
+            place: () => `${this.placeDesc(v, command.place).split('：')[0]}に${command.count}人置く`,
+            resolve: () => `${this.placeDesc(v, command.place).split('：')[0]}を使う`,
+            tools: () => (used ? `道具を${used}つ使う` : '道具を使わない'),
+            pay: () => `${res(command.pay)}を払う`,
+            decline: () => '払わずに見送る',
+            pickDie: () => `目が${v.pending?.dice?.[command.die] ?? ''}のサイコロを取る`,
+            feed: () => (res(command.pay) ? `食料の代わりに${res(command.pay)}を払う` : '食べさせる')
+        }[command.type]?.() ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const act = { place: 'place', resolve: 'resolve' }[c.type] ?? 'decide';
+        document.querySelector(`#actions [data-act="${act}"]`)?.classList.add('recommended');
     }
 
     toast(message) {

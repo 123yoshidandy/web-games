@@ -64,6 +64,7 @@ export default class UI {
         this.controller = null;
         this.view = null;
         this.selDie = null;         // 選んだプールのダイス
+        this.hintCommand = null;    // ヒントのおすすめの手（画面だけ）
         this.choice = null;         // 窓を選ぶ画面で選んだ窓
         this.tool = null;           // 道具の手順 { id, steps, k, data }
         this.selKey = null;
@@ -187,6 +188,7 @@ export default class UI {
             }
         });
         $('#actions').addEventListener('click', (event) => this.onAction(event));
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#prompt').addEventListener('click', (event) => this.onAction(event));
         $('#cards-body').addEventListener('click', (event) => {
             const b = event.target.closest('button[data-tool]');
@@ -223,6 +225,7 @@ export default class UI {
         if (!this.controller) return;
         this.selDie = null;
         this.tool = null;
+        this.hintCommand = null;
         this.controller.send(command);
     }
 
@@ -519,6 +522,9 @@ export default class UI {
         if (key !== this.selKey) {
             this.selKey = key;
             this.selDie = null;
+            // 場面が変わっても自分の番が続くなら、ヒントは今の場面のおすすめに出し直す
+            if (this.hintCommand) this.hintCommand = this.controller.hint();
+            if (this.hintCommand?.type === 'draft') this.selDie = this.hintCommand.die;
             if (this.tool && !this.myTurn()) this.tool = null;
         }
         $('#round').textContent = view.phase === 'choose' ? '窓を選ぶ' : (view.phase === 'end' ? '終わり' : `ラウンド ${view.round}/${ROUNDS}`);
@@ -529,6 +535,7 @@ export default class UI {
         this.renderPool(view);
         this.renderMine(view);
         this.renderActions(view);
+        this.markHint();
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !this.resultShown && !this.resultTimer) {
             this.resultTimer = setTimeout(() => {
@@ -740,6 +747,42 @@ export default class UI {
 
     renderLog() {
         $('#log-list').innerHTML = this.view.logs.slice(-200).map(text => `<li>${escapeHtml(text)}</li>`).join('');
+    }
+
+    // ---- ヒント ----
+
+    // おすすめの手を、選んだ状態にして印を付ける（画面だけ。記録には入れず、自分が動いたら消す）
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        this.tool = null;
+        if (command.type === 'choose') this.choice = command.pattern;
+        if (command.type === 'draft') this.selDie = command.die;
+        this.render();
+        const text = {
+            choose: () => 'この窓にする',
+            draft: () => 'このダイスを光るマスに置く',
+            place: () => (command.cell === null ? 'ダイスを戻す' : '光るマスに置く'),
+            fluxValue: () => `目を${command.value}にする`,
+            tool: () => `道具「${TOOLS[command.tool].name}」を使う`,
+            end: () => '番を終える'
+        }[command.type]?.() ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const selectors = {
+            choose: [`[data-pattern="${c.pattern}"]`, '[data-act="choose"]'],
+            draft: [`.my .cell[data-cell="${c.cell}"]`],
+            place: [c.cell === null ? '[data-act="return-die"]' : `.my .cell[data-cell="${c.cell}"]`],
+            fluxValue: [`[data-act="flux-value"][data-value="${c.value}"]`],
+            tool: ['[data-act="cards"]'],
+            end: ['[data-act="end"]']
+        }[c.type] ?? [];
+        selectors.forEach(s => document.querySelectorAll(s).forEach(el => el.classList.add('recommended')));
     }
 
     toast(message) {
