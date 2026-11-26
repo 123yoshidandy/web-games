@@ -154,7 +154,7 @@ button {
 .subtitle { margin: -10px 0 6px; color: var(--muted); font-size: 14px; letter-spacing: .3em; }
 .setup { display: flex; flex-direction: column; align-items: stretch; gap: 10px; width: max-content; }
 .setup .row { display: grid; grid-template-columns: 3em auto; justify-content: start; align-items: center; gap: 10px; font-weight: 800; }
-.setup .buttons { display: flex; justify-content: center; gap: 12px; margin-top: 6px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; justify-content: center; gap: 12px; margin-top: 6px; }
 .setup .link { align-self: center; }
 
 /* ---- ゲーム画面 ---- */

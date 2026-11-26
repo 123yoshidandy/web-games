@@ -9,7 +9,8 @@ const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const PRECACHE = [
     './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'css/style.css',
     'js/art.js', 'js/board.js', 'js/cpu-player.js', 'js/data.js', 'js/game-controller.js', 'js/game-view.js', 'js/game.js', 'js/main.js', 'js/random.js', 'js/scoring.js', 'js/ui.js',
-    'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js'
+    'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js',
+    'js/online-config.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/netplay-lobby.js'
 ];
 
 self.addEventListener('install', event => {

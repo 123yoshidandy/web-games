@@ -13,6 +13,8 @@ import { BORDER, GOAL_CELLS, OPEN_CELLS, CELL_COUNT, cellCenter } from './board.
 import { patchAt, awardsFor, scorePlayer, goalResult } from './scoring.js';
 import { colorName, patternName, tileName } from './game.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 import { symbolsSvg, patchSvg, tileSvg, goalSvg, goalTileSvg, catSvg, buttonSvg, patternSwatch, colorSwatch, hexPoints, COLOR_INFO } from './art.js';
 
 const SETTINGS_KEY = 'calico.settings';
@@ -88,6 +90,23 @@ export default class UI {
         this.resultTimer = null;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'キャリコ',
+            game: 'calico',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 1100,
+            minPlayers: 2,
+            maxPlayers: 4,
+            settings: [],
+            onStart: (controller) => this.begin(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => this.showTitle()
+        });
         this.renderTitleArt();
         this.renderHelp();
     }
@@ -99,13 +118,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -119,6 +139,13 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.begin(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    begin(controller) {
+        if (this.controller !== controller) this.stopGame();
+        this.controller = controller;
         this.view = null;
         this.clearSelection();
         $('#screen-title').hidden = true;
@@ -128,7 +155,7 @@ export default class UI {
         this.lastSeq = view.events.at(-1)?.seq ?? 0;
         this.render();
         if (view.phase === 'end') this.showResult();
-        this.controller.scheduleCpu();
+        if (!controller.isOnline) controller.scheduleCpu();
     }
 
     newGame() {
@@ -163,12 +190,17 @@ export default class UI {
         segment('#cpu-level', 'data-level', (v) => { this.settings.level = v; });
         segment('#setup-mode', 'data-setup', (v) => { this.settings.setup = v; });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#home').addEventListener('click', () => this.showTitle());
-        $('#again').addEventListener('click', () => this.newGame());
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle())); // オンラインは確かめてから部屋を出る
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            document.querySelectorAll('dialog[open]').forEach(d => d.close());
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
         $('#result-close').addEventListener('click', () => $('#result').close());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
@@ -263,6 +295,7 @@ export default class UI {
         const view = this.controller.getView();
         const prev = this.view;
         this.view = view;
+        $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         this.fresh = new Set();
         this.playSounds(view, view.events.filter(e => e.seq > this.lastSeq));
         view.events.filter(e => e.seq > this.lastSeq).forEach(e => {
