@@ -128,6 +128,16 @@ node scripts/cpu-match.mjs 200 easy,normal,easy
 
 人数が多いほど、ふつうとやさしいの差は小さい。同点で複数が勝った試合は、勝ちを等分して数えた。どの組み合わせでも、止まった試合はない。1試合は 9〜14 巡ほど。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜6人で、足りない席は CPU で埋められる。地図（ドイツ・アメリカ）を部屋の設定に持つ。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'power-grid' })`。web-games の1つのスタックから `?game=power-grid` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -150,7 +160,8 @@ npm test
 | `public/js/map-view.js` | 地図の描画（SVG）と、拡大・移動・タップ |
 | `public/js/ui.js`・`art.js`・`help.js` | 画面・絵・遊び方 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（オフラインでも開ける） |
-| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と勝率・平均の送電 |
 
 テスト（`test/`）：
@@ -163,6 +174,3 @@ npm test
 
 オフラインでの起動は、ヘッドレス Chrome で、Service Worker の側でネットワークを止めて再読み込みし、ゲームが始められることで確かめた（自動テストには入れていない）。
 
-### オンライン対戦を入れるとき
-
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。地図は部屋の設定（`options.map`）で選ぶ。端末から届いた操作は `sanitize` で種類ごとの項目だけを取り出してから `applyCommand` に渡す。

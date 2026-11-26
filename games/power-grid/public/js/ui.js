@@ -12,6 +12,9 @@ import MapView from './map-view.js';
 import { symbolsSvg, plantHtml, resIcon, PLAYER_COLORS } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 
 // 自分の操作の音
 const COMMAND_SOUND = { choose: 'place', bid: 'place', skip: 'select', pass: 'select', discard: 'pay', buy: 'pay', build: 'place', done: 'select' };
@@ -60,6 +63,23 @@ export default class UI {
         $('#title-art').innerHTML = titleArtHtml();
         $('#help-body').innerHTML = helpHtml();
         this.map = new MapView($('#map'), { onPick: (city) => this.pickCity(city) });
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
+        this.online = new NetplayLobby({
+            title: '電力会社',
+            game: 'power-grid',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 450,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [{ key: 'map', label: '地図', options: [{ value: 'germany', label: 'ドイツ' }, { value: 'usa', label: 'アメリカ' }] }],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.onControllerUpdate(),
+            onError: (message) => this.onControllerError(message),
+            onExit: () => {
+                this.stopGame();
+                this.showTitle();
+            }
+        });
         this.bindStatic();
     }
 
@@ -70,22 +90,16 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
-                onUpdate: () => {
-                    const previous = this.view;
-                    this.render();
-                    this.playUpdateSound(previous);
-                },
-                onError: (message) => {
-                    music.play('error');
-                    this.toast(message);
-                }
+            controller = new LocalGameController(setup, {
+                onUpdate: () => this.onControllerUpdate(),
+                onError: (message) => this.onControllerError(message)
             });
         } catch (error) {
             console.error(error);
@@ -93,18 +107,39 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+        controller.scheduleCpu();
+    }
+
+    onControllerUpdate() {
+        const previous = this.view;
+        this.render();
+        this.playUpdateSound(previous);
+    }
+
+    onControllerError(message) {
+        music.play('error');
+        this.toast(message);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        clearTimeout(this.resultTimer);
+        this.resultTimer = null;
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
         this.view = null;
         this.selectedPlant = null;
         this.selectedCity = null;
         this.amountKey = null;
         this.buyKey = null;
-        this.seenCommands = this.controller.game.commands.length;
+        this.seenCommands = this.controller.getView().commandCount;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
         this.map.resize();
         this.map.resetZoom();
-        this.controller.scheduleCpu();
     }
 
     newGame() {
@@ -182,10 +217,19 @@ export default class UI {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#result-home').addEventListener('click', () => this.showTitle());
+        $('#again').addEventListener('click', () => {
+            if (this.controller?.isOnline) {
+                $('#result').close();
+                this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+                return;
+            }
+            this.newGame();
+        });
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#result-board').addEventListener('click', () => $('#result').close());
-        $('#home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
@@ -469,6 +513,7 @@ export default class UI {
         }
         $('#phase').innerHTML = html;
         $('#hint').disabled = !this.myAct(view) || view.phase === 'end';
+        $('#hint').hidden = Boolean(this.controller?.isOnline); // ヒントはローカル対戦だけ
         if (this.hint && this.hint.count === view.commandCount) $(`#phase [data-act="${this.hint.type}"]`)?.classList.add('recommended');
     }
 

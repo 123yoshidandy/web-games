@@ -12,7 +12,7 @@ const ctxFor = (game, seat, command) => {
 };
 
 describe('オンライン対戦のゲームの定義', () => {
-    const create = (map) => definition.create({ players: [{ name: 'A' }, { name: 'B' }, { name: 'C', isCPU: true }], random: createRandom(5), options: { map } });
+    const create = (map) => definition.create({ players: [{ name: 'A' }, { name: 'B' }, { name: 'C', isCPU: true }], random: createRandom(5), settings: { map } });
 
     it('地図を選べ、操作を受け付け、記録から同じ状態を再現できる。余計な項目は記録しない', () => {
         expect(create('usa').mapId).toBe('usa');

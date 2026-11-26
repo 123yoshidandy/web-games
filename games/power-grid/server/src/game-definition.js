@@ -1,7 +1,6 @@
 /**
  * オンライン対戦に差し込むゲームの定義（netplay-kit の「ゲームの定義」の形）
- * 今はオンライン対戦を入れていない。入れるときは、netplay-kit の sync.mjs で部屋の処理（server/netplay/ など）を写し、
- * この定義を createHandler と startDevServer に渡す
+ * server/src/handler.js（AWS）と、web-games の npm run dev:online（手元のテスト用サーバー）が、この定義を使う
  *
  * 部屋には参加者・シード・操作の記録だけを保存し、操作を受けるたびに記録からゲームを再現する
  * 隠すのはビュー（createGameView）の役目：山の並び（段階3のカードの位置）と、準備で伏せて抜いた発電所は見せない
@@ -34,10 +33,16 @@ export default {
     maxPlayers: MAX_PLAYERS,
     allowCpu: true,
 
+    // ロビーの設定：地図（ドイツ・アメリカ）
+    settings: {
+        defaults: () => ({ map: 'germany' }),
+        validate: (patch, current) => ({ map: ['germany', 'usa'].includes(patch?.map) ? patch.map : current.map })
+    },
+
     // シードは、共通部品の乱数から作る（テストでは乱数を固定できる）。部屋の CPU は「ふつう」で打つ
-    create: ({ players, random, options }) => new Game(
+    create: ({ players, random, settings }) => new Game(
         players.map(p => ({ ...p, cpuLevel: p.isCPU ? 'normal' : null })),
-        { seed: Math.floor(random() * 2 ** 32), map: options?.map === 'usa' ? 'usa' : 'germany' }
+        { seed: Math.floor(random() * 2 ** 32), map: settings?.map === 'usa' ? 'usa' : 'germany' }
     ),
 
     persist: (game) => game.persist(),
