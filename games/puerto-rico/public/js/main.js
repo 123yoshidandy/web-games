@@ -3,7 +3,10 @@
  * ゲームの状態はコントローラーのビューだけを見て描く（オンライン対戦のコントローラーに差し替えられるように）
  */
 
-import LocalGameController from './game-controller.js';
+import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { GOODS, GOOD_NAMES, ROLE_NAMES, ROLE_TEXT, BUILDINGS, buildingOf, CITY_SPACES } from './data.js';
 import { barrel, coin, vpIcon, colonistIcon, roleIcon, titleArt, describeEvent, GOOD_COLORS, TILE_NAMES, TILE_SHORT } from './art.js';
 import { arrangeColonists } from './cpu-player.js';
@@ -37,6 +40,25 @@ let ui = freshUi();
 let seenSeq = 0;
 let resultShown = false;
 let sending = false; // 自分の操作を送っている間（その音は送った側で鳴らす）
+
+// オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
+const online = new NetplayLobby({
+    title: 'プエルトリコ',
+    game: 'puerto-rico',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: CPU_STEP_DELAY_MS,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [{ key: 'cpuLevel', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
 let summaryTimer = null;
 
 // ヒント：おすすめの手 { key, command }（その場面の間だけ）
@@ -98,6 +120,7 @@ function renderTitle() {
     document.querySelectorAll('#player-count button').forEach(b => b.setAttribute('aria-checked', String(Number(b.dataset.count) === settings.count)));
     document.querySelectorAll('#cpu-level button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.level === settings.level)));
     $('resume').hidden = !store.load(KEYS.save);
+    $('online-button').hidden = !online.available;
 }
 
 function newSetup() {
@@ -107,16 +130,23 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    controller?.stop();
-    document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    resultShown = false;
+    let next;
     try {
-        controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        next = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
     } catch (error) {
         console.warn(error);
         store.remove(KEYS.save);
-        controller = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        next = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
     }
+    beginGame(next);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    document.querySelectorAll('dialog[open]').forEach(d => d.close());
+    resultShown = false;
+    controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = freshUi();
@@ -126,12 +156,14 @@ function startGame(setup) {
 }
 
 function saveProgress() {
-    if (!controller) return;
+    if (!controller || controller.isOnline) return; // 途中経過を保存するのはローカル対戦だけ
     if (controller.game.isOver()) store.remove(KEYS.save);
     else store.save(KEYS.save, controller.saveData());
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     showScene('title');
@@ -276,7 +308,8 @@ function renderPanel() {
     else if (!mine()) body = `<div class="prompt muted">${d ? `${esc(nameOf(d.seat))}が${{ role: '役割を選んでいます', settle: '農園を選んでいます', mayor: '入植者を並べています', build: '建物を選んでいます', privilege: '品を選んでいます', sell: '売る品を選んでいます', ship: '船に積んでいます', store: 'とっておく品を選んでいます' }[d.kind]}` : ''}</div>`;
     else body = ({ role: roleHtml, settle: settleHtml, mayor: mayorHtml, build: buildHtml, privilege: privilegeHtml, sell: sellHtml, ship: shipHtml, store: storeHtml })[d.kind]();
     // ヒントのボタン（自分が選ぶ番だけ。案内文の右端）
-    if (mine() && view.phase !== 'end') body = body.replace('<div class="prompt">', `<div class="prompt">${HINT_BUTTON}`);
+    // ヒントはローカル対戦だけ
+    if (mine() && view.phase !== 'end' && !controller?.isOnline) body = body.replace('<div class="prompt">', `<div class="prompt">${HINT_BUTTON}`);
     $('panel').innerHTML = feedLine() + body;
     renderHint();
 }
@@ -574,16 +607,19 @@ function setup() {
             render();
         } else showBuilding(b.dataset.build);
     });
-    $('again').addEventListener('click', () => { $('result-dialog').close(); startGame(newSetup()); });
-    $('result-home').addEventListener('click', () => { $('result-dialog').close(); goHome(); });
+    // オンラインは、ロビーを出し、ホストの「もう一度」で再戦する
+    $('again').addEventListener('click', () => { $('result-dialog').close(); if (controller?.isOnline) online.rematch(); else startGame(newSetup()); });
+    $('result-home').addEventListener('click', () => { $('result-dialog').close(); if (controller?.isOnline) online.leave(); else goHome(); });
+    $('online-button').addEventListener('click', () => online.open());
 
     document.addEventListener('gesturestart', e => e.preventDefault());
     document.addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea')) e.preventDefault(); });
 
     showScene('title');
+    online.boot(); // 招待の URL（?room=）から入る、または前の部屋に戻る
     registerServiceWorker();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, send };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, send, online };
 }
 
 function registerServiceWorker() {
