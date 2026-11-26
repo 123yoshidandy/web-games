@@ -518,6 +518,12 @@ export function chooseCpuCommand(game, seat, profile = PROFILES.normal) {
     return decideQuick(game, seat);
 }
 
+// ヒント：seat のおすすめの手（CPU の「ふつう」が選ぶ手）。seat が答える番でなければ null
+export function suggest(game, seat) {
+    if (game.phase === 'end' || !game.actors().includes(seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 // でたらめな手（強さを測る比較用）
 function randomCommand(game, seat, random) {
     const d = game.decision;

@@ -14,6 +14,7 @@ import {
     esc, installSymbols, foodIcon, habitatIcon, eggIcon, icon, dieFace, cardHtml, slotHtml, cardDetailHtml, bonusHtml, powerAsk, birdArt
 } from './art.js';
 import { createSeed } from './random.js';
+import { music } from './music.js';
 
 const $ = (id) => document.getElementById(id);
 const SETTINGS_KEY = 'wingspan.settings';
@@ -79,7 +80,14 @@ export default class UI {
         this.sel = {};
         this.selStep = -1;
         this.sheetKind = null;
-        const listeners = { onUpdate: () => this.update(), onError: (message) => this.toast(message) };
+        const listeners = {
+            onUpdate: () => this.update(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            }
+        };
+        this.hintCommand = null;
         try {
             this.controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, listeners);
         } catch (error) {
@@ -96,6 +104,7 @@ export default class UI {
 
     update() {
         if (!this.controller) return;
+        this.prevSeat = this.view?.decision?.seat ?? null;
         this.view = this.controller.getView();
         this.render();
     }
@@ -158,12 +167,71 @@ export default class UI {
         this.renderHand();
         this.renderPrompt();
         this.autoSheets();
+        this.markHint();
+    }
+
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、自分の番になったら turn、終わりは勝ち負け
+    // CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
+    playSound(fresh) {
+        const v = this.view;
+        if (fresh.length === 0) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(v.you) ? 'win' : 'lose');
+        const mine = fresh.filter(e => e.seat === v.you);
+        const types = mine.map(e => e.type);
+        if (mine.some(e => (e.type === 'hunt' || e.type === 'predator') && e.hit)) return music.play('capture');
+        if (types.includes('play')) return music.play('place');
+        if (types.includes('reroll')) return music.play('dice');
+        if (['lay', 'take', 'bonus', 'trade'].some(t => types.includes(t))) return music.play('gain');
+        if (types.includes('draw')) return music.play('draw');
+        if (types.includes('tuck') || types.includes('power')) return music.play('place');
+        if (types.includes('discardEgg')) return music.play('pay');
+        if (types.length) return music.play('select');
+        if (fresh.some(e => e.type === 'roundEnd')) return music.play('notify');
+        if (v.decision?.seat === v.you && this.prevSeat !== v.you) music.play('turn');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = { key: this.lastSeq, command };
+        this.render();
+        const c = command;
+        const text = {
+            play: c.bird && `「${birdOf(c.bird).name}」を${HABITAT_NAMES[c.habitat]}に出す`,
+            action: `${HABITAT_NAMES[c.habitat]}の行動`,
+            take: '印の付いたさいころの餌を取る', reroll: 'さいころを振り直す', skip: '使わない', power: '能力を使う',
+            lay: '卵をおまかせで置く', draw: 'カードを引く', setup: '準備（おまかせで選べます）', bonus: '印の付いたボーナスカード'
+        }[c.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    // おすすめの手に印を付ける（前の印を外してから）
+    markHint() {
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        const h = this.hintCommand;
+        if (!h) return;
+        if (h.key !== this.lastSeq) {
+            this.hintCommand = null;
+            return;
+        }
+        const c = h.command;
+        const selector = {
+            action: `[data-act="${c.habitat}"]`,
+            play: `[data-card="${this.me.hand.indexOf(c.bird)}"]`,
+            reroll: '[data-prompt="reroll"]', skip: '[data-prompt="skip"]', lay: '[data-prompt="auto-lay"]',
+            setup: '[data-prompt="open-setup"]', bonus: '[data-prompt="open-bonus"]'
+        }[c.type];
+        if (selector) document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
     }
 
     // 新しく起きたことを、短い表示と光で見せる
     playEvents() {
         const fresh = this.view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = this.view.events.at(-1)?.seq ?? this.lastSeq;
+        this.playSound(fresh);
         this.flash = new Set();
         this.flashSeats = new Set();
         for (const e of fresh) {
@@ -191,7 +259,7 @@ export default class UI {
         }
         const goal = v.goals[Math.min(v.round, 4) - 1];
         const now = v.goalNow ? v.goalNow[v.you] : null;
-        $('goal-chip').innerHTML = `<small>目標</small>${esc(goal.name)}${now != null ? `<b>${now}</b>` : ''}`;
+        $('goal-chip').innerHTML = `<small>目標</small><span class="goal-name">${esc(goal.name)}</span>${now != null ? `<b>${now}</b>` : ''}`;
     }
 
     renderOpponents() {
@@ -666,6 +734,7 @@ export default class UI {
         $('home').addEventListener('click', () => this.showTitle());
         $('open-help-title').addEventListener('click', () => $('help').showModal());
         $('open-help-game').addEventListener('click', () => $('help').showModal());
+        $('hint').addEventListener('click', () => this.showHint());
         $('open-log').addEventListener('click', () => this.openLog());
         $('goal-chip').addEventListener('click', () => this.openGoals());
         $('help').querySelector('.close').addEventListener('click', () => $('help').close());
