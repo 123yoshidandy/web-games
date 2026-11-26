@@ -77,6 +77,16 @@ CPU 同士の対戦（各 100 試合、席の順と最初の手番はシード�
 node scripts/cpu-match.mjs 100 marquise,eyrie,alliance,vagabond
 ```
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、席の順に勢力が決まり、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'root' })`。web-games の1つのスタックから `?game=root` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 素の HTML / CSS / JavaScript（ES Modules）で、ビルドはない。
@@ -100,7 +110,5 @@ npm test -w games/root
 | `public/js/board-view.js` | 地図の描画と、拡大・移動・タップ |
 | `public/js/art.js` | 色・カード・紋 |
 | `server/src/game-definition.js` | オンライン対戦（netplay-kit）用のゲームの定義。陣営は参加の順に割り当てる |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 
-### オンライン対戦を入れるとき
-
-ルールとビューは、netplay-kit の「ゲームの定義」の形（`server/src/game-definition.js`）で用意してある。netplay-kit の `sync.mjs` で部屋の処理を写し、この定義を `createHandler` と `startDevServer` に渡す。画面は、ローカル対戦と同じ `getView()` / `send()` の形のオンライン用のコントローラーを足す。陣営を選ぶ画面は、ロビーに足す必要がある。
