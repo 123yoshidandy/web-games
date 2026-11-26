@@ -145,7 +145,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .subtitle { margin: -4px 0 10px; color: var(--muted); font-size: 14px; letter-spacing: .4em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .setup .row { display: flex; align-items: center; gap: 12px; font-weight: 800; }
-.setup .buttons { display: flex; gap: 12px; margin-top: 4px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 4px; }
 .segment { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
 .segment button { width: 74px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
 .segment button.on { color: #fff; background: var(--accent); }
