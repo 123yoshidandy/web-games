@@ -1,4 +1,5 @@
-// 設定（難易度・効果音）
+// 設定（難易度・サウンド）
+// サウンドは BGM と効果音をまとめて ON/OFF する。保存は今までどおり sound（効果音）と bgm の2つに同じ値を入れる
 export const SETTING_OPTIONS = [
     {
         key: 'difficulty',
@@ -12,15 +13,7 @@ export const SETTING_OPTIONS = [
     },
     {
         key: 'sound',
-        label: '効果音',
-        choices: [
-            { value: 'on', label: 'ON' },
-            { value: 'off', label: 'OFF' }
-        ]
-    },
-    {
-        key: 'bgm',
-        label: 'BGM',
+        label: 'サウンド',
         choices: [
             { value: 'on', label: 'ON' },
             { value: 'off', label: 'OFF' }
@@ -60,6 +53,9 @@ export function loadSettings() {
             settings[option.key] = saved[option.key];
         }
     }
+    // 前の版は効果音と BGM を別々に選べた。どちらかが ON なら、両方 ON にそろえる
+    const bgm = ['on', 'off'].includes(saved.bgm) ? saved.bgm : DEFAULT_SETTINGS.bgm;
+    settings.sound = settings.bgm = settings.sound === 'on' || bgm === 'on' ? 'on' : 'off';
     return settings;
 }
 

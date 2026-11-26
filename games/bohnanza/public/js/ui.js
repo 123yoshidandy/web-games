@@ -8,6 +8,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS, pickHand, suggest } from './cpu-player.js';
 import { symbolsSvg, sym, amountHtml, beanCard, fieldHtml } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'bohnanza.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
@@ -63,7 +64,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -74,6 +78,7 @@ export default class UI {
         this.view = null;
         this.form = null;
         this.answeredKey = null;
+        this.soundSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
@@ -286,6 +291,7 @@ export default class UI {
         this.renderHand(v);
         this.syncAnswer(v);
         this.renderActions(v);
+        this.playSounds(v);
         if ($('#log').open) this.renderLog();
         if (v.phase === 'end' && !$('#result').open && !this.resultTimer) {
             this.resultTimer = setTimeout(() => {
@@ -293,6 +299,29 @@ export default class UI {
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // 効果音：前の描画からのできごとを見て、1回の更新に1つだけ、大事な順に選んで鳴らす
+    // ほかの人が植える・売るのは鳴らさない（自分に関わる取引と申し出だけ知らせる）
+    playSounds(v) {
+        const fresh = v.events.filter(e => e.seq > this.soundSeq);
+        if (!fresh.length) return;
+        this.soundSeq = fresh.at(-1).seq;
+        const me = v.you;
+        const mine = (type) => fresh.some(e => e.type === type && e.seat === me);
+        const end = fresh.find(e => e.type === 'end');
+        if (end) {
+            if (!end.winners.includes(me)) return music.play('lose');
+            return music.play(end.winners.length > 1 ? 'notify' : 'win');
+        }
+        if (fresh.some(e => e.type === 'trade' && (e.to === me || e.from === me))) return music.play('gain');
+        if (mine('sell')) return music.play('gain');
+        if (mine('buyField')) return music.play('pay');
+        if (mine('plant')) return music.play('place');
+        if (fresh.some(e => e.type === 'reshuffle')) return music.play('shuffle');
+        if (fresh.some(e => e.type === 'turn' && e.seat === me)) return music.play('turn');
+        if (fresh.some(e => e.type === 'faceUp') && v.active === me) return music.play('draw');
+        if (fresh.some(e => e.type === 'offer' && e.from !== me)) music.play('notify');
     }
 
     renderStatus(v) {

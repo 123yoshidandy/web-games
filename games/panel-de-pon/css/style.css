@@ -628,14 +628,14 @@ button {
     justify-content: space-between;
 }
 
-/* 右側に BGM と遊び方を並べる */
+/* 右側にサウンドと遊び方を並べる */
 .play-menu-group {
     display: flex;
     gap: 8px;
 }
 
-/* BGM が OFF のときは薄くして線で消す */
-.play-menu-button.bgm-toggle[aria-pressed="false"] {
+/* サウンドが OFF のときは薄くして線で消す */
+.play-menu-button.sound-toggle[aria-pressed="false"] {
     opacity: 0.6;
     text-decoration: line-through;
 }

@@ -26,7 +26,7 @@ export function showTitle({ onSolo, onOnline }) {
             `).join('')}
         </fieldset>
     `;
-    // 難易度は1行、効果音と BGM は横に並べる
+    // 難易度は1行、サウンド（BGM と効果音をまとめて ON/OFF）はその下
     const [difficulty, ...toggles] = SETTING_OPTIONS;
     const settingGroups = `${fieldset(difficulty)}<div class="setting-row">${toggles.map(fieldset).join('')}</div>`;
 
@@ -64,6 +64,7 @@ function readSettings() {
     for (const option of SETTING_OPTIONS) {
         settings[option.key] = titleElement.querySelector(`input[name="${option.key}"]:checked`).value;
     }
+    settings.bgm = settings.sound;
     return settings;
 }
 

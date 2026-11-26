@@ -280,3 +280,10 @@ function choosePickSlot(view, me, ctx, random) {
 }
 
 export { convertersOf };
+
+// ヒント：人の手番の行動（取る・保管・建てる・研究）に、CPU（見落としのない設定）が選ぶ手を返す。その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.phase !== 'action' || game.current !== seat) return null;
+    return chooseCpuCommand(game, seat, PROFILES.strong);
+}

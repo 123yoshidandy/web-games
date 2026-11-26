@@ -33,6 +33,6 @@
   },
   "layoutCheck": {
     "start": ".start-button[data-mode=\"solo\"]",
-    "bgmToggle": ".setting label:has(input[name=\"bgm\"]), .play-menu .bgm-toggle"
+    "bgmToggle": ".setting label:has(input[name=\"sound\"]), .play-menu .sound-toggle"
   }
 }

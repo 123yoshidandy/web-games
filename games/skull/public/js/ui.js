@@ -12,6 +12,7 @@
 import { FLOWER, SKULL, WINS_NEEDED } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { discHtml, coasterHtml, PLAYER_COLORS } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'skull.settings';
 const CPU_NAMES = ['ジャック', 'ローズ', 'ダン', 'ミア', 'ケン'];
@@ -63,7 +64,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -252,6 +256,7 @@ export default class UI {
         if (!this.myTurn('reveal')) return;
         const me = this.view.players[this.view.seat];
         if (target !== this.view.seat && me.revealed.length < me.stackCount) {
+            music.play('error');
             this.toast('先に自分の山を全部めくります');
             return;
         }
@@ -261,13 +266,16 @@ export default class UI {
     act(act, data) {
         const view = this.view;
         if (act === 'open-bid') {
+            music.play('select');
             this.bidding = view.phase === 'bid' ? view.bid + 1 : Math.min(view.total, Math.max(1, view.players[view.seat].stackCount));
             this.render();
         } else if (act === 'minus' || act === 'plus') {
             const min = view.phase === 'bid' ? view.bid + 1 : 1;
             this.bidding = Math.max(min, Math.min(view.total, this.bidding + (act === 'plus' ? 1 : -1)));
+            music.play('select');
             this.render();
         } else if (act === 'cancel') {
+            music.play('cancel');
             this.bidding = null;
             this.render();
         } else if (act === 'challenge') this.send({ type: 'challenge', bid: this.bidding });
@@ -278,17 +286,38 @@ export default class UI {
         else if (act === 'again') this.newGame();
     }
 
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、相手の手は番が回るときに notify、自分の番になったら turn、終わりは勝ち負け
+    playSound(fresh, prevCurrent) {
+        const view = this.view;
+        const me = view.seat;
+        if (fresh.length === 0) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === me ? 'win' : 'lose');
+        const success = fresh.find(e => e.type === 'success');
+        if (success) return music.play(success.seat === me ? 'gain' : 'notify');
+        if (fresh.some(e => e.type === 'lost' && e.seat === me)) return music.play('pay');
+        const flip = fresh.findLast(e => e.type === 'flip' && e.seat === me);
+        if (flip) return music.play(flip.disc === SKULL ? 'pay' : 'draw');
+        if (fresh.some(e => e.type === 'round')) return music.play('shuffle');
+        if (fresh.some(e => e.seat === me && ['place', 'bid', 'pass'].includes(e.type))) return music.play('place');
+        if (view.phase === 'end') return;
+        if (view.current === me && prevCurrent !== me) return music.play('turn');
+        if (prevCurrent !== me) music.play('notify');
+    }
+
     // ---- 描く ----
 
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prevCurrent = this.view?.current;
         this.view = view;
         if (view.phase === 'bid' && this.bidding === null && view.current === view.seat) this.bidding = view.bid + 1;
         if (!(this.myTurn('turn') || this.myTurn('bid'))) this.bidding = null;
 
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        this.playSound(fresh, prevCurrent);
 
         this.renderTop();
         this.renderOpponents();

@@ -10,7 +10,8 @@ import { TYPES } from './cards.js';
 import { spendOptions } from './payment.js';
 import { cardText, cardTitle, effectText } from './card-text.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS } from './cpu-player.js';
+import { CPU_LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, sphere, cardHtml, cardBackHtml, tileHtml, icon, typeIcon } from './art.js';
 import { captureAnchors, playEvents, resetTicker } from './animator.js';
 
@@ -93,7 +94,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -173,6 +177,7 @@ export default class UI {
             dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
         });
 
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#display').addEventListener('click', (event) => {
             const deck = event.target.closest('[data-deck]');
             if (deck) return this.tapDeck(Number(deck.dataset.deck));
@@ -269,6 +274,7 @@ export default class UI {
             return;
         }
         const same = this.selection?.kind === 'card' && this.selection.card === card;
+        music.play(same ? 'cancel' : 'select');
         this.selection = same ? null : { kind: 'card', card, source };
         this.payIndex = 0;
         this.render();
@@ -279,6 +285,7 @@ export default class UI {
         if (this.chainEffect() === 'pick') return this.useChain({ slot });
         if (!this.myTurn() || storageRoom(this.me) <= 0) return;
         const same = this.selection?.kind === 'slot' && this.selection.slot === slot;
+        music.play(same ? 'cancel' : 'select');
         this.selection = same ? null : { kind: 'slot', slot };
         this.render();
     }
@@ -288,6 +295,7 @@ export default class UI {
         if (this.chainEffect() === 'research') return this.useChain({ level });
         if (!this.myTurn() || this.me.blocked.research) return;
         const same = this.selection?.kind === 'deck' && this.selection.level === level;
+        music.play(same ? 'cancel' : 'select');
         this.selection = same ? null : { kind: 'deck', level };
         this.render();
     }
@@ -307,6 +315,7 @@ export default class UI {
         const sel = this.selection;
         const view = this.view;
         if (action === 'cancel') {
+            music.play('cancel');
             this.selection = null;
             return this.render();
         }
@@ -359,6 +368,8 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         playEvents(fresh, before, { you: view.you, names: view.players.map(p => p.name) });
+        this.playSound(fresh);
+        this.markHint();
 
         this.afterRender();
     }
@@ -381,6 +392,53 @@ export default class UI {
             if (choices.length === 1) this.chainGizmo = choices[0].gizmo;
         }
         if (!this.myTurn('research') || !view.research?.cards?.includes(this.researchCard)) this.researchCard = null;
+    }
+
+    // 1つの更新に1つの音。自分の行動は結果の音、相手の行動は notify、自分の番になったら turn
+    playSound(fresh) {
+        const view = this.view;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        const mine = fresh.filter(e => e.seat === view.you).map(e => e.type);
+        if (mine.includes('build')) return music.play('place');
+        if (mine.includes('vp') || mine.includes('pick') || mine.includes('draw')) return music.play('gain');
+        if (mine.includes('file')) return music.play('place');
+        if (mine.includes('research')) return music.play('draw');
+        if (fresh.some(e => e.type === 'turn' && e.seat === view.you)) return music.play('turn');
+        if (fresh.some(e => e.seat !== undefined && e.seat !== view.you)) music.play('notify');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.myTurn() ? suggest(this.controller.game, this.view.you) : null;
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        this.payIndex = 0;
+        if (command.type === 'pick') this.selection = { kind: 'slot', slot: command.slot };
+        else if (command.type === 'research') this.selection = { kind: 'deck', level: command.level };
+        else if (command.type === 'file' || command.type === 'build') {
+            const source = this.me.archive.includes(command.card) ? 'archive' : 'display';
+            this.selection = { kind: 'card', card: command.card, source };
+            if (command.type === 'build') {
+                const index = payOptions(this.view, this.me, command.card, source).findIndex(o => JSON.stringify(o.spend) === JSON.stringify(command.spend));
+                this.payIndex = Math.max(0, index);
+            }
+        } else this.selection = null;
+        this.render();
+    }
+
+    // おすすめの操作のボタンに .recommended を付ける。盤面が進んだら消す
+    markHint() {
+        $('#hint').disabled = !this.myTurn();
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        const hint = this.hint;
+        if (!hint || hint.at !== this.controller?.game.commands.length || !this.myTurn()) {
+            this.hint = null;
+            return;
+        }
+        document.querySelectorAll(`#actions [data-act="${hint.command.type}"]`).forEach(el => el.classList.add('recommended'));
     }
 
     afterRender() {

@@ -1,5 +1,5 @@
 import {
-    initRenderer, render, setVersusVisible, setFieldVisible, renderOpponent, showVersusResult, hideVersusResult, setBgmToggle
+    initRenderer, render, setVersusVisible, setFieldVisible, renderOpponent, showVersusResult, hideVersusResult, setSoundToggle
 } from './renderer.js';
 import { saveSettings } from './settings.js';
 import { initInput, pollInput } from './input.js';
@@ -52,7 +52,7 @@ let resultTitle = null; // 表示中の勝敗（'WIN' など）
 function ensureSetup() {
     if (initialized) return;
     initialized = true;
-    const canvas = initRenderer({ onRematch: rematch, onBackToRoom: backToRoom, onHome: goHome, onBgm: toggleBgm, onHelp: openHelp });
+    const canvas = initRenderer({ onRematch: rematch, onBackToRoom: backToRoom, onHome: goHome, onSound: toggleSound, onHelp: openHelp });
     doLayout('solo');
     window.addEventListener('resize', () => doLayout());
     initInput(canvas);
@@ -61,12 +61,13 @@ function ensureSetup() {
 function applySoundSettings() {
     setSoundEnabled(settings.sound === 'on');
     setBgmEnabled(settings.bgm === 'on');
-    setBgmToggle(settings.bgm === 'on');
+    setSoundToggle(settings.sound === 'on' || settings.bgm === 'on');
 }
 
-// プレイ中の「BGM」。ON/OFF を切り替えて、タイトルの設定にも残す
-function toggleBgm() {
-    settings.bgm = settings.bgm === 'on' ? 'off' : 'on';
+// プレイ中の「サウンド」。BGM と効果音をまとめて ON/OFF し（どちらかが鳴っていれば両方消す）、タイトルの設定にも残す
+function toggleSound() {
+    const on = !(settings.sound === 'on' || settings.bgm === 'on');
+    settings.sound = settings.bgm = on ? 'on' : 'off';
     saveSettings(settings);
     applySoundSettings();
 }

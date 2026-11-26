@@ -25,8 +25,8 @@ export let playMenuElement;
 let incomingKey = '';
 
 // 描画の初期化。onRematch・onBackToRoom は対戦の勝敗画面（CPU 対戦では「リトライ」「タイトルへ」）、
-// onHome・onBgm・onHelp はプレイ中の画面の上のボタンで呼ばれる
-export function initRenderer({ onRematch, onBackToRoom, onHome, onBgm, onHelp }) {
+// onHome・onSound・onHelp はプレイ中の画面の上のボタンで呼ばれる
+export function initRenderer({ onRematch, onBackToRoom, onHome, onSound, onHelp }) {
     canvas = document.createElement('canvas');
     canvas.classList.add('field');
     g = canvas.getContext('2d');
@@ -62,11 +62,11 @@ export function initRenderer({ onRematch, onBackToRoom, onHome, onBgm, onHelp })
     playMenuElement.innerHTML = `
         <button type="button" class="play-menu-button" data-action="home">ホーム</button>
         <div class="play-menu-group">
-            <button type="button" class="play-menu-button bgm-toggle" data-action="bgm" aria-pressed="true">BGM</button>
+            <button type="button" class="play-menu-button sound-toggle" data-action="sound" aria-pressed="true">サウンド</button>
             <button type="button" class="play-menu-button" data-action="help">遊び方</button>
         </div>
     `;
-    const menuActions = { home: onHome, bgm: onBgm, help: onHelp };
+    const menuActions = { home: onHome, sound: onSound, help: onHelp };
     for (const button of playMenuElement.querySelectorAll('button')) {
         button.addEventListener('click', () => {
             button.blur();
@@ -78,9 +78,9 @@ export function initRenderer({ onRematch, onBackToRoom, onHome, onBgm, onHelp })
     return canvas;
 }
 
-// プレイ中の BGM のボタンの表示を、BGM の ON/OFF に合わせる
-export function setBgmToggle(on) {
-    playMenuElement.querySelector('.bgm-toggle').setAttribute('aria-pressed', String(on));
+// プレイ中のサウンドのボタンの表示を、ON/OFF（BGM か効果音のどちらかが ON）に合わせる
+export function setSoundToggle(on) {
+    playMenuElement.querySelector('.sound-toggle').setAttribute('aria-pressed', String(on));
 }
 
 // ===== フィールド =====
