@@ -1,7 +1,6 @@
 /**
  * オンライン対戦に差し込むゲームの定義（netplay-kit の「ゲームの定義」の形）
- * 今はオンライン対戦を入れていない。入れるときは、netplay-kit の sync.mjs で部屋の処理（server/netplay/ など）を写し、
- * この定義を createHandler と startDevServer に渡す
+ * server/src/handler.js（AWS）と、web-games の npm run dev:online（手元のテスト用サーバー）が、この定義を使う
  *
  * 部屋には参加者・オプション・操作の記録だけを保存し、操作を受けるたびに記録からゲームを再現する
  * 囲碁に隠す情報も乱数もない（死に石の見込みは、盤から作るシードで決まる）。席0が黒。待った（1手戻す）は、ローカルの対戦だけにする
@@ -9,6 +8,7 @@
  */
 
 import Game, { PLAYERS, COMMAND_FIELDS, normalizeOptions } from '../../public/js/game.js';
+import { SIZES } from '../../public/js/rules.js';
 import { createGameView } from '../../public/js/game-view.js';
 import { runCpuStep, isCpuTurn } from '../../public/js/cpu-player.js';
 
@@ -20,11 +20,17 @@ export default {
     maxPlayers: PLAYERS,
     allowCpu: true,
 
-    // options：{ size, komi, handicap }（部屋を作った人が決める。正しくなければ既定の値）
-    create: ({ players, options }) => {
+    // ロビーで決める盤の大きさ（文字で持つ。'9'・'13'・'19'）。コミ・置き石は既定の値
+    settings: {
+        defaults: () => ({ size: '9' }),
+        validate: (patch, current) => ({ size: SIZES.map(String).includes(String(patch?.size)) ? String(patch.size) : current.size })
+    },
+
+    // options：{ size, komi, handicap }。オンラインの部屋では、ロビーの設定の盤の大きさを使う（正しくなければ既定の値）
+    create: ({ players, options, settings }) => {
         let checked;
         try {
-            checked = normalizeOptions(options ?? {});
+            checked = normalizeOptions({ ...(options ?? {}), ...(settings?.size ? { size: Number(settings.size) } : {}) });
         } catch {
             checked = normalizeOptions({});
         }

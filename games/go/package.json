@@ -20,5 +20,8 @@
       "アブストラクト",
       "伝統ゲーム"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }

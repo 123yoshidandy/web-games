@@ -12,7 +12,9 @@ import { SIZES, MAX_HANDICAP, COLOR_NAME, colorOf, sqName, tryMove } from './rul
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS, LEVEL_NAMES, suggest } from './cpu-player.js';
 import { music } from './music.js';
-import { resultText, marginText } from './game.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { resultText, marginText, PLAYERS } from './game.js';
 import { toSgf, sgfFileName } from './sgf.js';
 import { symbolsSvg, stoneSvg, boardBaseSvg, boardExtent, pointXY, stoneAt, MARGIN } from './art.js';
 
@@ -68,6 +70,26 @@ export default class UI {
         this.confirmMode = false;
         this.resultTimer = null;
         this.resultShown = false;
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: '囲碁',
+            game: 'go',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 500,
+            minPlayers: PLAYERS,
+            maxPlayers: PLAYERS,
+            settings: [{ key: 'size', label: '盤の大きさ', options: [{ value: '9', label: '9路' }, { value: '13', label: '13路' }, { value: '19', label: '19路' }] }],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
         this.bindBoard();
@@ -83,13 +105,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -102,6 +125,15 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.stopGame();
+        else document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        this.hint = null;
         this.view = null;
         this.anim = null;
         this.pending = null;
@@ -111,7 +143,13 @@ export default class UI {
         $('#screen-game').hidden = false;
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         this.render();
-        this.controller.scheduleCpu();
+        if (!this.controller.isOnline) this.controller.scheduleCpu();
+    }
+
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    goHome() {
+        if (this.controller?.isOnline) return this.online.confirmLeave();
+        this.showTitle();
     }
 
     newGame() {
@@ -166,16 +204,21 @@ export default class UI {
             this.renderSetup();
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#again-end').addEventListener('click', () => this.newGame());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            $('#result').close();
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
+        $('#again-end').addEventListener('click', () => (this.controller?.isOnline ? this.online.rematch() : this.newGame()));
         $('#show-result').addEventListener('click', () => this.showResult());
         $('#result-board').addEventListener('click', () => $('#result').close());
         $('#result-sgf').addEventListener('click', () => this.saveSgf());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#home').addEventListener('click', () => this.goHome());
         $('#undo').addEventListener('click', () => this.undo());
         $('#hint').addEventListener('click', () => this.showHint());
         $('#sgf').addEventListener('click', () => this.saveSgf());
@@ -412,6 +455,9 @@ export default class UI {
         this.renderBoard();
         this.renderActions(view);
         $('#move-number').textContent = view.moveNumber ? `${view.moveNumber}手` : '';
+        const online = Boolean(this.controller?.isOnline);
+        // 待った・棋譜の保存・ヒントはローカル対戦だけ（オンラインのコントローラーはゲームの中身を持たない）
+        ['#undo', '#sgf', '#hint', '#result-sgf'].forEach(sel => { $(sel).hidden = online; });
         $('#undo').disabled = !view.canUndo;
         $('#resign').disabled = view.over;
         if (!view.over) this.resultShown = false;
@@ -591,7 +637,7 @@ export default class UI {
     // ---- ヒント ----
 
     showHint() {
-        if (!this.canPlay()) return;
+        if (!this.canPlay() || this.controller?.isOnline) return;
         const command = suggest(this.controller.game, this.view.you);
         if (!command) return;
         music.play('select');
@@ -604,7 +650,7 @@ export default class UI {
 
     // 今のおすすめの手（盤面が進んだら消す）
     currentHint() {
-        if (this.hint && (this.hint.at !== this.controller?.game.commands.length || !this.canPlay())) this.hint = null;
+        if (this.hint && (this.controller?.isOnline || this.hint.at !== this.controller?.game.commands.length || !this.canPlay())) this.hint = null;
         return this.hint?.command ?? null;
     }
 

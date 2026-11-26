@@ -116,4 +116,12 @@ node scripts/cpu-match.mjs 20 strong normal 9     # CPU どうしの勝率
 
 ### オンライン対戦
 
-まだ入れていない。入れるときは、netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋の CPU は「ふつう」。死に石は2人とも確定したら終わる。待ったは入れない。
+netplay-kit の「サーバーがゲームを進める型」。2人で（片方を CPU にもできる）、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+盤の大きさ（9路・13路・19路。既定は9路）はロビーで決める。コミ・置き石は既定の値。部屋の CPU は「ふつう」。死に石は2人とも確定したら終わる。待ったと棋譜の保存は、ローカルの対局だけ。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'go' })`。web-games の1つのスタックから `?game=go` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
