@@ -58,8 +58,18 @@ node scripts/cpu-match.mjs 60 2 strong,normal   # 強い 93%・ふつう 7%（2�
 | `public/js/cpu-player.js` | CPU |
 | `public/js/game-controller.js` | ローカル対戦の進行と保存 |
 | `public/js/ui.js`・`art.js` | 画面と図柄 |
-| `server/src/game-definition.js` | オンライン対戦（netplay-kit）に差し込む定義。まだオンライン対戦は入れていない |
+| `server/src/game-definition.js` | オンライン対戦（netplay-kit）に差し込む定義 |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦 |
+
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'everdell' })`。web-games の1つのスタックから `?game=everdell` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
 
 ## テスト
 
