@@ -10,6 +10,7 @@ import {
     GEM_MAX, EXTENSION_COST, MAX_EXTENSIONS, SMALL_PAY, LARGE_PAY
 } from './data.js';
 import { LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { GOOD_COLORS, PLAYER_COLORS, goodIcon, anyIcon, rubyIcon, coinIcon, cardIcon, merchantToken, assistantToken, familyToken } from './art.js';
 
@@ -38,6 +39,12 @@ const PLACE_TEXTS = {
     14: '品物がそろっていればタイルを取り、その品物を1つ払います。布のタイル：サイコロを直せる。香辛料のタイル：倉庫で+1。2枚そろうとルビー。',
     15: '品物がそろっていればタイルを取り、その品物を1つ払います。宝石のタイル：5人目の助手。果物のタイル：助手の呼び戻し。2枚そろうとルビー。',
     16: '今の値段のリラを払って、ルビーを1つ買います。買うたびに1リラ上がります。'
+};
+
+// 自分の操作の効果音
+const COMMAND_SOUNDS = {
+    move: 'place', pay: 'pay', act: 'gain', skip: 'cancel', draw: 'draw', discard: 'pay', dice: 'dice', good: 'gain',
+    catch: 'gain', governor: 'gain', smuggler: 'gain', bonus: 'gain', yellow: 'gain', end: 'place'
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -105,7 +112,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -140,7 +150,12 @@ export default class UI {
 
     send(command) {
         if ($('#sheet').open) $('#sheet').close();
-        return this.controller?.send(command);
+        this.sending = command;
+        try {
+            return this.controller?.send(command);
+        } finally {
+            this.sending = null;
+        }
     }
 
     // ---- 固定の部品 ----
@@ -206,6 +221,7 @@ export default class UI {
 
     onUpdate() {
         if (!this.controller) return;
+        this.wasMyTurn = !!this.view && this.myTurn() && this.view.phase !== 'end';
         this.view = this.controller.getView();
         const view = this.view;
         if (view.turn !== view.you || view.step.stage !== 'move') this.moveCard = null;
@@ -222,11 +238,27 @@ export default class UI {
         const view = this.view;
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        this.playSound(fresh, this.wasMyTurn);
         const logs = this.controller.game.logs;
         const newLogs = logs.slice(Math.max(0, logs.length - (view.logCount - this.lastLog)));
         this.lastLog = view.logCount;
         const notable = newLogs.filter(line => /ルビー|茶屋|闇市|このラウンドで終わり/.test(line));
         if (notable.length > 0 && fresh.length > 0) this.toast(notable.at(-1), 2200);
+    }
+
+    // 1つの更新に1つの音。自分の操作は結果の音（サイコロ・ルビーを優先）、相手の手は notify、自分の番になったら turn
+    playSound(fresh, wasMyTurn) {
+        const view = this.view;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        if (this.sending) {
+            const mine = fresh.filter(e => e.seat === view.you);
+            if (mine.some(e => e.type === 'ruby')) return music.play('gain');
+            if (mine.some(e => e.type === 'dice')) return music.play('dice');
+            return music.play(COMMAND_SOUNDS[this.sending.type] ?? 'place');
+        }
+        if (view.phase !== 'end' && this.myTurn() && !wasMyTurn) return music.play('turn');
+        if (fresh.some(e => e.seat !== undefined && e.seat !== view.you)) music.play('notify');
     }
 
     render() {
@@ -470,6 +502,7 @@ export default class UI {
         if (!this.myTurn()) return;
         const command = this.controller?.suggest();
         if (!command) return;
+        music.play('select');
         this.hint = { at: this.hintKey(), command };
         if (command.type === 'move') this.moveCard = command.card ?? null;
         this.render();

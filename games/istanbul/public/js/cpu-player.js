@@ -192,10 +192,14 @@ function bestGood(game, seat, choices) {
     return best;
 }
 
+// ボーナスカードと黄色のタイルを使える段階（game.js の FREE_STAGES と同じ。隊商宿で引く・捨てる、サイコロの間は使えない）
+const BONUS_STAGES = ['move', 'pay', 'action', 'after', 'encounter'];
+
 // 手番のはじめなどに、ためらわず使うカードとタイル
 function housekeeping(game, seat) {
     const p = game.players[seat];
     const stage = game.step.stage;
+    if (!BONUS_STAGES.includes(stage)) return null;
     if (ownsCard(p, 'lira5')) return { type: 'bonus', card: 'lira5' };
     if (ownsCard(p, 'family') && p.family !== POLICE) return { type: 'bonus', card: 'family', reward: 'lira' };
     if (ownsCard(p, 'good')) {
