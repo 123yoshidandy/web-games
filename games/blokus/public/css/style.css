@@ -139,7 +139,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .setup { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .setup .row { display: flex; align-items: center; gap: 12px; font-weight: 800; }
 .setup .label { width: 2.5em; text-align: right; }
-.setup .buttons { display: flex; gap: 12px; margin-top: 6px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 6px; }
 
 /* ---- ゲーム画面 ---- */
 

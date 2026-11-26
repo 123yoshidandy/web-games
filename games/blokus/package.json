@@ -15,5 +15,8 @@
     "genres": [
       "アブストラクト"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }

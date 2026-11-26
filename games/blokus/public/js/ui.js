@@ -9,10 +9,12 @@
  * - 回す・裏返すで向きを変える（影の中心は動かさない）。置ける位置なら「✓」で置く
  */
 
-import { SIZE, COLORS, COLOR_NAMES, PIECES, PIECE_ORDER, SHARED, canPlaceCells, placedCells, anchors, legalMoves } from './game.js';
+import { SIZE, COLORS, COLOR_NAMES, PIECES, PIECE_ORDER, SHARED, canPlaceCells, placedCells, anchors, legalMoves, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const SETTINGS_KEY = 'blokus.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
@@ -64,6 +66,23 @@ export default class UI {
         this.drag = null;
         this.buildBoard();
         this.bindStatic();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'ブロックス',
+            game: 'blokus',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 650,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.begin(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => this.showTitle()
+        });
         this.renderTitleArt();
         this.renderHelpFigure();
     }
@@ -75,13 +94,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -94,13 +114,20 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.begin(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    begin(controller) {
+        if (this.controller !== controller) this.stopGame();
+        this.controller = controller;
         this.view = null;
         this.selected = null;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         this.render();
-        this.controller.scheduleCpu();
+        if (!controller.isOnline) controller.scheduleCpu();
     }
 
     newGame() {
@@ -129,13 +156,18 @@ export default class UI {
         segment('#cpu-level', 'level', String);
         segment('#scoring', 'scoring', String);
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#home').addEventListener('click', () => this.showTitle());
-        $('#result-home').addEventListener('click', () => this.showTitle());
-        $('#again').addEventListener('click', () => this.newGame());
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle())); // オンラインは確かめてから部屋を出る
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            document.querySelectorAll('dialog[open]').forEach(d => d.close());
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#status').addEventListener('click', () => this.openLog());
@@ -342,6 +374,7 @@ export default class UI {
     render() {
         if (!this.controller) return;
         this.view = this.controller.getView();
+        $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         $('#place').classList.remove('recommended');
         const v = this.view;
         // 自分の番でなくなったら、選んでいたピースを外す
