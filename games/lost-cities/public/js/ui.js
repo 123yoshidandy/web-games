@@ -8,6 +8,7 @@
 
 import { CARDS, COLORS, COLOR_NAMES, ROUND_OPTIONS, DEFAULT_ROUNDS, expeditionScore, canPlace } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import { music } from './music.js';
 import { symbolsSvg, icon, cardHtml, chipHtml, cardBackHtml } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
 
@@ -64,7 +65,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -133,6 +137,7 @@ export default class UI {
             const card = event.target.closest('[data-card]');
             if (!card || !this.myTurn('play')) return;
             const id = Number(card.dataset.card);
+            music.play(this.picked === id ? 'cancel' : 'select');
             this.picked = this.picked === id ? null : id;
             this.render();
         });
@@ -208,6 +213,7 @@ export default class UI {
         if (!this.myTurn('play') && !this.myTurn('draw')) return;
         const command = this.controller?.suggest();
         if (!command) return;
+        music.play('select');
         this.hint = { at: this.view.logCount, command };
         if (command.type === 'play') this.picked = command.card;
         this.render();
@@ -243,6 +249,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         const roundEnd = fresh.find(e => e.type === 'roundEnd');
+        this.playSound(fresh);
         if (roundEnd) {
             // ラウンドが終わったときは、新しいラウンドが配られているので動かさず、結果を出す。見ている間は CPU を止める
             this.controller.pause();
@@ -251,6 +258,18 @@ export default class UI {
         } else {
             playEvents(fresh, before, { you: view.you });
         }
+    }
+
+    // 1つの更新に1つの音。自分は出す・捨てる・引く、相手の手は notify、自分の番になったら turn
+    playSound(fresh) {
+        const view = this.view;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'roundEnd')) return music.play('notify');
+        const last = fresh.filter(e => e.type === 'play' || e.type === 'draw').at(-1);
+        if (!last) return;
+        if (last.seat === view.you) return music.play(last.type === 'draw' ? 'draw' : last.to === 'discard' ? 'pay' : 'place');
+        music.play(this.myTurn('play') ? 'turn' : 'notify');
     }
 
     renderTop() {

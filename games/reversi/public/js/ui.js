@@ -10,6 +10,7 @@ import { SIZE, colorOf, sqName } from './rules.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, stoneSvg, COLOR_NAME } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'reversi.settings';
 const RESULT_DELAY_MS = 1100;
@@ -75,7 +76,10 @@ export default class UI {
                     if (this.hintSq !== null) this.hintSq = this.controller.hint()?.sq ?? null;
                     this.render();
                 },
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -152,13 +156,18 @@ export default class UI {
     }
 
     onCell(sq) {
-        if (!this.myTurn() || !this.view.moves.includes(sq)) return;
+        if (!this.myTurn()) return;
+        if (!this.view.moves.includes(sq)) {
+            music.play('error');
+            return;
+        }
         this.hintSq = null;
         this.controller?.send({ type: 'move', sq });
     }
 
     undo() {
         if (!this.controller?.undo()) return;
+        music.play('cancel');
         clearTimeout(this.resultTimer);
         this.resultTimer = null;
         $('#result').close();
@@ -276,6 +285,11 @@ export default class UI {
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
         const move = [...fresh].reverse().find(e => e.type === 'move');
+        // 音：終わったら勝ち負け、自分の手は石を返す音、CPU の手のあとは自分の番（2人で遊ぶときは、どちらの手も自分の手）
+        const twoPlayers = view.players.every(p => !p.isCPU);
+        if (view.over && !prev.over) music.play(view.winner === null ? 'notify' : twoPlayers || view.winner === view.you ? 'win' : 'lose');
+        else if (move && (twoPlayers || move.seat === view.you)) music.play('capture');
+        else if (move) music.play(this.myTurn() ? 'turn' : 'notify');
         if (move && !reduceMotion()) {
             // 置いた石からの距離（縦横斜めの歩数）の順に裏返す
             const r0 = Math.floor(move.sq / SIZE);
@@ -310,6 +324,7 @@ export default class UI {
         const command = this.myTurn() ? this.controller?.hint() : null;
         if (!command) return this.toast('いまはあなたの番ではありません');
         this.hintSq = command.sq;
+        music.play('select');
         this.render();
         this.toast(`おすすめ：${sqName(command.sq)}`);
     }

@@ -14,6 +14,14 @@ import {
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import BoardView from './board-view.js';
 import { cardHtml, cardText, suitDot, questHtml, emblemSvg, FACTION_COLORS } from './art.js';
+import { music } from './music.js';
+
+// 自分の操作の音（書いていない行動は place）
+const COMMAND_SOUND = {
+    battle: 'capture', strike: 'capture', steal: 'capture', revolt: 'capture',
+    craft: 'gain', quest: 'gain', score: 'gain', tax: 'gain', repair: 'gain',
+    draw: 'draw', explore: 'draw', discard: 'pay', next: 'select', end: 'select', turn: 'select'
+};
 
 const SETTINGS_KEY = 'root.settings';
 const RESULT_DELAY_MS = 900;
@@ -102,7 +110,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -116,6 +127,7 @@ export default class UI {
         this.board.reset();
         this.sel = null;
         this.hintCommand = null;
+        this.view = null; // 前のゲームのビューと比べて音を鳴らさない
         this.onUpdate();
         this.controller.scheduleCpu();
     }
@@ -240,7 +252,9 @@ export default class UI {
 
     onUpdate() {
         if (!this.controller) return;
+        const previous = this.view;
         this.view = this.controller.getView();
+        this.playUpdateSound(previous);
         // ヒントを出している間は、今の場面のおすすめに出し直す
         if (this.hintCommand) this.hintCommand = this.myTurn() ? this.controller.hint() : null;
         const key = JSON.stringify(this.view.legal);
@@ -259,6 +273,19 @@ export default class UI {
             clearTimeout(this.resultTimer);
             this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
         }
+    }
+
+    // 1回の更新に1つの音。自分の操作の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const v = this.view;
+        if (!previous) return;
+        if (v.over) {
+            if (!previous.over) music.play(v.winners.includes(v.you) ? 'win' : 'lose');
+            return;
+        }
+        if (this.sending) return;
+        const wasMine = !previous.over && previous.legal.length > 0 && !previous.prompt;
+        music.play(this.myTurn() && !wasMine ? 'turn' : 'notify');
     }
 
     myTurn() {
@@ -473,7 +500,10 @@ export default class UI {
             this.choiceKind = null;
             $('#choice').close();
         }
-        this.controller?.send(command);
+        this.sending = true;
+        const ok = this.controller?.send(command);
+        this.sending = false;
+        if (ok && !this.view.over) music.play(COMMAND_SOUND[command.type] ?? 'place');
     }
 
     startSelection(type, preset = {}) {
@@ -831,6 +861,7 @@ export default class UI {
         if (!command) return this.toast('いまはあなたの番ではありません');
         this.sel = null;
         this.hintCommand = command;
+        music.play('select');
         this.render();
         this.toast(`おすすめ：${this.hintText(command)}`);
     }

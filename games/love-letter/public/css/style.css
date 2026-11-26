@@ -149,8 +149,8 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
     grid-area: top; display: flex; align-items: center; gap: 6px;
     padding: calc(6px + var(--safe-top)) calc(8px + var(--safe-right)) 4px calc(8px + var(--safe-left));
 }
-.round-info { flex: 1; min-width: 0; font-weight: 800; font-size: 16px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
-.round-info small { font-size: 12px; color: var(--muted); font-weight: 500; }
+.round-info { flex: 1; min-width: 0; font-weight: 800; font-size: 16px; display: flex; align-items: baseline; gap: 8px; white-space: nowrap; overflow: hidden; }
+.round-info small { font-size: 12px; color: var(--muted); font-weight: 500; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 .hearts { display: inline-flex; gap: 2px; flex-wrap: wrap; }
 .hearts i { width: 9px; height: 9px; background: rgba(255, 255, 255, .2); clip-path: path('M4.5 8.5C2 6.7 0 5 0 3A2.3 2.3 0 0 1 4.5 2 2.3 2.3 0 0 1 9 3c0 2-2 3.7-4.5 5.5z'); }
@@ -337,9 +337,9 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 }
 
 /* BGM の ON/OFF（js/music.js） */
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+.sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }
 
 /* ヒント（おすすめの手） */
 #hint:disabled { opacity: .35; }

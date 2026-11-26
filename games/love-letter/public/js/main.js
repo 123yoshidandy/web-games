@@ -10,6 +10,7 @@ import { describeEvent } from './log.js';
 import { unseenCounts } from './cpu-player.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
+import { music } from './music.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'loveletter.settings.v1', save: 'loveletter.save.v1' };
@@ -120,6 +121,7 @@ function onUpdate() {
     view = controller.getView();
     const fresh = view.events.filter(e => e.seq > seenSeq);
     seenSeq = view.eventSeq;
+    playSound(fresh);
     const play = fresh.find(e => e.type === 'play');
     if (play) showSpotlight(play, fresh);
     const roundEnd = fresh.find(e => e.type === 'roundEnd');
@@ -128,7 +130,23 @@ function onUpdate() {
     render();
 }
 
+// 1つの更新に1つの音。自分の手は置く（相手を脱落させたら capture）、相手の手は notify、自分の番になったら turn
+function playSound(fresh) {
+    if (!fresh.length) return;
+    const end = fresh.find(e => e.type === 'end');
+    if (end) return music.play(end.winner === view.seat ? 'win' : 'lose');
+    const roundEnd = fresh.find(e => e.type === 'roundEnd');
+    if (roundEnd) return music.play(roundEnd.winners.includes(view.seat) ? 'gain' : 'notify');
+    const acts = fresh.filter(e => e.type === 'play' || e.type === 'keep');
+    const last = acts.at(-1);
+    if (fresh.some(e => e.type === 'out' && e.seat === view.seat)) return music.play('pay');
+    if (last?.seat === view.seat) return music.play(fresh.some(e => e.type === 'out') ? 'capture' : 'place');
+    if (myTurn()) return music.play('turn');
+    if (last) music.play('notify');
+}
+
 function onError(message) {
+    music.play('error');
     $('prompt').textContent = message;
 }
 
@@ -156,15 +174,18 @@ function legalOf(card) {
 function selectCard(card) {
     if (!myTurn()) return;
     if (view.phase === 'chancellor') {
+        music.play(ui.card === card ? 'cancel' : 'select');
         ui.card = ui.card === card ? null : card;
         render();
         return;
     }
     const legal = legalOf(card);
     if (!legal) {
+        music.play('error');
         $('prompt').textContent = '大臣を出さなければなりません';
         return;
     }
+    music.play(ui.card === card ? 'cancel' : 'select');
     if (ui.card === card) {
         ui = { ...freshUi(), key: ui.key };
     } else {
@@ -180,6 +201,7 @@ function selectTarget(seat) {
     if (!myTurn() || ui.card === null) return;
     const legal = legalOf(ui.card);
     if (!legal?.targets.includes(seat)) return;
+    music.play('select');
     ui.target = seat;
     render();
     if (legal.needsGuess && ui.guess === null) openGuess();
@@ -200,6 +222,7 @@ function showHint() {
     if (!myTurn() || !controller) return;
     const command = controller.suggest();
     if (!command) return;
+    music.play('select');
     if (command.type === 'keep') ui = { ...freshUi(), key: ui.key, card: command.card };
     else ui = { ...freshUi(), key: ui.key, card: command.card, target: command.target, guess: command.guess };
     hint = { key: ui.key, command };
@@ -450,6 +473,7 @@ function setup() {
     $('guess-list').addEventListener('click', e => {
         const b = e.target.closest('[data-guess]');
         if (!b) return;
+        music.play('select');
         ui.guess = Number(b.dataset.guess);
         $('guess-dialog').close();
         render();
