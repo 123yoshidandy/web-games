@@ -162,15 +162,16 @@ npm run bench:cpu -- --players 4 --games 20 --missions 1-50   # CPU だけでミ
 | `public/sw.js` | Service Worker（オフライン） |
 | `tools/cpu-bench.mjs` | CPU だけでミッションごとの成功の割合を測る |
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の「サーバーがゲームを進める型」にそのまま差し込める形にしてある。
+netplay-kit の「サーバーがゲームを進める型」。2〜5人で、足りない席は CPU で埋められる（2人のときは JARVIS が加わる）。部屋はミッション1から始め、ミッションを選ぶのと航海日誌はローカル対戦だけ。ほかの人の手札はビューに入れない。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
 
-- `create`：`new Game(players, { seed, mission })`
-- `persist` / `restore`：`{ players, options: { seed, mission }, commands }` と `Game.replay`
-- `view`：`createGameView(game, seat)`
-- 操作：通信（`communicate`）と遭難信号（`distress`）は手番と関係なく受け付ける。そのほかは `game.current` の人だけ。断る操作は状態を変えない
-- CPU：`runCpuStep(game)`、やることがあるかは `hasCpuWork(game)`
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'the-crew' })`。web-games の1つのスタックから `?game=the-crew` で呼ばれる）
+- ゲームの定義は `server/src/game-definition.js`（記録だけを保存して再現する。各席には、その席から見えるビューだけを送る）
+- テストは `tests/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
 
 ## 出典
 

@@ -9,6 +9,8 @@ import { commPosition, answerText } from './game.js';
 import { CPU_HELP } from './cpu.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
@@ -141,6 +143,7 @@ function renderTitle() {
     const attempts = app.progress.attempts[m] ?? 0;
     $('#mission-progress').textContent = app.progress.cleared[m] ? `クリア（${app.progress.cleared[m]}回）` : attempts ? `挑戦${attempts}回` : missionSummary(m);
     $('#resume-button').hidden = !LocalGameController.loadSaved();
+    $('#online-button').hidden = !online.available;
 }
 
 function newSetup(mission = selectedMission()) {
@@ -150,19 +153,51 @@ function newSetup(mission = selectedMission()) {
 }
 
 function startGame(setup) {
-    app.controller?.stop();
+    beginGame(new LocalGameController(setup, { onUpdate: () => update(), onError: () => {
+        music.play('error');
+        update();
+    }, onEnd: onGameEnd }));
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(controller) {
+    if (app.controller !== controller) app.controller?.stop();
     app.view = null;
     resetSelection();
     if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => {
-        music.play('error');
-        update();
-    }, onEnd: onGameEnd });
+    app.controller = controller;
     showScene('game');
     update();
 }
 
+// ===== オンライン対戦（入口とロビーは netplay-lobby.js の画面） =====
+// 部屋はミッション1から始める（ミッションを選ぶのと航海日誌はローカル対戦だけ）
+
+const online = new NetplayLobby({
+    title: 'ザ・クルー',
+    game: 'the-crew',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: 900,
+    minPlayers: 2,
+    maxPlayers: 5,
+    settings: [],
+    onStart: (controller) => beginGame(controller),
+    onUpdate: () => update(),
+    onError: () => {
+        music.play('error');
+        update();
+    },
+    onExit: () => {
+        app.controller = null;
+        for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+        showScene('title');
+    }
+});
+app.online = online;
+
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (app.controller?.isOnline) return online.confirmLeave();
     app.controller?.stop();
     app.controller = null;
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -202,6 +237,11 @@ function update() {
         // ほかの人が動いて自分の番になったら知らせる（CPU の手ごとには鳴らさない）
         const myTurn = v => !v.result && v.current === v.viewer;
         if (!app.sending && myTurn(view) && !myTurn(previous)) music.play('turn');
+    }
+    // オンライン対戦は onEnd がないので、ビューで終わりを知る（航海日誌はローカル対戦だけ）
+    if (app.controller.isOnline && previous && !previous.result && view.result) {
+        music.play(view.result.success ? 'win' : 'lose');
+        setTimeout(showResult, 1500);
     }
     app.view = view;
     render(view);
@@ -305,6 +345,7 @@ function overflowing() {
 }
 
 function renderTopbar(view) {
+    $('#hint').hidden = Boolean(app.controller?.isOnline); // ヒントはローカル対戦だけ
     const attempts = (app.progress.attempts[view.mission] ?? 0) + (view.result ? 0 : 1);
     $('#mission-label').innerHTML = `<b>${view.mission}</b>${escapeHtml(missionSummary(view.mission) || 'ミッション')}<span class="attempt">・${attempts}回目</span>`;
     $('#trick-label').textContent = view.phase === 'prep' ? '準備' : `トリック ${Math.min(view.trickNumber, view.totalTricks)}/${view.totalTricks}`;
@@ -603,7 +644,7 @@ function send(command) {
     } finally {
         app.sending = false;
     }
-    if (ok && !app.controller?.game.isOver && SEND_SOUNDS[command.type]) music.play(SEND_SOUNDS[command.type]);
+    if (ok && !app.controller?.getView()?.result && SEND_SOUNDS[command.type]) music.play(SEND_SOUNDS[command.type]);
 }
 
 function onPlayClick(event) {
@@ -802,6 +843,7 @@ function init() {
         LocalGameController.clearSaved();
         startGame(newSetup());
     });
+    $('#online-button').addEventListener('click', () => online.open());
     $('#resume-button').addEventListener('click', () => {
         const saved = LocalGameController.loadSaved();
         if (saved) startGame(saved);
@@ -826,6 +868,11 @@ function init() {
         if (action === 'distress-left' || action === 'distress-right') {
             $('#distress-dialog').close();
             send({ type: 'distress', direction: action === 'distress-left' ? 1 : -1 });
+        }
+        if (action === 'next' && app.controller?.isOnline) {
+            // オンライン対戦は、ホームなら部屋を出て、それ以外はロビーでホストの「もう一度」を待つ
+            $('#result-dialog').close();
+            return el.dataset.home ? online.leave() : online.rematch();
         }
         if (action === 'next') {
             const setup = app.controller?.setup;
@@ -853,6 +900,8 @@ function init() {
     });
 
     showScene('title');
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('sw.js').then(registration => {

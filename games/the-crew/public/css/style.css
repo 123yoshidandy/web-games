@@ -292,7 +292,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .mission-pick-label { font-size: 13px; font-weight: 800; color: var(--ink-soft); }
 .mission-pick-number { font-family: 'Orbitron', sans-serif; font-size: 26px; color: var(--accent); }
 .mission-pick-note { font-size: 12px; color: var(--ink-soft); }
-.title-buttons { display: flex; gap: 12px; margin-top: 2px; }
+.title-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 2px; }
 .title-buttons .btn { min-width: 120px; }
 .title-help { position: absolute; top: 8px; right: 8px; }
 /* ゲーム一覧へのリンク。遊び方と向かい合う左上に置く。

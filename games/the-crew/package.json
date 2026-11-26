@@ -19,5 +19,8 @@
       4,
       5
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }

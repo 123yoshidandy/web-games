@@ -53,7 +53,8 @@ export function createGameView(game, viewer) {
         lastMove: game.lastMove,
         options: null
     };
-    view.options = optionsFor(game, viewer);
+    // 観戦者（viewer が null）にはできることがない
+    view.options = viewer === null || viewer === undefined ? null : optionsFor(game, viewer);
     return view;
 }
 
