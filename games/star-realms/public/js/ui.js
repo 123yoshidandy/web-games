@@ -9,6 +9,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, cardHtml, icon, emblem } from './art.js';
 import { cardLines, effectsText, typeName } from './card-text.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'star-realms.settings';
 const CPU_NAMES = { easy: 'アルタイル', normal: 'ベガ' };
@@ -80,7 +81,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -90,6 +94,7 @@ export default class UI {
             return;
         }
         this.view = null;
+        this.lastSeq = null;
         this.selected = [];
         this.promptKey = null;
         this.promptHidden = false;
@@ -220,6 +225,7 @@ export default class UI {
             if (this.selected.includes(id)) this.selected = this.selected.filter(x => x !== id);
             else if (max === 1) this.selected = [id];
             else if (this.selected.length < max) this.selected.push(id);
+            music.play(this.selected.includes(id) ? 'select' : 'cancel');
             this.renderPrompt();
         });
         $('#prompt-buttons').addEventListener('click', (event) => {
@@ -337,10 +343,30 @@ export default class UI {
 
     // ---- ゲーム画面 ----
 
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、相手の攻撃は notify、自分の番になったら turn、終わりは勝ち負け
+    playSound(view, fresh) {
+        if (fresh.length === 0) return;
+        const end = fresh.find(e => e.type === 'gameEnd');
+        if (end) return music.play(end.winner === view.you ? 'win' : 'lose');
+        const turn = fresh.findLast(e => e.type === 'turn');
+        if (turn?.seat === view.you) return music.play('turn');
+        const mine = fresh.filter(e => e.seat === view.you).map(e => e.type);
+        if (mine.includes('attack')) return music.play('capture');
+        if (mine.includes('buy')) return music.play('gain');
+        if (mine.includes('shuffle')) return music.play('shuffle');
+        if (mine.includes('play')) return music.play('place');
+        if (mine.includes('scrap') || mine.includes('scrapCards') || mine.includes('discard')) return music.play('pay');
+        if (fresh.some(e => e.type === 'attack' && e.seat !== view.you)) music.play('notify');
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
         this.view = view;
+        // 始めた時点までの出来事は鳴らさない
+        const lastSeq = this.lastSeq;
+        this.lastSeq = view.events.at(-1)?.seq ?? 0;
+        if (lastSeq !== null) this.playSound(view, view.events.filter(e => e.seq > lastSeq));
         this.renderStats(view);
         this.renderZones(view);
         this.renderRow(view);

@@ -10,6 +10,7 @@ import {
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, tokenChip, cardHtml, cardBackHtml, royalHtml, gemIcon, lineIcon, scrollIcon } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'splendor-duel.settings';
 const CPU_NAME = 'ルカ';
@@ -81,7 +82,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -270,6 +274,7 @@ export default class UI {
             next = [cell];
         }
         this.selection = next.length ? { kind: 'cells', cells: asLine(next) ?? next } : null;
+        music.play(next.includes(cell) ? 'select' : 'cancel');
         this.render();
     }
 
@@ -277,6 +282,7 @@ export default class UI {
         if (!this.myTurn()) return;
         const same = this.selection?.kind === 'card' && this.selection.card === card;
         this.selection = same ? null : { kind: 'card', card, reserved };
+        music.play(same ? 'cancel' : 'select');
         this.render();
     }
 
@@ -284,12 +290,14 @@ export default class UI {
         if (!this.myTurn() || this.view.deckCounts[level] === 0) return;
         const same = this.selection?.kind === 'deck' && this.selection.level === level;
         this.selection = same ? null : { kind: 'deck', level };
+        music.play(same ? 'cancel' : 'select');
         this.render();
     }
 
     pickReplenish() {
         if (!this.myTurn() || !this.canReplenish()) return;
         this.selection = this.selection?.kind === 'replenish' ? null : { kind: 'replenish' };
+        music.play(this.selection ? 'select' : 'cancel');
         this.render();
     }
 
@@ -299,6 +307,7 @@ export default class UI {
         const total = Object.values(this.discardPick).reduce((s, n) => s + n, 0);
         if (picked < me.tokens[color] && total < this.view.discardCount) this.discardPick[color] = picked + 1;
         else delete this.discardPick[color];
+        music.play(this.discardPick[color] ? 'select' : 'cancel');
         this.render();
     }
 
@@ -323,6 +332,7 @@ export default class UI {
     act(action, data) {
         const sel = this.selection;
         if (action === 'cancel') {
+            music.play('cancel');
             this.selection = null;
             this.discardPick = {};
             this.render();
@@ -348,10 +358,30 @@ export default class UI {
 
     // ---- 描く ----
 
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、相手の番が終わったら notify、自分の番になったら turn、終わりは勝ち負け
+    playSound(fresh, prevCurrent) {
+        const view = this.view;
+        if (fresh.length === 0 || prevCurrent === undefined) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        const mine = prevCurrent === view.you ? fresh.filter(e => e.seat === view.you && e.type !== 'turn').map(e => e.type) : [];
+        if (mine.includes('steal')) return music.play('capture');
+        if (['royal', 'take', 'privilege', 'ability-token', 'gain-privilege'].some(t => mine.includes(t))) return music.play('gain');
+        if (mine.includes('buy') || mine.includes('wild')) return music.play('place');
+        if (mine.includes('reserve')) return music.play('draw');
+        if (mine.includes('replenish')) return music.play('shuffle');
+        if (mine.includes('discard')) return music.play('pay');
+        const turn = fresh.findLast(e => e.type === 'turn');
+        if (!turn || mine.length > 0) return;
+        if (turn.seat === view.you) music.play('turn');
+        else if (prevCurrent !== view.you) music.play('notify');
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
         const before = captureAnchors();
+        const prevCurrent = this.view?.current;
         this.view = view;
         if (!this.myTurn()) this.selection = null;
         if (!this.myTurn('discard')) this.discardPick = {};
@@ -368,6 +398,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         playEvents(fresh, before, { you: view.you });
+        this.playSound(fresh, prevCurrent);
 
         this.afterRender();
     }

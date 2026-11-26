@@ -9,6 +9,7 @@ import { scoreEdict, monsterPenalty, surroundedMountains, neighbors } from './sc
 import { normalize, rotate, flip, sizeOf } from './shapes.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, icon, shapeHtml, terrainChip } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'cartographers.settings';
 const CPU_NAMES = ['ルカ', 'ミラ', 'ノア'];
@@ -90,7 +91,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -216,6 +220,22 @@ export default class UI {
         return null;
     }
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ鳴らす（ほかの人が描くのは鳴らさない）
+    // 終局は勝ち（同点は知らせ）・負け、コインは得た音、自分が描いたら置いた音、季節の終わりは知らせ、カードをめくったら引く音
+    playSounds(view, fresh) {
+        if (!fresh.length) return;
+        const me = view.you;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) {
+            if (!end.winners.includes(me)) return music.play('lose');
+            return music.play(end.winners.length > 1 ? 'notify' : 'win');
+        }
+        if (fresh.some(e => e.type === 'coin' && e.seat === me)) return music.play('gain');
+        if (fresh.some(e => e.type === 'draw' && e.seat === me)) return music.play('place');
+        if (fresh.some(e => e.type === 'season-end')) return music.play('notify');
+        if (fresh.some(e => e.type === 'reveal')) music.play('draw');
+    }
+
     resetPlacement() {
         const base = this.currentShape();
         this.shape = base ? normalize(base) : null;
@@ -226,6 +246,7 @@ export default class UI {
         if (!this.view?.mustPlace || this.view.fallback) return;
         if (this.variant === index) return;
         const keep = this.anchor;
+        music.play('select');
         this.hintKey = null;
         this.variant = index;
         this.resetPlacement();
@@ -235,12 +256,14 @@ export default class UI {
 
     pickTerrain(terrain) {
         if (!this.view?.fallback) return;
+        music.play('select');
         this.terrain = terrain;
         this.render();
     }
 
     pickCell(cell) {
         if (!this.shape) return;
+        music.play('select');
         this.hintKey = null;
         this.anchor = cell;
         this.render();
@@ -319,6 +342,7 @@ export default class UI {
             this.resetPlacement();
         }
         // さっき描かれたマス（表示している地図の分）
+        this.playSounds(view, view.events.filter(e => e.seq > this.lastSeq));
         const fresh = view.events.filter(e => e.seq > this.lastSeq && e.type === 'draw');
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         const owner = view.monsterTarget ?? view.you;

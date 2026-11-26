@@ -265,3 +265,10 @@ export function runCpuStep(game, seat, profile = PROFILES.normal) {
     return !!simple && game.applyCommand(seat, simple);
 }
 
+
+// ヒント：人の手番に、CPU（つよい設定）が選ぶ次の操作を返す。CPU と同じく、山札は混ぜ直した写しで読む（のぞかない）
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.isOver() || game.turn !== seat) return null;
+    return chooseCommand(game.state, seat, PROFILES.strong);
+}

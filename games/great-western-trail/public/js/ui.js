@@ -15,7 +15,8 @@ import {
     hireableWorkers, breedingValue, permCerts, certLimit, handLimit, transportCost, scoreOf, taskCounts, objectiveScore,
     tollOf, backCount, ownedCards
 } from './rules.js';
-import { PROFILES } from './cpu-player.js';
+import { PROFILES, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import BoardView, { HAZARD_COLORS, TEEPEE_COLORS, posOf } from './board-view.js';
 import RailView from './rail-view.js';
@@ -27,6 +28,11 @@ const LEVELS = ['normal', 'strong'];
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const enc = (command) => encodeURIComponent(JSON.stringify(command));
+// 命令を比べるための、キーの順にそろえた文字列
+const canonical = (value) => JSON.stringify(value, (key, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v).sort()) : v));
+// 自分の操作の効果音
+const COMMAND_SOUNDS = { move: 'place', local: 'gain', aux: 'gain', choose: 'select', skip: 'cancel', end: 'place' };
+const HINT_TEXT = { local: 'この場所のアクション', aux: '補助アクション', choose: '光っているカードを選ぶ', skip: '飛ばす', end: '手番を終える' };
 const cmdButton = (command, label, cls = '', disabled = false) =>
     `<button class="opt ${cls}" data-cmd="${enc(command)}"${disabled ? ' disabled' : ''}>${label}</button>`;
 const actButton = (act, arg, label, cls = '', disabled = false) =>
@@ -168,7 +174,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -205,6 +214,7 @@ export default class UI {
 
     onUpdate() {
         if (!this.controller) return;
+        const before = { over: this.view?.over, myTurn: !!this.view && this.myTurn() };
         this.view = this.controller.getView();
         const logs = this.view.logs.filter(l => l.seq > this.lastLogSeq);
         this.lastLogSeq = this.view.logs.at(-1)?.seq ?? this.lastLogSeq;
@@ -213,6 +223,7 @@ export default class UI {
         if (others.length > 0) this.flash = others.map(l => `${this.view.state.players[l.seat].name}：${l.text}`).slice(-2);
         const system = logs.filter(l => l.seat === null).at(-1);
         if (system) this.toast(system.text, 3000);
+        this.playSound(before, others);
         this.render();
         if (this.view.over) setTimeout(() => this.showResult(), 700);
     }
@@ -239,6 +250,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => this.openDialog('#help'));
         $('#open-help-game').addEventListener('click', () => this.openDialog('#help'));
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#zoom-in').addEventListener('click', () => this.board.zoomBy(1.6));
         $('#zoom-out').addEventListener('click', () => this.board.zoomBy(1 / 1.6));
         $('#zoom-fit').addEventListener('click', () => this.board.resetZoom());
@@ -314,7 +326,57 @@ export default class UI {
     send(command) {
         if (!this.controller) return;
         this.flash = null;
-        this.controller.send(command);
+        this.sending = command;
+        try {
+            this.controller.send(command);
+        } finally {
+            this.sending = null;
+        }
+    }
+
+    // 1つの更新に1つの音。自分の操作は結果の音、ほかの人の手は notify、自分の番になったら turn
+    playSound(before, others) {
+        const view = this.view;
+        if (view.over) {
+            if (!before.over) music.play(view.winners.includes(view.seat) ? 'win' : 'lose');
+        } else if (this.sending) {
+            music.play(COMMAND_SOUNDS[this.sending.type] ?? 'place');
+        } else if (this.myTurn() && !before.myTurn) {
+            music.play('turn');
+        } else if (others.length > 0) {
+            music.play('notify');
+        }
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        if (!this.view || !this.myTurn()) return;
+        const command = suggest(this.controller.game, this.view.seat);
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        if (command.type === 'choose' && command.cards) this.sel = { ...this.sel, cards: [...command.cards] };
+        this.render();
+        const marked = document.querySelector('.recommended');
+        if (marked) marked.scrollIntoView({ block: 'nearest' });
+        this.toast(`おすすめ：${command.type === 'move' ? '光っている場所へ進む' : HINT_TEXT[command.type] ?? '光っている選択肢'}`);
+    }
+
+    // おすすめの命令と同じ選択肢のボタンに .recommended を付ける。盤面が進んだら消す
+    markHint() {
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        $('#hint').disabled = !this.myTurn();
+        const hint = this.hint;
+        if (!hint || hint.at !== this.controller?.game.commands.length || !this.myTurn()) {
+            this.hint = null;
+            return;
+        }
+        const want = canonical(hint.command);
+        document.querySelectorAll('button[data-cmd]').forEach(button => {
+            if (canonical(JSON.parse(decodeURIComponent(button.dataset.cmd))) === want) button.classList.add('recommended');
+        });
+        (hint.command.cards ?? []).forEach(id => document.querySelectorAll(`#hand [data-card="${id}"]`).forEach(el => el.classList.add('recommended')));
     }
 
     // ---- 描画 ----
@@ -356,6 +418,7 @@ export default class UI {
         this.renderBoard();
         this.renderPanel(d);
         this.renderHand(d);
+        this.markHint();
     }
 
     renderTop() {
@@ -802,6 +865,7 @@ export default class UI {
         if (ids.length > 0) requestAnimationFrame(() => this.board.focus(ids.map(posOf)));
         this.renderPanel(d);
         this.renderHand(d);
+        this.markHint();
     }
 
     onPick(kind, id) {
