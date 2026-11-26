@@ -143,6 +143,16 @@ node scripts/cpu-match.mjs 400 1 normal 5
 
 1人用では、CPU（ふつう）は目標の点を超えられない（道具5枚・1枚とも 400 試合で 0%。目標の点は平均 66、CPU は平均 26 点で、一番近い試合で 3 点差）。1人用は人が遊ぶためのもので、CPU は止まらずに終わることだけを確かめている。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる（1人で遊ぶのはローカルだけ）。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'sagrada' })`。web-games の1つのスタックから `?game=sagrada` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -164,6 +174,7 @@ npm test
 | `public/js/ui.js`・`art.js` | 画面・絵 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（オフラインでも開ける） |
 | `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない。部屋は2〜4人） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と勝率・平均点（1人用は目標を超えた割合） |
 
 操作の種類：`choose`（窓）・`draft`（ダイスとマス）・`tool`（道具。`die`・`delta`・`track`・`cell`・`from`・`to`・`moves`、1人用は `pay`）・`place`（振り直した・引いたダイスを置くマス。null ならプールに戻す）・`fluxValue`（フラックス落としの目）・`end`（番を終える）。
@@ -179,6 +190,3 @@ npm test
 - `game-definition.test.js`：オンライン対戦の定義と、ビューで個人の目標・配られた窓・シードが漏れないこと
 - `pwa.test.js`：service worker が画面のファイルを全部先に読むこと、manifest とアイコン
 
-### オンライン対戦を入れるとき
-
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。窓を選ぶ間は全員が同時に操作し、ラウンドの間に操作を待っている人は `game.actors()`（手番の人か、道具で置く場所・目を選ぶ人）。伏せた情報を隠すのはビュー（`createGameView`）の役目で、個人の目標と配られた窓は本人にだけ、シードと CPU の値（`cpuSalt`）は入れない。
