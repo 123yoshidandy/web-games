@@ -10,6 +10,9 @@ import { START_MARKS, SIZE, DISTINCT_ROTATIONS, simulate, trace, rowOf, colOf, S
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS, suggest } from './cpu-player.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { symbolsSvg, tileGroup, tileSvg, stoneSvg, trailPath, pointXY, dotHtml, dragonBadge, U, PAD, COLORS } from './art.js';
 
 const SETTINGS_KEY = 'tsuro.settings';
@@ -60,6 +63,23 @@ export default class UI {
         this.resultTimer = null;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'ツォロ',
+            game: 'tsuro',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 700,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.begin(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => this.showTitle()
+        });
         this.renderTitleArt();
         this.renderHelp();
     }
@@ -71,13 +91,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -90,6 +111,13 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.begin(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    begin(controller) {
+        if (this.controller !== controller) this.stopGame();
+        this.controller = controller;
         this.view = null;
         this.selected = null;
         this.rots = new Map();
@@ -99,7 +127,7 @@ export default class UI {
         $('#screen-game').hidden = false;
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         this.render();
-        this.controller.scheduleCpu();
+        if (!controller.isOnline) controller.scheduleCpu();
     }
 
     newGame() {
@@ -134,13 +162,18 @@ export default class UI {
             this.renderSetup();
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            document.querySelectorAll('dialog[open]').forEach(d => d.close());
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
         $('#result-board').addEventListener('click', () => $('#result').close());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle())); // オンラインは確かめてから部屋を出る
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#hint').addEventListener('click', () => this.showHint());
@@ -296,6 +329,7 @@ export default class UI {
         const view = this.controller.getView();
         const prev = this.view;
         this.view = view;
+        $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         this.syncSelection(view);
         this.playEvents(view, prev);
         this.renderStatus(view);
