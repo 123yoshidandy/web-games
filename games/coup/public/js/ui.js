@@ -7,6 +7,9 @@ import { ROLES, ROLE_ORDER, ACTIONS, ACTION_ORDER } from './roles.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { symbolsSvg, cardHtml, backHtml, roleTag, coinHtml } from './art.js';
 
 const SETTINGS_KEY = 'coup.settings';
@@ -48,6 +51,23 @@ export default class UI {
         this.resultTimer = null;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'クー',
+            game: 'coup',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 650,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.begin(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => this.showTitle()
+        });
         this.renderTitleArt();
         this.renderHelp();
     }
@@ -59,13 +79,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -79,14 +100,22 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.begin(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    begin(controller) {
+        if (this.controller !== controller) this.stopGame();
+        this.controller = controller;
         this.view = null;
+        this.logHistory = [];
         this.selecting = null;
         this.exchangeKey = null;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は動かさない
         this.render();
-        this.controller.scheduleCpu();
+        if (!controller.isOnline) controller.scheduleCpu();
     }
 
     newGame() {
@@ -121,13 +150,18 @@ export default class UI {
             this.renderSetup();
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#result-home').addEventListener('click', () => this.showTitle());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            document.querySelectorAll('dialog[open]').forEach(d => d.close());
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle())); // オンラインは確かめてから部屋を出る
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
@@ -261,6 +295,9 @@ export default class UI {
         const prev = this.view;
         const view = this.controller.getView();
         this.view = view;
+        // オンライン対戦のビューは新しい記録だけを運ぶので、記録の一覧のためにためておく（logCount は全体の数）
+        this.logHistory = this.logHistory.slice(0, view.logCount - view.logs.length).concat(view.logs);
+        $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         if (view.phase !== 'action' || view.current !== view.you) this.selecting = null;
         $('#deck').innerHTML = `${backHtml('tiny')}<span>${view.deckCount}</span>`;
         this.renderOpponents(view);
@@ -324,7 +361,7 @@ export default class UI {
         else if (view.phase === 'lose') note = view.loser === me ? '失う札を選ぶ' : `${name(view.loser)}が失う札を選んでいます`;
         else if (view.phase === 'exchange') note = t.actor === me ? '' : `${name(t.actor)}が交換しています`;
         else if (view.waiting.includes(me)) note = view.phase === 'block' ? 'ブロックする？' : 'チャレンジする？';
-        const last = view.logs.at(-1) ?? '';
+        const last = this.logHistory.at(-1) ?? '';
         $('#stage').innerHTML = `<div class="st-main">${main}</div>${note ? `<div class="st-note">${note}</div>` : ''}<div class="st-log">${escapeHtml(last)}</div>`;
     }
 
@@ -398,7 +435,7 @@ export default class UI {
     }
 
     renderLog() {
-        $('#log-list').innerHTML = this.view.logs.slice(-150).map(text => `<li>${escapeHtml(text)}</li>`).join('');
+        $('#log-list').innerHTML = this.logHistory.slice(-150).map(text => `<li>${escapeHtml(text)}</li>`).join('');
     }
 
     showResult() {
