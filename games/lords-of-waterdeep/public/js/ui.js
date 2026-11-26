@@ -7,10 +7,12 @@ import {
     BASIC_SPACES, SPACE_BY_ID, BUILDING_BY_ID, QUEST_BY_ID, INTRIGUE_BY_ID, LORD_BY_ID, CUBES, RESOURCES, RESOURCE_NAME,
     QUEST_TYPE_NAME, FAVOR_OPTIONS, ROUNDS, gainText, buildingText, plotText, lordText
 } from './cards.js';
-import { meets } from './game.js';
+import { meets, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 // 自分の操作の効果音（依頼を果たしたら gain）
 const COMMAND_SOUNDS = { place: 'place', pick: 'gain', quest: 'draw', buy: 'pay', intrigue: 'place', opponent: 'select', option: 'select', target: 'select' };
@@ -131,6 +133,26 @@ export default class UI {
         this.resultTimer = null;
         $('#title-art').innerHTML = titleArtHtml();
         $('#help-body').innerHTML = helpHtml();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'ロード・オブ・ウォーターディープ',
+            game: 'lords-of-waterdeep',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 650,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         this.bindStatic();
     }
 
@@ -141,13 +163,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -161,6 +184,15 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.stopGame();
+        else document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        this.hint = null;
         this.view = null;
         this.sel = null;
         this.info = null;
@@ -169,7 +201,13 @@ export default class UI {
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
-        this.controller.scheduleCpu();
+        if (!this.controller.isOnline) this.controller.scheduleCpu();
+    }
+
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    goHome() {
+        if (this.controller?.isOnline) return this.online.confirmLeave();
+        this.showTitle();
     }
 
     newGame() {
@@ -221,13 +259,18 @@ export default class UI {
             this.renderSetup();
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#result-home').addEventListener('click', () => this.showTitle());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            $('#result').close();
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#home').addEventListener('click', () => this.goHome());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
@@ -316,7 +359,7 @@ export default class UI {
     showHint() {
         const v = this.view;
         if (!v || !(this.myPlacement() || v.pending?.seat === v.you)) return;
-        const command = this.controller?.suggest();
+        const command = this.controller?.isOnline ? null : this.controller?.suggest();
         if (!command) return;
         music.play('select');
         this.hint = { at: v.commandCount, command };
@@ -522,7 +565,8 @@ export default class UI {
             news = true;
             desc = v.logs.slice(-2).map(l => escapeHtml(l.text)).join('<br>');
         }
-        const hint = this.myPlacement() && !this.info ? HINT_BUTTON : '';
+        // ヒントはローカル対戦だけ
+        const hint = this.myPlacement() && !this.info && !this.controller?.isOnline ? HINT_BUTTON : '';
         $('#actions').innerHTML = `<div class="desc${news ? ' news' : ''}">${desc}</div>${hint}${button}`;
         this.markHint();
     }
@@ -609,7 +653,7 @@ export default class UI {
                 break;
         }
         $('#decide-body').innerHTML = body;
-        $('#decide-buttons').innerHTML = HINT_BUTTON + buttons;
+        $('#decide-buttons').innerHTML = (this.controller?.isOnline ? '' : HINT_BUTTON) + buttons;
         this.markHint();
     }
 
@@ -652,7 +696,7 @@ export default class UI {
     }
 
     showLog() {
-        const logs = this.controller?.game.logs ?? [];
+        const logs = this.view?.logs ?? [];
         $('#log-list').innerHTML = logs.map(l => `<li${l.text.startsWith('—') ? ' class="round"' : ''}>${escapeHtml(l.text)}</li>`).join('');
         $('#log').showModal();
         const list = $('#log-list');

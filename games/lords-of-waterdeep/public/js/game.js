@@ -113,8 +113,9 @@ export default class Game {
         return game;
     }
 
+    // isCPU・cpuLevel は今の席から取る（オンライン対戦で部屋を出た人の席は、途中から CPU になる）
     persist() {
-        return { players: this.setup.map(p => ({ ...p })), options: { ...this.options }, commands: this.commands.map(c => structuredClone(c)) };
+        return { players: this.setup.map((p, i) => ({ ...p, isCPU: !!this.players[i]?.isCPU, cpuLevel: this.players[i]?.cpuLevel ?? p.cpuLevel })), options: { ...this.options }, commands: this.commands.map(c => structuredClone(c)) };
     }
 
     // CPU の先読み用の写し（記録とログは持たない）
