@@ -23,13 +23,22 @@ const TIMEOUT_MS = 120_000;
 
 // シードや乱数の状態らしいキー（seed・rng・rngState・randomState・prng・〜Seed・〜Rng など）
 const RANDOM_KEY = /^(seeds?|rngs?|rngState|randomState|prng|.+Seed|.+Rng|.+RngState)$/i;
+const SEED_KEY = /seeds?$/i;
+const SEED_MIN = 65536; // シードは 2^32 までの大きな数。これより小さい数は、ゲームの中の数（Wingspan の食べ物の seed の数など）とみなす
+
+// その値が、シードや乱数の状態に見えるか（seed という名前でも、小さな数なら数えない）
+const looksRandom = (key, value) => {
+    if (value === null || value === undefined || typeof value === 'boolean') return false;
+    if (SEED_KEY.test(key) && typeof value === 'number') return Math.abs(value) >= SEED_MIN;
+    return true;
+};
 
 // ビューの中の、シードや乱数の状態らしいキーの場所（view.options.seed など）
 export function randomKeysIn(value, at = 'view', found = []) {
     if (Array.isArray(value)) value.forEach((item, i) => randomKeysIn(item, `${at}[${i}]`, found));
     else if (value && typeof value === 'object') {
         for (const [key, item] of Object.entries(value)) {
-            if (RANDOM_KEY.test(key)) found.push(`${at}.${key}`);
+            if (RANDOM_KEY.test(key) && looksRandom(key, item)) found.push(`${at}.${key}`);
             randomKeysIn(item, `${at}.${key}`, found);
         }
     }
