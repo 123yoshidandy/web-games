@@ -39,8 +39,9 @@ test('直下の設定や scripts/ が変わったら全部、docs だけなら�
     assert.deepEqual(select(['README.md', 'docs/standards.md']), []);
 });
 
-test('このリポジトリで test-kit を変えたら、全ゲームを流す', () => {
+test('このリポジトリで test-kit を変えたら、全ゲームと test-kit 自身のテストを流す', () => {
     const all = readdirSync(join(root, 'games')).filter((name) => existsSync(join(root, 'games', name, 'package.json')));
     const selected = selectWorkspaces(['packages/test-kit/pwa.js']);
-    assert.equal(selected.length, all.length);
+    assert.equal(selected.filter((path) => path.startsWith('games/')).length, all.length);
+    assert.ok(selected.includes('packages/test-kit'));
 });

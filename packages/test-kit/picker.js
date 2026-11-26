@@ -13,15 +13,17 @@ export function createMovePicker({ definition, suggest = null, pick = null }) {
     const commandsOf = (game) => game.commands ?? definition.persist?.(game)?.commands ?? null;
 
     // 定義の CPU に、その席の手を1つ選ばせる（部屋の状態から作り直した写しで動かす）
+    // 写しでは、その席だけを CPU にし、ほかの席（本物の CPU の席も）は人にする。CPU がほかの席の手を先に打つ場面
+    // （ほかの人の返事を待つ交渉など）でも、頼んだ席の手だけが記録される
     const cpuPick = (room, seat) => {
         const game = restore(room);
-        const player = game.players?.[seat];
         const before = commandsOf(game)?.length;
-        if (!player || before === undefined || before === null || !definition.cpu?.step) return null;
-        player.isCPU = true;
+        if (!game.players?.[seat] || before === undefined || before === null || !definition.cpu?.step) return null;
+        game.players.forEach((player, i) => { player.isCPU = i === seat; });
         if (definition.cpu.needsStep && !definition.cpu.needsStep(game, room)) return null;
         if (!definition.cpu.step(game, { random: createSeededRandom(before + 1), now: 0, room })) return null;
         // 記録は { seat|playerId, command } か、操作を広げた { seat|playerId, ...command } の形
+        // 新しい記録の最初がほかの席なら、その席の手は今は選べない（null）
         const entry = commandsOf(game)[before];
         if (!entry || (entry.seat ?? entry.playerId) !== seat) return null;
         if (entry.command) return entry.command;

@@ -9,5 +9,8 @@
   },
   "dependencies": {
     "netplay-kit": "*"
+  },
+  "scripts": {
+    "test": "vitest run"
   }
 }
