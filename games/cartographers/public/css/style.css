@@ -163,7 +163,7 @@ button {
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .setup .row { display: flex; align-items: center; gap: 10px; font-weight: 800; }
 .setup .row.dim { opacity: .35; }
-.setup .buttons { display: flex; gap: 12px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 
 /* ---- ゲーム画面 ---- */
 
