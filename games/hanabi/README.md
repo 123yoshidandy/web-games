@@ -74,13 +74,16 @@ CPU 同士の点数（`npm run bench:cpu`、各 300 試合）：
 | `public/js/main.js` | 画面と入力 |
 | `public/sw.js` | Service Worker（オフライン） |
 | `tools/cpu-bench.mjs` | CPU 同士の点数を測る |
+| `server/src/game-definition.js` | オンライン対戦（netplay-kit）用のゲームの定義 |
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の「サーバーがゲームを進める型」にそのまま差し込める形にしてある。
+netplay-kit の「サーバーがゲームを進める型」。2〜5人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
 
-- `create`：`new Game(players, { seed })`
-- `persist` / `restore`：`{ players, options: { seed }, commands }` と `Game.replay`
-- `view`：`createGameView(game, seat)`（本人の手札の中身は入らない）
-- 操作：`clue`・`play`・`discard` の3種類。札は配られた順の番号（order）で指す。断る操作は状態を変えない
-- CPU：`runCpuStep(game)`
+協力ゲームなので、CPU は味方として足りない席を受け持つ。ゲームの定義（`server/src/game-definition.js`）は、`{ players, seed, commands }` を保存して `Game.replay` で再現する。操作は `clue`・`play`・`discard` の3種類で、ほかの項目は記録しない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'hanabi' })`。web-games の1つのスタックから `?game=hanabi` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）

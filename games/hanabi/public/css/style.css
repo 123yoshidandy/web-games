@@ -229,7 +229,7 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 .settings { display: flex; flex-direction: column; gap: 10px; }
 .setting { display: flex; align-items: center; gap: 12px; }
 .setting-label { font-size: 14px; color: var(--ink-soft); font-weight: 800; }
-.title-buttons { display: flex; gap: 12px; margin-top: 4px; }
+.title-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 4px; }
 .title-buttons .btn { min-width: 120px; }
 .title-help { position: absolute; top: 8px; right: 8px; }
 /* ゲーム一覧へのリンク。遊び方と向かい合う左上に置く。

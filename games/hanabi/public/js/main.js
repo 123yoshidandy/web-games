@@ -4,10 +4,12 @@
  */
 
 import LocalGameController from './game-controller.js';
-import { COLOR_NAMES, MAX_CLUES, MAX_MISTAKES, bitsToColors, bitsToRanks, clueText } from './game.js';
+import { COLOR_NAMES, MAX_CLUES, MAX_MISTAKES, MIN_PLAYERS, MAX_PLAYERS, bitsToColors, bitsToRanks, clueText } from './game.js';
 import * as storage from './storage.js';
 import { suggest } from './cpu-player.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
@@ -74,6 +76,7 @@ function showScene(scene) {
 function renderTitle() {
     for (const b of document.querySelectorAll('#count-select button')) b.classList.toggle('on', Number(b.dataset.value) === app.settings.count);
     $('#resume-button').hidden = !LocalGameController.loadSaved();
+    $('#online-button').hidden = !online.available;
 }
 
 function newSetup() {
@@ -83,22 +86,54 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    app.controller?.stop();
-    app.view = null;
-    app.selection = null;
-    if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, {
+    beginGame(new LocalGameController(setup, {
         onUpdate: () => update(),
         onError: () => {
             music.play('error');
             update();
         }
-    });
+    }));
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(controller) {
+    if (app.controller !== controller) app.controller?.stop();
+    app.view = null;
+    app.selection = null;
+    app.hint = null;
+    if ($('#result-dialog').open) $('#result-dialog').close();
+    app.controller = controller;
     showScene('game');
     update();
 }
 
+// ===== オンライン対戦（入口とロビーは netplay-lobby.js の画面） =====
+
+const online = new NetplayLobby({
+    title: '花火',
+    game: 'hanabi',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: 1100,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [],
+    onStart: (controller) => beginGame(controller),
+    onUpdate: () => update(),
+    onError: () => {
+        music.play('error');
+        update();
+    },
+    onExit: () => {
+        app.controller = null;
+        for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+        showScene('title');
+    }
+});
+app.online = online;
+
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）。終わったあとは、そのまま出る
+    if (app.controller?.isOnline) return app.view?.phase === 'end' ? online.leave() : online.confirmLeave();
     app.controller?.stop();
     app.controller = null;
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -141,7 +176,7 @@ function playSound(view, previous, moved) {
 // ヒント：おすすめの手の札を選んだ状態にし、札と操作のボタンに .recommended を付ける
 function showHint() {
     const view = app.view;
-    if (!view || !app.controller || !myTurn(view)) return;
+    if (!view || !app.controller || app.controller.isOnline || !myTurn(view)) return;
     const command = suggest(app.controller.game, view.viewer);
     if (!command) return;
     music.play('select');
@@ -156,6 +191,7 @@ function showHint() {
 }
 
 function markHint(view) {
+    $('#hint').hidden = Boolean(app.controller?.isOnline); // ヒントはローカル対戦だけ
     $('#hint').disabled = !myTurn(view);
     if (app.hint && (app.hint.at !== view.commandCount || !myTurn(view))) app.hint = null;
     const hint = app.hint?.command;
@@ -441,6 +477,7 @@ function init() {
         renderTitle();
     });
     $('#start-button').addEventListener('click', () => startGame(newSetup()));
+    $('#online-button').addEventListener('click', () => online.open());
     $('#resume-button').addEventListener('click', () => {
         const saved = LocalGameController.loadSaved();
         if (saved) startGame(saved);
@@ -456,6 +493,11 @@ function init() {
         if (action === 'log') openLog();
         if (action === 'result') showResult();
         if (action === 'close-result') $('#result-dialog').close();
+        if (action === 'rematch' && app.controller?.isOnline) {
+            $('#result-dialog').close();
+            online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+            return;
+        }
         if (action === 'rematch') {
             const setup = app.controller?.setup;
             $('#result-dialog').close();
@@ -478,6 +520,8 @@ function init() {
     });
 
     showScene('title');
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('sw.js').then(registration => {
