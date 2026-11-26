@@ -3,12 +3,14 @@
  * ゲームの状態はコントローラーのビューだけを見て描く（オンライン対戦のコントローラーに差し替えられるように）
  */
 
-import LocalGameController from './game-controller.js';
+import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
 import BoardView, { PLAYER_COLORS, dieSvg } from './board-view.js';
-import { PAIRINGS, COLUMNS, COLUMN_LENGTH } from './game.js';
+import { PAIRINGS, COLUMNS, COLUMN_LENGTH, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'cantstop.settings.v1', save: 'cantstop.save.v1' };
@@ -58,6 +60,7 @@ function renderTitle() {
     document.querySelectorAll('#player-count button').forEach(b => b.setAttribute('aria-checked', String(Number(b.dataset.count) === settings.count)));
     document.querySelectorAll('#cpu-level button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.level === settings.level)));
     $('resume').hidden = !store.load(KEYS.save);
+    $('online-button').hidden = !online.available;
 }
 
 // タイトルの絵：ゲームの途中の盤面（実際にありうる状態）
@@ -85,18 +88,26 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    controller?.stop();
-    clearTimeout(resultTimer);
-    clearTimeout(autoTimer);
-    if ($('result-dialog').open) $('result-dialog').close();
+    let local;
     try {
-        controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
     } catch (error) {
         // 保存した記録が読めないときは、新しく始める
         console.warn(error);
         store.remove(KEYS.save);
-        controller = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
     }
+    beginGame(local);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    clearTimeout(resultTimer);
+    clearTimeout(autoTimer);
+    if ($('result-dialog').open) $('result-dialog').close();
+    controller = next;
+    hint = null;
     view = controller.getView();
     seenSeq = view.eventSeq;
     lastMove = [...view.events].reverse().find(e => e.type === 'move') ?? null;
@@ -106,19 +117,44 @@ function startGame(setup) {
     saveProgress();
 }
 
+// オンライン対戦は保存しない（部屋の記録はサーバーにある）
 function saveProgress() {
-    if (!controller) return;
+    if (!controller || controller.isOnline) return;
     if (controller.game.isOver()) store.remove(KEYS.save);
     else store.save(KEYS.save, controller.saveData());
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     clearTimeout(resultTimer);
     clearTimeout(autoTimer);
     showScene('title');
 }
+
+// ---------- オンライン対戦（入口とロビーは netplay-lobby.js の画面） ----------
+
+const online = new NetplayLobby({
+    title: 'キャント・ストップ',
+    game: 'cant-stop',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: CPU_STEP_DELAY_MS,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [{ key: 'cpuLevel', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        clearTimeout(resultTimer);
+        clearTimeout(autoTimer);
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
 
 // ---------- 更新 ----------
 
@@ -210,7 +246,7 @@ function chooseOption(index) {
 function showHint() {
     const command = mine() ? controller?.hint() : null;
     if (!command) return showBanner('自分の番になったら、おすすめを出せます', 'info');
-    hint = { key: controller.game.commands.length, command };
+    hint = { key: view.eventSeq, command };
     markHint();
     if (command.type === 'move') return showBanner(`おすすめ：${command.sums.join('と')}の列を進める`, 'info');
     showBanner(command.type === 'stop' ? 'おすすめ：止めて確定する' : 'おすすめ：続けて振る', 'info');
@@ -219,7 +255,7 @@ function showHint() {
 function markHint() {
     $('roll').classList.remove('recommended');
     $('stop').classList.remove('recommended');
-    if (!hint || hint.key !== controller?.game.commands.length) return;
+    if (!hint || hint.key !== view.eventSeq) return;
     const command = hint.command;
     if (command.type !== 'move') return $(command.type).classList.add('recommended');
     const index = view.options.findIndex(o => o.pair === command.pair && o.sums.join() === command.sums.join());
@@ -230,8 +266,8 @@ function markHint() {
 function scheduleAuto() {
     clearTimeout(autoTimer);
     if (!mine() || document.querySelector('dialog[open]')) return;
-    const key = controller.game.commands.length;
-    const again = () => controller && controller.game.commands.length === key && mine();
+    const key = view.eventSeq;
+    const again = () => controller && view.eventSeq === key && mine();
     // 前の人のバーストや止めた結果を見る間を取ってから振る
     const lastType = view.events.at(-1)?.type;
     const rollDelay = lastType === 'bust' || lastType === 'stop' ? AUTO_DELAY_MS + 900 : AUTO_DELAY_MS;
@@ -243,6 +279,7 @@ function scheduleAuto() {
 
 function render() {
     if (!view) return;
+    $('hint').hidden = Boolean(controller?.isOnline); // ヒントはローカル対戦だけ
     renderPlayers();
     boardView.render(view, { highlight: view.phase === 'choose' ? [...new Set(view.sums.flat())] : [] });
     renderPanel();
@@ -418,6 +455,7 @@ function setup() {
         renderTitle();
     });
     $('start').addEventListener('click', () => startGame(newSetup()));
+    $('online-button').addEventListener('click', () => online.open());
     $('resume').addEventListener('click', () => startGame(store.load(KEYS.save) ?? newSetup()));
     $('open-help-title').addEventListener('click', () => openDialog('help-dialog'));
     $('open-help').addEventListener('click', () => openDialog('help-dialog'));
@@ -431,10 +469,12 @@ function setup() {
     });
     $('again').addEventListener('click', () => {
         $('result-dialog').close();
+        if (controller?.isOnline) return online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
         startGame(newSetup());
     });
     $('result-home').addEventListener('click', () => {
         $('result-dialog').close();
+        if (controller?.isOnline) return online.leave();
         goHome();
     });
     document.addEventListener('keydown', e => {
@@ -459,7 +499,9 @@ function setup() {
     showScene('title');
     registerServiceWorker();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, startGame, chooseOption, roll, stop };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, startGame, chooseOption, roll, stop, online };
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
 }
 
 function registerServiceWorker() {
