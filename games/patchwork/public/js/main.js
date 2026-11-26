@@ -3,7 +3,9 @@
  * 画面はビューだけを見て描く。操作はコントローラーの send() に送る
  */
 
-import LocalGameController from './game-controller.js';
+import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 import {
     ORIENTATIONS, END, INCOME_SPACES, QUILT_SIZE, BONUS_POINTS, placementCells, rotateOrient, flipOrient
 } from './game.js';
@@ -175,6 +177,7 @@ function showScene(scene) {
 function renderTitle() {
     for (const b of document.querySelectorAll('#level-select button')) b.classList.toggle('on', b.dataset.value === app.settings.level);
     $('#resume-button').hidden = !LocalGameController.loadSaved();
+    $('#online-button').hidden = !online.available;
 }
 
 function newSetup() {
@@ -182,22 +185,54 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    app.controller?.stop();
-    app.view = null;
-    app.place = null;
-    if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, {
+    beginGame(new LocalGameController(setup, {
         onUpdate: () => update(),
         onError: () => {
             music.play('error');
             update();
         }
-    });
+    }));
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(controller) {
+    if (app.controller !== controller) app.controller?.stop();
+    app.view = null;
+    app.place = null;
+    app.hint = null;
+    if ($('#result-dialog').open) $('#result-dialog').close();
+    app.controller = controller;
     showScene('game');
     update();
 }
 
+// ===== オンライン対戦（入口とロビーは netplay-lobby.js の画面） =====
+
+const online = new NetplayLobby({
+    title: 'パッチワーク',
+    game: 'patchwork',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: CPU_STEP_DELAY_MS,
+    minPlayers: 2,
+    maxPlayers: 2,
+    settings: [],
+    onStart: (controller) => beginGame(controller),
+    onUpdate: () => update(),
+    onError: () => {
+        music.play('error');
+        update();
+    },
+    onExit: () => {
+        app.controller = null;
+        for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+        showScene('title');
+    }
+});
+app.online = online;
+
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (app.controller?.isOnline) return online.confirmLeave();
     app.controller?.stop();
     app.controller = null;
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -243,6 +278,7 @@ function render(view) {
     $('#status').textContent = statusText(view);
     $('#result-button').hidden = view.phase !== 'end';
     $('#hint').disabled = !myTurn(view);
+    $('#hint').hidden = Boolean(app.controller?.isOnline); // ヒントはローカル対戦だけ
     if (app.hint && app.hint.count !== view.commandCount) app.hint = null;
     if ($('#log-dialog').open) renderLog(view);
     renderTimeBoard(view);
@@ -609,6 +645,11 @@ function init() {
         if (action === 'close-help') $('#help-dialog').close();
         if (action === 'result') showResult();
         if (action === 'close-result') $('#result-dialog').close();
+        if (action === 'rematch' && app.controller?.isOnline) {
+            $('#result-dialog').close();
+            online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+            return;
+        }
         if (action === 'rematch') {
             const setup = app.controller?.setup;
             $('#result-dialog').close();
@@ -630,7 +671,9 @@ function init() {
         if (app.view && app.scene === 'game') render(app.view);
     });
 
+    $('#online-button').addEventListener('click', () => online.open());
     showScene('title');
+    online.boot(); // 招待の URL（?room=）から入る、または前の部屋に戻る
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('sw.js').then(registration => {
