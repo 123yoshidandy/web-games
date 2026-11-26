@@ -925,6 +925,9 @@ body.in-room .solo-only {
 }
 
 /* BGM の ON/OFF（js/music.js） */
-.bgm-toggle[aria-pressed="false"] { opacity: .5; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+.sound-toggle[aria-pressed="false"] { opacity: .5; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }
+
+/* ヒント：候補の単語を入れたら、「決定」に印を付ける */
+.key.enter.recommended { box-shadow: 0 0 0 2px #7fe8ff, 0 0 12px rgba(127, 232, 255, .6); }

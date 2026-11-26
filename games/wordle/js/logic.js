@@ -132,3 +132,18 @@ export function evaluateGuess(guess, secret) {
     }
     return result;
 }
+
+// ヒント：これまでの答えと判定にすべて合う答えの候補から1つ選ぶ（guesses は [{ word, result }]）
+// 候補の中で多く出る字を多く含むものを選ぶ（同じなら一覧の順）。候補がなければ null
+export function suggest(mode, guesses) {
+    const width = boardWidth(mode);
+    const tried = new Set(guesses.map(g => g.word));
+    const candidates = answerList(mode)
+        .map(answer => answer + BLANK.repeat(width - answer.length))
+        .filter(c => !tried.has(c) && guesses.every(g => evaluateGuess(g.word, c).join() === g.result.join()));
+    if (candidates.length === 0) return null;
+    const count = {};
+    candidates.forEach(c => new Set(c).forEach(ch => { count[ch] = (count[ch] ?? 0) + 1; }));
+    const score = (c) => [...new Set(c)].reduce((sum, ch) => sum + count[ch], 0);
+    return candidates.reduce((best, c) => (score(c) > score(best) ? c : best));
+}

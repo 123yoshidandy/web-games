@@ -3,8 +3,9 @@
  * 判定は logic.js、部屋と通信は online.js が行う
  */
 
-import { BLANK, MAX_ROWS, baseKana, boardWidth, checkGuess, createRandom, cycleVariant, evaluateGuess, normalizeLetter, pickAnswer, trimBlanks, usesBlank } from './logic.js';
+import { BLANK, MAX_ROWS, baseKana, boardWidth, checkGuess, createRandom, cycleVariant, evaluateGuess, normalizeLetter, pickAnswer, suggest, trimBlanks, usesBlank } from './logic.js';
 import { resultMessage, setupOnline } from './online.js';
+import { music } from './music.js';
 
 const MODE_STORAGE_KEY = 'wordle-mode';
 const GAME_STORAGE_KEY = 'wordle-game'; // 1人プレイの途中経過（モード・シード・入れた単語）
@@ -276,6 +277,7 @@ function handleModifier() {
     tile.textContent = next;
     tile.classList.add('pop');
     setTimeout(() => tile.classList.remove('pop'), 100);
+    music.play('select');
 }
 
 // キーボード入力の処理（入力欄に書いているときと、ダイアログを開いているときは受け付けない）
@@ -309,6 +311,8 @@ function handleLetter(key) {
     }, 100);
 
     state.currentCol++;
+    clearHint();
+    music.play('select');
     updateCurrentRowFocus();
 }
 
@@ -322,6 +326,8 @@ function handleBackspace() {
 
     const tile = document.querySelector(`.tile[data-row="${state.currentRow}"][data-col="${state.currentCol}"]`);
     setTileLetter(tile, '');
+    clearHint();
+    music.play('cancel');
     updateCurrentRowFocus();
 }
 
@@ -330,6 +336,7 @@ function handleEnterKey() {
     if (!canType()) return;
 
     if (state.currentCol !== state.length) {
+        music.play('error');
         showMessage(checkGuess(state.mode, '', state.length));
         return;
     }
@@ -339,15 +346,19 @@ function handleEnterKey() {
     if (state.mode === 'pokemon' || state.online) {
         const error = checkGuess(state.mode, word, state.length);
         if (error) {
+            music.play('error');
             showMessage(error);
             return;
         }
     }
+    clearHint();
 
     if (state.online) {
         submitOnline(word);
         return;
     }
+    // 当たり・最後の行は、結果を出すときに勝ち負けを鳴らす
+    if (word !== state.secret && state.currentRow + 1 < MAX_ROWS) music.play('place');
 
     flipRow(state.currentRow, word, evaluateGuess(word, state.secret));
     state.currentRow++;
@@ -356,6 +367,34 @@ function handleEnterKey() {
     setTimeout(updateCurrentRowFocus, 800);
     checkGameEnd(word);
     saveGame();
+}
+
+// ===== ヒント =====
+
+// これまでの判定に合う候補の単語を、今の行に入れる（「決定」で答えられる）。対戦中は使えない
+function showHint() {
+    if (state.online) {
+        showMessage('対戦中はヒントを使えません');
+        return;
+    }
+    if (!canType()) return;
+    const guesses = state.words.map(word => ({ word, result: evaluateGuess(word, state.secret) }));
+    const word = suggest(state.mode, guesses);
+    if (!word) {
+        music.play('error');
+        showMessage('合う候補が見つかりません');
+        return;
+    }
+    fillRow(state.currentRow, word);
+    state.currentCol = state.length;
+    updateCurrentRowFocus();
+    music.play('select');
+    document.querySelector('.key.enter')?.classList.add('recommended');
+    showMessage('ヒント：これまでの色に合う候補です');
+}
+
+function clearHint() {
+    document.querySelector('.key.enter.recommended')?.classList.remove('recommended');
 }
 
 // ===== 1人プレイ =====
@@ -371,8 +410,10 @@ function checkGameEnd(word) {
         if (secret !== state.secret || state.online) return; // 待つ間に新しいゲームが始まった
 
         if (word === secret) {
+            music.play('win');
             showMessage('素晴らしい！正解です！');
         } else if (state.currentRow >= MAX_ROWS) {
+            music.play('lose');
             showMessage(`ゲームオーバー! 正解は ${trimBlanks(secret)} でした`);
         }
     }, RESULT_DELAY_MS);
@@ -388,7 +429,10 @@ function startNewGame(announce = true) {
     resetBoard();
     saveGame();
 
-    if (announce) showMessage('新しいゲームを開始しました');
+    if (announce) {
+        music.play('shuffle');
+        showMessage('新しいゲームを開始しました');
+    }
 }
 
 // 保存した途中のゲームを並べ直す
@@ -468,6 +512,7 @@ function submitOnline(word) {
         return;
     }
     state.online.waiting = true;
+    music.play('place');
     markPending();
 }
 
@@ -490,6 +535,7 @@ function applyOnlineView({ view, seat, matchId }) {
         state.secret = '';
         applyMode();
         resetBoard();
+        music.play('notify');
         showMessage('対戦開始');
     }
     state.online.view = view;
@@ -497,6 +543,7 @@ function applyOnlineView({ view, seat, matchId }) {
 
     // 公開された行をめくる（再接続したときは、まとめてめくる）
     const me = view.players[seat];
+    const revealed = state.currentRow < me.rows.length;
     while (state.currentRow < me.rows.length) {
         const { word, result } = me.rows[state.currentRow];
         fillRow(state.currentRow, word);
@@ -517,6 +564,8 @@ function applyOnlineView({ view, seat, matchId }) {
     }
 
     state.gameOver = view.phase === 'end';
+    // 全員の答えが公開されて、次の行を入れられるようになった
+    if (revealed && !state.gameOver) music.play('turn');
     setTimeout(updateCurrentRowFocus, 800);
     renderOpponents(view, seat);
 
@@ -524,7 +573,9 @@ function applyOnlineView({ view, seat, matchId }) {
         state.online.resultShown = true;
         const message = resultMessage(view, seat);
         setTimeout(() => {
-            if (state.online?.matchId === matchId) showMessage(message);
+            if (state.online?.matchId !== matchId) return;
+            music.play(view.winners.length === 0 ? 'notify' : view.winners.includes(seat) ? 'win' : 'lose');
+            showMessage(message);
         }, RESULT_DELAY_MS);
     }
 }
@@ -648,6 +699,9 @@ function setupModal(modalId, closeId, ...openButtonIds) {
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 
 document.getElementById('new-game').addEventListener('click', startNewGame);
+document.getElementById('hint').addEventListener('click', showHint);
+// ヘッドレス Chrome での確認に使う
+window.__app = { state, online };
 setupKeyboard();
 setupModeToggle();
 setupTitle();
