@@ -8,6 +8,8 @@ import { MIN_PLAYERS, MAX_PLAYERS, DECK_SLOT, routeBlockReason, paymentOptions, 
 import { CITIES, ROUTES, TICKETS, COLORS, LOCO, COLOR_NAMES, ROUTE_POINTS } from './map.js';
 import { mapSvg, cardSvg, nearestRoute, PLAYER_COLORS, LINE_ICONS } from './art.js';
 import { HELP_HTML } from './help.js';
+import { suggest } from './cpu-player.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'ticket-to-ride.settings';
 const CPU_NAMES = ['ジョー', 'メイ', 'サム', 'ルーシー'];
@@ -110,8 +112,14 @@ export default class UI {
         this.resultShown = false;
         this.controller = new LocalGameController(setup, {
             onUpdate: () => this.render(),
-            onError: (message) => this.toast(message)
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            }
         });
+        this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は鳴らさない
+        this.view = null;
+        this.hintCommand = null;
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.render();
@@ -124,6 +132,7 @@ export default class UI {
         $('home').addEventListener('click', () => this.showTitle());
         $('open-help-game').addEventListener('click', () => this.openDialog('help'));
         $('open-log').addEventListener('click', () => this.showLog());
+        $('hint').addEventListener('click', () => this.showHint());
         $('players').addEventListener('click', () => this.showLog());
         $('map').addEventListener('click', event => this.tapMap(event));
         $('market').addEventListener('click', event => {
@@ -138,10 +147,12 @@ export default class UI {
             if (!b || b.disabled) return;
             if (b.dataset.pay !== undefined) {
                 this.payIndex = Number(b.dataset.pay);
+                music.play('select');
                 return this.render();
             }
             if (b.id === 'claim') return this.claim();
             if (b.id === 'cancel') {
+                music.play('cancel');
                 this.selected = null;
                 return this.render();
             }
@@ -154,6 +165,7 @@ export default class UI {
             const id = Number(b.dataset.ticket);
             if (this.picked.has(id)) this.picked.delete(id);
             else this.picked.add(id);
+            music.play(this.picked.has(id) ? 'select' : 'cancel');
             this.renderChoose();
         });
         $('choose-ok').addEventListener('click', () => {
@@ -198,11 +210,13 @@ export default class UI {
         const p = point.matrixTransform(svg.getScreenCTM().inverse());
         const id = nearestRoute(p.x, p.y, r => this.view.claimed[r.id] === null);
         if (id === null) {
+            if (this.selected !== null) music.play('cancel');
             this.selected = null;
             return this.render();
         }
         this.selected = this.selected === id ? null : id;
         this.payIndex = 0;
+        music.play(this.selected === null ? 'cancel' : 'select');
         this.render();
     }
 
@@ -236,7 +250,12 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
         this.view = view;
+        const fresh = view.events.filter(e => e.seq > this.lastSeq);
+        this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        if (prev) this.playSound(fresh, prev);
+        if (fresh.length > 0) this.hintCommand = null;
         const me = this.me();
         if (this.selected !== null && view.claimed[this.selected] !== null) this.selected = null;
         this.renderPlayers(view);
@@ -244,6 +263,7 @@ export default class UI {
         this.renderMarket(view, me);
         this.renderHand(me);
         this.renderActions(view, me);
+        this.markHint();
         if (!me.offered && $('choose').open) $('choose').close();
         if (me.offered && !$('choose').open) {
             this.picked = new Set(me.offered);
@@ -254,6 +274,50 @@ export default class UI {
             this.resultShown = true;
             setTimeout(() => this.showResult(), 700);
         }
+    }
+
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、自分の番になったら turn、終わりは勝ち負け
+    // CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
+    playSound(fresh, prev) {
+        const view = this.view;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        const mine = fresh.filter(e => e.seat === view.you).map(e => e.type);
+        if (mine.includes('claim')) return music.play('place');
+        if (mine.includes('draw') || mine.includes('tickets')) return music.play('draw');
+        if (mine.includes('keep')) return music.play('select');
+        const myTurn = v => v.phase === 'play' && v.actors.includes(v.you);
+        if (myTurn(view) && !myTurn(prev)) music.play('turn');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.view ? suggest(this.view) : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        if (command.type === 'claim') {
+            // 引く路線を選び、払い方もおすすめに合わせる（「引く」で決められる）
+            this.selected = command.route;
+            this.payIndex = Math.max(0, this.payOptions().findIndex(p => p.color === command.color && p.locos === command.locos));
+        }
+        if (command.type === 'keep') {
+            this.picked = new Set(command.tickets);
+            this.renderChoose();
+        }
+        this.render();
+        const text = { claim: '光っている路線を引く', draw: '印の付いたカードを引く', tickets: '目的地のカードを引く', pass: '見送る', keep: '選んだ目的地を残す' }[command.type];
+        this.toast(`おすすめ：${text}`);
+    }
+
+    // おすすめの手のボタンに印を付ける
+    markHint() {
+        // ダイアログのボタンは描き直さないので、前の印を外してから付ける
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        const c = this.hintCommand;
+        if (!c) return;
+        const selector = { claim: '#claim', draw: `[data-slot="${c.slot}"]`, tickets: '#draw-tickets', pass: '#pass', keep: '#choose-ok' }[c.type];
+        document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
     }
 
     renderPlayers(view) {

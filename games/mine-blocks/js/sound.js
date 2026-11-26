@@ -6,7 +6,7 @@
  * - 効果音と BGM の ON/OFF は localStorage に保存する（初めは両方 ON）
  * - 別のタブを見ている間は、音を止める
  *
- * 画面からは playSound(名前) と、設定の関数（getSoundSettings・toggleSound・toggleAllSound・onSoundSettingsChange）だけを使う
+ * 画面からは playSound(名前) と、設定の関数（getSoundSettings・toggleAllSound・onSoundSettingsChange）だけを使う
  */
 
 const SOUND_SETTINGS_KEY = 'mineBlocks.sound';
@@ -56,12 +56,7 @@ function onSoundSettingsChange(listener) {
     soundState.listeners.add(listener);
 }
 
-// 効果音（'effects'）か BGM（'bgm'）の ON/OFF を切り替える
-function toggleSound(kind) {
-    setSoundSettings({ ...soundState.settings, [kind]: !soundState.settings[kind] });
-}
-
-// ヘッダーのボタン：どちらかが鳴っていれば両方消し、両方消えていれば両方つける
+// サウンドのボタン：どちらかが鳴っていれば両方消し、両方消えていれば両方つける
 function toggleAllSound() {
     const on = !(soundState.settings.effects || soundState.settings.bgm);
     setSoundSettings({ effects: on, bgm: on });

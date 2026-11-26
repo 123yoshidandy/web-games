@@ -11,6 +11,9 @@ function setupEventListeners() {
     // ヒントボタン（遊び方をアニメーションで説明する）
     setupHint();
 
+    // アシスト（おすすめのピースと置き先を光らせる）
+    setupAssist();
+
     // ご意見・不具合の報告（GitHub の Issue 作成画面を開く）
     setupFeedback();
 
@@ -41,19 +44,15 @@ function setupEventListeners() {
     elements.clearHomeButton.addEventListener('click', goToTop);
 }
 
-// 音の切り替えボタン：ヘッダーは BGM と効果音をまとめて、トップ画面はそれぞれを切り替える
+// サウンドのボタン（ヘッダーとトップ画面）：どちらも BGM と効果音をまとめて切り替える。ON/OFF は aria-pressed で伝え、文言は変えない
 function setupSoundControls() {
     elements.soundButton.addEventListener('click', toggleAllSound);
-    elements.topBgm.addEventListener('click', () => toggleSound('bgm'));
-    elements.topEffects.addEventListener('click', () => toggleSound('effects'));
+    elements.topSound.addEventListener('click', toggleAllSound);
 
     const render = ({ effects, bgm }) => {
-        const anyOn = effects || bgm;
-        elements.soundButton.setAttribute('aria-pressed', String(anyOn));
-        elements.soundButton.title = anyOn ? '音を消す' : '音を出す';
-        elements.soundButton.setAttribute('aria-label', elements.soundButton.title);
-        elements.topBgm.setAttribute('aria-pressed', String(bgm));
-        elements.topEffects.setAttribute('aria-pressed', String(effects));
+        const anyOn = String(effects || bgm);
+        elements.soundButton.setAttribute('aria-pressed', anyOn);
+        elements.topSound.setAttribute('aria-pressed', anyOn);
     };
     onSoundSettingsChange(render);
     render(getSoundSettings());

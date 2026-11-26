@@ -32,6 +32,9 @@ function generateGame(seed) {
     
     // 問題を出した時刻を覚える（クリア時間に使う）
     gameState.startTime = Date.now();
+
+    // アシストの印を消し、使える場面かに合わせてボタンを切り替える
+    updateAssist();
 }
 
 // ゲーム初期化

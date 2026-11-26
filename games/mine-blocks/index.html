@@ -69,8 +69,7 @@
             </div>
             <!-- 音の切り替え（設定はこの端末に保存する）と、ご意見・不具合の報告。1画面に収めるため1行に並べる -->
             <div class="top-sound">
-                <button id="topBgm" class="top-sound-toggle" aria-pressed="true">BGM</button>
-                <button id="topEffects" class="top-sound-toggle" aria-pressed="true">効果音</button>
+                <button type="button" id="topSound" class="top-sound-toggle sound-toggle" aria-pressed="true">サウンド</button>
                 <button id="topFeedback" class="top-feedback">ご意見・不具合の報告</button>
             </div>
         </div>
@@ -102,14 +101,21 @@
                         <path d="M5.5 9.5V20h4.5v-5.5h4V20h4.5V9.5"/>
                     </svg>
                 </button>
+                <!-- ヒント：想定解のうち、まだ置けていないピースを1つ光らせる（チャレンジとオンライン対戦では使えない） -->
+                <button type="button" id="hint" class="icon-button" title="おすすめの手" aria-label="ヒント">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M9 18h6M10 21h4"/>
+                        <path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/>
+                    </svg>
+                </button>
                 <button id="surrender" class="icon-button" title="降参して想定解を見る" aria-label="降参">
                     <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
                         <line x1="4" y1="22" x2="4" y2="15"/>
                     </svg>
                 </button>
-                <!-- 音（BGM と効果音）をまとめて消す・出す。個別の切り替えはトップ画面で -->
-                <button id="soundButton" class="icon-button sound-button" title="音を消す" aria-label="音を消す" aria-pressed="true">
+                <!-- 音（BGM と効果音）をまとめて消す・出す。トップ画面のサウンドのボタンと同じ -->
+                <button type="button" id="soundButton" class="icon-button sound-button sound-toggle" title="サウンド" aria-label="サウンド" aria-pressed="true">
                     <svg class="icon-sound-on" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/>
                         <path d="M15.5 9a4 4 0 0 1 0 6"/>
@@ -117,8 +123,7 @@
                     </svg>
                     <svg class="icon-sound-off" viewBox="0 0 24 24" aria-hidden="true">
                         <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/>
-                        <line x1="15.5" y1="9.5" x2="20.5" y2="14.5"/>
-                        <line x1="20.5" y1="9.5" x2="15.5" y2="14.5"/>
+                        <line x1="3.5" y1="3.5" x2="20.5" y2="20.5"/>
                     </svg>
                 </button>
                 <button id="feedbackButton" class="icon-button" title="ご意見・不具合の報告" aria-label="ご意見・不具合の報告">
@@ -374,6 +379,7 @@
     <script src="js/interaction.js"></script>
     <script src="js/challenge.js"></script>
     <script src="js/hint.js"></script>
+    <script src="js/assist.js"></script>
     <script src="js/surrender.js"></script>
     <script src="js/resume.js"></script>
     <script src="js/top.js"></script>

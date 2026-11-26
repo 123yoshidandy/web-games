@@ -196,7 +196,7 @@ button:focus-visible {
     display: block;
 }
 
-/* 音のボタン：鳴っているときはスピーカー、消しているときは × のアイコン */
+/* 音のボタン：鳴っているときはスピーカー、消しているときは斜線を入れて薄くする */
 .sound-button .icon-sound-off,
 .sound-button[aria-pressed="false"] .icon-sound-on {
     display: none;
@@ -2164,8 +2164,8 @@ body.is-top {
     }
 }
 
-/* さらに幅の狭いスマホ（幅320px など）：タイトルと5つのボタンを1行に収めるため、ボタンを少し小さくする */
-@media (max-width: 340px) {
+/* 幅 420px までのスマホ：タイトルと6つのボタン（ヒントを含む）を1行に収めるため、ボタンを少し小さくする */
+@media (max-width: 420px) {
     .logo {
         font-size: 0.9rem;
         letter-spacing: 0.02em;
@@ -2176,8 +2176,30 @@ body.is-top {
     }
 
     .icon-button {
-        width: 30px;
-        height: 30px;
+        width: 31px;
+        height: 31px;
+    }
+
+    .icon-button svg {
+        width: 18px;
+        height: 18px;
+    }
+}
+
+/* さらに幅の狭いスマホ（幅320px など）：タイトルと6つのボタンを1行に収めるため、ボタンとタイトルをもう少し小さくする */
+@media (max-width: 340px) {
+    .logo {
+        font-size: 0.8rem;
+        letter-spacing: 0.01em;
+    }
+
+    .buttons {
+        gap: 2px;
+    }
+
+    .icon-button {
+        width: 28px;
+        height: 28px;
     }
 
     .icon-button svg {
@@ -2294,4 +2316,21 @@ body.is-top {
     .blocks-container {
         --block-cell: 17px;
     }
+}
+
+/* アシスト：おすすめのピース（置き場）と置き先のマスを光らせる */
+#hint:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
+.recommended {
+    outline: 3px solid #fff;
+    outline-offset: 1px;
+    box-shadow: 0 0 0 5px rgba(255, 210, 87, 0.75), 0 0 16px rgba(255, 210, 87, 0.8);
+}
+
+.cell.recommended {
+    position: relative;
+    z-index: 1;
 }

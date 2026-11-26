@@ -11,7 +11,7 @@ const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const PRECACHE = [
     './', 'index.html', 'style.css', 'manifest.webmanifest', 'favicon.svg', 'favicon.png',
     'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'js/block.js',
-    'js/board.js', 'js/challenge.js', 'js/effects.js', 'js/feedback.js', 'js/game-state.js', 'js/hint.js',
+    'js/assist.js', 'js/board.js', 'js/challenge.js', 'js/effects.js', 'js/feedback.js', 'js/game-state.js', 'js/hint.js',
     'js/interaction.js', 'js/main.js', 'js/online-config.js', 'js/online.js', 'js/piece-shape.js',
     'js/random.js', 'js/resume.js', 'js/solution.js', 'js/sound.js', 'js/surrender.js', 'js/top.js',
     'js/ui.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs'

@@ -36,6 +36,6 @@
   },
   "layoutCheck": {
     "start": "#topEndless",
-    "bgmToggle": "#topBgm, #soundButton"
+    "bgmToggle": "#topSound, #soundButton"
   }
 }

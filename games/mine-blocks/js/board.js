@@ -159,6 +159,7 @@ function placeBlock(startRow, startCol, block) {
     }
     
     addPieceOverlay(blockIndex, startRow, startCol, block);
+    clearAssist();
 
     // ブロックを使用済みにする
     const blockElement = elements.blocksContainer.children[blockIndex];
@@ -177,6 +178,7 @@ function placeBlock(startRow, startCol, block) {
 
 // 配置済みのブロックを盤面から外し、置き場に戻す
 function removeBlock(blockIndex) {
+    clearAssist();
     for (let row = 0; row < gameState.boardRows; row++) {
         for (let col = 0; col < gameState.boardCols; col++) {
             const placed = gameState.board[row][col];
