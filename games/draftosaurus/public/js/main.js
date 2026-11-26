@@ -3,7 +3,8 @@
  * ゲームの状態はコントローラーのビューだけを見て描く（オンライン対戦のコントローラーに差し替えられるように）
  */
 
-import LocalGameController from './game-controller.js';
+import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { SPECIES, ZONES, DIE_FACES } from './dinos.js';
 import { dieAllows } from './park.js';
 import { spritesMarkup, dinoSvg, faceSvg } from './art.js';
@@ -11,6 +12,8 @@ import { boardHtml } from './board.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'draftosaurus.settings.v1', save: 'draftosaurus.save.v1' };
@@ -61,6 +64,7 @@ function renderTitle() {
     document.querySelectorAll('#player-count button').forEach(b => b.setAttribute('aria-checked', String(Number(b.dataset.count) === settings.count)));
     document.querySelectorAll('#cpu-level button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.level === settings.level)));
     $('resume').hidden = !store.load(KEYS.save);
+    $('online-button').hidden = !online.available;
 }
 
 // タイトルの絵：川をはさんだ公園と、6 種の恐竜
@@ -89,16 +93,23 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    controller?.stop();
-    document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    clearTimeout(resultTimer);
+    let local;
     try {
-        controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
     } catch (error) {
         console.warn(error);
         store.remove(KEYS.save);
-        controller = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
     }
+    beginGame(local);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    document.querySelectorAll('dialog[open]').forEach(d => d.close());
+    clearTimeout(resultTimer);
+    controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = { dino: null, zone: null, key: null };
@@ -116,18 +127,42 @@ function lastPlacementsOf(events) {
     return reveal ? Object.fromEntries(reveal.placements.map(p => [p.seat, p])) : {};
 }
 
+// オンライン対戦は保存しない（部屋の記録はサーバーにある）
 function saveProgress() {
-    if (!controller) return;
+    if (!controller || controller.isOnline) return;
     if (controller.game.isOver()) store.remove(KEYS.save);
     else store.save(KEYS.save, controller.saveData());
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     clearTimeout(resultTimer);
     showScene('title');
 }
+
+// ---------- オンライン対戦（入口とロビーは netplay-lobby.js の画面） ----------
+
+const online = new NetplayLobby({
+    title: 'ドラフトザウルス',
+    game: 'draftosaurus',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: CPU_STEP_DELAY_MS,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [{ key: 'cpuLevel', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        clearTimeout(resultTimer);
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
 
 // ---------- 更新 ----------
 
@@ -250,6 +285,7 @@ function autoSelect() {
 
 function render() {
     if (!view) return;
+    $('hint').hidden = Boolean(controller?.isOnline); // ヒントはローカル対戦だけ
     const key = `${view.round}:${view.turn}:${view.phase}`;
     if (ui.key !== key) ui = { dino: null, zone: null, key };
     autoSelect();
@@ -455,6 +491,7 @@ function setup() {
     segment('player-count', d => { settings.count = Number(d.count); });
     segment('cpu-level', d => { settings.level = d.level; });
     $('start').addEventListener('click', () => startGame(newSetup()));
+    $('online-button').addEventListener('click', () => online.open());
     $('resume').addEventListener('click', () => startGame(store.load(KEYS.save) ?? newSetup()));
     $('open-help-title').addEventListener('click', () => openDialog('help-dialog'));
     $('open-help').addEventListener('click', () => openDialog('help-dialog'));
@@ -481,10 +518,12 @@ function setup() {
     });
     $('again').addEventListener('click', () => {
         $('result-dialog').close();
+        if (controller?.isOnline) return online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
         startGame(newSetup());
     });
     $('result-home').addEventListener('click', () => {
         $('result-dialog').close();
+        if (controller?.isOnline) return online.leave();
         goHome();
     });
 
@@ -497,7 +536,9 @@ function setup() {
     showScene('title');
     registerServiceWorker();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, selectDino, selectZone, place, discard, openPark, showResult };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, selectDino, selectZone, place, discard, openPark, showResult, online };
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
 }
 
 function registerServiceWorker() {
