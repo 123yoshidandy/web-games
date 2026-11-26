@@ -18,4 +18,17 @@ describe('オンライン対戦（センチュリー：スパイスロード）'
         expect(view.players[0].handCount).toBeGreaterThan(0);
         expect(JSON.stringify(view)).not.toContain('"deck":');
     });
+
+    it('1手打つと、ほかの席のビューにその手の出来事が届く（印とビューの絞り方の単位がそろっている）', async () => {
+        const server = createTestServer(definition);
+        const clients = await server.createRoom(['あか', 'あお']);
+        await clients[0].send('start');
+        const room = await server.store.getRoom(clients[0].last('joined').roomCode);
+        const game = definition.restore(structuredClone(room.game), room);
+        const seat = [0, 1].find(s => suggest(game, s));
+        expect(seat).toBeDefined();
+        await clients[seat].send('command', { command: suggest(game, seat) });
+        const other = clients[1 - seat];
+        expect(other.last('state').view.events.length).toBeGreaterThan(0);
+    });
 });
