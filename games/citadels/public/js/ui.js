@@ -7,6 +7,7 @@
 import { CHARACTERS, CHARACTER_ORDER, DISTRICTS, DISTRICT_ORDER, COLORS, COLOR_ORDER, cardInfo, cardType, districtPoints } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, icon, coinHtml, characterCard, characterTag, districtCard, districtChip } from './art.js';
 
 const SETTINGS_KEY = 'citadels.settings';
@@ -69,7 +70,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -161,6 +165,7 @@ export default class UI {
             if (!card || !this.myDraft()) return;
             const character = card.dataset.character;
             this.selected = this.selected?.character === character ? null : { kind: 'character', character };
+            music.play(this.selected ? 'select' : 'cancel');
             this.render();
         });
         $('#hand').addEventListener('click', (event) => {
@@ -168,6 +173,7 @@ export default class UI {
             if (!card) return;
             const id = Number(card.dataset.card);
             this.selected = this.selected?.card === id ? null : { kind: 'card', card: id };
+            music.play(this.selected ? 'select' : 'cancel');
             this.render();
         });
         $('#actions').addEventListener('click', (event) => {
@@ -666,10 +672,31 @@ export default class UI {
 
     // ---- 出来事の演出 ----
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ、大事な順に選んで鳴らす
+    // 盗まれた・壊されたら払う音、自分の役割が呼ばれたら自分の番の音。自分の手は建てる（置く）・暗殺や盗み（取る）・
+    // 金を得る・札を引く・払う。ラウンドの始まりは切る音、ほかの人の手は知らせ
+    playSounds(view, fresh) {
+        const me = view.you;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === me ? 'win' : 'lose');
+        if (fresh.some(e => (e.type === 'gold' && e.from === me && e.to !== null && e.to !== me) || (e.type === 'destroy' && e.target === me))) return music.play('pay');
+        if (fresh.some(e => e.type === 'call' && e.seat === me)) return music.play('turn');
+        const has = (...types) => fresh.some(e => types.includes(e.type) && e.seat === me);
+        if (has('build', 'complete')) return music.play('place');
+        if (has('kill', 'rob', 'destroy', 'swap')) return music.play('capture');
+        if (fresh.some(e => e.type === 'gold' && e.to === me)) return music.play('gain');
+        if (has('draw', 'redraw', 'drawOffer')) return music.play('draw');
+        if (fresh.some(e => e.type === 'gold' && e.from === me)) return music.play('pay');
+        if (has('pick', 'discardCharacter', 'graveyard', 'crown')) return music.play('place');
+        if (fresh.some(e => e.type === 'round')) return music.play('shuffle');
+        if (fresh.some(e => e.seat !== undefined && e.seat !== null && e.seat !== me)) music.play('notify');
+    }
+
     playEvents(view, prev) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.playSounds(view, fresh);
         const deltas = new Map();
         const add = (seat, amount) => deltas.set(seat, (deltas.get(seat) ?? 0) + amount);
         const me = view.players[view.you];

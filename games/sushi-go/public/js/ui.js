@@ -8,6 +8,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, cardHtml, miniHtml, icon } from './art.js';
 import { makiIcons } from './scoring.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'sushi-go.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
@@ -75,7 +76,10 @@ export default class UI {
                     if (this.hintCommand) this.hintCommand = this.controller.hint();
                     this.render();
                 },
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -88,6 +92,7 @@ export default class UI {
         this.selected = [];
         this.chopsticks = false;
         const view = this.controller.getView();
+        this.lastSeq = view.events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は鳴らさない
         // 続きから始めたときは、もう見せたはずのラウンドの得点は出さない
         this.shownRound = view.roundResult?.round ?? 0;
         $('#screen-title').hidden = true;
@@ -160,6 +165,7 @@ export default class UI {
             if (button.dataset.act === 'chopsticks') {
                 this.chopsticks = !this.chopsticks;
                 if (!this.chopsticks) this.selected = this.selected.slice(0, 1);
+                music.play(this.chopsticks ? 'select' : 'cancel');
                 this.render();
             } else if (button.dataset.act === 'pick') {
                 this.submit();
@@ -178,6 +184,7 @@ export default class UI {
         if (this.selected.includes(index)) this.selected = this.selected.filter(i => i !== index);
         else if (this.selected.length < limit) this.selected.push(index);
         else this.selected = limit === 1 ? [index] : [this.selected[0], index];
+        music.play(this.selected.includes(index) ? 'select' : 'cancel');
         this.render();
     }
 
@@ -190,7 +197,9 @@ export default class UI {
         this.selected = [];
         this.chopsticks = false;
         this.hintCommand = null;
+        this.picking = true;
         this.controller.send(command);
+        this.picking = false;
     }
 
     // ---- タイトル ----
@@ -220,10 +229,23 @@ export default class UI {
 
     // ---- ゲーム画面 ----
 
+    // 新しい出来事から効果音を1つ鳴らす。自分が出したら place、全員の札が開いて次を選べるようになったら turn、終わりは勝ち負け
+    playSound(view, fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        if (this.picking) return music.play('place');
+        if (fresh.some(e => e.type === 'roundEnd')) return music.play('notify');
+        if (fresh.some(e => e.type === 'round')) return music.play('shuffle');
+        if (fresh.some(e => e.type === 'reveal')) music.play(this.canPick() ? 'turn' : 'notify');
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
         this.view = view;
+        const fresh = view.events.filter(e => e.seq > this.lastSeq);
+        this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        this.playSound(view, fresh);
         const me = view.players[view.you];
         if (view.round !== this.seenRound || me.picked) {
             // 新しいラウンドか、選び終えたら、選択を消す

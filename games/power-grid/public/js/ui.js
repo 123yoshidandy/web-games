@@ -11,6 +11,10 @@ import { CPU_LEVELS } from './cpu-player.js';
 import MapView from './map-view.js';
 import { symbolsSvg, plantHtml, resIcon, PLAYER_COLORS } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
+import { music } from './music.js';
+
+// 自分の操作の音
+const COMMAND_SOUND = { choose: 'place', bid: 'place', skip: 'select', pass: 'select', discard: 'pay', buy: 'pay', build: 'place', done: 'select' };
 
 const SETTINGS_KEY = 'power-grid.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン', 'ユイ'];
@@ -73,8 +77,15 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onUpdate: () => {
+                    const previous = this.view;
+                    this.render();
+                    this.playUpdateSound(previous);
+                },
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -113,12 +124,46 @@ export default class UI {
 
     send(command) {
         if (!this.controller) return false;
+        this.sending = true;
         const ok = this.controller.send(command);
+        this.sending = false;
         if (ok) {
             this.selectedPlant = null;
             this.selectedCity = null;
+            this.hint = null;
+            if (this.view.phase !== 'end') music.play(command.type === 'buy' && !RESOURCES.some(t => command[t]) ? 'select' : COMMAND_SOUND[command.type] ?? 'place');
         }
         return ok;
+    }
+
+    // 1回の更新に1つの音。自分の操作の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const view = this.view;
+        if (!previous) return;
+        if (view.phase === 'end') {
+            if (previous.phase !== 'end') music.play(!view.winners.includes(view.you) ? 'lose' : view.winners.length > 1 ? 'notify' : 'win');
+            return;
+        }
+        if (this.sending) return;
+        music.play(this.myAct(view) && !this.myAct(previous) ? 'turn' : 'notify');
+    }
+
+    // おすすめの手を、今の選び方（発電所・金額・買う資源・都市）に入れ、押すボタンを光らせる（押すのは自分）
+    showHint() {
+        const c = this.myAct() && this.controller?.hint();
+        if (!c) {
+            music.play('error');
+            return;
+        }
+        music.play('select');
+        if (c.type === 'choose' || c.type === 'discard') this.selectedPlant = c.plant;
+        if (c.type === 'build') this.selectedCity = c.city;
+        this.render();
+        if (c.type === 'choose') this.amount = c.bid;
+        if (c.type === 'bid') this.amount = c.amount;
+        if (c.type === 'buy') this.buy = { coal: c.coal ?? 0, oil: c.oil ?? 0, garbage: c.garbage ?? 0, uranium: c.uranium ?? 0 };
+        this.hint = { count: this.view.commandCount, type: c.type };
+        this.renderPhase(this.view);
     }
 
     bindStatic() {
@@ -144,6 +189,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#zoom-in').addEventListener('click', () => this.map.zoomBy(1.6));
         $('#zoom-out').addEventListener('click', () => this.map.zoomBy(1 / 1.6));
         $('#zoom-fit').addEventListener('click', () => this.map.resetZoom());
@@ -422,6 +468,8 @@ export default class UI {
             } else html = `<p class="hint">${this.name(view, view.actors[0])}が都市を建てています</p>${this.resourceSummary(view)}`;
         }
         $('#phase').innerHTML = html;
+        $('#hint').disabled = !this.myAct(view) || view.phase === 'end';
+        if (this.hint && this.hint.count === view.commandCount) $(`#phase [data-act="${this.hint.type}"]`)?.classList.add('recommended');
     }
 
     resourceSummary(view) {

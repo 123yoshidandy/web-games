@@ -173,6 +173,11 @@ export function chooseCommand(view, level = 'normal') {
     return null;
 }
 
+// ヒント：人の番に、ふつうの CPU が選ぶ手を返す
+export function suggest(view) {
+    return chooseCommand(view, 'normal');
+}
+
 // いちばん単純な手（決めた手が通らなかったときの逃げ道）
 function fallbacks(game, seat) {
     const a = game.auction;

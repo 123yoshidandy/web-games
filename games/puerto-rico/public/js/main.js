@@ -9,6 +9,10 @@ import { barrel, coin, vpIcon, colonistIcon, roleIcon, titleArt, describeEvent, 
 import { arrangeColonists } from './cpu-player.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
+import { music } from './music.js';
+
+// 自分の操作の音（役割を選ぶ・入植・市長・建てる・監督・商人・船長・倉庫）。見送りは select
+const COMMAND_SOUND = { role: 'place', settle: 'place', hacienda: 'draw', mayor: 'place', build: 'pay', privilege: 'gain', sell: 'gain', ship: 'gain', store: 'place' };
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'puertorico.settings.v1', save: 'puertorico.save.v1' };
@@ -32,6 +36,7 @@ let view = null;
 let ui = freshUi();
 let seenSeq = 0;
 let resultShown = false;
+let sending = false; // 自分の操作を送っている間（その音は送った側で鳴らす）
 let summaryTimer = null;
 
 // ヒント：おすすめの手 { key, command }（その場面の間だけ）
@@ -48,6 +53,7 @@ function showHint() {
     if (c.type === 'build') ui.building = c.building;
     if (c.type === 'store') ui.store = { warehouse: [...(c.warehouse ?? [])], single: c.single ?? null };
     hint = { key: ui.key, command: c };
+    music.play('select');
     render();
 }
 
@@ -133,18 +139,39 @@ function goHome() {
 
 function onUpdate() {
     if (!controller) return;
+    const previous = view;
     view = controller.getView();
     saveProgress();
     render();
+    playUpdateSound(previous);
+}
+
+// 1回の更新に1つの音。CPU の手は知らせ、自分の番になったらチャイム、終わったら勝ち負け
+function playUpdateSound(previous) {
+    if (!previous) return;
+    if (view.phase === 'end') {
+        const winners = view.winners ?? [];
+        if (previous.phase !== 'end') music.play(!winners.includes(view.seat) ? 'lose' : winners.length > 1 ? 'notify' : 'win');
+        return;
+    }
+    if (sending) return;
+    const wasMine = previous.decision && previous.decision.seat === previous.seat;
+    music.play(mine() && !wasMine ? 'turn' : 'notify');
 }
 
 function onError(message) {
+    music.play('error');
     const feed = $('panel').querySelector('.feed');
     if (feed) feed.innerHTML = `<span class="error">${esc(message)}</span>`;
 }
 
 function send(command) {
-    controller?.send(command);
+    if (!controller) return;
+    sending = true;
+    const ok = controller.send(command);
+    sending = false;
+    const passed = command.take === null || command.building === null || command.good === null || command.pass;
+    if (ok && view.phase !== 'end') music.play(passed ? 'select' : COMMAND_SOUND[command.type] ?? 'place');
 }
 
 // ---------- 描画 ----------
@@ -435,6 +462,7 @@ function onMayorIsland(i) {
     const m = ui.mayor;
     if (m.island[i]) m.island[i] = false;
     else if (mayorLeft() > 0) m.island[i] = true;
+    music.play('select');
     render();
 }
 
@@ -443,6 +471,7 @@ function onMayorCity(i) {
     const cap = capacity(me().city[i].key);
     if (m.city[i] < cap && mayorLeft() > 0) m.city[i]++;
     else m.city[i] = 0;
+    music.play('select');
     render();
 }
 
@@ -456,9 +485,10 @@ function onAct(act) {
         case 'mayorAuto': {
             const c = arrangeColonists(me(), d.total);
             ui.mayor = { island: c.island, city: c.city };
+            music.play('select');
             return render();
         }
-        case 'mayorClear': ui.mayor = { island: me().island.map(() => false), city: me().city.map(() => 0) }; return render();
+        case 'mayorClear': ui.mayor = { island: me().island.map(() => false), city: me().city.map(() => 0) }; music.play('cancel'); return render();
         case 'mayor': return send({ type: 'mayor', island: ui.mayor.island, city: ui.mayor.city });
         case 'openBuild': openDialog('build-dialog'); return renderBuildDialog();
         case 'build': return send({ type: 'build', building: ui.building });
@@ -505,7 +535,7 @@ function setup() {
     $('panel').addEventListener('click', e => {
         const t = e.target;
         const role = t.closest('[data-role]');
-        if (role) { ui.role = Number(role.dataset.role); return render(); }
+        if (role) { ui.role = Number(role.dataset.role); music.play('select'); return render(); }
         const take = t.closest('[data-take]');
         if (take) return send({ type: 'settle', take: take.dataset.take === 'quarry' ? 'quarry' : Number(take.dataset.take) });
         const good = t.closest('[data-good]');
@@ -520,6 +550,7 @@ function setup() {
             const s = ui.store;
             s.warehouse = s.warehouse.includes(g) ? s.warehouse.filter(x => x !== g) : s.warehouse.length < view.decision.slots ? [...s.warehouse, g] : s.warehouse;
             if (s.single === g) s.single = null;
+            music.play('select');
             return render();
         }
         const single = t.closest('[data-single]');
@@ -527,6 +558,7 @@ function setup() {
             const g = single.dataset.single;
             ui.store.single = ui.store.single === g ? null : g;
             ui.store.warehouse = ui.store.warehouse.filter(x => x !== g);
+            music.play('select');
             return render();
         }
         const act = t.closest('[data-act]')?.dataset.act;
@@ -538,6 +570,7 @@ function setup() {
         if (mine('build') && view.options.buildable.includes(b.dataset.build)) {
             ui.building = b.dataset.build;
             $('build-dialog').close();
+            music.play('select');
             render();
         } else showBuilding(b.dataset.build);
     });

@@ -7,7 +7,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_DELAY_MS = 450;       // CPU は1手ずつ、間を置いて打つ
 const SAVE_KEY = 'power-grid.save';
@@ -44,6 +44,12 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人の番なら、おすすめの手を返す（記録は変えない）。人の番でなければ null
+    hint() {
+        if (this.game.isOver() || !this.game.actors().includes(this.humanSeat)) return null;
+        return suggest(this.getView());
     }
 
     setHold(hold) {
