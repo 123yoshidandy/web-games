@@ -123,6 +123,9 @@ node scripts/cpu-match.mjs 20 strong normal      # CPU どうしの勝率と1手
 | `public/js/ui.js`・`art.js` | 画面と絵 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（自分のファイルはネットワークを先に、字体はキャッシュを先に使う。キャッシュの名前は `chess-v1`） |
 | `server/src/game-definition.js` | オンライン対戦の「ゲームの定義」（netplay-kit の形） |
+| `server/src/handler.js` | オンライン対戦のサーバーの入口（AWS Lambda） |
+| `public/js/online-config.js` | オンライン対戦の接続先 |
+| `public/js/netplay/` | netplay-kit のクライアントとロビーの画面の写し（同期で置く。手で直さない） |
 | `scripts/cpu-match.mjs` | CPU どうしの対戦と勝率・1手の時間 |
 
 保存の名前は `chess.save`（対局の記録）と `chess.settings`（対戦・強さ・色）。
@@ -138,4 +141,11 @@ node scripts/cpu-match.mjs 20 strong normal      # CPU どうしの勝率と1手
 
 ### オンライン対戦
 
-まだ入れていない。入れるときは、netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者と操作の記録だけを保存し、操作のたびに記録から再現する。部屋の CPU は「ふつう」。対戦中に部屋を出た人の席は、CPU が代わりに続ける。待ったは入れない。
+netplay-kit の「サーバーがゲームを進める型」。2人で、足りない席は CPU（ふつう）で埋められる。席0が白、席1が黒で、自分の色を下にして描く。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントと待ったを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'chess' })`。web-games の1つのスタックから `?game=chess` で呼ばれる）
+- ゲームの定義は `server/src/game-definition.js`（記録だけを保存して再現する。各席には、その席から見えるビューだけを送る）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
