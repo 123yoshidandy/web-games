@@ -9,6 +9,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, sym, titleArtHtml } from './art.js';
 import { helpHtml } from './help.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'viticulture.settings';
 const CPU_NAMES = ['ジュリア', 'マルコ', 'ソフィア', 'ニコロ', 'キアラ'];
@@ -87,7 +88,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -97,6 +101,7 @@ export default class UI {
             return;
         }
         this.view = null;
+        this.hintCommand = null;
         this.grandeMode = false;
         this.decideKey = null;
         this.dismissedKey = null;
@@ -123,7 +128,67 @@ export default class UI {
 
     send(command) {
         if (!this.controller) return false;
-        return this.controller.send(command);
+        const before = this.view?.players[this.view.you];
+        const wasOver = this.view?.season === 'end';
+        this.hintCommand = null;
+        this.sending = true;
+        let ok = false;
+        try {
+            ok = this.controller.send(command);
+        } finally {
+            this.sending = false;
+        }
+        if (ok) this.playSent(command, before, wasOver);
+        return ok;
+    }
+
+    // ---- 効果音 ----
+
+    // 自分が送った操作の音（1つの操作に1つ）。点やお金が増えたら gain、お金を払ったら pay
+    playSent(command, before, wasOver) {
+        const view = this.view;
+        if (view.season === 'end') {
+            if (!wasOver) music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+            return;
+        }
+        const me = view.players[view.you];
+        if (before && (me.vp > before.vp || me.lira > before.lira)) return music.play('gain');
+        if (before && me.lira < before.lira) return music.play('pay');
+        music.play(command.type === 'place' || command.type === 'choose' ? 'place' : 'select');
+    }
+
+    // ほかの人が動いたときの音。自分が操作する番になったら turn、終わりは勝ち負け（CPU の手ごとには鳴らさない）
+    playUpdate(prev) {
+        const view = this.view;
+        if (view.season === 'end') {
+            if (prev.season !== 'end') music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+            return;
+        }
+        if (view.actors.includes(view.you) && !prev.actors.includes(prev.you)) music.play('turn');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        if (command.type === 'place') this.grandeMode = !!command.grande;
+        if (command.type === 'choose') this.dismissedKey = null;
+        this.render();
+        const text = { place: '印の付いた場所に置く', wake: '印の付いた起きる時間', pass: 'パス', choose: '印の付いたもの' }[command.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    // おすすめの手のボタンに印を付ける（選ぶダイアログのボタンは描き直さないので、前の印を外してから）
+    markHint() {
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        const c = this.hintCommand;
+        if (!c) return;
+        const selector = {
+            place: `[data-action="${c.action}"]`, wake: `[data-row="${c.row}"]`, pass: '[data-act="pass"]', choose: `#decide-body [data-index="${c.index}"]`
+        }[c.type];
+        if (selector) document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
     }
 
     bindStatic() {
@@ -151,6 +216,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => this.showLog());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（終わりの画面は、外側では閉じない）
@@ -202,6 +268,7 @@ export default class UI {
             if (act === 'pass') this.send({ type: 'pass' });
             else if (act === 'grande') {
                 this.grandeMode = !this.grandeMode;
+                music.play(this.grandeMode ? 'select' : 'cancel');
                 this.render();
             } else if (act === 'decide') {
                 this.dismissedKey = null;
@@ -232,7 +299,10 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
         this.view = view;
+        if (prev && view.logCount !== prev.logCount) this.hintCommand = null;
+        if (prev && !this.sending) this.playUpdate(prev);
         const me = view.players[view.you];
         if (!me.grandeFree) this.grandeMode = false;
         $('#status').innerHTML = this.statusHtml(view);
@@ -243,6 +313,7 @@ export default class UI {
         $('#me').innerHTML = this.estateHtml(me, { mine: true });
         this.renderActions(view);
         this.renderDecide(view);
+        this.markHint();
         if ($('#log').open) this.renderLog();
         if (view.season === 'end' && !this.resultTimer && !$('#result').open) {
             this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);

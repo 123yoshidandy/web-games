@@ -48,6 +48,12 @@ function simplestCommands(game) {
     return [{ type: 'pass' }];
 }
 
+// ヒント：seat のおすすめの手（CPU の「ふつう」が選ぶ手）。seat が操作する番でなければ null
+export function suggest(game, seat) {
+    if (game.season === 'end' || !game.actors().includes(seat)) return null;
+    return decide(game, seat);
+}
+
 export function decide(game, seat) {
     const p = game.players[seat];
     const easy = p.cpuLevel === 'easy';
