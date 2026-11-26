@@ -6,11 +6,13 @@
  * - 各人の欄に、押し出した数を6つの丸で出す
  */
 
-import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS } from './game-controller.js';
 import { createState, lineAxis, STEP, SIZE, BLACK, WHITE, LAYOUTS } from './rules.js';
-import { COLOR_NAMES } from './game.js';
+import { COLOR_NAMES, PLAYERS } from './game.js';
 import * as art from './art.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const SETTINGS_KEY = 'abalone.settings';
 const $ = (id) => document.getElementById(id);
@@ -45,6 +47,30 @@ export default class UI {
         this.resultShown = false;
         this.buildBoard();
         this.bind();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'アバロン',
+            game: 'abalone',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: CPU_STEP_DELAY_MS,
+            minPlayers: PLAYERS,
+            maxPlayers: PLAYERS,
+            settings: [
+                { key: 'level', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] },
+                { key: 'layout', label: '最初の並べ方', options: [{ value: 'standard', label: '標準' }, { value: 'belgian', label: 'ベルギー' }, { value: 'german', label: 'ジャーマン' }] }
+            ],
+            onStart: (controller) => this.begin(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                document.querySelectorAll('dialog[open]').forEach(d => d.close());
+                this.showTitle();
+            }
+        });
         $('title-art').appendChild(art.diagram(createState().board));
     }
 
@@ -76,11 +102,16 @@ export default class UI {
         seg('level', 'level');
         seg('layout', 'layout');
         $('start').addEventListener('click', () => this.startNew());
+        $('online-button').addEventListener('click', () => this.online.open());
         $('resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.start(saved);
         });
-        $('home').addEventListener('click', () => this.showTitle());
+        $('home').addEventListener('click', () => {
+            // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+            if (this.controller?.isOnline) return this.online.confirmLeave();
+            this.showTitle();
+        });
         const help = $('help');
         $('open-help-title').addEventListener('click', () => help.showModal());
         $('open-help-game').addEventListener('click', () => {
@@ -97,10 +128,12 @@ export default class UI {
         $('look').addEventListener('click', () => $('result').close());
         $('again').addEventListener('click', () => {
             $('result').close();
+            if (this.controller?.isOnline) return this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
             this.startNew();
         });
         $('result-home').addEventListener('click', () => {
             $('result').close();
+            if (this.controller?.isOnline) return this.online.leave();
             this.showTitle();
         });
         $('clear').addEventListener('click', () => {
@@ -138,6 +171,7 @@ export default class UI {
         this.controller = null;
         this.renderSettings();
         $('resume').hidden = !loadSavedGame();
+        $('online-button').hidden = !this.online.available;
         $('screen-game').hidden = true;
         $('screen-title').hidden = false;
     }
@@ -153,25 +187,32 @@ export default class UI {
     }
 
     start(setup) {
-        this.controller?.stop();
-        this.controller = new LocalGameController(setup, {
+        this.begin(new LocalGameController(setup, {
             onUpdate: () => this.render(),
             onError: (message) => {
                 music.play('error');
                 this.toast(message);
             }
-        });
-        this.resultShown = this.controller.game.isOver();
+        }));
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    begin(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        this.controller = controller;
+        const view = controller.getView();
+        this.resultShown = view.over;
         this.selection = [];
+        this.hintMove = null;
         this.marbles.forEach(g => g.remove());
         this.marbles.clear();
-        this.seenSeq = this.controller.game.eventSeq;
-        this.soundSeq = this.controller.game.eventSeq;
+        this.seenSeq = view.eventSeq;
+        this.soundSeq = view.eventSeq;
         this.shownCaptured = {};
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.render({ still: true });
-        this.controller.scheduleCpu();
+        if (!controller.isOnline) controller.scheduleCpu();
     }
 
     // ---- 描画 ----
@@ -201,6 +242,7 @@ export default class UI {
         this.renderMarbles(still);
         this.renderMarks();
         this.playSounds(view);
+        $('hint').hidden = Boolean(this.controller?.isOnline); // ヒントはローカル対戦だけ
         if (view.over && !this.resultShown) {
             this.resultShown = true;
             setTimeout(() => this.showResult(), 800);
