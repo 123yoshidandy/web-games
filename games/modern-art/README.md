@@ -159,6 +159,12 @@ npm test
 
 オフラインでの起動は、ヘッドレス Chrome で、Service Worker の側でネットワークを止めて再読み込みし、ゲームが始められることで確かめた（自動テストには入れていない）。
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。入札では、まだ握っていない全員が同時に操作を待つ（`game.actors()`）。端末から届いた操作は `sanitize` で種類ごとの項目だけを取り出してから `applyCommand` に渡す。
+netplay-kit の「サーバーがゲームを進める型」。3〜5人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'modern-art' })`。web-games の1つのスタックから `?game=modern-art` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）

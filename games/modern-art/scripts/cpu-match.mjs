@@ -1,7 +1,7 @@
 /**
  * CPU 同士を多数回対戦させて、勝率と平均の所持金を数える
  * 席の並び（最初の番の人はシードで決まる）で有利不利が出ないように、試合ごとに強さの並びを1つずつずらす
- * 使い方: node scripts/cpu-match.mjs [試合数] [強さの並び（easy,normal,...）]
+ * 使い方: node scripts/cpu-match.mjs [試合数] [強さの並び（easy,normal,...。人数は3〜5人。既定は easy,normal,normal の3人）]
  *   例: node scripts/cpu-match.mjs 400 easy,normal,easy
  */
 
@@ -45,7 +45,7 @@ export function runMatches({ games, levels, seedBase = 1, rotate = true }) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
     const games = Number(process.argv[2] ?? 100);
-    const levels = (process.argv[3] ?? 'easy,normal').split(',');
+    const levels = (process.argv[3] ?? 'easy,normal,normal').split(',');
     const started = Date.now();
     const r = runMatches({ games, levels });
     const f = Math.max(1, r.finished);
