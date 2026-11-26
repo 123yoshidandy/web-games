@@ -134,7 +134,21 @@ npm run cpu-match -- 100 easy,normal   # CPU 同士の勝率
 | `public/js/cpu-player.js` | CPU |
 | `public/js/game-controller.js` | ローカル対戦のコントローラー（CPU の間合い、途中経過の保存） |
 | `public/js/ui.js`・`art.js`・`main.js` | 画面と絵 |
-| `server/src/game-definition.js` | netplay-kit 形式のオンライン対戦の定義（今はオンライン対戦を入れていない） |
+| `server/src/game-definition.js` | netplay-kit 形式のオンライン対戦の定義 |
+| `server/src/handler.js` | オンライン対戦のサーバーの入口（AWS Lambda） |
+| `public/js/online-config.js` | オンライン対戦の接続先 |
+| `public/js/netplay/` | netplay-kit のクライアントとロビーの画面の写し（同期で置く。手で直さない） |
 | `public/sw.js`・`manifest.webmanifest` | PWA |
 
 テストは、ルール（王国と得点・指導者・内乱・外乱・記念碑・宝物・大災害・交換・終わり方・最終得点）、記録からの再現、ランダムな操作を浴びせても断った操作で状態が変わらないこと、CPU どうしの試合が人数・強さ・シードを変えても止まらないこと、ビューで隠すもの、オンライン対戦の定義、PWA の設定、オフラインでの起動（service worker）を確かめます。
+
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる。ほかの人の手のタイルと袋の中身はビューに入れない。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'tigris-euphrates' })`。web-games の1つのスタックから `?game=tigris-euphrates` で呼ばれる）
+- ゲームの定義は `server/src/game-definition.js`（記録だけを保存して再現する。各席には、その席から見えるビューだけを送る）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
