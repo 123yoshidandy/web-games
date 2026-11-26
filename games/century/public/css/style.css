@@ -209,7 +209,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .subtitle { margin: -4px 0 12px; color: var(--muted); font-size: 14px; letter-spacing: .15em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .setup .setup-row { display: flex; align-items: center; gap: 12px; font-weight: 800; }
-.setup .buttons { display: flex; gap: 12px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 
 /* ---- ゲーム画面 ---- */
 
