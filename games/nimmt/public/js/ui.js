@@ -10,6 +10,7 @@ import { ROW_LIMIT, MIN_PLAYERS, MAX_PLAYERS, HAND_SIZE, END_SCORE, sumBulls } f
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, bullIcon, cardHtml } from './art.js';
 import { fly, rectOf } from './animator.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'nimmt.settings';
 const CPU_NAMES = ['ハンス', 'エマ', 'ルイ', 'ミア', 'オット', 'リナ', 'カール', 'ノア', 'ソフィ'];
@@ -66,7 +67,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -78,6 +82,7 @@ export default class UI {
         this.picked = null;
         this.queue = [];
         this.paused = false;
+        this.wasActive = true; // 再開した直後は「自分の番」を鳴らさない
         this.view = this.controller.getView();
         this.lastSeq = this.view.events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は再生しない
         this.display = this.fromView(this.view);
@@ -203,6 +208,7 @@ export default class UI {
         if (!command) return;
         this.hint = command;
         if (command.type === 'play') this.picked = command.card;
+        music.play('select');
         this.render();
     }
 
@@ -221,6 +227,7 @@ export default class UI {
         if (!this.canPlay()) return;
         // 選んだカードをもう一度押したら出す
         if (this.picked === card) return this.playPicked();
+        music.play('select');
         this.picked = card;
         this.render();
     }
@@ -228,7 +235,7 @@ export default class UI {
     playPicked() {
         const card = this.picked;
         this.picked = null;
-        this.controller?.send({ type: 'play', card });
+        if (this.controller?.send({ type: 'play', card })) music.play('place');
     }
 
     // ---- 再生 ----
@@ -289,6 +296,7 @@ export default class UI {
             d.bulls = d.bulls.map(() => 0);
             d.selected = d.selected.map(() => false);
             this.render();
+            music.play('shuffle');
             return STEP_MS.deal;
         case 'reveal': {
             // 各自のカードを、持ち主の札（自分は手札の場所）から、小さい順に並べた帯へ飛ばす
@@ -302,6 +310,7 @@ export default class UI {
                 const target = $(`#strip [data-strip="${i}"] .card`);
                 fly(cardHtml(p.card), from[p.seat], rectOf(target), { delay: i * 40, hide: target, size: rectOf(target) });
             });
+            music.play('draw', { delay: 0.15 });
             return STEP_MS.reveal;
         }
         case 'chooseRow':
@@ -317,6 +326,7 @@ export default class UI {
             this.render();
             cards.forEach(({ card, rect }, i) => fly(cardHtml(card), rect, to, { delay: i * 50 }));
             this.bumpPlayer(event.seat);
+            music.play(event.seat === you ? 'pay' : 'notify');
             return STEP_MS.take;
         }
         case 'place': {
@@ -328,6 +338,7 @@ export default class UI {
             this.render();
             const target = $(`#rows .card[data-card="${event.card}"]`);
             fly(cardHtml(event.card), from, rectOf(target), { hide: target });
+            music.play('place');
             return STEP_MS.place;
         }
         case 'roundEnd':
@@ -336,13 +347,17 @@ export default class UI {
             this.render();
             // 最後のラウンドなら、そのまま最後の結果へ
             if (this.queue[0]?.type === 'end') return 0;
+            music.play('notify');
             this.showRoundResult(event);
             this.paused = true;
             return null;
-        case 'end':
+        case 'end': {
             this.render();
+            const winners = this.view.winners ?? [];
+            music.play(!winners.includes(you) ? 'lose' : winners.length > 1 ? 'notify' : 'win');
             this.showResult();
             return null;
+        }
         default:
             return 0;
         }
@@ -350,6 +365,10 @@ export default class UI {
 
     afterIdle() {
         if (!this.canPlay()) this.picked = null;
+        // カードを出す・列を選ぶ番になったら知らせる
+        const active = this.canPlay() || this.canChooseRow();
+        if (active && !this.wasActive) music.play('turn');
+        this.wasActive = active;
         if (this.view.phase === 'end' && !$('#result').open) this.showResult();
     }
 

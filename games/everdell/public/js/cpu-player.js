@@ -334,3 +334,10 @@ export function answerPrompt(game, seat, prompt, profile = PROFILES.strong) {
             return options.slice(0, Math.max(min, 0)).map(o => o.value);
     }
 }
+
+// ヒント：人の番に、CPU（強い設定）が選ぶ手を返す。CPU と同じく、その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.isOver() || game.prompt || game.turn !== seat) return null;
+    return chooseAction(game, seat, PROFILES.strong);
+}

@@ -5,7 +5,8 @@
 
 import { CARDS, RESOURCES, RESOURCE_NAMES, TYPES, BASIC_LOCATIONS, FOREST_LOCATIONS, BASIC_EVENTS, SPECIAL_EVENTS, JOURNEY_SPOTS } from './cards.js';
 import { MIN_PLAYERS, MAX_PLAYERS, SEASON_NAMES, CITY_LIMIT, HAND_LIMIT } from './game.js';
-import { LEVELS } from './cpu-player.js';
+import { LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, icon, workerIcon, resHtml, costHtml, cardHtml, cardDetailHtml, typeChip, PLAYER_COLORS } from './art.js';
 
@@ -13,6 +14,8 @@ const SETTINGS_KEY = 'everdell.settings';
 const CPU_NAMES = ['リス', 'カエル', 'ネズミ'];
 const RESULT_DELAY_MS = 900;
 const FRESH_MS = 1600;
+// 自分の操作の効果音
+const COMMAND_SOUNDS = { place: 'place', play: 'place', prepare: 'gain', pass: 'notify', answer: 'select' };
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -84,7 +87,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -137,6 +143,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
 
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.querySelector('.close')?.addEventListener('click', () => dialog.close());
@@ -161,6 +168,7 @@ export default class UI {
         const onPick = (event) => {
             const el = event.target.closest('[data-src],[data-loc],[data-seat]');
             if (!el || !this.view) return;
+            music.play('select');
             if (el.dataset.src) this.openCard(el.dataset.src, Number(el.dataset.index), el.dataset.uid ? Number(el.dataset.uid) : null);
             else if (el.dataset.loc) this.openPlace(el.dataset.loc);
             else if (el.dataset.seat) this.openCity(Number(el.dataset.seat));
@@ -173,7 +181,7 @@ export default class UI {
             const command = JSON.parse(button.dataset.cmd);
             $('#detail').close();
             $('#city').close();
-            this.controller?.send(command);
+            this.send(command);
         });
 
         $('#actions').addEventListener('click', (event) => {
@@ -184,7 +192,7 @@ export default class UI {
                 this.dismissedPrompt = null;
                 this.openPrompt();
             } else if (act === 'prepare') {
-                this.controller?.send({ type: 'prepare' });
+                this.send({ type: 'prepare' });
             } else if (act === 'pass') {
                 this.confirmPass();
             }
@@ -229,8 +237,20 @@ export default class UI {
 
     // ---- 更新 ----
 
+    // 自分の操作を送る。送っている間の更新は、自分の操作の結果として音を鳴らす
+    send(command) {
+        if (!this.controller) return false;
+        this.sending = command;
+        try {
+            return this.controller.send(command);
+        } finally {
+            this.sending = null;
+        }
+    }
+
     onUpdate() {
         if (!this.controller) return;
+        const before = { phase: this.view?.phase, myTurn: this.myTurn(), prompt: this.view?.prompt?.id };
         this.view = this.controller.getView();
         const freshEvents = this.view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = this.view.events.at(-1)?.seq ?? this.lastSeq;
@@ -240,9 +260,65 @@ export default class UI {
             if (e.type === 'place') this.fresh.set(`l${e.loc}`, now);
             if (e.seat !== undefined) this.fresh.set(`s${e.seat}`, now);
         });
+        this.playSound(before, freshEvents);
         this.render();
         clearTimeout(this.freshTimer);
         this.freshTimer = setTimeout(() => this.clearFresh(), FRESH_MS);
+    }
+
+    // 1つの更新に1つの音。相手の手は notify、自分の番になったら turn
+    playSound(before, freshEvents) {
+        const v = this.view;
+        if (v.phase === 'end') {
+            if (before.phase !== 'end') music.play(v.winners.includes(v.you) ? 'win' : 'lose');
+        } else if (this.sending) {
+            music.play(COMMAND_SOUNDS[this.sending.type] ?? 'place');
+        } else if (this.myTurn() && !before.myTurn) {
+            music.play('turn');
+        } else if ((v.prompt && !v.prompt.waiting && v.prompt.id !== before.prompt) || freshEvents.some(e => e.seat !== v.you)) {
+            music.play('notify');
+        }
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = suggest(this.controller.game, this.view.you);
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        if (command.type === 'place') this.tab = [...BASIC_EVENTS, ...SPECIAL_EVENTS].some(e => e.id === command.loc) ? 'events' : 'places';
+        else if (command.type === 'play' && command.source === 'meadow') this.tab = 'meadow';
+        this.render();
+        this.toast(`おすすめ：${this.describeHint(command)}`);
+    }
+
+    describeHint(command) {
+        const me = this.me();
+        if (command.type === 'play') {
+            const id = command.source === 'hand' ? me.hand[command.index] : this.view.meadow[command.index];
+            return `${command.source === 'hand' ? '手札' : '草原'}の「${CARDS[id]?.name ?? ''}」を出す`;
+        }
+        if (command.type === 'place') return '光っている場所にワーカーを置く';
+        if (command.type === 'prepare') return `${SEASON_NAMES[me.season + 1]}の準備`;
+        return '終える';
+    }
+
+    // おすすめの手の要素に .recommended を付ける。盤面が進んだら消す
+    markHint() {
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        $('#hint').disabled = !this.myTurn();
+        const hint = this.hint;
+        if (!hint || hint.at !== this.controller?.game.commands.length || !this.myTurn()) {
+            this.hint = null;
+            return;
+        }
+        const c = hint.command;
+        const selector = c.type === 'place' ? `[data-loc="${c.loc}"]`
+            : c.type === 'play' ? `[data-src="${c.source}"][data-index="${c.index}"]`
+                : `#actions [data-act="${c.type}"]`;
+        document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
     }
 
     clearFresh() {
@@ -276,6 +352,7 @@ export default class UI {
         this.renderActions();
         this.syncPrompt();
         this.refreshOpenSheets();
+        this.markHint();
         if (this.view.phase === 'end' && !$('#result').open && !this.resultShown) {
             clearTimeout(this.resultTimer);
             this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
@@ -689,7 +766,7 @@ export default class UI {
         if (!prompt || prompt.waiting) return;
         $('#prompt').close();
         this.promptId = null;
-        this.controller?.send({ type: 'answer', id: prompt.id, values });
+        this.send({ type: 'answer', id: prompt.id, values });
     }
 
     dismissPrompt() {

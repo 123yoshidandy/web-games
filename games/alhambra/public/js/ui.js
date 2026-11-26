@@ -8,6 +8,7 @@ import { keyOf, parseKey, placeSpots, placeError, removeError, swapError, longes
 import { bestPayment } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, tileHtml, moneyHtml, coinHtml } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'alhambra.settings';
 const CPU_NAMES = ['ルカ', 'ミラ', 'ノア', 'エマ', 'カイ'];
@@ -82,7 +83,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -226,6 +230,7 @@ export default class UI {
 
     pickMoney(slot) {
         if (!this.myTurn('action') || !this.view.moneyMarket[slot]) return;
+        music.play('select');
         const slots = this.sel?.kind === 'money' ? new Set(this.sel.slots) : new Set();
         if (slots.has(slot)) slots.delete(slot);
         else slots.add(slot);
@@ -236,6 +241,7 @@ export default class UI {
 
     pickMarket(slot) {
         if (!this.myTurn('action') || this.view.market[slot].tile === null) return;
+        music.play('select');
         if (this.sel?.kind === 'buy' && this.sel.slot === slot) {
             this.sel = null;
         } else {
@@ -252,6 +258,7 @@ export default class UI {
         if (this.sel?.kind !== 'buy') return;
         const card = this.me.hand.find(c => c.id === id);
         if (!card || card.currency !== CURRENCIES[this.sel.slot]) return;
+        music.play('select');
         const cards = new Set(this.sel.cards);
         if (cards.has(id)) cards.delete(id);
         else cards.add(id);
@@ -342,6 +349,7 @@ export default class UI {
         this.validate();
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        this.playSounds(view, fresh);
         this.fresh = new Set(fresh.filter(e => e.seat === view.you && (e.type === 'place' || e.type === 'redesign') && e.x !== null).map(e => keyOf(e.x, e.y)));
 
         this.renderPlayers();
@@ -351,6 +359,23 @@ export default class UI {
         this.renderMine();
         this.renderActions();
         this.afterRender();
+    }
+
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分の手はお金を取る（得る）・買う（払う）・置く、ほかの人の手のあとは自分の番か知らせ、終局は勝ち・負け
+    playSounds(view, fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        const acts = fresh.filter(e => e.type !== 'turn' && e.type !== 'score');
+        if (!acts.length) {
+            if (fresh.some(e => e.type === 'score')) music.play('notify');
+            return;
+        }
+        if (acts.every(e => e.seat === view.you)) {
+            const last = acts.at(-1).type;
+            return music.play(last === 'take' ? 'gain' : last === 'buy' ? 'pay' : 'place');
+        }
+        music.play(this.myTurn() ? 'turn' : 'notify');
     }
 
     // 選んでいたものがなくなったら外す

@@ -9,6 +9,7 @@ import { LEVELS } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, chipIcon, cardHtml, cardBackHtml, runsHtml, potHtml } from './art.js';
 import { fly, rectOf, reducedMotion } from './animator.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'no-thanks.settings';
 const CPU_NAMES = ['ハンス', 'エマ', 'ルイ', 'ミア', 'オット', 'リナ'];
@@ -68,7 +69,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -79,6 +83,7 @@ export default class UI {
         }
         this.view = this.controller.getView();
         this.lastSeq = this.view.events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は動かさない
+        this.endSounded = this.view.phase === 'end';
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
@@ -194,7 +199,22 @@ export default class UI {
         this.lastSeq = this.view.events.at(-1)?.seq ?? this.lastSeq;
         this.render();
         this.animate(fresh, before);
+        this.playSound(fresh);
         this.afterRender();
+    }
+
+    // 1回の更新に1つの音。自分の手は払う・得る、相手の手は知らせ、自分の番になったらチャイム
+    playSound(events) {
+        const view = this.view;
+        if (view.phase === 'end') {
+            if (!this.endSounded) music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+            this.endSounded = true;
+            return;
+        }
+        const own = events.find(e => (e.type === 'pass' || e.type === 'take') && e.seat === view.you);
+        if (own) music.play(own.type === 'pass' ? 'pay' : 'gain');
+        else if (this.myTurn()) music.play('turn');
+        else if (events.length) music.play('notify');
     }
 
     animate(events, before) {
@@ -262,6 +282,7 @@ export default class UI {
     showHint() {
         if (!this.myTurn()) return;
         this.hint = this.controller?.suggest()?.type ?? null;
+        music.play('select');
         this.renderActions();
     }
 
