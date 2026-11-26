@@ -6,6 +6,7 @@
 import { KINDS, KIND_ORDER } from './kinds.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, cardHtml, backHtml, kindTag, critter, icon } from './art.js';
 
 const SETTINGS_KEY = 'cockroach-poker.settings';
@@ -66,7 +67,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -143,6 +147,7 @@ export default class UI {
             if (!tile || !tile.classList.contains('targetable')) return;
             const target = Number(tile.dataset.player);
             this.pick.target = this.pick.target === target ? null : target;
+            music.play(this.pick.target === null ? 'cancel' : 'select');
             this.render();
         });
         $('#my-hand').addEventListener('click', (event) => {
@@ -150,6 +155,7 @@ export default class UI {
             if (!slot || !this.myPrompt('give') || slot.classList.contains('empty')) return;
             const kind = slot.dataset.kind;
             this.pick.card = this.pick.card === kind ? null : kind;
+            music.play(this.pick.card === null ? 'cancel' : 'select');
             this.render();
         });
         $('#actions').addEventListener('click', (event) => {
@@ -399,10 +405,29 @@ export default class UI {
 
     // ---- 出来事の演出 ----
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ鳴らす
+    // 負けた1人が決まったら、自分なら負け・ほかの人なら勝ち。札を引き取ったら払う音、自分の指摘が当たったら取る音、
+    // 自分が渡す・回すのは置く音、のぞくのは引く音。自分に回ってきたら自分の番の音、ほかは知らせ
+    playSounds(view, fresh) {
+        const me = view.you;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.seat === me ? 'lose' : 'win');
+        const reveal = fresh.find(e => e.type === 'reveal');
+        if (reveal) {
+            if (reveal.taker === me) return music.play('pay');
+            return music.play(reveal.seat === me ? 'capture' : 'notify');
+        }
+        const last = fresh.at(-1);
+        if (last.seat === me && last.type !== 'turn') return music.play(last.type === 'peek' ? 'draw' : 'place');
+        if ((last.type === 'turn' && last.seat === me) || ((last.type === 'give' || last.type === 'pass') && last.target === me)) return music.play('turn');
+        music.play('notify');
+    }
+
     playEvents(view, prev) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.playSounds(view, fresh);
         fresh.forEach(e => {
             if (e.type === 'give' || e.type === 'pass') this.fly(e.seat, e.target);
             if (e.type === 'reveal') {

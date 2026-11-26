@@ -5,7 +5,8 @@
  */
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS } from './cpu-player.js';
+import { CPU_LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import { CELLS, CELL_COUNT, ROWS } from './board.js';
 import { symbolsSvg, iceTile, penguinUse, penguinIcon, fishIcon, hexPoints, HEX_W, HEX_H, PLAYER_COLORS } from './art.js';
 
@@ -74,7 +75,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -146,6 +150,7 @@ export default class UI {
         });
 
         // 盤のタップ：ペンギンを押したら、そのペンギンのいるマスとして扱う
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#board').addEventListener('click', (event) => {
             const el = event.target.closest('[data-cell]');
             this.tapCell(el ? Number(el.dataset.cell) : null);
@@ -170,6 +175,7 @@ export default class UI {
         }
         const pick = v.penguins.findIndex(p => p.cell === cell);
         if (pick >= 0 && v.moves[pick]) {
+            music.play(this.selected === pick ? 'cancel' : 'select');
             this.selected = this.selected === pick && this.movable(v).length > 1 ? null : pick;
             this.render();
             return;
@@ -245,6 +251,7 @@ export default class UI {
         this.renderPenguins(view);
         this.renderNote(view);
         if (prev) this.announce(view, fresh);
+        if (prev) this.playSound(view, fresh);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer) {
             this.resultTimer = setTimeout(() => {
@@ -292,6 +299,9 @@ export default class UI {
                 });
             }
         }
+        const hinted = this.hintCell();
+        if (hinted !== null) html += ring(hinted, 'recommended');
+        $('#hint').disabled = !mine;
         $('#marks').innerHTML = html;
     }
 
@@ -340,6 +350,36 @@ export default class UI {
         fresh.filter(e => e.type === 'retire').forEach(e => {
             this.toast(e.seat === view.you ? 'あなたのペンギンは、もう動けません' : `${view.players[e.seat].name}のペンギンは、もう動けません`);
         });
+    }
+
+    // 1つの更新に1つの音。自分は置く・魚を得る、ほかの人の手は notify、自分の番になったら turn
+    playSound(view, fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        const last = fresh.filter(e => e.type === 'place' || e.type === 'move').at(-1);
+        if (!last) return;
+        if (last.seat === view.you) return music.play(last.type === 'move' ? 'gain' : 'place');
+        music.play(this.myTurn() ? 'turn' : 'notify');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        if (!this.myTurn()) return;
+        const command = suggest(this.controller.game, this.view.you);
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        if (command.type === 'move') this.selected = command.penguin;
+        this.render();
+    }
+
+    // おすすめの手のマス（置く先・動かす先）。盤面が進んだら消す
+    hintCell() {
+        if (this.hint && (this.hint.at !== this.controller?.game.commands.length || !this.myTurn())) this.hint = null;
+        const c = this.hint?.command;
+        if (!c || (c.type === 'move' && this.selected !== c.penguin)) return null;
+        return c.type === 'place' ? c.cell : c.to;
     }
 
     // ---- 記録・終わり ----

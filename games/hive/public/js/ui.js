@@ -12,6 +12,7 @@
 import { KIND_NAMES, COLOR_NAMES } from './game.js';
 import { KINDS } from './rules.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import { music } from './music.js';
 import { symbolsSvg, pieceShape, pieceSvg, cellCenter, hexPoints, HEX_R } from './art.js';
 
 const SETTINGS_KEY = 'hive.settings';
@@ -89,7 +90,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -194,11 +198,14 @@ export default class UI {
             if (!button || !this.myTurn()) return;
             const piece = button.dataset.piece;
             if (button.classList.contains('locked')) {
+                music.play('error');
                 this.toast(this.lockReason(piece));
                 return;
             }
             this.inspect = null;
-            this.sel = this.sel?.kind === 'hand' && this.sel.piece === piece ? null : { kind: 'hand', piece };
+            const same = this.sel?.kind === 'hand' && this.sel.piece === piece;
+            music.play(same ? 'cancel' : 'select');
+            this.sel = same ? null : { kind: 'hand', piece };
             this.render();
         });
         $('#actions').addEventListener('click', (event) => {
@@ -206,6 +213,7 @@ export default class UI {
             if (!button || button.disabled) return;
             const act = button.dataset.act;
             if (act === 'cancel') {
+                music.play('cancel');
                 this.sel = null;
                 this.inspect = null;
                 this.render();
@@ -360,13 +368,18 @@ export default class UI {
         const stack = this.view.board[cell];
         if (this.myTurn() && this.movableCells().has(cell)) {
             this.inspect = stack && stack.length > 1 ? cell : null;
-            this.sel = this.sel?.kind === 'board' && this.sel.cell === cell ? null : { kind: 'board', cell };
+            const same = this.sel?.kind === 'board' && this.sel.cell === cell;
+            music.play(same ? 'cancel' : 'select');
+            this.sel = same ? null : { kind: 'board', cell };
             this.render();
             return;
         }
         if (stack) {
             const top = stack[stack.length - 1];
-            if (this.myTurn() && top.owner === this.myColor()) this.toast(this.stuckReason(top));
+            if (this.myTurn() && top.owner === this.myColor()) {
+                music.play('error');
+                this.toast(this.stuckReason(top));
+            }
             this.sel = null;
             this.inspect = stack.length > 1 ? cell : null;
             this.render();
@@ -385,6 +398,7 @@ export default class UI {
         if (!this.myTurn()) return;
         const command = this.controller?.suggest();
         if (!command) return;
+        music.play('select');
         this.hint = { at: this.hintKey(), command };
         this.inspect = null;
         if (command.type === 'place') this.sel = { kind: 'hand', piece: command.kind };
@@ -465,11 +479,23 @@ export default class UI {
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         this.keepInView();
         this.animate(fresh);
+        this.playSound(fresh);
         if (fresh.some(e => e.type === 'pass') && !view.over) {
             const passer = fresh.filter(e => e.type === 'pass').at(-1).seat;
             this.toast(passer === view.seat ? '動かせる駒がないので、パスしました' : `${view.players[passer].name}はパスしました`);
         }
         if (view.over && fresh.some(e => e.type === 'end')) setTimeout(() => this.showResult(), 900);
+    }
+
+    // 1つの更新に1つの音。自分の手は置く、相手の手は notify、自分の番になったら turn
+    playSound(fresh) {
+        const view = this.view;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === null ? 'notify' : end.winner === view.seat ? 'win' : 'lose');
+        const last = fresh.filter(e => ['place', 'move', 'pass'].includes(e.type)).at(-1);
+        if (!last) return;
+        if (last.seat === view.seat) return music.play(last.type === 'pass' ? 'notify' : 'place');
+        music.play(this.myTurn() ? 'turn' : 'notify');
     }
 
     renderTop() {

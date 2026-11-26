@@ -265,3 +265,10 @@ export function runCpuStep(game, seat = nextCpuSeat(game), level) {
         })();
     return game.applyCommand(seat, fallback) ? fallback : null;
 }
+
+// ヒント：人が操作する番に、CPU（ふつう）が選ぶ手を返す。盤は全員に見えているので、隠す情報はない
+// 状態は変えず、ゲームの乱数も使わない（CPU 用の別の乱数）ので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCommand(createGameView(game, seat), 'normal', cpuRandom(game, seat));
+}

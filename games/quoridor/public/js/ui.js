@@ -11,6 +11,7 @@ import { stateFromView } from './game-view.js';
 import { wallReason, applyAction, distances, paths, SIZE, SLOTS, xOf, yOf } from './rules.js';
 import { wallMessage } from './game.js';
 import * as art from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'quoridor.settings';
 const $ = (id) => document.getElementById(id);
@@ -173,8 +174,15 @@ export default class UI {
     start(setup) {
         this.controller?.stop();
         this.controller = new LocalGameController(setup, {
-            onUpdate: () => this.render(),
-            onError: (message) => this.toast(message)
+            onUpdate: () => {
+                const previous = this.view;
+                this.render();
+                this.playUpdateSound(previous);
+            },
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            }
         });
         this.resultShown = this.controller.game.isOver();
         this.hint = null;
@@ -214,6 +222,27 @@ export default class UI {
             this.resultShown = true;
             setTimeout(() => this.showResult(), 700);
         }
+    }
+
+    // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const v = this.view;
+        if (!previous) return;
+        if (v.over) {
+            if (!previous.over) music.play(v.winner === v.seat ? 'win' : 'lose');
+            return;
+        }
+        if (this.sending) return;
+        const wasMine = !previous.over && previous.current === previous.seat;
+        music.play(this.myTurn && !wasMine ? 'turn' : 'notify');
+    }
+
+    send(command) {
+        this.sending = true;
+        const ok = this.controller.send(command);
+        this.sending = false;
+        if (ok && !this.view.over) music.play('place');
+        return ok;
     }
 
     nameOf(seat) {
@@ -357,6 +386,8 @@ export default class UI {
 
     onAction(act) {
         if (!this.myTurn) return;
+        if (act === 'wall' || act === 'rotate') music.play('select');
+        if (act === 'cancel') music.play('cancel');
         if (act === 'wall') this.enterWallMode(this.defaultPreview());
         else if (act === 'rotate') this.setPreview({ ...this.preview, o: this.preview.o === 'h' ? 'v' : 'h' });
         else if (act === 'cancel') this.leaveWallMode();
@@ -364,7 +395,7 @@ export default class UI {
             const c = this.checkPreview();
             if (!c || c.reason) return;
             this.leaveWallMode(false);
-            this.controller.send({ type: 'wall', ...c.wall });
+            this.send({ type: 'wall', ...c.wall });
         }
     }
 
@@ -449,7 +480,7 @@ export default class UI {
             if (vx >= 0 && vy >= 0 && vx < SIZE && vy < SIZE) {
                 const [x, y] = cellToLogic(vx, vy, this.rot);
                 if (this.view.moves.some(m => m.x === x && m.y === y)) {
-                    this.controller.send({ type: 'move', x, y });
+                    this.send({ type: 'move', x, y });
                     return;
                 }
             }
@@ -489,6 +520,7 @@ export default class UI {
         const command = this.controller.suggest();
         if (!command) return;
         this.hint = { seq: this.view.eventSeq, command };
+        music.play('select');
         if (command.type === 'wall') this.enterWallMode(wallToView(command, this.rot));
         else {
             this.leaveWallMode(false);
