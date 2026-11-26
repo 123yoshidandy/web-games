@@ -10,7 +10,8 @@
 
 import { SIZES, MAX_HANDICAP, COLOR_NAME, colorOf, sqName, tryMove } from './rules.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS, LEVEL_NAMES } from './cpu-player.js';
+import { CPU_LEVELS, LEVEL_NAMES, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import { resultText, marginText } from './game.js';
 import { toSgf, sgfFileName } from './sgf.js';
 import { symbolsSvg, stoneSvg, boardBaseSvg, boardExtent, pointXY, stoneAt, MARGIN } from './art.js';
@@ -90,7 +91,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -173,6 +177,7 @@ export default class UI {
         $('#result-sgf').addEventListener('click', () => this.saveSgf());
         $('#home').addEventListener('click', () => this.showTitle());
         $('#undo').addEventListener('click', () => this.undo());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#sgf').addEventListener('click', () => this.saveSgf());
         $('#resign').addEventListener('click', () => $('#resign-confirm').showModal());
         $('#resign-yes').addEventListener('click', () => {
@@ -231,6 +236,7 @@ export default class UI {
             this.press = { sq, pointerId: event.pointerId, hadPending: this.pending, moved: false };
             try { board.setPointerCapture(event.pointerId); } catch { /* 取れなくても動く */ }
             if (this.confirmMode && sq !== null && v.board[sq] === 0 && sq !== this.pending) {
+                music.play('select');
                 this.pending = sq;
                 this.renderBoard();
             }
@@ -288,6 +294,7 @@ export default class UI {
         if (!this.canPlay() || sq === null) return;
         const res = tryMove(v.board, v.size, sq, v.toPlay, v.ko);
         if (!res.ok) {
+            music.play('error');
             if (res.reason === 'ko') this.toast('コウなので、すぐには取り返せません');
             else if (res.reason === 'suicide') this.toast('自殺手は打てません');
             this.pending = null;
@@ -307,6 +314,7 @@ export default class UI {
 
     undo() {
         if (!this.controller?.undo()) return;
+        music.play('cancel');
         this.pending = null;
         clearTimeout(this.resultTimer);
         this.resultTimer = null;
@@ -490,6 +498,11 @@ export default class UI {
         } else if (this.hover !== null && v.board[this.hover] === 0) {
             parts.push(stoneAt(this.hover, size, v.toPlay, 'ghost hover'));
         }
+        const hint = this.currentHint();
+        if (hint?.type === 'move') {
+            const [x, y] = pointXY(hint.sq, size);
+            parts.push(`<circle class="recommended" cx="${x}" cy="${y}" r="0.44" stroke-width="0.1"/>`);
+        }
         svg.setAttribute('viewBox', `0 0 ${ext} ${ext}`);
         svg.innerHTML = parts.join('');
         svg.classList.toggle('mine', this.canPlay() || v.phase === 'scoring');
@@ -535,6 +548,8 @@ export default class UI {
         $('#actions-scoring').hidden = view.phase !== 'scoring';
         $('#actions-end').hidden = !view.over;
         $('#pass').disabled = !this.canPlay();
+        $('#pass').classList.toggle('recommended', this.currentHint()?.type === 'pass');
+        $('#hint').disabled = !this.canPlay();
         const humanSeats = view.players.filter(p => !p.isCPU).map(p => p.id);
         $('#confirm').disabled = view.phase !== 'scoring' || humanSeats.every(s => view.agreed[s]);
     }
@@ -545,6 +560,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.playSound(view, prev, fresh);
         const move = fresh.filter(e => e.type === 'move').at(-1);
         if (move && !reduceMotion()) {
             this.anim = { sq: move.sq, captured: move.captured, capturedColor: 3 - colorOf(move.seat) };
@@ -555,6 +571,41 @@ export default class UI {
         if (pass && view.phase === 'play' && (!cpuGame || view.players[pass.seat].isCPU)) this.toast(`${cpuGame ? this.nameOf(pass.seat) : COLOR_NAME[colorOf(pass.seat)]}はパス`);
         const resume = fresh.find(e => e.type === 'resume');
         if (resume) this.toast('対局再開');
+    }
+
+    // 1つの更新に1つの音。人の手は置く・取る、CPU の手のあとに自分の番になったら turn
+    playSound(view, prev, fresh) {
+        if (view.over && !prev.over) {
+            const winner = view.result?.winner;
+            const cpuGame = view.players.some(p => p.isCPU);
+            if (winner === null || winner === undefined) return music.play('notify');
+            return music.play(!cpuGame || winner === view.you ? 'win' : 'lose');
+        }
+        const last = fresh.filter(e => e.type === 'move' || e.type === 'pass').at(-1);
+        if (last && view.players[last.seat]?.isCPU) return music.play(view.myTurn ? 'turn' : 'notify');
+        if (last?.type === 'move') return music.play(last.captured?.length ? 'capture' : 'place');
+        if (last) return music.play('notify');
+        music.play('select');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        if (!this.canPlay()) return;
+        const command = suggest(this.controller.game, this.view.you);
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        if (command.type === 'move' && this.confirmMode) this.pending = command.sq;
+        if (command.type === 'pass') this.toast('おすすめ：パス');
+        this.renderBoard();
+        this.renderActions(this.view);
+    }
+
+    // 今のおすすめの手（盤面が進んだら消す）
+    currentHint() {
+        if (this.hint && (this.hint.at !== this.controller?.game.commands.length || !this.canPlay())) this.hint = null;
+        return this.hint?.command ?? null;
     }
 
     // ---- ダイアログ ----

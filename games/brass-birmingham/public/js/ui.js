@@ -17,6 +17,7 @@ import { LEVELS, suggestDiscard } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import MapView from './map-view.js';
 import { industryBadge } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'brass-birmingham.settings';
 const CPU_NAMES = ['ワット', 'ボールトン', 'ダーウィン'];
@@ -90,7 +91,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -102,6 +106,8 @@ export default class UI {
         this.mode = null;
         this.view = this.controller.getView();
         this.lastSeq = this.view.logs.at(-1)?.seq ?? 0;
+        this.soundSeq = this.lastSeq;
+        this.soundOver = this.view.over;
         this.lastEra = this.view.state.era;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
@@ -128,6 +134,7 @@ export default class UI {
         if (!this.controller) return;
         this.view = this.controller.getView();
         const state = this.view.state;
+        this.playSounds(this.view, state.era !== this.lastEra);
         if (state.era !== this.lastEra) {
             this.lastEra = state.era;
             const score = state.scores.at(-1);
@@ -136,6 +143,22 @@ export default class UI {
         if (this.view.current !== this.view.seat) this.mode = null;
         this.render();
         if (this.view.over) setTimeout(() => this.showResult(), 700);
+    }
+
+    // 効果音：前の更新からの記録を見て、1回の更新に1つだけ鳴らす
+    // 終局は勝ち・負け、時代の得点は知らせ、自分の手は置いた音、ほかの人の手のあとは自分の番か知らせ
+    playSounds(view, eraChanged) {
+        const fresh = view.logs.filter(l => l.seq > this.soundSeq);
+        this.soundSeq = view.logs.at(-1)?.seq ?? this.soundSeq;
+        if (view.over && !this.soundOver) {
+            this.soundOver = true;
+            return music.play(view.results.find(r => r.seat === view.seat)?.rank === 1 ? 'win' : 'lose');
+        }
+        if (eraChanged) return music.play('notify');
+        const acts = fresh.filter(l => l.seat !== null && l.seat !== undefined);
+        if (!acts.length) return;
+        if (acts.every(l => l.seat === view.seat)) return music.play('place');
+        music.play(view.current === view.seat ? 'turn' : 'notify');
     }
 
     // ---- 固定の部品 ----

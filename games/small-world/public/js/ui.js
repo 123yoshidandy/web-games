@@ -14,6 +14,7 @@ import { CPU_LEVELS } from './cpu-player.js';
 import BoardView from './board-view.js';
 import { symbolsSvg, icon, coinIcon, tokenSvg, PLAYER_COLORS } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'small-world.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
@@ -72,7 +73,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -204,6 +208,7 @@ export default class UI {
             }
         }
         this.selected = id === this.selected ? -1 : id;
+        music.play(this.selected >= 0 ? 'select' : 'cancel');
         this.render();
     }
 
@@ -220,7 +225,8 @@ export default class UI {
                 this.send({ type: action });
                 return;
             case 'place': case 'lift': case 'hero': case 'camp': case 'uncamp': case 'fort':
-                this.send({ type: action, region: id });
+                // 配置の操作は出来事を出さないので、受け付けられたらここで鳴らす
+                if (this.send({ type: action, region: id })) music.play(action === 'lift' || action === 'uncamp' ? 'cancel' : 'place');
                 return;
             case 'done': {
                 const options = peaceOptions(v);
@@ -255,7 +261,7 @@ export default class UI {
         this.renderPanel();
         if (!this.isMine()) this.hintCommand = null;
         this.markHint();
-        this.showEvents(v);
+        this.showEvents(v, prev);
         clearTimeout(this.autoTimer);
         if (this.isMine() && v.stage === 'pick' && this.pickShownAt !== v.commandCount && !document.querySelector('dialog[open]')) {
             this.pickShownAt = v.commandCount;
@@ -436,9 +442,10 @@ export default class UI {
 
     // ---- 演出と結果 ----
 
-    showEvents(v) {
+    showEvents(v, prev) {
         const events = v.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = v.events.reduce((m, e) => Math.max(m, e.seq), this.lastSeq === Infinity ? 0 : this.lastSeq);
+        if (prev) this.playSound(v, events, prev);
         const messages = [];
         events.forEach(e => {
             const name = e.seat === v.you ? 'あなた' : v.players[e.seat]?.name;
@@ -451,6 +458,21 @@ export default class UI {
             }
         });
         if (messages.length) this.toast(messages.join('\n'));
+    }
+
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、相手の番が終わったら notify、自分の番になったら turn、終わりは勝ち負け
+    playSound(v, events, prev) {
+        if (events.length === 0) return;
+        if (events.some(e => e.type === 'end')) return music.play(v.winners.includes(v.you) ? 'win' : 'lose');
+        const mine = events.filter(e => e.seat === v.you && e.type !== 'turn');
+        if (mine.some(e => e.type === 'dice')) return music.play('dice');
+        if (mine.some(e => e.type === 'conquer' && e.from)) return music.play('capture');
+        if (mine.some(e => e.type === 'income')) return music.play('gain');
+        if (mine.length > 0) return music.play('place');
+        const turn = events.findLast(e => e.type === 'turn');
+        if (!turn) return;
+        if (turn.seat === v.you) music.play('turn');
+        else if (prev.current !== v.you) music.play('notify');
     }
 
     showResult() {

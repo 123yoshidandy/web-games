@@ -10,6 +10,10 @@ import {
 import { PATCHES } from './patches.js';
 import { placementScore } from './cpu-player.js';
 import * as storage from './storage.js';
+import { music } from './music.js';
+
+// 自分の操作の音：買って置く・革のパッチを置く・進んでボタンを得る
+const COMMAND_SOUND = { buy: 'place', leather: 'place', advance: 'gain' };
 
 const HUMAN_NAME = 'あなた';
 const CPU_NAME = 'ローザ';
@@ -182,7 +186,13 @@ function startGame(setup) {
     app.view = null;
     app.place = null;
     if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => update() });
+    app.controller = new LocalGameController(setup, {
+        onUpdate: () => update(),
+        onError: () => {
+            music.play('error');
+            update();
+        }
+    });
     showScene('game');
     update();
 }
@@ -203,7 +213,27 @@ function update() {
     if (previous && view.commandCount !== previous.commandCount) app.place = null;
     app.view = view;
     render(view);
+    playUpdateSound(view, previous);
     if (view.phase === 'end' && previous && previous.phase !== 'end') setTimeout(showResult, 1200);
+}
+
+// 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+function playUpdateSound(view, previous) {
+    if (!previous || view.commandCount === previous.commandCount) return;
+    if (view.phase === 'end') {
+        if (previous.phase !== 'end') music.play(view.result?.winner === view.viewer ? 'win' : 'lose');
+        return;
+    }
+    if (app.sending) return;
+    music.play(myTurn(view) && !myTurn(previous) ? 'turn' : 'notify');
+}
+
+function send(command) {
+    app.sending = true;
+    const ok = app.controller.send(command);
+    app.sending = false;
+    if (ok && app.view.phase !== 'end') music.play(COMMAND_SOUND[command.type] ?? 'place');
+    return ok;
 }
 
 const myTurn = view => view.phase !== 'end' && view.current === view.viewer;
@@ -341,6 +371,7 @@ function showHint() {
     app.hint = { count: view.commandCount, command };
     if (command.type === 'buy') app.place = { choice: command.choice, orient: command.orient, x: command.x, y: command.y };
     else if (command.type === 'advance') app.place = null;
+    music.play('select');
     render(view);
 }
 
@@ -386,9 +417,13 @@ function fitLayout(view) {
 function pickCard(choice) {
     const view = app.view;
     const info = view.buyable[choice];
-    if (!info || !info.affordable || info.placements.length === 0) return;
+    if (!info || !info.affordable || info.placements.length === 0) {
+        music.play('error');
+        return;
+    }
     if (app.place && app.place.choice === choice) {
         app.place = null;
+        music.play('cancel');
         return render(view);
     }
     const id = view.offer[choice];
@@ -403,6 +438,7 @@ function pickCard(choice) {
         }
     }
     app.place = { choice, ...best };
+    music.play('select');
     render(view);
 }
 
@@ -429,7 +465,7 @@ function changeOrient(next) {
 function tapQuilt(cx, cy) {
     const view = app.view;
     if (view.pendingLeather) {
-        app.controller.send({ type: 'leather', x: cx, y: cy });
+        send({ type: 'leather', x: cx, y: cy });
         return;
     }
     if (!app.place) return;
@@ -449,6 +485,7 @@ function tapQuilt(cx, cy) {
     if (options.length === 0) return;
     const best = options.reduce((a, b) => (center(a) <= center(b) ? a : b));
     app.place = { choice, ...best };
+    music.play('select');
     render(view);
 }
 
@@ -459,18 +496,20 @@ function onPlayClick(event) {
     if (action === 'opponent') return openOpponent();
     if (action === 'ring') return openRing();
     if (!myTurn(view)) return;
-    if (action === 'advance') return app.controller.send({ type: 'advance' });
+    if (action === 'advance') return send({ type: 'advance' });
     if (app.place) {
         const id = view.offer[app.place.choice];
+        if (action === 'rotate' || action === 'flip') music.play('select');
         if (action === 'rotate') return changeOrient(rotateOrient(id, app.place.orient));
         if (action === 'flip') return changeOrient(flipOrient(id, app.place.orient));
         if (action === 'cancel') {
             app.place = null;
+            music.play('cancel');
             return render(view);
         }
         if (action === 'buy') {
             const { choice, orient, x, y } = app.place;
-            return app.controller.send({ type: 'buy', choice, orient, x, y });
+            return send({ type: 'buy', choice, orient, x, y });
         }
     }
     const card = event.target.closest('.card[data-choice]');

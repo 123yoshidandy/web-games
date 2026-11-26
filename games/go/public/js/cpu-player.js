@@ -83,3 +83,12 @@ export function runCpuStep(game) {
     // 決められなかった・断られたときは、いちばん単純な答えで進める
     return game.applyCommand(seat, game.phase === 'scoring' ? { type: 'confirm' } : { type: 'pass' });
 }
+
+// ヒント：人の手番に、CPU（ふつうの読み）が選ぶ手（打つ点かパス）を返す。盤は全員に見えているので、隠す情報はない
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.phase !== 'play') return null;
+    const view = createGameView(game, seat);
+    if (view.over || !view.myTurn) return null;
+    return decide(view, 'normal');
+}
