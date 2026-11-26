@@ -373,9 +373,9 @@ dialog .buttons { flex: none; display: flex; justify-content: center; gap: 12px;
 }
 
 /* BGM の ON/OFF（js/music.js） */
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+.sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }
 
 /* ヒントのおすすめ：金の枠 */
 .recommended { outline: 3px solid var(--gold); outline-offset: 1px; }

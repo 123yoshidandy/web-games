@@ -13,6 +13,7 @@ import {
     FAVOR_TILES, TOWN_TILES, SCORE_TILES, ROUNDS, SHIP_COST, DIG_VP
 } from './data.js';
 import { HEXES, LAND, BRIDGE_PAIRS } from './map.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'terra-mystica.settings';
 const RESULT_DELAY_MS = 900;
@@ -107,7 +108,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -123,6 +127,8 @@ export default class UI {
         this.openedPrompt = null;
         this.view = this.controller.getView();
         this.seenSeq = this.view.events.at(-1)?.seq ?? 0;
+        this.soundSeq = this.seenSeq;
+        this.hint = null;
         this.board.resetZoom();
         this.onUpdate();
         this.controller.scheduleCpu();
@@ -210,6 +216,7 @@ export default class UI {
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.openLog());
         $('#round-info').addEventListener('click', () => this.openInfo());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#zoom-in').addEventListener('click', () => this.board.zoomBy(1.4));
         $('#zoom-out').addEventListener('click', () => this.board.zoomBy(1 / 1.4));
         $('#me').addEventListener('click', () => this.view && this.openPlayer(this.view.you));
@@ -289,9 +296,15 @@ export default class UI {
     send(...commands) {
         if (!this.controller) return false;
         this.mode = null;
-        for (const command of commands) {
-            if (!this.controller?.send(command)) return false;
+        this.sending = true;
+        try {
+            for (const command of commands) {
+                if (!this.controller?.send(command)) return false;
+            }
+        } finally {
+            this.sending = false;
         }
+        this.playSent(commands.at(-1));
         // 自分が動いたら、それまでのほかの人の動きの印を消す
         this.seenSeq = this.view?.events.at(-1)?.seq ?? this.seenSeq;
         this.render();
@@ -314,7 +327,10 @@ export default class UI {
 
     onUpdate() {
         if (!this.controller) return;
+        const wasMine = !!this.myWaiting();
         this.view = this.controller.getView();
+        if (this.hint && this.hint.key !== this.view.commandCount) this.hint = null;
+        if (!this.sending) this.playUpdate(wasMine);
         this.sim = Game.fromState(this.view.state, this.view.options);
         // 自分の番が来たら、それまでのほかの人の動きを印で見せる。自分が動いたら印を消す
         if (this.mode && !this.myAction()) this.mode = null;
@@ -348,6 +364,73 @@ export default class UI {
         }
     }
 
+    // ---- 効果音 ----
+
+    // 自分が送った操作の音（1つの操作に1つ。町ができたら gain、終わりは勝ち負け）
+    playSent(command) {
+        const fresh = this.view.events.filter(e => e.seq > this.soundSeq);
+        this.soundSeq = this.view.events.at(-1)?.seq ?? this.soundSeq;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(this.you) ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'town' && e.seat === this.you)) return music.play('gain');
+        const sound = {
+            place: 'place', build: 'place', transform: 'place', upgrade: 'place', bridge: 'place', priest: 'place', darklings: 'place',
+            power: 'place', special: 'place', ship: 'gain', dig: 'gain', bonus: 'gain', favor: 'gain', town: 'gain', cultist: 'gain',
+            convert: 'pay', pass: 'place', done: 'select', leech: command?.accept ? 'gain' : 'cancel'
+        }[command?.type];
+        if (sound) music.play(sound);
+    }
+
+    // ほかの人が動いたときの音。自分が答える番になったら turn、ラウンドが変わったら notify、終わりは勝ち負け
+    // CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
+    playUpdate(wasMine) {
+        const fresh = this.view.events.filter(e => e.seq > this.soundSeq);
+        this.soundSeq = this.view.events.at(-1)?.seq ?? this.soundSeq;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(this.you) ? 'win' : 'lose');
+        if (this.myWaiting() && !wasMine) return music.play('turn');
+        if (fresh.some(e => e.type === 'round')) music.play('notify');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hint = { key: this.view.commandCount, command };
+        this.render();
+        this.toast(`おすすめ：${this.hintText(command)}`);
+    }
+
+    hintText(c) {
+        switch (c.type) {
+        case 'place': return '光っている土地に最初の住居を置く';
+        case 'build': return '光っている土地に住居を建てる';
+        case 'transform': return '光っている土地の地形を変える';
+        case 'upgrade': return `光っている土地の建物を${BUILDING_INFO[c.to]?.name ?? ''}に改良する`;
+        case 'ship': return '航海を伸ばす（改良）';
+        case 'dig': return '鋤を改良する（改良）';
+        case 'priest': return `司祭を${CULT_INFO[c.track]?.name ?? ''}の宗教に送る（宗教）`;
+        case 'power': return `魔力のアクション「${POWER_ACTIONS[c.id]?.name ?? ''}」（魔力）`;
+        case 'special': return `${SPECIALS[c.id]?.name ?? '特別なアクション'}`;
+        case 'pass': return 'パスする';
+        case 'bonus': return `ボーナスカード（${BONUS_CARDS[c.id]?.text ?? ''}）`;
+        case 'favor': return `恩恵タイル（${FAVOR_TILES[c.id]?.text ?? ''}）`;
+        case 'town': return `町タイル（${TOWN_TILES[c.id]?.text ?? ''}）`;
+        case 'leech': return c.accept ? '魔力を受け取る' : '魔力を受け取らない';
+        case 'cultist': return `${CULT_INFO[c.track]?.name ?? ''}の宗教を進める`;
+        case 'darklings': return `職人を司祭に${c.n}人替える`;
+        case 'done': return '使わずに進める';
+        default: return '交換する';
+        }
+    }
+
+    // ヒントのおすすめを付ける下のボタン（土地を選ぶ手は盤の土地に付ける）
+    hintPanel(c) {
+        if (c.hex !== undefined) return null;
+        return { power: 'power', special: 'power', priest: 'cult', cultist: 'cult', ship: 'upgrade', dig: 'upgrade', convert: 'convert', pass: 'pass' }[c.type] ?? null;
+    }
+
     // ---- 描画 ----
 
     render() {
@@ -376,8 +459,10 @@ export default class UI {
         // 下のボタン
         const action = this.myAction();
         const mine = !!this.myWaiting();
+        const hintPanel = this.hint ? this.hintPanel(this.hint.command) : null;
         document.querySelectorAll('#actions .act').forEach(button => {
             const panel = button.dataset.panel;
+            button.classList.toggle('recommended', panel === hintPanel);
             button.disabled = s.phase === 'end'
                 ? !['info', 'cult'].includes(panel)
                 : ['power', 'upgrade', 'pass'].includes(panel) ? !action
@@ -393,7 +478,7 @@ export default class UI {
             if (e.type === 'build' || e.type === 'transform') recent.add(e.hex);
             if (e.type === 'bridge') { recent.add(e.a); recent.add(e.b); }
         });
-        const marks = { recent };
+        const marks = { recent, hint: this.hint?.command.hex ?? null };
         const w = this.myWaiting();
         if (!w) return marks;
         if (this.mode?.type === 'bridge') {

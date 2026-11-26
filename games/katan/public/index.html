@@ -61,14 +61,13 @@
                                 <path class="assist-off" d="M4 4l16 16"/>
                             </svg>
                         </button>
-                        <button class="small icon sound-toggle" aria-label="効果音">
+                        <button type="button" class="small icon sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド">
                             <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/>
                                 <path class="sound-on" d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>
-                                <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
+                                <path class="sound-off" d="M3.5 3.5l17 17"/>
                             </svg>
                         </button>
-                        <button class="small icon bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
                         <button class="small icon open-settings" aria-label="設定" title="設定">
                             <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                                 <circle cx="12" cy="12" r="3"/>
@@ -130,17 +129,17 @@
             <div class="board-area">
                 <svg id="board" aria-label="盤面"></svg>
                 <div id="dice" class="dice"></div>
-                <!-- ホーム・遊び方・効果音・スタンプ（上部のバーは置かず、盤面の隅に並べる） -->
+                <!-- ホーム・遊び方・サウンド・スタンプ（上部のバーは置かず、盤面の隅に並べる） -->
                 <div class="board-buttons">
                     <button id="menu-button" class="small icon" aria-label="ホームに戻る">
                         <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5h-6v5.5H5.5A1.5 1.5 0 0 1 4 19z"/></svg>
                     </button>
                     <button id="help-button" class="small icon" aria-label="遊び方">？</button>
-                    <button class="small icon sound-toggle" aria-label="効果音">
+                    <button type="button" class="small icon sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド">
                         <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true">
                                 <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/>
                                 <path class="sound-on" d="M15.5 9.5a3.5 3.5 0 0 1 0 5M18 7a7 7 0 0 1 0 10"/>
-                                <path class="sound-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
+                                <path class="sound-off" d="M3.5 3.5l17 17"/>
                             </svg>
                     </button>
                     <button class="small icon assist-toggle" aria-label="アシスト" title="アシスト">
@@ -277,8 +276,7 @@
             <button class="small icon close-dialog" aria-label="閉じる">✕</button>
         </div>
         <div class="settings">
-            <label class="setting"><span>効果音</span><input type="checkbox" id="set-sound"></label>
-            <label class="setting"><span>BGM</span><input type="checkbox" class="bgm-toggle" checked></label>
+            <label class="setting"><span>サウンド</span><input type="checkbox" id="set-sound" class="sound-toggle" checked></label>
             <label class="setting"><span>アシスト（説明と★）</span><input type="checkbox" id="set-assist"></label>
             <label class="setting"><span>持っていない資源の交渉は、自動で断る</span><input type="checkbox" id="set-auto-reject"></label>
             <!-- CPU の強さ（ローカル対戦だけ。オンライン対戦の CPU は、ふつう） -->

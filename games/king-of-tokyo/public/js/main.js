@@ -8,6 +8,7 @@ import { cardOf, keyOf, FACES, FACE_NAMES, MONSTERS } from './cards.js';
 import { monsterSvg, monsterOf, dieSvg, icon, describeEvent } from './art.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
+import { music } from './music.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'kingoftokyo.settings.v1', save: 'kingoftokyo.save.v1' };
@@ -35,6 +36,11 @@ let controller = null;
 let view = null;
 let ui = freshUi();
 let resultShown = false;
+let lastSeq = 0;       // 音を鳴らし終えた出来事の番号
+let sending = null;    // 自分が送っている操作（その間の更新は、自分の操作の結果として鳴らす）
+
+// 自分の操作の効果音（サイコロ・攻撃・得点は、出来事から決める）
+const COMMAND_SOUNDS = { buy: 'pay', buyTop: 'pay', buyFrom: 'pay', sweep: 'pay', change: 'select', rapidHeal: 'gain' };
 
 // ヒント：おすすめの手 { key, command }（その場面の間だけ）
 let hint = null;
@@ -46,6 +52,7 @@ function showHint() {
     if (!mine() || !controller) return;
     const c = controller.suggest();
     if (!c) return;
+    music.play('select');
     hint = { key: hintKey(), command: c };
     if (c.type === 'reroll') ui.kept = new Set(view.dice.map((_, i) => i).filter(i => !c.dice.includes(i)));
     if (c.type === 'buy') ui.card = c.card;
@@ -121,6 +128,7 @@ function startGame(setup) {
         controller = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
     }
     view = controller.getView();
+    lastSeq = view.events.at(-1)?.seq ?? 0;
     ui = freshUi();
     showScene('game');
     render();
@@ -143,18 +151,45 @@ function goHome() {
 
 function onUpdate() {
     if (!controller) return;
+    const before = view;
     view = controller.getView();
+    const fresh = view.events.filter(e => e.seq > lastSeq);
+    lastSeq = view.events.at(-1)?.seq ?? lastSeq;
+    playSound(before, fresh);
     saveProgress();
     render();
 }
 
+// 1つの更新に1つの音。自分の操作は結果の音、ほかの怪獣の手は notify、自分の番になったら turn
+function playSound(before, fresh) {
+    const end = fresh.find(e => e.type === 'end');
+    if (end) return music.play(end.winner === view.seat ? 'win' : 'lose');
+    if (sending) {
+        const me = fresh.filter(e => e.seat === view.seat);
+        if (me.some(e => e.type === 'roll')) return music.play('dice');
+        if (me.some(e => e.type === 'attack')) return music.play('capture');
+        if (me.some(e => (e.type === 'vp' || e.type === 'energy') && e.n > 0)) return music.play('gain');
+        return music.play(COMMAND_SOUNDS[sending.type] ?? 'place');
+    }
+    const wasMine = before?.decision && before.decision.seat === before.seat;
+    if (mine() && !wasMine) return music.play('turn');
+    if (fresh.some(e => e.type === 'damage' && e.seat === view.seat)) return music.play('pay');
+    if (fresh.some(e => e.seat !== undefined && e.seat !== view.seat)) music.play('notify');
+}
+
 function onError(message) {
+    music.play('error');
     $('feed').innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
 }
 
 function send(command) {
     if (!controller) return;
-    controller.send(command);
+    sending = command;
+    try {
+        controller.send(command);
+    } finally {
+        sending = null;
+    }
 }
 
 // ---------- 描画 ----------
@@ -496,6 +531,7 @@ function setup() {
             render();
             return;
         }
+        music.play(ui.kept.has(i) ? 'cancel' : 'select');
         if (ui.kept.has(i)) ui.kept.delete(i);
         else ui.kept.add(i);
         render();

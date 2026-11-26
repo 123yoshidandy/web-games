@@ -71,6 +71,13 @@ function fallback(game, seat) {
     return tries.some(command => game.applyCommand(seat, command));
 }
 
+// ヒント：seat のおすすめの手（CPU の「ふつう」が選ぶ手のうち、交換を除いた本命の1手）。seat が答える番でなければ null
+export function suggest(game, seat) {
+    if (game.state.phase === 'end' || !game.actors().includes(seat)) return null;
+    const commands = chooseCpuCommands(game, seat, PROFILES.normal);
+    return commands.filter(command => command.type !== 'convert').at(-1) ?? commands.at(-1) ?? null;
+}
+
 export function chooseCpuCommands(game, seat, profile = PROFILES.normal) {
     const w = game.waiting();
     const random = cpuRandom(game, seat);

@@ -12,7 +12,8 @@ import Game, {
 import { GEOMETRY } from './board.js';
 import { renderBoard, injectSymbols, resourceIcon, pieceIcon, vertexPips, PLAYER_COLORS } from './board-view.js';
 import { runCpuStep, CPU_LEVELS } from './cpu-player.js';
-import { unlockSound, playEffect, toggleSound, isSoundOn, onSoundChange } from './sound.js';
+import { unlockSound, playEffect, onSoundChange } from './sound.js';
+import { music } from './music.js';
 import NetplayClient from './netplay/netplay-client.mjs';
 import { renderCoach } from './coach.js';
 import { renderHelpPictures } from './help-pictures.js';
@@ -251,7 +252,7 @@ export default class UI {
         });
         showHelpTab('basic');
         $('menu-button').addEventListener('click', () => this.goHome());
-        document.querySelectorAll('.sound-toggle').forEach(button => button.addEventListener('click', () => toggleSound()));
+        // サウンドのボタン（.sound-toggle）は、music.js が押されたときに BGM と効果音をまとめて切り替える
         onSoundChange(() => {
             this.renderSoundButtons();
             this.renderSettings();
@@ -267,9 +268,6 @@ export default class UI {
             this.renderSettings();
             this.showModal($('settings-dialog'));
         }));
-        $('set-sound').addEventListener('change', () => {
-            if ($('set-sound').checked !== isSoundOn()) toggleSound();
-        });
         $('set-assist').addEventListener('change', () => this.setAssist($('set-assist').checked));
         $('cpu-level').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-level]');
@@ -375,11 +373,11 @@ export default class UI {
         });
     }
 
+    // 表示は BGM か効果音のどちらかが ON なら ON（aria-pressed・checked は music.js が合わせる）
     renderSoundButtons() {
-        document.querySelectorAll('.sound-toggle').forEach(button => {
-            button.classList.toggle('off', !isSoundOn());
-            button.setAttribute('aria-pressed', String(isSoundOn()));
-        });
+        const settings = music.getSettings();
+        const on = settings.bgm || settings.effects;
+        document.querySelectorAll('.sound-toggle').forEach(button => button.classList.toggle('off', !on));
     }
 
     setAssist(on) {
@@ -391,7 +389,6 @@ export default class UI {
     }
 
     renderSettings() {
-        $('set-sound').checked = isSoundOn();
         $('set-assist').checked = this.assist;
         $('set-auto-reject').checked = this.autoReject;
         selectSegment($('cpu-level'), this.cpuLevel);

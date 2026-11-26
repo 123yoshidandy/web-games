@@ -122,6 +122,11 @@ export default class BoardView {
             const p = hexCenter(marks.picked);
             hl.append(el('polygon', { points: HEX_POINTS, transform: `translate(${p.x.toFixed(2)},${p.y.toFixed(2)}) scale(.86)`, class: 'picked' }));
         }
+        // ヒントのおすすめの土地
+        if (marks.hint !== undefined && marks.hint !== null) {
+            const p = hexCenter(marks.hint);
+            hl.append(el('polygon', { points: HEX_POINTS, transform: `translate(${p.x.toFixed(2)},${p.y.toFixed(2)}) scale(.78)`, class: 'recommended' }));
+        }
         // 建物と町の印
         state.hexes.forEach((h, id) => {
             if (!h.building) return;

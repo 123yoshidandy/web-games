@@ -11,6 +11,10 @@ import { legalCells, canMove, applyMove, objectiveScore, privateScore } from './
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, icon, dieHtml, windowHtml, difficultyDots, colorChip, titleArtSvg } from './art.js';
+import { music } from './music.js';
+
+// 自分の操作の音：窓を選ぶ・ダイスを取って置く・置く・道具（払う）・値を決める・番を終える
+const COMMAND_SOUND = { choose: 'place', draft: 'place', place: 'place', tool: 'pay', fluxValue: 'select', end: 'select' };
 
 const SETTINGS_KEY = 'sagrada.settings';
 const CPU_NAMES = ['マリア', 'ジョルディ', 'ヌリア'];
@@ -91,8 +95,15 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onUpdate: () => {
+                    const previous = this.view;
+                    this.render();
+                    this.playUpdateSound(previous);
+                },
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -168,6 +179,7 @@ export default class UI {
             const pick = event.target.closest('[data-pattern]');
             if (pick) {
                 this.choice = Number(pick.dataset.pattern);
+                music.play('select');
                 this.render();
                 return;
             }
@@ -207,7 +219,7 @@ export default class UI {
             case 'choose': return this.send({ type: 'choose', pattern: this.choice });
             case 'end': return this.send({ type: 'end' });
             case 'cards': return this.showCards();
-            case 'cancel-tool': this.tool = null; return this.render();
+            case 'cancel-tool': this.tool = null; music.play('cancel'); return this.render();
             case 'delta': this.tool.data.delta = Number(v); return this.nextStep();
             case 'track': return this.showTrack();
             case 'no-cell': this.tool.data.cell = null; return this.nextStep();
@@ -226,7 +238,26 @@ export default class UI {
         this.selDie = null;
         this.tool = null;
         this.hintCommand = null;
-        this.controller.send(command);
+        const { round, phase } = this.view;
+        this.sending = true;
+        const ok = this.controller.send(command);
+        this.sending = false;
+        // ラウンドが変わったときは、新しいダイスの音（playUpdateSound）だけにする
+        if (ok && this.view.phase === phase && this.view.round === round) music.play(command.type === 'place' && command.cell === null ? 'cancel' : COMMAND_SOUND[command.type] ?? 'place');
+    }
+
+    // 1回の更新に1つの音。自分の手の音は send で鳴らす。新しいラウンドはダイス、CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const v = this.view;
+        if (!previous) return;
+        if (v.phase === 'end') {
+            if (previous.phase !== 'end') music.play(v.winners.includes(v.you) || (v.solo && v.winners.length) ? 'win' : 'lose');
+        } else if (v.phase === 'play' && (v.round !== previous.round || previous.phase !== 'play')) {
+            music.play('dice');
+        } else if (!this.sending) {
+            const wasMine = previous.phase === 'play' && previous.actors.includes(previous.you);
+            music.play(this.myTurn() && !wasMine ? 'turn' : 'notify');
+        }
     }
 
     // ---- 状態の判定 ----
@@ -327,6 +358,7 @@ export default class UI {
         if (!this.canDraft()) return false;
         if (this.selDie === id && !drag) this.selDie = null;
         else this.selDie = id;
+        if (!drag) music.play(this.selDie === null ? 'cancel' : 'select');
         this.render();
         return true;
     }
@@ -756,6 +788,7 @@ export default class UI {
         const command = this.controller?.hint();
         if (!command) return this.toast('いまはあなたの番ではありません');
         this.hintCommand = command;
+        music.play('select');
         this.tool = null;
         if (command.type === 'choose') this.choice = command.pattern;
         if (command.type === 'draft') this.selDie = command.die;

@@ -1,40 +1,37 @@
 /**
  * 効果音（音声ファイルを使わず、Web Audio API で合成する）
  * ブラウザの制限で、最初に画面を触るまでは鳴らない（unlockSound を操作の中で呼ぶ）
+ * ON/OFF は BGM と同じ共通のプレイヤー（music.js）の設定に従う。.sound-toggle のボタン1つで、BGM と一緒に切り替える
  */
 
-const STORAGE_KEY = 'katan.sound';
+import { music } from './music.js';
+
+const LEGACY_KEY = 'katan.sound'; // 前の版の、効果音だけの ON/OFF
 
 let context = null;
-let enabled = loadEnabled();
-const listeners = new Set();
 
-function loadEnabled() {
-    try {
-        return localStorage.getItem(STORAGE_KEY) !== 'off';
-    } catch {
-        return true;
-    }
+// 前の版で効果音を消していたら、共通の設定の効果音も消して始める（移すのは1回だけ）
+try {
+    const legacy = localStorage.getItem(LEGACY_KEY);
+    if (legacy === 'off' && music.getSettings().effects) music.toggle('effects');
+    if (legacy !== null) localStorage.removeItem(LEGACY_KEY);
+} catch {
+    // 保存を読めなくても遊べる
 }
 
-export const isSoundOn = () => enabled;
+export const isSoundOn = () => music.getSettings().effects;
 
-export function toggleSound() {
-    enabled = !enabled;
-    try {
-        localStorage.setItem(STORAGE_KEY, enabled ? 'on' : 'off');
-    } catch {
-        // 保存できなくても切り替えはできる
-    }
-    if (enabled) unlockSound();
-    listeners.forEach(listener => listener(enabled));
-}
+// BGM と効果音をまとめて切り替える（サウンドのボタンと同じ）
+export const toggleSound = () => music.toggleAll();
 
-export const onSoundChange = (listener) => listeners.add(listener);
+export const onSoundChange = (listener) => music.onChange(settings => {
+    if (settings.effects) unlockSound();
+    listener(settings.effects);
+});
 
 // ユーザー操作の中で呼ぶ（AudioContext を作る・再開する）
 export function unlockSound() {
-    if (!enabled) return;
+    if (!isSoundOn()) return;
     try {
         context ??= new (window.AudioContext || window.webkitAudioContext)();
         if (context.state === 'suspended') context.resume();
@@ -96,7 +93,7 @@ const EFFECTS = {
 };
 
 export function playEffect(name, { delay = 0 } = {}) {
-    if (!enabled || !context || context.state !== 'running') return;
+    if (!isSoundOn() || !context || context.state !== 'running') return;
     const effect = EFFECTS[name];
     if (!effect) return;
     if (delay > 0) setTimeout(() => effect(), delay * 1000);

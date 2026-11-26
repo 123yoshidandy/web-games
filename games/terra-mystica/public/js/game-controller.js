@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuActors, PROFILES, LEVELS } from './cpu-player.js';
+import { runCpuStep, cpuActors, suggest, PROFILES, LEVELS } from './cpu-player.js';
 
 const CPU_DELAY_MS = [550, 900];     // CPU が手番の行動を選ぶまでの間（毎回少しずつ違う）
 const CPU_QUICK_MS = 260;            // 魔力のもらい・タイル選び・準備など、見た目の変わりが小さい答えの間
@@ -43,6 +43,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人のおすすめの手（人が答える番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {
