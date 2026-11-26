@@ -170,6 +170,16 @@ node scripts/cpu-match.mjs 400 5 normal basic
 
 答える番に出る電球（ヒント）を押すと、ふつうの CPU が選ぶ手を、選んだ状態にして光らせる（相棒・使うカードと相手・応じ方・番を終える）。CPU と同じく、自分のビューだけで決めるので、ほかの人の役割はもれない。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。4〜6人で、足りない席は CPU で埋められる。ルールと CPU の強さを部屋の設定に持つ。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'omaroke' })`。web-games の1つのスタックから `?game=omaroke` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -189,13 +199,7 @@ npm test
 | `public/js/game-controller.js` | 人間 1 人と CPU のローカル対戦（途中経過の保存） |
 | `public/js/main.js`・`art.js`・`help.js` | 画面・絵・遊び方 |
 | `public/sw.js`・`manifest.webmanifest` | PWA |
-| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と勝率 |
 
-### オンライン対戦を入れるとき
-
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。
-
-- 部屋には、参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する
-- 端末から届いた操作は、`sanitize` で種類ごとに決まった項目だけを取り出す
-- よける・助ける・イベントへの答えのように、手番の人以外が答える操作がある。操作を待っている人は `game.actors()` で見る

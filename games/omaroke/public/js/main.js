@@ -3,12 +3,15 @@
  * ゲームの状態はコントローラーのビューだけを見て描く（オンライン対戦のコントローラーに差し替えられるように）
  */
 
-import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS } from './game-controller.js';
 import { CARDS, POKEMON, ROLES, STATUSES, TYPES, ABILITIES, WEATHERS } from './data.js';
 import { spritesMarkup, icon, cardArt, monArt, titleArt } from './art.js';
 import { helpMarkup } from './help.js';
 import { createSeed } from './random.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 
 const $ = id => document.getElementById(id);
 const SETTINGS_KEY = 'omaroke.settings.v1';
@@ -36,6 +39,29 @@ let ui = freshUi();
 let resultTimer = null;
 let sending = false; // 自分の操作を送っている間（その音は送った側で鳴らす）
 
+// オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
+const online = new NetplayLobby({
+    title: 'お前、もしかしてロケット団？',
+    game: 'omaroke',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: CPU_STEP_DELAY_MS,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [
+        { key: 'mode', label: 'ルール', options: [{ value: 'basic', label: '基本ルール' }, { value: 'expert', label: '玄人ルール' }] },
+        { key: 'level', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }
+    ],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        clearTimeout(resultTimer);
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
+
 function freshUi() {
     return { key: null, card: null, band: false, picks: [], choose: [] };
 }
@@ -62,6 +88,7 @@ function renderTitle() {
     mark('rule-mode', 'mode', settings.mode);
     mark('cpu-level', 'level', settings.level);
     $('resume').hidden = !loadSavedGame();
+    $('online-button').hidden = !online.available;
 }
 
 // ---------- ゲームの開始 ----------
@@ -73,16 +100,23 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    controller?.stop();
-    document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    clearTimeout(resultTimer);
+    let next;
     try {
-        controller = new LocalGameController(setup, { onUpdate, onError }, { cpuDelay: CPU_DELAY });
+        next = new LocalGameController(setup, { onUpdate, onError }, { cpuDelay: CPU_DELAY });
     } catch (error) {
         console.warn(error);
         clearSavedGame();
-        controller = new LocalGameController(newSetup(), { onUpdate, onError }, { cpuDelay: CPU_DELAY });
+        next = new LocalGameController(newSetup(), { onUpdate, onError }, { cpuDelay: CPU_DELAY });
     }
+    beginGame(next);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    document.querySelectorAll('dialog[open]').forEach(d => d.close());
+    clearTimeout(resultTimer);
+    controller = next;
     view = controller.getView();
     prevView = null;
     ui = freshUi();
@@ -92,6 +126,8 @@ function startGame(setup) {
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     clearTimeout(resultTimer);
@@ -411,7 +447,8 @@ function renderAction() {
         text = view.waitingOn !== null ? `${nameOf(view.waitingOn)}が考えています` : 'ほかの人の答えを待っています';
     }
     // ヒントのボタン（自分が答える番だけ）
-    const hintButton = view.myAction && view.phase !== 'end' && view.phase !== 'choose' ? HINT_BUTTON : '';
+    // ヒントはローカル対戦だけ
+    const hintButton = view.myAction && view.phase !== 'end' && view.phase !== 'choose' && !controller?.isOnline ? HINT_BUTTON : '';
     el.innerHTML = `<div class="prompt">${text}</div><div class="buttons">${hintButton}${buttons(list)}</div>`;
 }
 
@@ -647,10 +684,12 @@ function setup() {
     });
     $('again').addEventListener('click', () => {
         $('result-dialog').close();
+        if (controller?.isOnline) return online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
         startGame(newSetup());
     });
     $('result-home').addEventListener('click', () => {
         $('result-dialog').close();
+        if (controller?.isOnline) return online.leave();
         goHome();
     });
 
@@ -660,10 +699,12 @@ function setup() {
         if (!e.target.closest('input, textarea')) e.preventDefault();
     });
 
+    $('online-button').addEventListener('click', () => online.open());
     showScene('title');
+    online.boot(); // 招待の URL（?room=）から入る、または前の部屋に戻る
     registerServiceWorker();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, newSetup, showResult, openDetail };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, newSetup, showResult, openDetail, online };
 }
 
 function registerServiceWorker() {
