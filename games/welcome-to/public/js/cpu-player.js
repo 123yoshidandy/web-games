@@ -198,6 +198,11 @@ export function chooseCommand(view, level = 'normal', random = viewRandom(view))
     return { type: 'end' };
 }
 
+// ヒント：人のビューから、おすすめの手（CPU の「ふつう」が選ぶ手）を返す。自分の番でなければ null
+export function suggest(view) {
+    return chooseCommand(view, 'normal');
+}
+
 // ---- ゲームを進める ----
 
 // 操作を待っている CPU（いなければ undefined）

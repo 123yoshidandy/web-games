@@ -13,6 +13,8 @@ import {
 } from './sheet.js';
 import { effectIcon, sheetSvg, planSizesHtml, LINE_ICONS } from './art.js';
 import { HELP_HTML } from './help.js';
+import { suggest } from './cpu-player.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'welcome-to.settings';
 const CPU_NAMES = ['ベティ', 'フランク', 'ドリス', 'ハロルド', 'ルース'];
@@ -137,8 +139,14 @@ export default class UI {
         this.resultShown = false;
         this.controller = new LocalGameController(setup, {
             onUpdate: () => this.render(),
-            onError: (message) => this.toast(message)
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            }
         });
+        this.view = null;
+        this.hintCommand = null;
+        this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は鳴らさない
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.render();
@@ -151,6 +159,7 @@ export default class UI {
         $('home').addEventListener('click', () => this.showTitle());
         $('open-help-game').addEventListener('click', () => this.openDialog('help'));
         $('open-others').addEventListener('click', () => this.showOthers());
+        $('hint').addEventListener('click', () => this.showHint());
         $('cards').addEventListener('click', event => {
             const b = event.target.closest('[data-card]');
             if (b && !b.disabled) this.selectCard(Number(b.dataset.card));
@@ -237,6 +246,7 @@ export default class UI {
         }
         const combo = this.combo();
         if (combo) this.sel.value = combo.n;
+        music.play(this.sel.num === null ? 'cancel' : 'select');
         this.render();
     }
 
@@ -246,6 +256,7 @@ export default class UI {
         const values = Game.values(combo);
         const next = this.sel.value + delta;
         if (values.includes(next)) this.sel.value = next;
+        music.play(values.includes(next) ? 'select' : 'error');
         this.render();
     }
 
@@ -291,7 +302,81 @@ export default class UI {
 
     send(command) {
         if (!this.controller) return false;
-        return this.controller.send(command);
+        this.hintCommand = null;
+        this.sending = true;
+        let ok = false;
+        try {
+            ok = this.controller.send(command);
+        } finally {
+            this.sending = false;
+        }
+        if (ok) this.playSent(command);
+        return ok;
+    }
+
+    // ---- 効果音 ----
+
+    freshEvents() {
+        const events = this.controller.getView().events;
+        const fresh = events.filter(e => e.seq > this.lastSeq);
+        this.lastSeq = events.at(-1)?.seq ?? this.lastSeq;
+        return fresh;
+    }
+
+    endSound(fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) music.play(end.winners.includes(this.view.you) ? 'win' : 'lose');
+        return !!end;
+    }
+
+    // 自分が送った操作の音（1つの操作に1つ）
+    playSent(command) {
+        const fresh = this.freshEvents();
+        if (this.endSound(fresh)) return;
+        // 全員が書き終えて、次のカードがめくられた
+        if (fresh.some(e => e.type === 'turn')) return music.play('turn');
+        const sound = { build: 'place', effect: 'place', plan: 'gain', refuse: 'pay', undo: 'cancel', end: 'select' }[command.type];
+        if (sound) music.play(sound);
+    }
+
+    // ほかの人が動いたときの音。次のカードがめくられて自分が書けるようになったら turn、終わりは勝ち負け
+    // CPU は速く書くので、CPU の手ごとには鳴らさない
+    playUpdate() {
+        const fresh = this.freshEvents();
+        if (this.endSound(fresh)) return;
+        if (fresh.some(e => e.type === 'turn') && this.mine()) music.play('turn');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.view ? suggest(this.view) : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        // 建てる手は、カードと番号を選んだ状態にする（光っている家を押して決める）
+        if (command.type === 'build') this.sel = { num: command.num, eff: command.eff, value: command.value };
+        this.render();
+        const text = {
+            build: `${command.value} を印の付いた家に建てる`, effect: '印の付いたところに効果を使う', plan: '印の付いた都市計画を達成する',
+            refuse: '建てられないので、断る', end: '手番を終える'
+        }[command.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    // おすすめの手の家・フェンス・ボタンに印を付ける
+    markHint() {
+        // シートとボタンは描き直さないことがあるので、前の印を外してから付ける
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        const c = this.hintCommand;
+        if (!c) return;
+        let selector = { plan: `[data-plan="${c.plan}"]`, refuse: '#refuse', end: '#end' }[c.type];
+        if (c.type === 'build') selector = `[data-street="${c.street}"][data-house="${c.house}"]`;
+        if (c.type === 'effect') {
+            if (c.size !== undefined) selector = `[data-size="${c.size}"]`;
+            else if (c.value !== undefined) selector = `[data-street="${c.street}"][data-house="${c.pos}"]`;
+            else if (c.pos !== undefined) selector = `[data-street="${c.street}"][data-fence="${c.pos}"]`;
+        }
+        if (selector) document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
     }
 
     // 選んで使う効果を待っているか（'surveyor'・'estate'・'bis' か null）
@@ -307,7 +392,9 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
         this.view = view;
+        if (prev && !this.sending) this.playUpdate();
         if (view.turnNo !== this.turnNo) {
             this.turnNo = view.turnNo;
             this.sel = { num: null, eff: null, value: null };
@@ -327,6 +414,7 @@ export default class UI {
         this.renderSheet(view, me);
         this.renderTracks(view, me);
         this.renderActions(view, me);
+        this.markHint();
 
         if (view.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
