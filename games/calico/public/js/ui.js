@@ -12,6 +12,7 @@ import { TILES, CATS, GOALS, COLORS, PATTERNS } from './data.js';
 import { BORDER, GOAL_CELLS, OPEN_CELLS, CELL_COUNT, cellCenter } from './board.js';
 import { patchAt, awardsFor, scorePlayer, goalResult } from './scoring.js';
 import { colorName, patternName, tileName } from './game.js';
+import { music } from './music.js';
 import { symbolsSvg, patchSvg, tileSvg, goalSvg, goalTileSvg, catSvg, buttonSvg, patternSwatch, colorSwatch, hexPoints, COLOR_INFO } from './art.js';
 
 const SETTINGS_KEY = 'calico.settings';
@@ -106,7 +107,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -204,6 +208,7 @@ export default class UI {
             if (!button || !this.canPlace()) return;
             const i = Number(button.dataset.hand);
             this.sel = this.sel === i ? null : i;
+            music.play(this.sel === null ? 'cancel' : 'select');
             if (this.sel === null) this.draft = null;
             this.viewSeat = this.view.you;
             this.render();
@@ -259,6 +264,7 @@ export default class UI {
         const prev = this.view;
         this.view = view;
         this.fresh = new Set();
+        this.playSounds(view, view.events.filter(e => e.seq > this.lastSeq));
         view.events.filter(e => e.seq > this.lastSeq).forEach(e => {
             if (e.type === 'place') this.fresh.add(`${e.seat}:${e.cell}`);
         });
@@ -362,6 +368,26 @@ export default class UI {
         label.textContent = mine ? '' : `${p.name}のキルト`;
     }
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分が置いたら置いた音（猫やボタンを得たら得た音）、取ったら引く音、ほかの人の手のあとは自分の番か知らせ
+    playSounds(view, fresh) {
+        if (!fresh.length) return;
+        const me = view.you;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) {
+            if (!end.winners.includes(me)) return music.play('lose');
+            return music.play(end.winners.length > 1 ? 'notify' : 'win');
+        }
+        const acts = fresh.filter(e => e.type === 'place' || e.type === 'take');
+        if (acts.length && acts.every(e => e.seat === me)) {
+            const last = acts.at(-1);
+            if (last.type === 'take') return music.play('draw');
+            return music.play(last.gained.length ? 'gain' : 'place');
+        }
+        if (fresh.some(e => e.type === 'turn' && e.seat === me)) return music.play('turn');
+        if (acts.length) music.play('notify');
+    }
+
     onBoard(event) {
         const target = event.target.closest('[data-cell]');
         if (!target || !this.canPlace() || this.sel === null || this.viewSeat !== this.view.you) return;
@@ -371,6 +397,7 @@ export default class UI {
             this.confirmPlace();
             return;
         }
+        music.play('select');
         this.draft = cell;
         this.render();
     }

@@ -8,6 +8,7 @@ import BoardView, { PLAYER_COLORS, dieSvg } from './board-view.js';
 import { PAIRINGS, COLUMNS, COLUMN_LENGTH } from './game.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
+import { music } from './music.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'cantstop.settings.v1', save: 'cantstop.save.v1' };
@@ -146,11 +147,29 @@ function onUpdate() {
             showResultSoon(RESULT_DELAY_MS);
         }
     });
+    playSounds(fresh);
     saveProgress();
     render();
 }
 
+// 効果音：1回の更新に1つだけ鳴らす。自分の手はロール・進める・止める（列を取れば得た音）・バースト（失う音）、
+// 相手の手はバーストと止めたときだけ知らせ（自分の番になったら自分の番の音）、終局は勝ち・負け
+function playSounds(fresh) {
+    if (!fresh.length) return;
+    const end = fresh.find(e => e.type === 'end');
+    if (end) return music.play(end.winner === view.seat ? 'win' : 'lose');
+    const last = fresh.at(-1);
+    if (last.seat === view.seat) {
+        if (last.type === 'roll') return music.play('dice');
+        if (last.type === 'bust') return music.play('pay');
+        if (last.type === 'stop') return music.play(last.claimed.length ? 'gain' : 'place');
+        return music.play('place');
+    }
+    if (last.type === 'bust' || last.type === 'stop') music.play(mine() ? 'turn' : 'notify');
+}
+
 function onError(message) {
+    music.play('error');
     showBanner(message, 'info');
 }
 

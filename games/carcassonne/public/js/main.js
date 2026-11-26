@@ -9,6 +9,7 @@ import BoardView from './board-view.js';
 import { createSeed } from './random.js';
 import { TILE_TYPES, UNIQUE_ROTATIONS, KIND_NAMES, rotatedTile } from './tiles.js';
 import { helpMarkup } from './help.js';
+import { music } from './music.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'carcassonne.settings.v1', save: 'carcassonne.save.v1' };
@@ -143,12 +144,31 @@ function onUpdate() {
     if (messages.length > 0) showToast(messages.length > 3 ? '終了時の得点' : messages.join('　'));
     saveProgress();
     render();
+    playSounds(fresh);
+}
+
+// 効果音：1回の更新に1つだけ鳴らす。終局は勝ち（同点は知らせ）・負け、自分の得点は得た音、
+// 自分が置いたら置いた音、引き直しは引く音、相手の手のあとは自分の番か知らせ
+function playSounds(fresh) {
+    if (!fresh.length) return;
+    const end = fresh.find(e => e.type === 'end');
+    if (end) {
+        const firsts = end.ranking.filter(r => r.rank === 1);
+        if (!firsts.some(r => r.seat === view.seat)) return music.play('lose');
+        return music.play(firsts.length > 1 ? 'notify' : 'win');
+    }
+    if (fresh.some(e => e.type === 'score' && e.winners.includes(view.seat))) return music.play('gain');
+    const places = fresh.filter(e => e.type === 'place');
+    if (places.length && places.every(e => e.seat === view.seat)) return music.play('place');
+    if (places.length) return music.play(myTurn() ? 'turn' : 'notify');
+    if (fresh.some(e => e.type === 'discard')) music.play('draw');
 }
 
 // 同時に数えた得点の演出は、少しずつずらして見せる（終了時のように多いときは、全体で 3 秒まで）
 const fxDelay = index => Math.min(index * 350, 3000);
 
 function onError(message) {
+    music.play('error');
     showToast(message);
 }
 
@@ -197,12 +217,14 @@ function onBoardTap({ x, y, spot }) {
     if (ui.step === 'meeple') {
         if (spot !== null) {
             ui.meeple = ui.meeple === spot ? null : spot;
+            music.play(ui.meeple === null ? 'cancel' : 'select');
             render();
         }
         return;
     }
     const rots = rotsAt(x, y);
     if (rots.length === 0) return;
+    music.play('select');
     if (ui.tentative && ui.tentative.x === x && ui.tentative.y === y) {
         ui.tentative.rot = nextRot(rots, ui.tentative.rot, false);
     } else {
@@ -214,6 +236,7 @@ function onBoardTap({ x, y, spot }) {
 
 function rotate() {
     if (!myTurn() || ui.step !== 'place') return;
+    music.play('select');
     if (ui.tentative) {
         ui.tentative.rot = nextRot(rotsAt(ui.tentative.x, ui.tentative.y), ui.tentative.rot, false);
         ui.previewRot = ui.tentative.rot;

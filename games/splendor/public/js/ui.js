@@ -8,6 +8,7 @@ import { COLOR_NAMES } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { gemSymbolsSvg, tokenChip, cardHtml, cardBackHtml, nobleHtml, gemIcon } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'splendor.settings';
 const CPU_NAMES = ['エレナ', 'マルコ', 'ルカ'];
@@ -71,7 +72,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -216,6 +220,7 @@ export default class UI {
             current[color] = 1;
         }
         this.selection = Object.keys(current).length ? { kind: 'tokens', tokens: current } : null;
+        music.play(current[color] ? 'select' : 'cancel');
         this.render();
     }
 
@@ -230,6 +235,7 @@ export default class UI {
         if (!this.myTurn()) return;
         const same = this.selection?.kind === 'card' && this.selection.card === card;
         this.selection = same ? null : { kind: 'card', card, reserved };
+        music.play(same ? 'cancel' : 'select');
         this.render();
     }
 
@@ -237,6 +243,7 @@ export default class UI {
         if (!this.myTurn() || this.view.deckCounts[level] === 0) return;
         const same = this.selection?.kind === 'deck' && this.selection.level === level;
         this.selection = same ? null : { kind: 'deck', level };
+        music.play(same ? 'cancel' : 'select');
         this.render();
     }
 
@@ -247,6 +254,7 @@ export default class UI {
         const total = countTokens({ ...Object.fromEntries(TOKEN_COLORS.map(c => [c, 0])), ...this.discardPick });
         if (picked < me.tokens[color] && total < this.view.discardCount) this.discardPick[color] = picked + 1;
         else delete this.discardPick[color];
+        music.play(this.discardPick[color] ? 'select' : 'cancel');
         this.render();
     }
 
@@ -258,6 +266,7 @@ export default class UI {
             this.controller?.send(command);
         };
         if (action === 'cancel') {
+            music.play('cancel');
             this.selection = null;
             this.discardPick = {};
             this.render();
@@ -280,10 +289,28 @@ export default class UI {
 
     // ---- 描く ----
 
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、相手の番が終わったら notify、自分の番になったら turn、終わりは勝ち負け
+    playSound(fresh, prevCurrent) {
+        const view = this.view;
+        if (fresh.length === 0 || prevCurrent === undefined) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        const mine = fresh.filter(e => e.seat === view.you && e.type !== 'turn').map(e => e.type);
+        if (mine.includes('noble') || mine.includes('take')) return music.play('gain');
+        if (mine.includes('buy')) return music.play('place');
+        if (mine.includes('reserve')) return music.play('draw');
+        if (mine.includes('discard')) return music.play('pay');
+        const turn = fresh.findLast(e => e.type === 'turn');
+        if (!turn || mine.length > 0) return;
+        if (turn.seat === view.you) music.play('turn');
+        else if (prevCurrent !== view.you) music.play('notify');
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
         const before = captureAnchors();
+        const prevCurrent = this.view?.current;
         this.view = view;
         if (!this.myTurn()) this.selection = null;
         if (!this.myTurn('discard')) this.discardPick = {};
@@ -301,6 +328,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         playEvents(fresh, before, { you: view.you });
+        this.playSound(fresh, prevCurrent);
 
         this.afterRender();
     }

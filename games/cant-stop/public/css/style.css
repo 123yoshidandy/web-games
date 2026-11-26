@@ -266,8 +266,8 @@ button.link {
     .player { flex: 1 1 calc(50% - 4px); height: 34px; }
     .topbar #open-help { margin-left: auto; }
     /* BGM は遊び方の左に並べる（右に寄せる役を BGM に移す） */
-    .topbar .bgm-toggle { margin-left: auto; }
-    .topbar .bgm-toggle + #open-help { margin-left: 0; }
+    .topbar .sound-toggle { margin-left: auto; }
+    .topbar .sound-toggle + #open-help { margin-left: 0; }
     .action-panel { height: auto; border-top: none; border-left: 1px solid var(--line); }
 }
 @media (orientation: landscape) and (max-height: 420px) {
@@ -322,10 +322,10 @@ button.link {
     .portal-link { display: none; }
 }
 
-/* BGM の ON/OFF（js/music.js） */
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+/* サウンド（BGM と効果音）の ON/OFF（js/music.js） */
+.sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }
 
 /* ヒント：おすすめの印 */
 .recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
