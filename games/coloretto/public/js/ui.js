@@ -12,6 +12,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { gainOf } from './cpu-player.js';
 import { symbolsSvg, chameleon, cardHtml, cardBackHtml } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'coloretto.settings';
 const CPU_NAMES = ['ルル', 'ポポ', 'ミミ', 'ココ'];
@@ -66,7 +67,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -145,6 +149,7 @@ export default class UI {
                 if (this.openRows().includes(row)) this.controller?.send({ type: 'place', row });
             } else if (this.myTurn('play') && this.takableRows().includes(row)) {
                 this.selectedRow = this.selectedRow === row ? null : row;
+                music.play(this.selectedRow === null ? 'cancel' : 'select');
                 this.render();
             }
         });
@@ -189,6 +194,25 @@ export default class UI {
 
     // ---- 状態 ----
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分の手はめくる（引く）・列に置く・列を取る（得る）、ラウンドの終わりは知らせ、
+    // ほかの人の手のあとは自分の番か知らせ、終局は勝ち（同点は知らせ）・負け
+    playSounds(view, fresh) {
+        if (!fresh.length) return;
+        const me = view.you;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) {
+            if (!end.winners.includes(me)) return music.play('lose');
+            return music.play(end.winners.length > 1 ? 'notify' : 'win');
+        }
+        const acts = fresh.filter(e => ['draw', 'place', 'take'].includes(e.type));
+        if (acts.length && acts.every(e => e.seat === me)) {
+            return music.play({ draw: 'draw', place: 'place', take: 'gain' }[acts.at(-1).type]);
+        }
+        if (fresh.some(e => e.type === 'roundEnd')) return music.play('notify');
+        if (acts.length) music.play(view.current === me && view.phase === 'play' ? 'turn' : 'notify');
+    }
+
     myTurn(phase) {
         const view = this.view;
         return !!view && view.current === view.you && view.phase === phase;
@@ -224,6 +248,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         playEvents(fresh, before, { you: view.you });
+        this.playSounds(view, fresh);
         if (fresh.some(e => e.type === 'lastRound')) this.toast('最後のラウンドのカードが出ました。このラウンドで終わりです');
         else if (fresh.some(e => e.type === 'roundEnd') && view.phase !== 'end') this.toast(`第${view.round}ラウンド`);
         if (view.phase === 'end' && !$('#result').open) setTimeout(() => this.showResult(), 700);

@@ -9,6 +9,10 @@ import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { checkPlacements, keyOf, frontier, generateMoves, HAND_SIZE } from './board.js';
 import { tileDefs, tileGroup, tileSvg } from './art.js';
 import { HELP_HTML } from './help.js';
+import { music } from './music.js';
+
+// 自分の操作の音：並べて決める（点を得る）・交換する（袋に戻して引き直す）・パス
+const COMMAND_SOUND = { play: 'gain', trade: 'shuffle', pass: 'select' };
 
 const SETTINGS_KEY = 'qwirkle.settings';
 const CPU_NAMES = ['ノア', 'エマ', 'レオ'];
@@ -129,7 +133,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.update(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -140,6 +147,7 @@ export default class UI {
         }
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
+        this.view = null;
         this.update();
         this.controller.scheduleCpu();
     }
@@ -162,11 +170,13 @@ export default class UI {
             if (this.trading) this.tradeSet.clear();
             else this.pending = [];
             this.selected = null;
+            music.play('cancel');
             this.render();
         });
         $('trade').addEventListener('click', () => {
             if (!this.myTurn()) return;
             this.trading = !this.trading;
+            music.play(this.trading ? 'select' : 'cancel');
             this.pending = [];
             this.selected = null;
             this.tradeSet = new Set();
@@ -203,10 +213,32 @@ export default class UI {
         // 手番が変わったら、置いている途中のものを消す
         if (!prev || prev.turnNo !== v.turnNo) this.resetTurn();
         this.render();
+        this.playUpdateSound(prev);
         if (v.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
             setTimeout(() => this.openResult(), 700);
         }
+    }
+
+    // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(prev) {
+        const v = this.view;
+        if (!prev) return;
+        if (v.phase === 'end') {
+            if (prev.phase !== 'end') music.play(!v.winners.includes(v.you) ? 'lose' : v.winners.length > 1 ? 'notify' : 'win');
+            return;
+        }
+        if (this.sending) return;
+        const wasMine = prev.phase !== 'end' && prev.current === prev.you;
+        music.play(this.myTurn() && !wasMine ? 'turn' : 'notify');
+    }
+
+    send(command) {
+        this.sending = true;
+        const ok = this.controller.send(command);
+        this.sending = false;
+        if (ok && this.view.phase !== 'end') music.play(COMMAND_SOUND[command.type] ?? 'place');
+        return ok;
     }
 
     boardMap() {
@@ -356,6 +388,7 @@ export default class UI {
             this.tradeSet = used;
         }
         this.hinted = true;
+        music.play('select');
         this.render();
     }
 
@@ -379,6 +412,7 @@ export default class UI {
         } else {
             this.selected = this.selected === i ? null : i;
         }
+        music.play('select');
         this.render();
     }
 
@@ -389,6 +423,7 @@ export default class UI {
         const k = this.pending.findIndex(p => p.x === x && p.y === y);
         if (k >= 0) {
             this.pending.splice(k, 1);
+            music.play('cancel');
             this.render();
             return;
         }
@@ -398,8 +433,12 @@ export default class UI {
 
     placeAt(index, x, y) {
         const tile = this.myHand()[index];
-        if (!this.targets(tile).some(c => c.x === x && c.y === y)) return false;
+        if (!this.targets(tile).some(c => c.x === x && c.y === y)) {
+            music.play('error');
+            return false;
+        }
         this.pending.push({ x, y, tile, index });
+        music.play('place');
         this.selected = null;
         this.render();
         return true;
@@ -410,15 +449,18 @@ export default class UI {
         if (!this.myTurn()) return;
         if (this.trading) {
             const hand = this.myHand();
-            this.controller.send({ type: 'trade', tiles: [...this.tradeSet].map(i => hand[i]) });
+            this.send({ type: 'trade', tiles: [...this.tradeSet].map(i => hand[i]) });
             return;
         }
         if (!this.pending.length && v.bagCount === 0 && !this.canPlay()) {
-            this.controller.send({ type: 'pass' });
+            this.send({ type: 'pass' });
             return;
         }
-        if (!this.pendingResult()?.ok) return;
-        this.controller.send({ type: 'play', placements: this.pending.map(({ x, y, tile }) => ({ x, y, tile })) });
+        if (!this.pendingResult()?.ok) {
+            music.play('error');
+            return;
+        }
+        this.send({ type: 'play', placements: this.pending.map(({ x, y, tile }) => ({ x, y, tile })) });
     }
 
     // 手札を押す（そのまま離せば選ぶ、動かせば盤へ引っぱる）

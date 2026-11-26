@@ -8,6 +8,7 @@
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import { COLORS, COLOR_ORDER } from './colors.js';
 import { CELLS, CELL_COUNT, NEIGHBORS, START_SYMBOLS } from './board.js';
 import { symbolsSvg, hexPoints, symbolUse, symbolIcon, tileSvg, icon } from './art.js';
@@ -92,7 +93,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -166,6 +170,7 @@ export default class UI {
             const b = event.target.closest('[data-index]');
             if (!b || !this.myTurn('place')) return;
             const index = Number(b.dataset.index);
+            music.play('select');
             if (this.sel?.index === index) this.sel.flip = !this.sel.flip;
             else this.sel = { index, flip: false, anchor: this.sel?.anchor ?? null, dir: this.sel?.dir ?? 5 };
             this.render();
@@ -194,6 +199,7 @@ export default class UI {
         const v = this.view;
         const command = this.controller?.suggest();
         if (!v || !command) return;
+        music.play('select');
         this.hint = { command };
         if (command.type === 'place') {
             const hand = v.players[v.you].hand;
@@ -207,6 +213,21 @@ export default class UI {
             this.sel = { index, flip, anchor: a, dir: NEIGHBORS[a].indexOf(b) };
         }
         this.render();
+    }
+
+    // 1つの更新に1つの音。自分の手は置く（インジーニアスは gain）、相手の手は notify、自分の番になったら turn
+    playSound(view, fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        const acts = fresh.filter(e => ['place', 'ingenious', 'swap'].includes(e.type));
+        const last = acts.at(-1);
+        if (!last) return;
+        if (last.seat === view.you) {
+            if (acts.some(e => e.type === 'ingenious')) return music.play('gain');
+            if (last.type === 'swap') return music.play('shuffle');
+            return music.play('place');
+        }
+        music.play(view.answering.includes(view.you) ? 'turn' : 'notify');
     }
 
     myTurn(phase) {
@@ -266,6 +287,7 @@ export default class UI {
         if (!el) return;
         const cell = Number(el.dataset.cell);
         if (!this.sel) {
+            music.play('error');
             this.toast('手札のタイルを選んでください');
             return;
         }
@@ -280,11 +302,13 @@ export default class UI {
         } else {
             return;
         }
+        music.play('select');
         this.render();
     }
 
     rotate() {
         if (!this.sel || this.sel.anchor === null) return;
+        music.play('select');
         const next = ROTATE_ORDER[(ROTATE_ORDER.indexOf(this.sel.dir) + 1) % 6];
         this.sel.dir = this.findDir(this.sel.anchor, next);
         this.render();
@@ -401,6 +425,7 @@ export default class UI {
         this.renderHand(view);
         this.renderAct(view);
         this.renderNote(view);
+        this.playSound(view, fresh);
         if (view.phase !== 'end') fresh.filter(e => e.type === 'ingenious').forEach(e => {
             const who = e.seat === view.you ? '' : `${view.players[e.seat].name}：`;
             this.toast(`${who}インジーニアス！（${COLORS[e.color].name}）もう1枚`);

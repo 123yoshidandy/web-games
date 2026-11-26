@@ -11,6 +11,7 @@ import { CITY, ROAD, ROADS, PROVINCES, ROME } from './map.js';
 import { renderMap } from './map-view.js';
 import { insertSymbols, goodIcon, cardText, godText, GOD_COLORS, PLAYER_COLORS } from './art.js';
 import { helpHtml } from './help.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'concordia.settings';
 const esc = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -117,7 +118,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.refresh(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -128,6 +132,7 @@ export default class UI {
         this.mode = null;
         this.selected = null;
         this.resultShown = false;
+        this.soundSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.refresh();
@@ -222,10 +227,31 @@ export default class UI {
         this.renderHand();
         this.renderActions();
         this.markHint();
+        this.playSounds(this.view);
         if (this.view.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
             setTimeout(() => this.showResult(), 600);
         }
+    }
+
+    // 効果音：前の更新からのできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分の手は得る（お金・品物）、払う（カードを買う）、置く（建てる・入植・移動・カードを出す）。
+    // ほかの人の手のあとは自分の番か知らせ、終局は勝ち（同点は知らせ）・負け
+    playSounds(v) {
+        const fresh = v.events.filter(e => e.seq > this.soundSeq);
+        if (!fresh.length) return;
+        this.soundSeq = fresh.at(-1).seq;
+        if (fresh.some(e => e.type === 'end')) {
+            if (!v.winners.includes(v.you)) return music.play('lose');
+            return music.play(v.winners.length > 1 ? 'notify' : 'win');
+        }
+        const mine = fresh.filter(e => e.seat === v.you);
+        if (mine.length && mine.length === fresh.filter(e => e.seat !== undefined).length) {
+            if (mine.some(e => ['cash', 'colonistCash', 'produce', 'trade', 'craft', 'concordia'].includes(e.type))) return music.play('gain');
+            if (mine.some(e => e.type === 'buy')) return music.play('pay');
+            return music.play('place');
+        }
+        music.play(this.myTurn ? 'turn' : 'notify');
     }
 
     renderPlayers() {
