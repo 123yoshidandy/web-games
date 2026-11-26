@@ -9,10 +9,12 @@
  * - 積み重なった駒は、下の駒を少しずらして見せ、高さの数を添える。押すと、下から順に操作の欄に出す
  */
 
-import { KIND_NAMES, COLOR_NAMES } from './game.js';
+import { KIND_NAMES, COLOR_NAMES, PLAYERS } from './game.js';
 import { KINDS } from './rules.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 import { symbolsSvg, pieceShape, pieceSvg, cellCenter, hexPoints, HEX_R } from './art.js';
 
 const SETTINGS_KEY = 'hive.settings';
@@ -58,6 +60,26 @@ export default class UI {
         this.camera = { scale: 1, tx: 0, ty: 0 };
         this.sel = null;      // { kind: 'hand', piece } / { kind: 'board', cell }
         this.inspect = null;  // 中を見ている積み重なりのマス
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'ハイブ',
+            game: 'hive',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 700,
+            minPlayers: PLAYERS,
+            maxPlayers: PLAYERS,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
         this.bindBoard();
@@ -82,13 +104,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSettings();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -102,6 +125,15 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.stopGame();
+        else document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        this.hint = null;
         this.sel = null;
         this.inspect = null;
         this.view = null;
@@ -110,7 +142,13 @@ export default class UI {
         $('#screen-game').hidden = false;
         this.render();
         this.fitBoard();
-        this.controller.scheduleCpu();
+        if (!this.controller.isOnline) this.controller.scheduleCpu();
+    }
+
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    goHome() {
+        if (this.controller?.isOnline) return this.online.confirmLeave();
+        this.showTitle();
     }
 
     newGame() {
@@ -156,14 +194,19 @@ export default class UI {
             this.renderSettings();
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            $('#result').close();
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
         $('#look').addEventListener('click', () => $('#result').close());
-        $('#result-home').addEventListener('click', () => this.showTitle());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#home').addEventListener('click', () => this.goHome());
         $('#hint').addEventListener('click', () => this.showHint());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         // 遊び方・記録を開いている間は、CPU を止める
@@ -395,7 +438,7 @@ export default class UI {
 
     // おすすめの手を示す。動かす駒（手持ちか盤の上）を選んでおき、行き先を光らせる（押せば動く）
     showHint() {
-        if (!this.myTurn()) return;
+        if (!this.myTurn() || this.controller?.isOnline) return;
         const command = this.controller?.suggest();
         if (!command) return;
         music.play('select');
@@ -465,6 +508,7 @@ export default class UI {
         const view = this.controller.getView();
         this.view = view;
         if (!this.myTurn()) this.sel = null;
+        $('#hint').hidden = Boolean(this.controller?.isOnline); // ヒントはローカル対戦だけ
         $('#hint').disabled = !this.myTurn();
         if (this.sel?.kind === 'board' && !this.movableCells().has(this.sel.cell)) this.sel = null;
         if (this.inspect && !(view.board[this.inspect]?.length > 1)) this.inspect = null;

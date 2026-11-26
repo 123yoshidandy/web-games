@@ -126,7 +126,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .subtitle { margin: -6px 0 10px; color: var(--muted); font-size: 14px; letter-spacing: .4em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 360px; }
 .setup .setup-row { display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; flex-wrap: wrap; }
-.setup .buttons { display: flex; gap: 12px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 
 /* ---- ゲーム画面 ---- */
 
