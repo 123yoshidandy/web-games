@@ -103,6 +103,16 @@ node scripts/cpu-match.mjs 300 easy,normal
 
 自分の番に操作の欄の電球（ヒント）を押すと、ふつうの CPU が選ぶ手を光らせる（めくる・止める・撃退・置く・取らないのボタンか、取る港のカード・果たす遠征）。CPU は見えているカードから残りを数えるだけで、山の並びはのぞかない。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜5人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'port-royal' })`。web-games の1つのスタックから `?game=port-royal` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -123,6 +133,7 @@ npm test
 | `public/js/ui.js`・`art.js` | 画面・絵 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（オフラインでも開ける） |
 | `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と勝率 |
 
 テスト（`test/`）：
@@ -133,6 +144,3 @@ npm test
 - `game-definition.test.js`：オンライン対戦の定義（受け付け・断る・保存と再現・CPU・抜けた人）と、ビューで隠すもの（山の並び・コインのカード・シード）
 - `pwa.test.js`：service worker が画面のファイルを全部先に読むこと、manifest とアイコン
 
-### オンライン対戦を入れるとき
-
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。ビュー（`createGameView`）が、山の並びと各自のコインのカードの中身・シードを入れないので、各端末にはそのまま送ってよい。
