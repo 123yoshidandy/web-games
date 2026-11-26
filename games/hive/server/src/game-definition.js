@@ -26,8 +26,9 @@ export default {
 
     view: (game, seat, { since } = {}) => createGameView(game, seat, { since: since ?? 0 }),
     spectatorView: (game, { since } = {}) => createGameView(game, null, { since: since ?? 0 }),
-    mark: (game) => game.logs.length,
-    joinMark: (game) => Math.max(0, game.logs.length - 50),
+    // ビューは出来事（events）を seq で絞る（記録は全部入れる）ので、印も出来事の番号にそろえる。入ったときは前の出来事を動かさない
+    mark: (game) => game.eventSeq,
+    joinMark: (game) => game.eventSeq,
 
     actions: {
         command({ game, seat, message, reject }) {
