@@ -113,6 +113,12 @@ function serveStatic(publicDir, port) {
 const COLLECT_ERRORS = 'window.__errs=[];addEventListener("error",e=>__errs.push(String(e.message)));'
     + 'addEventListener("unhandledrejection",e=>__errs.push(String(e.reason&&e.reason.message||e.reason)));';
 const READY = 'window.__app && window.__app.online';
+// 盤面が描かれているか：文字が20字より多いか、見えている SVG の図形・canvas があるか（盤面を SVG だけで描くゲームもある）
+const BOARD_DRAWN = `(() => {
+    if (document.body.innerText.length > 20) return true;
+    const visible = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0; };
+    return [...document.querySelectorAll('svg *, canvas')].some((el) => el.tagName !== 'defs' && !el.closest('defs, symbol') && visible(el));
+})()`;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function runE2E({ game, moves = 6, shots = null }) {
@@ -211,7 +217,7 @@ export async function runE2E({ game, moves = 6, shots = null }) {
             played++;
         }
         check.ok(`${moves} 手を打ち、両方の画面に届く`, played >= moves || (played > 0 && dev.store.rooms.get(roomKey).status !== 'playing'), `${played} 手`);
-        check.ok('A・B: 盤面に何か描かれている', await a.eval('document.body.innerText.length > 20') && await b.eval('document.body.innerText.length > 20'));
+        check.ok('A・B: 盤面に何か描かれている', await a.eval(BOARD_DRAWN) && await b.eval(BOARD_DRAWN));
         await a.shot(join(shotDir, `${game}-game-A.png`));
         await b.shot(join(shotDir, `${game}-game-B.png`));
 
