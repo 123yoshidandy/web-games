@@ -13,6 +13,7 @@ import OnlineGameController from './online-controller.js';
 const hintKey = (view) => [view.logsFrom + view.logs.length, view.phase, view.me?.hand?.length, view.me?.actions, view.me?.buys, view.me?.coffers].join(':');
 import { getServerUrl } from './online-config.js';
 import { loadSavedGame } from './game-controller.js';
+import { music } from './music.js';
 
 // 表示設定はブラウザに保存し、次回以降も引き継ぐ
 const SETTINGS_KEY = 'dominion.settings';
@@ -360,6 +361,7 @@ class UIController {
         this.renderedLogCount = 0;
         this.shownPromptId = null;
         this.isResultShown = false;
+        this.soundView = null;
     }
     
     // ゲーム画面を更新（ゲームの状態が変わるたびに呼ばれる）
@@ -374,6 +376,8 @@ class UIController {
         }
         
         this.eventHandler.clearPendingActions();
+        this.playSounds(this.soundView, view);
+        this.soundView = view;
         this.view.updateGameView(view);
         this.markHint(view);
         this.syncLogs(view);
@@ -384,6 +388,33 @@ class UIController {
         this.scheduleCpuStep();
     }
     
+    // 効果音：前の表示と比べて、1回の更新に1つだけ鳴らす
+    // 終局は1位なら勝ち（同点は知らせ）・それ以外は負け。自分の番になったら自分の番の音。
+    // 自分の番の間は、山札を切り直したら切る音、買ったら得る音、カードを出したら置く音、引いたら引く音。
+    // 相手の番は、相手が買ったときと、自分に選択待ちが来たときだけ知らせる（CPU が出すカードごとには鳴らさない）
+    playSounds(prev, view) {
+        if (!prev || prev.viewerId !== view.viewerId) return;
+        if (view.result && !prev.result) {
+            const [first, second] = view.result;
+            if (first.playerId !== view.viewerId) return music.play('lose');
+            return music.play(second && second.points === first.points ? 'notify' : 'win');
+        }
+        if (view.isMyTurn && !prev.isMyTurn) return music.play('turn');
+        const before = prev.players.find(p => p.id === view.viewerId);
+        const me = view.players.find(p => p.id === view.viewerId);
+        if (view.isMyTurn && before && me) {
+            if (me.deckCount > before.deckCount && me.discardCount < before.discardCount) return music.play('shuffle');
+            if (me.buys < before.buys) return music.play('gain');
+            if (me.playArea.length > before.playArea.length) return music.play('place');
+            if (me.handCount > before.handCount) music.play('draw');
+            return;
+        }
+        if (view.prompt && !view.prompt.waiting && view.prompt.id !== prev.prompt?.id) return music.play('notify');
+        const current = view.players.find(p => p.id === view.currentPlayerId);
+        const was = prev.players.find(p => p.id === view.currentPlayerId);
+        if (current && was && current.id !== view.viewerId && current.buys < was.buys) music.play('notify');
+    }
+
     // まだ表示していないログを追加する（ビューには logsFrom 番目以降のログが入っている）
     syncLogs(view) {
         const skip = Math.max(0, this.renderedLogCount - view.logsFrom);

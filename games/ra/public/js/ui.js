@@ -8,6 +8,10 @@ import { TILES, TILE_ORDER, CIVS, MONUMENTS, AUCTION_MAX, SUN_SETS, RA_TRACK } f
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, icon, tileHtml, sunHtml } from './art.js';
+import { music } from './music.js';
+
+// 自分の操作の音：引く・ラー宣言・神で取る・太陽駒を出す・見送る・災害で捨てる
+const COMMAND_SOUND = { draw: 'draw', ra: 'place', god: 'gain', bid: 'place', pass: 'select', discard: 'pay' };
 
 const SETTINGS_KEY = 'ra.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
@@ -70,8 +74,15 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onUpdate: () => {
+                    const previous = this.view;
+                    this.render();
+                    this.playUpdateSound(previous);
+                },
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -129,6 +140,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
             if (dialog.id === 'result' || dialog.id === 'choose') {
@@ -151,6 +163,7 @@ export default class UI {
             const gods = this.me().tiles.god ?? 0;
             if (this.godPicks.includes(i)) this.godPicks = this.godPicks.filter(x => x !== i);
             else if (this.godPicks.length < gods) this.godPicks.push(i);
+            music.play('select');
             this.render();
         });
         $('#me').addEventListener('click', (event) => {
@@ -171,6 +184,7 @@ export default class UI {
             const need = this.view.disaster.needed;
             if (this.discardPicks.includes(i)) this.discardPicks = this.discardPicks.filter(x => x !== i);
             else if (this.discardPicks.length < need) this.discardPicks.push(i);
+            music.play('select');
             this.renderChoose();
         });
         $('#choose-ok').addEventListener('click', () => {
@@ -182,12 +196,57 @@ export default class UI {
     }
 
     send(command) {
+        this.sending = true;
         const ok = this.controller?.send(command);
+        this.sending = false;
         if (ok) {
             this.godMode = false;
             this.godPicks = [];
+            this.hint = null;
+            if (!this.view.over) music.play(COMMAND_SOUND[command.type] ?? 'place');
         }
         return ok;
+    }
+
+    // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const v = this.view;
+        if (!previous) return;
+        if (v.over) {
+            if (!previous.over) music.play(v.winner === v.you ? 'win' : 'lose');
+            return;
+        }
+        if (this.sending) return;
+        const mine = v.answering.includes(v.you);
+        music.play(mine && !previous.answering.includes(previous.you) ? 'turn' : 'notify');
+    }
+
+    hintKey(view = this.view) {
+        return `${view.phase}:${view.logs.length}`;
+    }
+
+    // おすすめの手：押すボタン・出す太陽駒を光らせる。神で取る手は、取るタイルを選んだ状態にする（押すのは自分）
+    showHint() {
+        const c = (this.myPrompt('play') || this.myPrompt('auction')) && this.controller?.hint();
+        if (!c) {
+            music.play('error');
+            return;
+        }
+        music.play('select');
+        this.godMode = c.type === 'god';
+        this.godPicks = c.type === 'god' ? [...c.slots] : [];
+        this.hint = { key: this.hintKey(), command: c };
+        this.render();
+    }
+
+    markHint() {
+        const c = this.hint?.key === this.hintKey() ? this.hint.command : null;
+        if (!c) {
+            this.hint = null;
+            return;
+        }
+        if (c.type === 'bid') $(`#me [data-sun="${c.sun}"]`)?.classList.add('recommended');
+        else $(`#actions [data-act="${c.type === 'god' ? 'god-take' : c.type}"]`)?.classList.add('recommended');
     }
 
     me() {
@@ -222,6 +281,7 @@ export default class UI {
             case 'god':
                 this.godMode = !this.godMode;
                 this.godPicks = [];
+                music.play(this.godMode ? 'select' : 'cancel');
                 return this.render();
             case 'god-take': return this.send({ type: 'god', slots: [...this.godPicks] });
             case 'pass': return this.send({ type: 'pass' });
@@ -289,6 +349,8 @@ export default class UI {
         this.renderTable(view);
         this.renderMe(view);
         this.renderActions(view);
+        $('#hint').disabled = !(this.myPrompt('play') || this.myPrompt('auction'));
+        this.markHint();
         this.updateChoose(view);
         this.playEvents(view, prev);
         if ($('#log').open) this.renderLog();
@@ -301,7 +363,7 @@ export default class UI {
     }
 
     renderStatus(view) {
-        $('#status').innerHTML = `<span class="epoch">第${view.epoch}時代（全3）</span><span class="bag">袋 ${view.bagCount}</span>`;
+        $('#status').innerHTML = `<span class="epoch">第${view.epoch}/3時代</span><span class="bag">袋 ${view.bagCount}</span>`;
     }
 
     // その人の状態（競りでの答え・ラーの印・手番）

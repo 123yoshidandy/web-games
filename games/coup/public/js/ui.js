@@ -6,6 +6,7 @@
 import { ROLES, ROLE_ORDER, ACTIONS, ACTION_ORDER } from './roles.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, cardHtml, backHtml, roleTag, coinHtml } from './art.js';
 
 const SETTINGS_KEY = 'coup.settings';
@@ -66,7 +67,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -222,6 +226,7 @@ export default class UI {
         if (!this.myPrompt('action')) return;
         if (ACTIONS[action].target) {
             this.selecting = this.selecting === action ? null : action;
+            music.play(this.selecting ? 'select' : 'cancel');
             this.render();
             return;
         }
@@ -412,10 +417,29 @@ export default class UI {
 
     // ---- 出来事の演出 ----
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ、大事な順に選んで鳴らす
+    // 自分が影響力を失ったら払う音、自分の手で相手が失ったら取る音、お金は得る・払う音、交換は引く音、
+    // 自分の行動は置く音、自分の番になったら自分の番の音、ほかは知らせ。勝者が決まったら勝ち・負け
+    playSounds(view, fresh) {
+        const me = view.you;
+        const win = fresh.find(e => e.type === 'win');
+        if (win) return music.play(win.seat === me ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'lose' && e.seat === me)) return music.play('pay');
+        const myMove = fresh.some(e => (e.type === 'action' || e.type === 'challenge') && e.seat === me) || view.current === me;
+        if (myMove && fresh.some(e => e.type === 'lose' && e.seat !== me)) return music.play('capture');
+        if (fresh.some(e => e.type === 'coins' && e.to === me)) return music.play('gain');
+        if (fresh.some(e => e.type === 'coins' && e.from === me)) return music.play('pay');
+        if (fresh.some(e => e.type === 'exchangeDraw' && e.seat === me)) return music.play('draw');
+        if (fresh.some(e => ['action', 'challenge', 'block'].includes(e.type) && e.seat === me)) return music.play('place');
+        if (fresh.some(e => e.type === 'turn' && e.seat === me)) return music.play('turn');
+        music.play('notify');
+    }
+
     playEvents(view, prev) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.playSounds(view, fresh);
         const name = (seat) => view.players[seat].name;
         const deltas = new Map();
         const add = (seat, amount) => deltas.set(seat, (deltas.get(seat) ?? 0) + amount);

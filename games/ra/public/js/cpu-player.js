@@ -119,6 +119,12 @@ export function chooseCommand(game, seat, level = game.players[seat].cpuLevel ??
     }
 }
 
+// ヒント：人の番（手番・競り）に、ふつうの CPU が選ぶ手を返す
+export function suggest(game, seat) {
+    if (game.isOver() || !game.actors().includes(seat)) return null;
+    return chooseCommand(game, seat, 'normal');
+}
+
 function chooseBid(view, rand, easy) {
     const me = view.players[view.you];
     const high = view.auction.high?.sun ?? 0;

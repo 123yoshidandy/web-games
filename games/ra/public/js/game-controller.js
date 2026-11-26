@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_TURN_START_MS = 1000;  // 手番を始める前は、引いたタイルや競りの結果が見えるように長めに待つ
 const CPU_STEP_MS = 650;         // 手番の中の操作
@@ -43,6 +43,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, this.humanSeat);
+    }
+
+    // ヒント：人の番なら、おすすめの手を返す（記録は変えない）。人の番でなければ null
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     send(command) {

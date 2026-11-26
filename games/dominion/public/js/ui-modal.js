@@ -148,7 +148,7 @@ class UIModal {
                 <p class="title-sub">デッキ構築型カードゲーム</p>
                 <div class="title-links">
                     <button id="title-help-btn" class="title-help-btn">？ 遊び方</button>
-                    <button type="button" class="title-help-btn bgm-toggle" aria-pressed="true">♪ BGM</button>
+                    <button type="button" class="title-help-btn sound-toggle" aria-pressed="true">サウンド</button>
                     <a class="portal-link" href="../">← ゲーム一覧</a>
                 </div>
             </div>

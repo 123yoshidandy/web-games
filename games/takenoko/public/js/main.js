@@ -12,6 +12,7 @@ import {
 import { rotations } from './game.js';
 import { progressOf } from './progress.js';
 import * as storage from './storage.js';
+import { music } from './music.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ'];
 const HUMAN_NAME = 'あなた';
@@ -121,7 +122,10 @@ function startGame(setup) {
     app.view = null;
     resetModes();
     if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => update() });
+    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => {
+        music.play('error');
+        update();
+    } });
     showScene('game');
     app.board.userMoved = false;
     app.board.tileCount = 0;
@@ -151,12 +155,31 @@ function update() {
     const view = app.controller.getView();
     if (previous && view.commandCount !== previous.commandCount) resetModes();
     app.view = view;
+    if (previous && view.commandCount !== previous.commandCount) playSound(view, previous);
     render(view);
     scheduleAutoEnd(view);
     if (view.phase === 'end' && previous && previous.phase !== 'end') setTimeout(showResult, 1200);
 }
 
 const myTurn = view => view.phase === 'play' && view.current === view.viewer;
+
+// 進んだ1手から効果音を1つ鳴らす。自分の手はその音、自分の番に戻ったら turn、終わりは勝ち負け
+// CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
+const MOVE_SOUNDS = {
+    complete: 'gain', placePlot: 'place', irrigate: 'place', improve: 'place', gardener: 'place',
+    rain: 'place', storm: 'place', weather: 'select', drawPlots: 'draw', drawObjective: 'draw', skip: 'cancel'
+};
+function playSound(view, previous) {
+    if (view.phase === 'end') return music.play(view.result?.winners.includes(view.viewer) ? 'win' : 'lose');
+    const move = view.lastMove;
+    if (move?.seat === view.viewer) {
+        // パンダ（嵐で動かしたときも）が竹を食べたら、竹を得る
+        if (move.eaten) return music.play('gain');
+        if (move.type === 'panda') return music.play('place');
+        if (MOVE_SOUNDS[move.type]) return music.play(MOVE_SOUNDS[move.type]);
+    }
+    if (myTurn(view) && !myTurn(previous)) music.play('turn');
+}
 
 function render(view) {
     renderTurnInfo(view);
@@ -415,11 +438,13 @@ function onPlayClick(event) {
     const improvement = target.closest('[data-improvement]')?.dataset.improvement;
     if (improvement) {
         app.cloudKind = app.cloudKind === improvement ? null : improvement;
+        music.play(app.cloudKind ? 'select' : 'cancel');
         return render(view);
     }
     const plot = target.closest('[data-plot]')?.dataset.plot;
     if (plot !== undefined) {
         app.plotChoice = Number(plot);
+        music.play('select');
         return render(view);
     }
     const kind = target.closest('[data-kind]')?.dataset.kind;
@@ -428,6 +453,7 @@ function onPlayClick(event) {
     if (action === 'skip') return app.controller.send({ type: 'skip' });
     if (action === 'cancel') {
         app.mode = null;
+        music.play('cancel');
         return render(view);
     }
     if (action === 'end-turn') return app.controller.send({ type: 'endTurn' });
@@ -435,6 +461,7 @@ function onPlayClick(event) {
     if (act) {
         if (act === 'plot') return app.controller.send({ type: 'drawPlots' });
         app.mode = app.mode === act ? null : act;
+        music.play(app.mode ? 'select' : 'cancel');
         return render(view);
     }
 }

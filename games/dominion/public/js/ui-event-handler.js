@@ -6,6 +6,7 @@
 import { CARD_TYPES, ALL_CARDS } from './card-data.js';
 import cardAnimator, { STAGGER_MS } from './card-animations.js';
 import { hasNightCard } from './ui-view.js';
+import { music } from './music.js';
 
 // 場札の小さなカードの大きさと間隔（styles.css の .card.mini・#played-cards と合わせる）
 const MINI_CARD_WIDTH = 76;
@@ -124,6 +125,8 @@ class UIEventHandler {
         if (!card || (view.supply[cardId] ?? 0) <= 0 || view.prompt ||
             currentPlayer.buys - pending.count <= 0 || usableCoins - pending.cost < cost ||
             (currentPlayer.potions ?? 0) - (pending.potions ?? 0) < potionCost) {
+            // 返事を待つ間の連打では鳴らさない
+            if (pending.count === 0) music.play('error');
             return;
         }
         this.pendingPurchases = { count: pending.count + 1, cost: pending.cost + cost, potions: (pending.potions ?? 0) + potionCost };

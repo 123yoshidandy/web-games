@@ -2676,8 +2676,9 @@ button.primary.online {
     }
 }
 
-/* BGM の ON/OFF（js/music.js） */
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+/* サウンド（BGM と効果音）の ON/OFF（js/music.js） */
+.sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
 
 /* ===== 縦持ちのスマホ：横にするよう促す ===== */
 /* 画面は横向きで作っている。タブレットの縦向きは今の配置のままにし、スマホの幅だけで出す */
