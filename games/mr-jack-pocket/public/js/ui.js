@@ -17,6 +17,7 @@ import { JACK, DETECTIVE, visibleSuspects, wallOf, pickOrder } from './game.js';
 import { SUSPECTS, DETECTIVES, TOKENS, ACTION_NAMES, ROUNDS, HOURGLASSES_TO_WIN } from './data.js';
 import { TRACK, spaceCell } from './board.js';
 import { symbolsSvg, icon, districtShape, detectiveShape, actionIcon, portraitSvg } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'mr-jack-pocket.settings';
 const RESULT_DELAY_MS = 1400;
@@ -78,8 +79,14 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onUpdate: () => {
+                    this.render();
+                    this.updateSound();
+                },
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -94,6 +101,8 @@ export default class UI {
         $('#screen-game').hidden = false;
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         this.render();
+        this.wasMine = this.myTurn();
+        this.endSounded = this.view.phase === 'end';
         this.controller.scheduleCpu();
     }
 
@@ -134,6 +143,7 @@ export default class UI {
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
+        $('#hint').addEventListener('click', () => this.showHint());
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
             dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
@@ -154,17 +164,27 @@ export default class UI {
         if (!b || b.disabled || !this.myTurn()) return;
         if (b.dataset.act === 'confirm') {
             const command = this.pendingCommand();
-            if (command && this.controller.send(command)) this.sel = null;
+            this.sending = true;
+            const ok = command && this.controller.send(command);
+            this.sending = false;
+            if (ok) {
+                this.sel = null;
+                this.hintAction = null;
+                if (this.view.phase !== 'end') music.play(command.type === 'alibi' ? 'draw' : 'place');
+            }
             this.render();
             return;
         }
         if (b.dataset.act === 'stay') {
+            music.play('select');
             this.sel = { action: 'joker', who: 'holmes', steps: 0 };
             this.render();
             return;
         }
         const action = b.dataset.action;
         if (!action) return;
+        if (action !== this.hintAction) this.hintAction = null;
+        music.play(this.sel?.action === action ? 'cancel' : 'select');
         this.sel = this.sel?.action === action ? null : { action };
         this.render();
     }
@@ -218,6 +238,7 @@ export default class UI {
                 s.b = pos;
             }
         }
+        music.play('select');
         this.render();
     }
 
@@ -299,6 +320,7 @@ export default class UI {
         this.renderBoard(view);
         this.renderNote(view);
         this.renderActions(view);
+        $('#hint').disabled = !this.myTurn();
         this.announce(view, fresh);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer && !this.resultShown) {
@@ -414,7 +436,8 @@ export default class UI {
         const tokens = view.tokens.map((t, i) => {
             const action = TOKENS[i][t.face];
             const on = this.sel?.action === action;
-            return `<button class="token ${t.used ? 'used' : ''} ${on ? 'selected' : ''}" data-action="${action}" ${mine && !t.used ? '' : 'disabled'} aria-label="${ACTION_NAMES[action]}">${actionIcon(action)}<span>${ACTION_NAMES[action]}</span></button>`;
+            const recommended = mine && !t.used && this.hintAction === action;
+            return `<button class="token ${t.used ? 'used' : ''} ${on ? 'selected' : ''} ${recommended ? 'recommended' : ''}" data-action="${action}" ${mine && !t.used ? '' : 'disabled'} aria-label="${ACTION_NAMES[action]}">${actionIcon(action)}<span>${ACTION_NAMES[action]}</span></button>`;
         }).join('');
         const turns = order.map((seat, i) => `<i class="${seat === view.you ? 'me' : ''} ${i < view.pick ? 'done' : i === view.pick ? 'now' : ''}"></i>`).join('');
         const stay = mine && this.sel?.action === 'joker' && view.you === JACK ? '<button class="btn secondary small" data-act="stay">動かさない</button>' : '';
@@ -429,6 +452,36 @@ export default class UI {
                 this.toast(e.card ? `アリバイ：${NAME[e.card]}` : '相手がアリバイカードを引きました');
             }
         });
+    }
+
+    // ヒント：おすすめの手を下書きにし、その行動タイルに印を付ける。「決定」はしない
+    showHint() {
+        const c = this.myTurn() && this.controller.hint();
+        if (!c) {
+            music.play('error');
+            return;
+        }
+        music.play('select');
+        if (c.type === 'move') this.sel = { action: c.who, steps: c.steps };
+        else if (c.type === 'joker') this.sel = { action: 'joker', who: c.who, steps: c.steps };
+        else if (c.type === 'rotate') this.sel = { action: 'rotate', tile: c.tile, rot: c.rot };
+        else if (c.type === 'exchange') this.sel = { action: 'exchange', a: c.a, b: c.b };
+        else this.sel = { action: c.type };
+        this.hintAction = this.sel.action;
+        this.render();
+    }
+
+    // コントローラーが進めたときの音。自分の手の音は押したときに鳴らすので、ここでは相手の手・自分の番・終わりだけ
+    updateSound() {
+        const view = this.view;
+        const mine = this.myTurn();
+        if (view.phase === 'end') {
+            if (!this.endSounded) music.play(view.winner === view.you ? 'win' : 'lose');
+            this.endSounded = true;
+        } else if (!this.sending) {
+            music.play(mine && !this.wasMine ? 'turn' : 'notify');
+        }
+        this.wasMine = mine;
     }
 
     // ---- 記録・終わり ----

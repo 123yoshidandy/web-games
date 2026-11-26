@@ -15,6 +15,7 @@ import { CPU_LEVELS, chooseCommand, suggest } from './cpu-player.js';
 import { symbolsSvg, sym, amountHtml, majorIcon } from './art.js';
 import { farmHtml } from './farm-view.js';
 import { helpHtml, titleArtHtml } from './help.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'agricola.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
@@ -81,7 +82,10 @@ export default class UI {
                     this.hintSpace = null;
                     this.render();
                 },
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -90,6 +94,7 @@ export default class UI {
             return;
         }
         this.view = null;
+        this.soundSeq = this.controller.game.eventSeq;
         this.sel = null;
         this.info = null;
         this.decideKey = null;
@@ -215,6 +220,7 @@ export default class UI {
                 this.confirm();
                 return;
             }
+            music.play('select');
             this.select(space);
             return;
         }
@@ -365,6 +371,23 @@ export default class UI {
         if (!this.send(command)) this.render();
     }
 
+    // 効果音：前の更新からのできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分の手は置いた音（子が生まれたら得た音、物乞いは払った音）、ほかの人の手のあとは自分の番か知らせの音、終局は勝ち・負けの音
+    playSounds(v) {
+        const fresh = v.events.filter(e => e.seq > this.soundSeq);
+        if (!fresh.length) return;
+        this.soundSeq = fresh.at(-1).seq;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(v.you) ? 'win' : 'lose');
+        const others = fresh.some(e => e.seat !== undefined && e.seat !== v.you);
+        if (!others && fresh.some(e => e.seat === v.you)) {
+            if (fresh.some(e => e.type === 'beg' && e.seat === v.you)) return music.play('pay');
+            if (fresh.some(e => e.type === 'born' && e.seat === v.you)) return music.play('gain');
+            return music.play('place');
+        }
+        music.play(this.myTurn() ? 'turn' : 'notify');
+    }
+
     // ---- タイトル ----
 
     renderSetup() {
@@ -387,6 +410,7 @@ export default class UI {
         this.syncDecide(v);
         this.renderActions(v);
         if ($('#log').open) this.renderLog();
+        this.playSounds(v);
         if (v.phase === 'end' && !$('#result').open && !this.resultTimer) {
             this.resultTimer = setTimeout(() => {
                 this.resultTimer = null;

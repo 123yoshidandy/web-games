@@ -10,6 +10,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { createState, lineAxis, STEP, SIZE, BLACK, WHITE, LAYOUTS } from './rules.js';
 import { COLOR_NAMES } from './game.js';
 import * as art from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'abalone.settings';
 const $ = (id) => document.getElementById(id);
@@ -103,6 +104,7 @@ export default class UI {
             this.showTitle();
         });
         $('clear').addEventListener('click', () => {
+            music.play('cancel');
             this.selection = [];
             this.render();
         });
@@ -154,13 +156,17 @@ export default class UI {
         this.controller?.stop();
         this.controller = new LocalGameController(setup, {
             onUpdate: () => this.render(),
-            onError: (message) => this.toast(message)
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            }
         });
         this.resultShown = this.controller.game.isOver();
         this.selection = [];
         this.marbles.forEach(g => g.remove());
         this.marbles.clear();
         this.seenSeq = this.controller.game.eventSeq;
+        this.soundSeq = this.controller.game.eventSeq;
         this.shownCaptured = {};
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
@@ -194,6 +200,7 @@ export default class UI {
         this.renderPanels(still);
         this.renderMarbles(still);
         this.renderMarks();
+        this.playSounds(view);
         if (view.over && !this.resultShown) {
             this.resultShown = true;
             setTimeout(() => this.showResult(), 800);
@@ -325,6 +332,8 @@ export default class UI {
         const v = this.view;
         const sel = this.selection;
         const mine = v.board[c] === this.myColor;
+        if (mine) music.play(sel.includes(c) && sel.length === 1 ? 'cancel' : 'select');
+        else if (sel.length) music.play('cancel');
         if (!mine) {
             this.selection = [];
         } else if (sel.includes(c)) {
@@ -339,6 +348,22 @@ export default class UI {
             else this.selection = [c];
         }
         this.render();
+    }
+
+    // 効果音：前の更新からのできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分の手は置いた（押し出したら取った）音、CPU の手のあとは自分の番の音、終局は勝ち・負けの音
+    playSounds(view) {
+        const fresh = view.events.filter(e => e.seq > this.soundSeq);
+        if (!fresh.length) return;
+        this.soundSeq = fresh.at(-1).seq;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === view.seat ? 'win' : 'lose');
+        const mine = fresh.filter(e => e.type === 'move' && e.seat === view.seat);
+        if (mine.length && !fresh.some(e => e.type === 'move' && e.seat !== view.seat)) {
+            const out = mine.some(e => e.pushed.some(([, to]) => to === -1));
+            return music.play(out ? 'capture' : 'place');
+        }
+        music.play(this.myTurn ? 'turn' : 'notify');
     }
 
     // a と b が1つおきに並び、間が自分の玉なら、その間のマス

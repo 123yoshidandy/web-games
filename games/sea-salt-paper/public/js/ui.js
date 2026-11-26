@@ -8,6 +8,7 @@ import { TYPE_ORDER, COLORS, COLOR_NAMES } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, cardHtml, cardBackHtml, icon, CARD_TEXT, cardName } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'sea-salt-paper.settings';
 const CPU_NAMES = ['ナギ', 'ミナト', 'シオン'];
@@ -75,7 +76,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -319,6 +323,7 @@ export default class UI {
         // 置ける山が1つだけなら、すぐに置く
         if (piles.length === 1) return this.send({ type: 'keep', card, pile: piles[0] });
         this.keepCard = this.keepCard === card ? null : card;
+        music.play(this.keepCard === null ? 'cancel' : 'select');
         this.render();
     }
 
@@ -327,12 +332,14 @@ export default class UI {
         this.stealCards = null;
         if (this.selected.includes(card)) this.selected = this.selected.filter(id => id !== card);
         else this.selected = [...this.selected, card].slice(-2);
+        music.play('select');
         this.render();
     }
 
     act(action) {
         const view = this.view;
         if (action === 'cancel') {
+            music.play('cancel');
             this.clearChoices();
             return this.render();
         }
@@ -342,6 +349,7 @@ export default class UI {
                 // 相手が何人もいれば、相手の札を押して選ぶ
                 this.selected = [];
                 this.stealCards = cards;
+                music.play('select');
                 return this.render();
             }
             const target = duoEffect(cards[0], cards[1]) === 'steal' ? view.stealTargets[0] : undefined;
@@ -356,6 +364,7 @@ export default class UI {
         if (!this.controller) return;
         const before = this.captureAnchors();
         const view = this.controller.getView();
+        const prevCurrent = this.view?.current;
         this.view = view;
         this.validateChoices();
 
@@ -371,7 +380,30 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         this.playEvents(fresh, before);
+        this.playSound(fresh, view, prevCurrent);
         this.afterRender();
+    }
+
+    // 新しい出来事から効果音を1つ鳴らす。自分の操作はその音、相手の番の終わりは notify、自分の番になったら turn、終わりは勝ち負け
+    playSound(fresh, view, prevCurrent) {
+        if (fresh.length === 0) return;
+        if (fresh.some(e => e.type === 'end')) return music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'roundStart')) return music.play('shuffle');
+        const roundEnd = fresh.find(e => e.type === 'roundEnd');
+        if (roundEnd) return music.play(roundEnd.gained[view.you] > 0 ? 'gain' : 'notify');
+        const mine = fresh.filter(e => e.seat === view.you && e.type !== 'turn');
+        if (mine.length > 0) {
+            const types = mine.map(e => e.type);
+            if (types.includes('steal')) return music.play('capture');
+            if (types.some(t => ['drawDeck', 'takeDiscard', 'fish', 'crabTake'].includes(t))) return music.play('draw');
+            if (types.some(t => ['discard', 'duo', 'call'].includes(t))) return music.play('place');
+            if (types.includes('crabLook')) return music.play('select');
+        }
+        // 相手の手は1手ずつ鳴らさず、番が回ったときにまとめて知らせる
+        const turn = fresh.findLast(e => e.type === 'turn');
+        if (!turn || mine.length > 0) return;
+        if (turn.seat === view.you) music.play('turn');
+        else if (prevCurrent !== view.you) music.play('notify');
     }
 
     // 選んでいたものが、状態の変化でなくなったら外す

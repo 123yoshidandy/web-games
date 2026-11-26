@@ -6,7 +6,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn } from './cpu-player.js';
+import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
 const CPU_ACTION_DELAY_MS = 900; // CPU がアクションをする前は、前の手が見えるように待つ
 const CPU_CHOICE_DELAY_MS = 700; // 争いで出す枚数や、記念碑を決めるとき
@@ -64,6 +64,12 @@ export default class LocalGameController {
         }
         this.afterChange();
         return true;
+    }
+
+    // ヒント：人の番なら、おすすめの手を返す（記録は変えない）。人の番でなければ null
+    hint() {
+        if (this.game.isOver() || !this.game.actors().includes(this.humanSeat)) return null;
+        return suggest(this.getView());
     }
 
     afterChange() {

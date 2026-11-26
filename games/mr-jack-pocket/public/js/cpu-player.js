@@ -177,6 +177,11 @@ export function chooseCommand(view, level = 'normal', rand = viewRandom(view)) {
     return best.c;
 }
 
+// ヒント：人の番に、ふつうの CPU が選ぶ手を返す（同じ局面なら同じ手）
+export function suggest(view) {
+    return chooseCommand(view, 'normal');
+}
+
 // CPU 用の乱数（ゲームの乱数とは別）
 export const cpuRandom = (game, seat) => createRandom((game.cpuSalt ^ Math.imul(game.commands.length + 1, 0x9E3779B1) ^ Math.imul(seat + 1, 0x85EBCA6B)) >>> 0);
 
