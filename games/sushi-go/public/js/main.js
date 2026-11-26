@@ -14,6 +14,8 @@ const ui = new UI();
 ui.showTitle();
 // 確かめるときに、ページの外から状態を見られるようにする
 window.__app = ui;
+// 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+ui.online.boot();
 
 // ホーム画面に置いて、オフラインでも開けるようにする（PWA）
 if ('serviceWorker' in navigator) {

@@ -8,7 +8,7 @@ import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
-const CPU_PICK_DELAY_MS = 700;   // CPU が1人ずつ、間を置いて選ぶ（人は CPU を待たずに選べる）
+export const CPU_PICK_DELAY_MS = 700;   // CPU が1人ずつ、間を置いて選ぶ（人は CPU を待たずに選べる）
 const SAVE_KEY = 'sushi-go.save';
 
 export function loadSavedGame() {
