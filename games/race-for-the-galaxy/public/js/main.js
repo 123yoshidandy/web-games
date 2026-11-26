@@ -3,7 +3,10 @@
  * ゲームの状態はコントローラーのビューだけを見て描く（オンライン対戦のコントローラーに差し替えられるように）
  */
 
-import LocalGameController from './game-controller.js';
+import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { cardOf, GOOD_NAMES, TRADE_VALUE } from './cards.js';
 import { ACTION_NAMES, PHASE_NAMES, HAND_LIMIT } from './game.js';
 import { fullText, shortText, kindText, powerText } from './card-text.js';
@@ -39,6 +42,28 @@ let seenSeq = 0;
 let resultShown = false;
 let revealTimer = null;
 let sending = false; // 自分の操作を送っている間（その音は送った側で鳴らす）
+
+// オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
+const online = new NetplayLobby({
+    title: 'レース・フォー・ザ・ギャラクシー',
+    game: 'race-for-the-galaxy',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: CPU_STEP_DELAY_MS,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [
+        { key: 'cpuLevel', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] },
+        { key: 'advanced', label: '2人の上級ルール', options: [{ value: false, label: 'なし' }, { value: true, label: 'あり' }] }
+    ],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
 
 // ヒント：おすすめの手 { key, command }（その場面の間だけ）
 let hint = null;
@@ -106,6 +131,7 @@ function renderTitle() {
     $('advanced').disabled = settings.count !== 2;
     $('advanced-row').classList.toggle('disabled', settings.count !== 2);
     $('resume').hidden = !store.load(KEYS.save);
+    $('online-button').hidden = !online.available;
 }
 
 // ---------- ゲームの開始 ----------
@@ -117,16 +143,23 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    controller?.stop();
-    document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    resultShown = false;
+    let next;
     try {
-        controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        next = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
     } catch (error) {
         console.warn(error);
         store.remove(KEYS.save);
-        controller = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        next = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
     }
+    beginGame(next);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    document.querySelectorAll('dialog[open]').forEach(d => d.close());
+    resultShown = false;
+    controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = freshUi();
@@ -136,12 +169,14 @@ function startGame(setup) {
 }
 
 function saveProgress() {
-    if (!controller) return;
+    if (!controller || controller.isOnline) return; // 途中経過を保存するのはローカル対戦だけ
     if (controller.game.isOver()) store.remove(KEYS.save);
     else store.save(KEYS.save, controller.saveData());
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     showScene('title');
@@ -306,7 +341,8 @@ function renderPanel() {
         develop: placeHtml, settle: placeHtml, trade: tradeHtml, consume: consumeHtml, windfall: windfallHtml
     })[d.kind]();
     // ヒントのボタン（自分が選ぶ番だけ。案内文の右端）
-    if (d && view.phase !== 'end') body = body.replace('<div class="prompt">', `<div class="prompt">${HINT_BUTTON}`);
+    // ヒントはローカル対戦だけ
+    if (d && view.phase !== 'end' && !controller?.isOnline) body = body.replace('<div class="prompt">', `<div class="prompt">${HINT_BUTTON}`);
     $('panel').innerHTML = feedLine() + body + focusLine();
 }
 
@@ -656,16 +692,19 @@ function setup() {
     $('explore-ok').addEventListener('click', () => { $('explore-dialog').close(); send({ type: 'explore', keep: ui.keep }); });
     // 相手の場札のカードを押すと、その効果に切り替える
     $('info-body').addEventListener('click', e => { const b = e.target.closest('[data-info]'); if (b) showInfo(cardOf(b.dataset.info).name, cardInfoHtml(b.dataset.info)); });
-    $('again').addEventListener('click', () => { $('result-dialog').close(); startGame(newSetup()); });
-    $('result-home').addEventListener('click', () => { $('result-dialog').close(); goHome(); });
+    // オンラインは、ロビーを出し、ホストの「もう一度」で再戦する
+    $('again').addEventListener('click', () => { $('result-dialog').close(); if (controller?.isOnline) online.rematch(); else startGame(newSetup()); });
+    $('result-home').addEventListener('click', () => { $('result-dialog').close(); if (controller?.isOnline) online.leave(); else goHome(); });
+    $('online-button').addEventListener('click', () => online.open());
 
     document.addEventListener('gesturestart', e => e.preventDefault());
     document.addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea')) e.preventDefault(); });
 
     showScene('title');
+    online.boot(); // 招待の URL（?room=）から入る、または前の部屋に戻る
     registerServiceWorker();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, send };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, send, online };
 }
 
 function registerServiceWorker() {

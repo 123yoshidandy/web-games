@@ -84,6 +84,9 @@ button:disabled { cursor: default; opacity: .4; }
 .check-row.disabled { opacity: .45; }
 .buttons { display: flex; gap: 8px; }
 .buttons > * { flex: 1; }
+/* タイトルの「オンラインで遊ぶ」は、開始のボタンの下の行に出す */
+.buttons:has(#online-button) { flex-wrap: wrap; }
+#online-button { flex-basis: 100%; }
 .panel .link { align-self: center; }
 
 /* ---------- ゲーム ---------- */
