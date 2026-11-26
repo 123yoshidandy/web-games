@@ -14,6 +14,7 @@ const sortIds = (ids) => [...ids].sort();
 export function createGameView(game, seat, { since = 0 } = {}) {
     const s = game.state;
     const state = clone(s);
+    delete state.rng; // 乱数の状態は送らない（あれば山札の並びやこれから引くカードを計算し直せてしまう）
     state.supply = s.supply.map(pile => pile.map(() => 0));
     state.marketStack = s.marketStack.map(() => 0);
     state.objStack = s.objStack.map(() => 0);
