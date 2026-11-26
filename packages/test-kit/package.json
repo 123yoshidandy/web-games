@@ -4,7 +4,8 @@
   "type": "module",
   "exports": {
     "./pwa.js": "./pwa.js",
-    "./online.js": "./online.js"
+    "./online.js": "./online.js",
+    "./picker.js": "./picker.js"
   },
   "dependencies": {
     "netplay-kit": "*"

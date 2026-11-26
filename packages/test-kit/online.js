@@ -13,7 +13,8 @@
 //   leaveContinues … 対戦中に抜けた人の席を CPU が引き継ぐか（既定 true。onPlayerGone で引き継がないゲームは false）
 //   maxMoves      … 終局まで打つ手の上限（既定 3000）
 import { describe, it, expect } from 'vitest';
-import { createTestServer, createSeededRandom } from 'netplay-kit/server/testing.js';
+import { createTestServer } from 'netplay-kit/server/testing.js';
+import { createMovePicker } from './picker.js';
 
 const TIMEOUT_MS = 120_000;
 
@@ -22,31 +23,8 @@ export function testOnline({ definition, suggest = null, pick = null, humans = 2
     const maxPlayers = definition.maxPlayers ?? 4;
     const humanCount = Math.min(humans, maxPlayers);
 
-    const restore = (room) => (definition.restore ? definition.restore(structuredClone(room.game), room) : structuredClone(room.game));
-    const commandsOf = (game) => game.commands ?? definition.persist?.(game)?.commands ?? null;
-
-    // 定義の CPU に、その席の手を1つ選ばせる（部屋の状態から作り直した写しで動かすので、本物の部屋は変わらない）
-    const cpuPick = (room, seat) => {
-        const game = restore(room);
-        const player = game.players?.[seat];
-        const before = commandsOf(game)?.length;
-        if (!player || before === undefined || before === null || !definition.cpu?.step) return null;
-        player.isCPU = true;
-        if (definition.cpu.needsStep && !definition.cpu.needsStep(game, room)) return null;
-        if (!definition.cpu.step(game, { random: createSeededRandom(before + 1), now: 0, room })) return null;
-        const entry = commandsOf(game)[before];
-        if (!entry || (entry.seat ?? entry.playerId) !== seat) return null;
-        if (entry.command) return entry.command;
-        const { seat: _seat, playerId: _playerId, ...command } = entry;
-        return command;
-    };
-
-    // 席の今の手（打てなければ null）
-    const moveFor = (room, seat) => {
-        if (pick) return pick(restore(room), seat);
-        if (suggest) return suggest(restore(room), seat);
-        return cpuPick(room, seat);
-    };
+    // 席の今の手（打てなければ null）。選び方は picker.js
+    const { moveFor } = createMovePicker({ definition, suggest, pick });
 
     // 部屋を作って人を集め、足りなければ CPU を足して始める
     const startRoom = async (server) => {
