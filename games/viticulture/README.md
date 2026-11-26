@@ -86,4 +86,15 @@ cd games/viticulture/public && python3 -m http.server 8000
 - `public/js/game.js`：ルール（DOM に依存しない）。操作は `wake`・`place`・`pass`・`choose` の4つだけで、`applyCommand` に通し、記録から `Game.replay` で再現できる。断る操作は状態を変えない
 - `public/js/game-view.js`：そのプレイヤーから見てよい情報だけのビュー（ほかの人の手札は山ごとの枚数だけ）
 - `public/js/cpu-player.js`：CPU。`public/js/game-controller.js`：ローカル対戦と保存。`public/js/ui.js`：画面
-- `server/src/game-definition.js`：netplay-kit の「ゲームの定義」の形（オンライン対戦はまだ入れていない）
+- `server/src/game-definition.js`：netplay-kit の「ゲームの定義」の形。`server/src/handler.js`（サーバーの入口）・`public/js/online-config.js`（接続先）・`public/js/netplay/`（netplay-kit の写し。手で直さない）は、下の「オンライン対戦」
+
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜6人で、足りない席は CPU で埋められる。ほかの人の手札と山札の並びはビューに入れない。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'viticulture' })`。web-games の1つのスタックから `?game=viticulture` で呼ばれる）
+- ゲームの定義は `server/src/game-definition.js`（記録だけを保存して再現する。各席には、その席から見えるビューだけを送る）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
