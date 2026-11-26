@@ -165,7 +165,8 @@ export const ITEMS = [
     {
         id: 'sound-toggle', name: '音の ON/OFF', category: '音', level: '必須',
         check: (c) => {
-            if (/class="[^"]*\bbgm-toggle\b/.test(c.html + c.js)) return OK;
+            // sound-toggle（BGM と効果音をまとめて切り替える）が今の名前。移す途中は、前の bgm-toggle も認める
+            if (/class="[^"]*\b(sound|bgm)-toggle\b/.test(c.html + c.js)) return OK;
             // 独自の音（js/sound.js）のゲームは、BGM と効果音の切り替えを自前の作りで持つ
             const ownSound = c.ownJsFiles.some((file) => basename(file) === 'sound.js');
             return yes(ownSound && /BGM/.test(c.html + c.js) && /効果音/.test(c.html + c.js)
@@ -295,6 +296,14 @@ export const ITEMS = [
             return yes(theme?.toLowerCase() === m.theme_color?.toLowerCase()
                 && (appTitle ?? m.short_name) === m.short_name
                 && Boolean(title) && (title === m.name || title.includes(m.short_name)));
+        }
+    },
+    {
+        id: 'effects', name: '効果音', category: '音', level: '推奨',
+        check: (c) => {
+            // 独自の音（js/sound.js）のゲームは、効果音も自前で持つ
+            if (c.ownJsFiles.some((file) => basename(file) === 'sound.js')) return OK;
+            return yes(/\.play\(\s*['"](select|place|capture|cancel|error|turn|notify|dice|draw|shuffle|gain|pay|win|lose)['"]/.test(c.js));
         }
     }
 ];

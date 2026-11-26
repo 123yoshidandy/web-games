@@ -60,7 +60,7 @@ web-games のゲームは、作った時期と作りがまちまちで、同じ�
 | 12 | result | 結果と「もう一度」 | 画面の流れ | 推奨 | 終局で結果を出し、同じ設定で再戦できる | 「もう一度」「再戦」「新しい対局」などの文言 |
 | 13 | resume | 続きから | 遊び | 必須 | 途中経過を保存し、タイトル画面から「続きから」で再開できる | 「続きから」の文言 |
 | 14 | bgm | BGM と効果音 | 音 | 必須 | 共通の音のエンジンの写し（`js/sound/engine.js`・`engine.mjs`）と、ゲームの曲（`js/sound/bgm.js`）があり、`Sound.createPlayer` で鳴らす | `<公開>/js/sound/` の `engine.(m)js` と `bgm.js`、ゲームのコード（`js/sound/` の外）の `createPlayer(`。写しが元と同じかは check-games.mjs が見る |
-| 15 | sound-toggle | 音の ON/OFF | 音 | 必須 | 画面に BGM（と効果音）の ON/OFF のボタンがあり、設定を保存する | `class="bgm-toggle"`（HTML と JS）。独自の音（`js/sound.js`）のゲームは、「BGM」「効果音」の切り替え（`aria-pressed` など）。**要統一** |
+| 15 | sound-toggle | 音の ON/OFF | 音 | 必須 | 画面に、BGM と効果音をまとめて ON/OFF する「サウンド」のボタンがあり、設定を保存する | `class="sound-toggle"`（HTML と JS。移す途中は前の `bgm-toggle` も認める）。独自の音（`js/sound.js`）のゲームは、「BGM」「効果音」の切り替え（`aria-pressed` など）。**要統一** |
 | 16 | cpu | CPU 対戦 | 遊び | ゲームによる | 人が足りなくても CPU と遊べる | `js/` の下の `cpu*.js` の有無 |
 | 17 | cpu-level | CPU の強さ | 遊び | 推奨 | タイトル画面で CPU の強さを選べる | `data-level`・`level-select`・「やさしい」「強さ」など。`cpu` が n/a なら n/a |
 | 18 | seeded-rng | シード付きの乱数 | 遊び | 必須 | ロジック（ルール・状態の更新）は、シード付きの乱数だけを使う。`Math.random` はシードを決めるときだけ | ロジックのファイル（名前に ui・main・view・render・sound・online・storage・cpu などを含まないもの）で、`seed` を含まない行に `Math.random` がない（コメントは除く）。ファイルの名前で決めるので外れうる |
@@ -84,6 +84,7 @@ web-games のゲームは、作った時期と作りがまちまちで、同じ�
 | 36 | portal-meta | 入口のページの情報 | 情報 | 必須 | package.json の `portal`（原題・ジャンル・人数）がそろっている | `scripts/portal/metadata.mjs` の errors がない（check-games.mjs でも落とす） |
 | 37 | storage-prefix | 保存の名前 | 情報 | 必須 | localStorage のキーが「<頭>.<種類>」の形で、頭が1つ | `'<頭>.save'` などの文字列と `PREFIX = '<頭>.'` から頭を集め、1つか。localStorage を使わなければ n/a。ほかのゲームとの重なりは check-games.mjs が見る |
 | 38 | names-match | 名前と色の一致 | 情報 | 推奨 | index.html の title・apple-mobile-web-app-title・theme-color が、manifest の name・short_name・theme_color とそろう | index.html と manifest を比べる（title は name と同じか short_name を含む） |
+| 39 | effects | 効果音 | 音 | 推奨 | ゲームのできごとで、共通の効果音を鳴らす（`packages/sound/README.md` の「共通の効果音」の表と当て方の決まり） | JS に `.play('<共通の効果音の名前>')` がある。独自の音（`js/sound.js`）のゲームは、自前の効果音を認める |
 
 ## 要統一の決まり
 
@@ -94,7 +95,7 @@ web-games のゲームは、作った時期と作りがまちまちで、同じ�
 | title | タイトル画面の要素は `id="screen-title"`（87本がこれ） | `#title-screen`（server なしの6本）・`#screen-setup`（lucky-numbers）・`#topScreen`（mine-blocks）・JS で作る `.title-screen`（dominion）・`showTitle()`（panel-de-pon） |
 | help | 遊び方を開くボタンは、タイトル画面に `id="open-help-title"`、プレイ中に `id="open-help-game"`。遊び方の中身は `id="help"` | 「遊び方」「ルール」の button・a が2つ以上 |
 | home | プレイ中からタイトルへ戻るボタンは `id="home"`（結果の画面からは `id="result-home"`） | aria-label の「ホーム」など |
-| sound-toggle | BGM の ON/OFF のボタンは `<button type="button" class="bgm-toggle" aria-pressed="true">`（タイトル画面とプレイ中に置く。保存は `<頭>.sound`） | 独自の音の3本の、自前の切り替え |
+| sound-toggle | 音の ON/OFF のボタンは `<button type="button" class="sound-toggle" aria-pressed="true">` で、押すと `toggleAll()`（タイトル画面は「サウンド」の文字、プレイ中はスピーカーのアイコンに `aria-label="サウンド"`。保存は `<頭>.sound`。`packages/sound/README.md` の「音の ON/OFF」） | 独自の音の3本の、自前の切り替え |
 | pwa-test | `test/pwa.test.js` で `describePwa(公開するフォルダ, { css })` を呼ぶ。CSS の場所が `css/style.css` でなければ `css` で渡す | 同じ（自前の PWA のテストは認めない。`pending` は直すまでの印で、残っている間は ✗） |
 | replay-test | 再現のテストは `describe('記録からの再現', …)` にまとめる | テストの中の `replay`・「再現」 |
 | hint | ヒントのボタンは `id="hint"`。おすすめの手は、CPU のファイル（`cpu*.js`）から export する `suggest(…)` で選び、画面ではおすすめの手の要素に `class="recommended"` を付ける。テストは `test/hint.test.js` | katan の `class="assist-toggle"`（アシストの ON/OFF。`suggest` は `cpu-player.js`、テストは `test/assist.test.js`） |
@@ -149,7 +150,7 @@ NG があれば終了コード1。ゲームは本番と同じ `/<ゲーム>/` �
 |---|---|---|
 | タイトル画面 | 横のはみ出し | ページの幅が画面の幅より広い |
 | | 縦のスクロール | NG にしない（注意）。主要な要素がスクロールで届くかで判定する |
-| | 主要な要素：「← ゲーム一覧」（`.portal-link`）・BGM の切り替え（`.bgm-toggle`）・開始（`#start`・`#start-button`・`#start-local`・`#start-cpu`、なければ「開始」「スタート」「はじめる」の文言）・遊び方（`#open-help-title`、なければ「遊び方」「ルール」の文言） | 見えない。画面の外にあり、スクロールでも届かない（`overflow: hidden` で切れている）。真ん中がほかの要素に覆われている。高さ 24px 未満（44px 未満は注意）。ほかの操作の要素（ボタン・リンク・入力）と 2px より大きく重なる |
+| | 主要な要素：「← ゲーム一覧」（`.portal-link`）・音の切り替え（`.sound-toggle`、前の `.bgm-toggle`）・開始（`#start`・`#start-button`・`#start-local`・`#start-cpu`、なければ「開始」「スタート」「はじめる」の文言）・遊び方（`#open-help-title`、なければ「遊び方」「ルール」の文言） | 見えない。画面の外にあり、スクロールでも届かない（`overflow: hidden` で切れている）。真ん中がほかの要素に覆われている。高さ 24px 未満（44px 未満は注意）。ほかの操作の要素（ボタン・リンク・入力）と 2px より大きく重なる |
 | 開始のボタンを押したあと | タイトルのまま | 押した開始のボタンがまだ見えている |
 | | 「← ゲーム一覧」 | 見えている |
 | | BGM の切り替え | 見えず、閉じたダイアログ（katan の設定）の中にもない。開始の直後に出る、選ぶまで閉じないダイアログに覆われるのは注意 |

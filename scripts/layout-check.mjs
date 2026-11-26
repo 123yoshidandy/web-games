@@ -36,7 +36,7 @@ const SELECTORS = {
     start: ['#start', '#start-button', '#start-local', '#start-cpu'],
     help: ['#open-help-title'],
     portal: ['.portal-link'],
-    bgm: ['.bgm-toggle']
+    bgm: ['.sound-toggle', '.bgm-toggle']
 };
 
 const readJson = (path) => {
