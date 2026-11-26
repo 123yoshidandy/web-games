@@ -29,7 +29,7 @@
     <!-- 開始画面 -->
     <main id="title-screen" class="screen">
         <a class="portal-link" href="../">← ゲーム一覧</a>
-        <button type="button" class="icon-btn corner-btn title-bgm bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
+        <button type="button" class="icon-btn corner-btn title-bgm sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg></button>
         <button id="open-rules" class="icon-btn corner-btn" aria-label="遊び方"><svg><use href="#icon-help"/></svg></button>
         <div class="title-wrap">
             <h1 class="title-logo">Pokémon Card Game</h1>
@@ -134,9 +134,9 @@
         <!-- メニューは左端の縦の列（画面の縦の幅を盤面に使うため） -->
         <nav class="side-menu" aria-label="メニュー">
             <button id="go-home" class="icon-btn" aria-label="ホーム"><svg><use href="#icon-home"/></svg></button>
+            <button id="hint" class="icon-btn" aria-label="ヒント" title="ヒント"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>
             <button id="open-log" class="icon-btn" aria-label="ログ"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6.5h12M8 12h12M8 17.5h12M4 6.5h.01M4 12h.01M4 17.5h.01"/></svg></button>
-            <button id="sound-toggle" class="icon-btn sound-toggle" aria-label="効果音" aria-pressed="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="sound-wave" d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/><path class="sound-slash" d="M3.5 3.5l17 17"/></svg></button>
-            <button type="button" class="icon-btn bgm-toggle" aria-pressed="true" aria-label="BGM" title="BGM"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path class="bgm-off" d="M3 3l18 18"/></svg></button>
+            <button type="button" class="icon-btn sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg></button>
             <button id="open-rules-game" class="icon-btn" aria-label="遊び方"><svg><use href="#icon-help"/></svg></button>
         </nav>
         <div id="fx" class="fx-layer" aria-hidden="true"></div>

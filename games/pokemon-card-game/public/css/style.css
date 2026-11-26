@@ -867,7 +867,8 @@ button.prize-grid { cursor: pointer; }
 /* 手札のトレーナーズでは、種類（グッズ・サポートなど）は出さない（絵の色で分かる） */
 .hand-card .card-trainer .card-head { display: none; }
 .hand-card.selected > .card { box-shadow: 0 0 0 3px #fff, 0 0 12px rgba(255, 255, 255, 0.6); animation: none; }
-/* 同じカードが何枚あるか（重ねて1枚で出している） */
+/* ヒントのおすすめ（手札のカード・ポケモン・番を終える） */
+.hand-card.recommended > .card, .mon.recommended, #end-turn.recommended { box-shadow: 0 0 0 3px #fff, 0 0 18px 5px rgba(255, 216, 74, 0.95); animation: none; }/* 同じカードが何枚あるか（重ねて1枚で出している） */
 .hand-count {
     position: absolute;
     top: 40%;
@@ -1342,11 +1343,6 @@ dialog button:focus { outline: none; }
 }
 
 /* 効果音の ON/OFF（オフのときは薄くし、斜線を重ねる） */
-.sound-toggle svg { width: 22px; height: 22px; }
-.sound-toggle .sound-slash { display: none; }
-.sound-toggle.off { opacity: 0.55; }
-.sound-toggle.off .sound-slash { display: inline; }
-.sound-toggle.off .sound-wave { display: none; }
 /* コイン：回って、オモテかウラで止まる */
 .fx-coin {
     width: 52px;
@@ -1541,6 +1537,6 @@ dialog button:focus { outline: none; }
 
 /* BGM の ON/OFF（js/music.js）。タイトルでは遊び方の左に置く */
 .title-bgm { right: calc(8px + 30px + 6px + var(--safe-r)); }
-.bgm-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
-.bgm-toggle[aria-pressed="true"] .bgm-off { display: none; }
-.bgm-toggle svg { fill: none; stroke: currentColor; }
+.sound-toggle[aria-pressed="false"] { opacity: .5; }
+.sound-toggle[aria-pressed="true"] .sound-off { display: none; }
+.sound-toggle svg { fill: none; stroke: currentColor; }

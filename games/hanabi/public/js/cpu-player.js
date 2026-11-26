@@ -239,3 +239,10 @@ export function runCpuStep(game) {
     const first = game.hands[seat][0];
     return game.applyCommand(seat, game.clues < MAX_CLUES ? { type: 'discard', order: first } : { type: 'play', order: first });
 }
+
+// ヒント：人の番に、CPU が選ぶ手を返す。CPU と同じく、自分の札はヒントで分かったことだけで考える（のぞかない）
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.phase === 'end' || game.current !== seat) return null;
+    return chooseCommand(game, seat);
+}

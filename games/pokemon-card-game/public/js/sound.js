@@ -1,37 +1,18 @@
 /**
  * 効果音（音声ファイルを使わず、Web Audio API で合成する）
  * ブラウザの制限で、最初に画面を触るまでは鳴らない（unlockSound を操作の中で呼ぶ）
- * いきなり鳴って驚かせないよう、初めはオフ。上の帯のボタンでオンにしたときだけ鳴らす
+ * ON/OFF は BGM と同じ「サウンド」のボタン1つで切り替える（music.js が、共通の音のプレイヤーの効果音の設定を setSoundEnabled で渡す）
  */
 
-const STORAGE_KEY = 'pokemon-card-game:sound';
-
 let context = null;
-let enabled = loadEnabled();
-const listeners = new Set();
-
-function loadEnabled() {
-    try {
-        return localStorage.getItem(STORAGE_KEY) === 'on';
-    } catch {
-        return false;
-    }
-}
+let enabled = false;
 
 export const isSoundOn = () => enabled;
 
-export function toggleSound() {
-    enabled = !enabled;
-    try {
-        localStorage.setItem(STORAGE_KEY, enabled ? 'on' : 'off');
-    } catch {
-        // 保存できなくても切り替えはできる
-    }
-    if (enabled) unlockSound();
-    listeners.forEach(listener => listener(enabled));
+// AudioContext は作らない（作るのは操作の中の unlockSound）
+export function setSoundEnabled(on) {
+    enabled = on;
 }
-
-export const onSoundChange = listener => listeners.add(listener);
 
 // ユーザー操作の中で呼ぶ（AudioContext を作る・再開する）
 export function unlockSound() {

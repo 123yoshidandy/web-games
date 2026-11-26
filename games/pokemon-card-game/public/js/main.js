@@ -12,7 +12,7 @@ import NetplayClient from './netplay/netplay-client.mjs';
 import GameScreen from './ui/game-screen.js';
 import DeckScreens from './ui/deck-screen.js';
 import { cardFace } from './ui/card-view.js';
-import { unlockSound, toggleSound, isSoundOn } from './sound.js';
+import { unlockSound } from './sound.js';
 import { closeOnBackdrop, showDeckPicker, showConfirm } from './ui/sheets.js';
 import { loadCachedSharedDecks, fetchSharedDecks } from './shared-decks.js';
 
@@ -480,17 +480,8 @@ $('go-home').addEventListener('click', () => {
 });
 ['open-rules', 'open-rules-game'].forEach(id => $(id).addEventListener('click', () => $('rules').showModal()));
 closeOnBackdrop($('rules'));
-// 効果音：ブラウザの制限で、画面に触れたときに使えるようにする。ボタンで ON/OFF（保存する）
+// 効果音：ブラウザの制限で、画面に触れたときに使えるようにする。ON/OFF は「サウンド」のボタン（music.js）
 document.addEventListener('pointerdown', unlockSound, { passive: true });
-const renderSoundToggle = () => {
-    $('sound-toggle').classList.toggle('off', !isSoundOn());
-    $('sound-toggle').setAttribute('aria-pressed', String(isSoundOn()));
-};
-$('sound-toggle').addEventListener('click', () => {
-    toggleSound();
-    renderSoundToggle();
-});
-renderSoundToggle();
 // 縦向きのスマホは、画面を回して描くだけだと、キーボードが縦に出る。できる端末（Android）では、端末の向きを横に固定する
 // ホーム画面のアプリならそのまま固定できる。ブラウザでは全画面のときだけ固定できるので、全画面にしてから固定する
 // 自分で全画面を抜けたら、もう試さない（触るたびに全画面に戻らないように）。iOS は固定できないので、回して描くだけ

@@ -79,6 +79,47 @@ export default class GameScreen {
         this.errorTimer = setTimeout(() => this.render(), 1800);
     }
 
+    // おすすめの手：手札のカード・対象のポケモン・番を終えるボタンを光らせ、状態の欄に短く書く（打つのは自分）
+    showHint() {
+        const view = this.view;
+        const command = view && this.controller?.hint?.();
+        if (!command) {
+            this.showError('今はおすすめの手がありません');
+            return;
+        }
+        this.mode = null;
+        this.hint = { key: this.hintKey(view), command };
+        this.render();
+    }
+
+    hintKey(view) {
+        return `${view.turn}:${view.log.length}:${view.current}`;
+    }
+
+    hintText(view, c) {
+        const me = view.players[view.viewerId];
+        const name = uid => {
+            const inst = me.hand?.find(item => item.uid === uid);
+            return inst ? getCard(inst.id).name : 'カード';
+        };
+        switch (c.type) {
+            case 'playBasic': return `${name(c.uid)}をベンチに出す`;
+            case 'evolve': return `${name(c.uid)}に進化させる`;
+            case 'attachEnergy': return `${name(c.uid)}をつける`;
+            case 'playTrainer': return `${name(c.uid)}を使う`;
+            case 'useHandAbility': return `${name(c.uid)}の特性を使う`;
+            case 'useAbility': return '特性を使う';
+            case 'useStadium': return 'スタジアムを使う';
+            case 'retreat': return 'にげる';
+            case 'attack': {
+                const attack = me.active?.top ? getCard(me.active.top).attacks?.[c.index] : null;
+                return attack?.name ? `ワザ「${attack.name}」` : 'ワザを使う';
+            }
+            case 'endTurn': return '番を終える';
+            default: return '';
+        }
+    }
+
     // ===== 入力 =====
 
     // ワザが使えるのに、またはエネルギーをつけられるのに番を終えようとしたときだけ、確かめる（押しまちがいで番を失わないように）
@@ -104,6 +145,7 @@ export default class GameScreen {
             onLongPress: element => (element.dataset.uid ? this.openHandDetail(element.dataset.uid) : this.openPokemonDetail(element.dataset.pokemon))
         });
         $('end-turn').addEventListener('click', () => this.confirmEndTurn());
+        $('hint').addEventListener('click', () => this.showHint());
         // Esc や Android の「戻る」で選択・決着のダイアログが閉じたら、「盤面を見る」と同じ扱いにする（中央の帯から戻せるように）
         $('prompt').addEventListener('close', () => {
             // プログラムから閉じたとき（答えた・選択がなくなった）は、何もしない
@@ -315,6 +357,10 @@ export default class GameScreen {
         $('stadium').innerHTML = view.stadium ? `<span class="stadium-chip ${view.legal?.stadium ? 'playable' : ''}"><small>${view.stadium.owner === view.viewerId ? 'あなた' : '相手'}</small>${getCard(view.stadium.id).name}</span>` : '';
         $('status').classList.remove('status-error');
         $('status').textContent = this.statusText(view, prompt);
+        const hint = !prompt && this.hint?.key === this.hintKey(view) ? this.hint.command : null;
+        if (!hint) this.hint = null;
+        else $('status').textContent = `おすすめ：${this.hintText(view, hint)}`;
+        $('hint').disabled = !this.controller.hint || view.phase !== 'main' || view.current !== view.viewerId || Boolean(prompt);
         // 同じカードは1枚に重ねて、枚数を出す（手札が多くても横に流れすぎないように）。タップすると、そのうちの1枚を使う
         const groups = new Map();
         for (const inst of me.hand ?? []) {
@@ -323,13 +369,18 @@ export default class GameScreen {
         }
         // 種類の順（ポケモン → トレーナーズ → エネルギー。デッキ構築の一覧と同じ順）に並べる
         $('hand').innerHTML = [...groups].sort((a, b) => cardOrder(a[0]) - cardOrder(b[0])).map(([id, uids]) => {
-            const uid = uids.find(item => item === this.mode?.uid) ?? uids.find(item => view.legal?.hand[item]) ?? uids[0];
+            const uid = uids.find(item => item === this.mode?.uid) ?? uids.find(item => item === hint?.uid) ?? uids.find(item => view.legal?.hand[item]) ?? uids[0];
             const playable = view.legal?.hand[uid] && !prompt;
             const selected = this.mode?.uid === uid;
+            const recommended = hint?.uid !== undefined && hint.uid === uid;
             const count = uids.length > 1 ? `<span class="hand-count">×${uids.length}</span>` : '';
-            return `<div class="hand-card ${playable ? 'playable' : ''} ${selected ? 'selected' : ''}" data-uid="${uid}">${cardFace(id)}${count}</div>`;
+            return `<div class="hand-card ${playable ? 'playable' : ''} ${selected ? 'selected' : ''} ${recommended ? 'recommended' : ''}" data-uid="${uid}">${cardFace(id)}${count}</div>`;
         }).join('');
         $('end-turn').disabled = !view.legal?.endTurn || Boolean(prompt);
+        $('end-turn').classList.toggle('recommended', hint?.type === 'endTurn');
+        // ワザ・にげる・特性は、自分のバトル場（にげる・特性は対象）のポケモンを光らせる
+        const hintTarget = hint && (hint.target ?? (['attack', 'retreat'].includes(hint.type) ? me.active?.id : undefined));
+        if (hintTarget !== undefined) document.querySelector(`#my-side [data-pokemon="${hintTarget}"], #opp-side [data-pokemon="${hintTarget}"]`)?.classList.add('recommended');
         const log = $('log');
         log.innerHTML = view.log.slice(-40).map(text => `<li class="${text.startsWith('—') ? 'log-turn' : ''}">${escapeHtml(text)}</li>`).join('');
         log.scrollTop = log.scrollHeight;

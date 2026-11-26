@@ -6,6 +6,8 @@
 import LocalGameController from './game-controller.js';
 import { COLOR_NAMES, MAX_CLUES, MAX_MISTAKES, bitsToColors, bitsToRanks, clueText } from './game.js';
 import * as storage from './storage.js';
+import { suggest } from './cpu-player.js';
+import { music } from './music.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
@@ -18,6 +20,7 @@ const app = {
     controller: null,
     view: null,
     selection: null, // { seat, order }
+    hint: null,      // { at: 手数, command }
     settings: { count: 3, ...storage.load('settings', {}) }
 };
 
@@ -84,7 +87,13 @@ function startGame(setup) {
     app.view = null;
     app.selection = null;
     if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => update() });
+    app.controller = new LocalGameController(setup, {
+        onUpdate: () => update(),
+        onError: () => {
+            music.play('error');
+            update();
+        }
+    });
     showScene('game');
     update();
 }
@@ -108,12 +117,54 @@ function update() {
     const from = moved && moved.type !== 'clue' && !reduced()
         ? document.querySelector(`.card[data-order="${moved.order}"]`)?.getBoundingClientRect() : null;
     app.view = view;
+    playSound(view, previous, moved);
     render(view);
     if (moved && from) flyCard(moved, from);
     if (view.phase === 'end' && previous && previous.phase !== 'end') setTimeout(showResult, 1300);
 }
 
 const myTurn = view => view.phase !== 'end' && view.current === view.viewer;
+
+// 1つの更新に1つの音。自分の手は結果の音、CPU の手は notify、自分の番になったら turn
+function playSound(view, previous, moved) {
+    if (!previous) return;
+    if (view.phase === 'end') {
+        if (previous.phase !== 'end') music.play(view.endReason === 'mistakes' ? 'lose' : 'win');
+        return;
+    }
+    if (!moved) return;
+    if (moved.seat !== view.viewer) return music.play(myTurn(view) ? 'turn' : 'notify');
+    if (moved.type === 'play') return music.play(moved.success ? 'gain' : 'pay');
+    music.play(moved.type === 'discard' ? 'draw' : 'place');
+}
+
+// ヒント：おすすめの手の札を選んだ状態にし、札と操作のボタンに .recommended を付ける
+function showHint() {
+    const view = app.view;
+    if (!view || !app.controller || !myTurn(view)) return;
+    const command = suggest(app.controller.game, view.viewer);
+    if (!command) return;
+    music.play('select');
+    if (command.type === 'clue') {
+        const card = view.players[command.target].hand.find(c => (command.kind === 'color' ? c.color : c.rank) === command.value);
+        app.selection = { seat: command.target, order: card.order };
+    } else {
+        app.selection = { seat: view.viewer, order: command.order };
+    }
+    app.hint = { at: view.commandCount, command };
+    render(view);
+}
+
+function markHint(view) {
+    $('#hint').disabled = !myTurn(view);
+    if (app.hint && (app.hint.at !== view.commandCount || !myTurn(view))) app.hint = null;
+    const hint = app.hint?.command;
+    const sel = app.selection;
+    if (!hint || !sel) return;
+    const order = hint.type === 'clue' ? sel.order : hint.order;
+    document.querySelector(`.slot[data-order="${order}"] .card`)?.classList.add('recommended');
+    if (sel.order === order) $(`#actions [data-action="${hint.type === 'clue' ? `clue-${hint.kind}` : hint.type}"]`)?.classList.add('recommended');
+}
 
 function render(view) {
     fitLayout(view);
@@ -209,6 +260,7 @@ function renderActions(view) {
         }
     }
     $('#actions').innerHTML = html;
+    markHint(view);
 }
 
 function statusText(view) {
@@ -308,6 +360,7 @@ function onPlayClick(event) {
         const seat = slot.dataset.seat === 'me' ? view.viewer : Number(slot.dataset.seat);
         const order = Number(slot.dataset.order);
         const same = sel && sel.seat === seat && sel.order === order;
+        music.play(same ? 'cancel' : 'select');
         app.selection = same ? null : { seat, order };
         render(view);
     }
@@ -378,6 +431,7 @@ function renderStaticArt() {
 // ===== 初期化 =====
 
 function init() {
+    window.__app = app; // ヘッドレス Chrome での確認用
     renderStaticArt();
     $('#count-select').addEventListener('click', event => {
         const button = event.target.closest('button');
@@ -392,6 +446,7 @@ function init() {
         if (saved) startGame(saved);
     });
     $('#play').addEventListener('click', onPlayClick);
+    $('#hint').addEventListener('click', showHint);
 
     document.addEventListener('click', event => {
         const action = event.target.closest('[data-action]')?.dataset.action;

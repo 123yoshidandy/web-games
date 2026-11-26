@@ -12,6 +12,7 @@ import { CPU_LEVELS, bestRotation, suggest } from './cpu-player.js';
 import { TILES } from './tiles.js';
 import { CARD_IDS, scoreEnv } from './scoring.js';
 import { CARD_TEXT, CARD_TITLES } from './cards.js';
+import { music } from './music.js';
 import { key, parseKey, toPixel, fromPixel, neighbors } from './hex.js';
 import { symbolsSvg, tileSvg, tokenSvg, tileOnlySvg, habitatSwatch, natureSvg, hexPoints, ANIMALS, HABITATS, HABITAT_ORDER, ANIMAL_ORDER } from './art.js';
 
@@ -86,7 +87,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -148,6 +152,23 @@ export default class UI {
         if (!h || !d || !this.sel || this.sel.tile !== h.tile || this.sel.token !== h.token) return false;
         const at = this.tokenAt ?? null;
         return d.q === h.q && d.r === h.r && d.rot === h.rot && JSON.stringify(at) === JSON.stringify(h.at ?? null);
+    }
+
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分が置いたら置いた音（自然トークンを得たら得た音）、流し直しは切る音、ほかの人の手のあとは自分の番か知らせ
+    playSounds(view, fresh) {
+        if (!fresh.length) return;
+        const me = view.you;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) {
+            if (!end.winners.includes(me)) return music.play('lose');
+            return music.play(end.winners.length > 1 ? 'notify' : 'win');
+        }
+        const place = fresh.find(e => e.type === 'place' && e.seat === me);
+        if (place) return music.play(place.nature ? 'gain' : 'place');
+        if (fresh.some(e => e.type === 'wipe' && (e.seat === me || e.auto))) return music.play('shuffle');
+        if (fresh.some(e => e.type === 'turn' && e.seat === me)) return music.play('turn');
+        if (fresh.some(e => e.type === 'place')) music.play('notify');
     }
 
     clearSelection() {
@@ -251,6 +272,7 @@ export default class UI {
         this.view = view;
         // 新しく置かれたタイルを落とす
         this.fresh = new Set();
+        this.playSounds(view, view.events.filter(e => e.seq > this.lastSeq));
         view.events.filter(e => e.seq > this.lastSeq).forEach(e => {
             if (e.type === 'place') this.fresh.add(`${e.seat}:${key(e.q, e.r)}`);
         });
@@ -507,6 +529,7 @@ export default class UI {
         const me = v.players[v.you];
         if (this.wiping) {
             if (part !== 'token') return;
+            music.play('select');
             if (this.wiping.has(slot)) this.wiping.delete(slot);
             else this.wiping.add(slot);
             this.render();
@@ -519,6 +542,7 @@ export default class UI {
             if (this.sel.tile !== this.sel.token && me.nature < 1) this.sel.token = slot;
         } else if (slot !== this.sel.tile) {
             if (me.nature < 1) {
+                music.play('error');
                 this.toast('別々の組から取るには、自然トークンが要ります');
                 return;
             }
@@ -526,6 +550,7 @@ export default class UI {
         } else {
             this.sel = { ...this.sel, token: slot };
         }
+        music.play('select');
         if (v.display.tokens[this.sel.token] !== prevAnimal) this.tokenAt = undefined;
         if (this.draft) {
             const env = me.env;

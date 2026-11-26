@@ -5,7 +5,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, actingPlayerId, minimalAnswer } from './cpu-player.js';
+import { runCpuStep, actingPlayerId, minimalAnswer, suggest } from './cpu-player.js';
 import { createSeed } from './random.js';
 
 const CPU_STEP_DELAY_MS = 650; // CPU の手は1手ずつ間を置いて見せる（場が変わった手のあと）
@@ -55,6 +55,11 @@ export default class LocalGameController {
 
     getView() {
         return createGameView(this.game, HUMAN);
+    }
+
+    // ヒント：自分の番（選択待ちでない）なら、おすすめの操作を返す（記録は変えない）。そうでなければ null
+    hint() {
+        return suggest(this.game, HUMAN);
     }
 
     send(command) {

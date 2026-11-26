@@ -74,6 +74,17 @@ function safely(fn) {
     }
 }
 
+// ヒント：人の番の操作を、CPU と同じ考え方で選ぶ（選択待ちの答えは出さない）。CPU が持つ判断の写しは、元に戻す
+export function suggest(game, playerId) {
+    if (game.phase !== 'main' || game.pendingPrompt || game.current !== playerId) return null;
+    const saved = { anchor, rootHandUids };
+    try {
+        return safely(() => chooseCpuCommand(game, playerId));
+    } finally {
+        ({ anchor, rootHandUids } = saved);
+    }
+}
+
 export function chooseCpuCommand(game, playerId) {
     if (game.phase === 'deck') {
         // オンラインで足した CPU のデッキは、対戦のシードと席で選ぶ（対戦ごとに変わる。ゲームの乱数は使わない：記録からの再現がずれるため）
