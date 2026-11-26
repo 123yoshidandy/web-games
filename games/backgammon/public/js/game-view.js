@@ -27,7 +27,8 @@ export function createGameView(game, seat, { since = 0 } = {}) {
         canDouble: seat !== null && game.canDouble(seat),
         result: s.result ? { ...s.result } : null,
         gameNo: game.gameNo,
-        options: { ...game.options },
+        // シードは入れない（そこから先のダイスの目が分かってしまうため）
+        options: { matchLength: game.options.matchLength, cube: game.options.cube },
         over: game.isOver(),
         winner: game.winner,
         events: game.events.filter(e => e.seq > since).map(e => structuredClone(e)),

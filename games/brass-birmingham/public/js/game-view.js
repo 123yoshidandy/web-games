@@ -7,10 +7,10 @@
 import { incomeLevel, currentSeat } from './rules.js';
 
 export function createGameView(game, seat, { since = 0 } = {}) {
-    const s = game.state;
+    // 乱数の状態（rng）は入れない。そこから山札の並びや手札を計算できてしまうため
+    const { rng: _rng, ...s } = game.state;
     const state = {
         ...s,
-        rng: 0,
         deck: [],
         deckCount: s.deck.length,
         players: s.players.map((p, i) => ({

@@ -373,6 +373,7 @@ describe('操作の受け付けと記録', () => {
         expect(view.state.players[0].handCount).toBe(8);
         expect(view.state.deck).toEqual([]);
         expect(view.state.deckCount).toBe(game.state.deck.length);
-        expect(view.state.rng).toBe(0);
+        // 乱数の状態は入れない（山札の並びや手札が計算できてしまう）
+        expect(view.state).not.toHaveProperty('rng');
     });
 });

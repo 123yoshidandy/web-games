@@ -18,6 +18,8 @@ export default {
     minPlayers: PLAYERS,
     maxPlayers: PLAYERS,
     allowCpu: true,
+    // 隠れた情報も先の乱数もない（シードは先手を決めるのに使うだけ）。ビューのシードの検査は要らない
+    perfectInformation: true,
 
     settings: {
         defaults: () => ({ level: 'normal', layout: 'standard' }),
