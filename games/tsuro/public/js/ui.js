@@ -8,7 +8,8 @@
 
 import { START_MARKS, SIZE, DISTINCT_ROTATIONS, simulate, trace, rowOf, colOf, SIDE } from './tiles.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS } from './cpu-player.js';
+import { CPU_LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, tileGroup, tileSvg, stoneSvg, trailPath, pointXY, dotHtml, dragonBadge, U, PAD, COLORS } from './art.js';
 
 const SETTINGS_KEY = 'tsuro.settings';
@@ -78,7 +79,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -139,6 +143,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => this.showLog());
         document.querySelectorAll('dialog').forEach(dialog => {
             dialog.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', () => dialog.close()));
@@ -164,6 +169,7 @@ export default class UI {
         if (!this.view?.players[this.view.you].hand?.includes(tile)) return;
         if (this.selected === tile) return this.rotateSelected();
         this.selected = tile;
+        music.play('select');
         this.render();
     }
 
@@ -175,6 +181,7 @@ export default class UI {
         } else {
             this.rots.set(this.selected, ((this.rots.get(this.selected) ?? 0) + 1) % 4);
         }
+        music.play('select');
         this.render();
     }
 
@@ -218,6 +225,7 @@ export default class UI {
             });
             if (best !== null) {
                 this.markPick = best;
+                music.play('select');
                 this.render();
             }
             return;
@@ -291,6 +299,7 @@ export default class UI {
         this.syncSelection(view);
         this.playEvents(view, prev);
         this.renderStatus(view);
+        this.markHint();
         this.renderPlayers(view);
         this.renderBoard(view);
         this.renderHand(view);
@@ -453,6 +462,8 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.hintCommand = null;
+        this.playSound(view, prev, fresh);
         const now = performance.now();
         fresh.forEach(e => {
             if (e.type === 'play') {
@@ -465,6 +476,43 @@ export default class UI {
             }
             if (e.type === 'dragon' && e.seat === view.you) this.toast('山が空です。竜のタイルを取りました');
         });
+    }
+
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、自分の番になったら turn、終わりは勝ち負け
+    playSound(view, prev, fresh) {
+        const me = view.you;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(me) ? 'win' : 'lose');
+        const play = fresh.find(e => e.type === 'play' && e.seat === me);
+        if (play) {
+            const out = play.moves.filter(m => m.out).map(m => m.seat);
+            if (out.includes(me)) return music.play('pay');
+            return music.play(out.length ? 'capture' : 'place');
+        }
+        if (fresh.some(e => e.type === 'place' && e.seat === me)) return music.play('place');
+        if (fresh.some(e => e.type === 'dragon' && e.seat === me)) return music.play('draw');
+        if (fresh.some(e => e.type === 'play' && e.moves.some(m => m.seat === me && m.out))) return music.play('pay');
+        if (view.current === me && prev.current !== me && !view.over) music.play('turn');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.view ? suggest(this.view) : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        // おすすめの印・タイルと向きを選んだ状態にする（「置く」で決められる）
+        if (command.type === 'place') this.markPick = command.mark;
+        if (command.type === 'play') {
+            this.selected = command.tile;
+            this.rots.set(command.tile, command.rotation);
+        }
+        this.render();
+        this.toast(command.type === 'place' ? 'おすすめ：光っている印に駒を置く' : 'おすすめ：選んだタイルをこの向きで置く');
+    }
+
+    markHint() {
+        $('#confirm').classList.toggle('recommended', !!this.hintCommand);
     }
 
     // 駒を道に沿って動かし、道を少しずつ色でなぞる

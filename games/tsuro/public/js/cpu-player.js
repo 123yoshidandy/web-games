@@ -165,6 +165,13 @@ export function decide(view, level) {
     return move ? { type: 'play', tile: move.tile, rotation: move.rot } : null;
 }
 
+// ヒント：人のビューから、おすすめの手（CPU の「ふつう」が選ぶ手）を返す。自分の番でなければ null
+export function suggest(view) {
+    if (view.over || view.current !== view.you || !view.players[view.you]?.alive) return null;
+    if (view.phase === 'play' && !view.moves?.length) return null;
+    return decide(view, 'normal');
+}
+
 // CPU の番なら1手打つ。打てたら true
 export function runCpuStep(game) {
     if (!isCpuTurn(game)) return false;
