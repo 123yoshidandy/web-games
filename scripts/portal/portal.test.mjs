@@ -57,7 +57,7 @@ test('人数はコードの export から読み、オンライン対戦は画面
     const dir = mkdtempSync(join(tmpdir(), 'portal-'));
     try {
         // online：画面側の js/netplay/ とサーバーの server/src/handler.js を置く。definition：ゲームの定義だけを置く
-        const make = (name, pkg, code, { online = false, definition = false } = {}) => {
+        const make = (name, pkg, code, { online = false, definition = false, deployed = online } = {}) => {
             mkdirSync(join(dir, name, 'public', 'js'), { recursive: true });
             writeFileSync(join(dir, name, 'package.json'), JSON.stringify(pkg));
             writeFileSync(join(dir, name, 'public', 'js', 'game.js'), code);
@@ -66,6 +66,9 @@ test('人数はコードの export から読み、オンライン対戦は画面
             if (online) {
                 mkdirSync(join(dir, name, 'public', 'js', 'netplay'));
                 writeFileSync(join(dir, name, 'server', 'src', 'handler.js'), '');
+                writeFileSync(join(dir, name, 'public', 'js', 'online-config.js'), deployed
+                    ? "export const DEPLOYED_SERVER_URL = 'wss://example.execute-api.ap-northeast-1.amazonaws.com/prod';"
+                    : "export const DEPLOYED_SERVER_URL = ''; // デプロイしたら書く");
             }
         };
         make('a', { portal: { original: 'A', genres: ['協力'] } }, 'export const MIN_PLAYERS = 2;\nexport const MAX_PLAYERS = 4;', { online: true });
@@ -73,10 +76,13 @@ test('人数はコードの export から読み、オンライン対戦は画面
         make('c', {}, 'export const PLAYER_COUNTS = [2, 4];');
         make('d', { portal: { original: 'D', genres: ['協力'], players: [3] } }, 'export const PLAYERS = 2;');
         make('e', { portal: { original: 'E', genres: ['なにか'] } }, '');
+        make('f', { portal: { original: 'F', genres: ['協力'] } }, 'export const MIN_PLAYERS = 2;\nexport const MAX_PLAYERS = 4;', { online: true, deployed: false });
 
         assert.deepEqual(playersFromCode(join(dir, 'c', 'public')), { players: [2, 4] });
         const a = gameMetadata(dir, 'a');
         assert.deepEqual([a.players, a.online, a.errors], [[2, 3, 4], true, []]);
+        // 手元では遊べても、配備先の URL がなければ「オンライン」と出さない
+        assert.equal(gameMetadata(dir, 'f').online, false);
         const b = gameMetadata(dir, 'b');
         assert.deepEqual([b.players, b.online, b.errors], [[2], false, []], 'ゲームの定義だけでは、オンライン対戦できるとしない');
         assert.equal(gameMetadata(dir, 'c').errors.length, 1, 'portal がない');

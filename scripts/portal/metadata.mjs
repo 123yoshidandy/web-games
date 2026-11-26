@@ -53,9 +53,21 @@ export const playersFromCode = (dir) => {
     return null;
 };
 
-// オンライン対戦が画面から遊べるか（画面側の写しとサーバーの入口がそろっている）
+// オンライン対戦が画面から遊べるか（画面側の写しとサーバーの入口がそろっている。手元のテスト用サーバーでは遊べる）
 export const hasOnlinePlay = (gameDir, publicDir) => existsSync(join(publicDir, 'js', 'netplay'))
     && existsSync(join(gameDir, 'server', 'src', 'handler.js'));
+
+// 配備したサーバーの接続先（js/ の直下のファイルの DEPLOYED_SERVER_URL・ONLINE_DEPLOYED_SERVER_URL に書いた wss:// の URL）
+const DEPLOYED_URL = /\b(?:ONLINE_)?DEPLOYED_SERVER_URL\s*=\s*(['"`])wss:\/\/[^'"`\s]+\1/;
+export const hasDeployedServer = (publicDir) => {
+    const dir = join(publicDir, 'js');
+    if (!existsSync(dir)) return false;
+    return readdirSync(dir).filter((name) => /\.m?js$/.test(name))
+        .some((name) => DEPLOYED_URL.test(readFileSync(join(dir, name), 'utf8')));
+};
+
+// ポータルで「オンライン」と出すのは、配備したサーバーにつながるゲームだけ（デプロイ前は、画面でもオンラインのボタンを隠す）
+export const hasDeployedOnline = (gameDir, publicDir) => hasOnlinePlay(gameDir, publicDir) && hasDeployedServer(publicDir);
 
 const isPlayerList = (value) => Array.isArray(value) && value.length > 0
     && value.every((n, i) => Number.isInteger(n) && n >= 1 && (i === 0 || n > value[i - 1]));
@@ -97,7 +109,7 @@ export const gameMetadata = (gamesDir, game) => {
 
     return {
         players,
-        online: hasOnlinePlay(gameDir, publicDir),
+        online: hasDeployedOnline(gameDir, publicDir),
         original,
         aliases: Array.isArray(aliases) ? aliases.filter((a) => typeof a === 'string') : [],
         genres: genres.filter((genre) => GENRES.includes(genre)),
