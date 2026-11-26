@@ -4,11 +4,13 @@
  */
 
 import { TERRAINS, LOCATIONS, KING_CARDS, CASTLE_POINTS } from './boards.js';
-import { MANDATORY } from './game.js';
+import { MANDATORY, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { buildTargets, tileTargets, moveSources, usableTiles } from './rules.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 import BoardView from './board-view.js';
 import { symbolsSvg, icon, terrainHex, locationHex, houseSvg, PLAYER_COLORS } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
@@ -46,6 +48,26 @@ export default class UI {
         this.seenCommands = 0;
         this.resultTimer = null;
         this.endTimer = null;
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'キングダムビルダー',
+            game: 'kingdom-builder',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 700,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         $('#symbols').innerHTML = symbolsSvg();
         $('#title-art').innerHTML = titleArtHtml();
         $('#help-body').innerHTML = helpHtml();
@@ -63,13 +85,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -82,16 +105,31 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.stopGame();
+        else document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        this.hint = null;
         this.view = null;
         this.mode = null;
         this.recent = new Set();
-        this.seenCommands = this.controller.game.commands.length;
+        this.seenCommands = this.controller.getView().commandCount;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
         this.board.resize();
         this.board.resetZoom();
-        this.controller.scheduleCpu();
+        if (!this.controller.isOnline) this.controller.scheduleCpu();
+    }
+
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    goHome() {
+        if (this.controller?.isOnline) return this.online.confirmLeave();
+        this.showTitle();
     }
 
     newGame() {
@@ -132,14 +170,19 @@ export default class UI {
             this.renderSetup();
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#result-home').addEventListener('click', () => this.showTitle());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            $('#result').close();
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
         $('#result-board').addEventListener('click', () => $('#result').close());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#home').addEventListener('click', () => this.goHome());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
@@ -205,7 +248,7 @@ export default class UI {
     // おすすめの手を示す。建てるマスか、使う場所タイルと動かす家・行き先を選んでおき、盤のマスを光らせる
     showHint() {
         if (!this.myTurn()) return;
-        const command = this.controller?.suggest();
+        const command = this.controller?.isOnline ? null : this.controller?.suggest();
         if (!command) return;
         music.play('select');
         this.hint = { at: this.view.commandCount, command };
@@ -402,13 +445,15 @@ export default class UI {
             const cls = [can ? 'can' : '', this.mode?.tile === type ? 'on' : '', g.ready ? '' : 'dim'].filter(Boolean).join(' ');
             return `<button class="tile ${cls}" data-tile="${type}">${locationHex(type, 24)}<span>${LOCATIONS[type].name}</span>${g.total > 1 ? `<small>×${g.ready}</small>` : ''}</button>`;
         }).join('') || '<span class="none">場所タイルなし</span>';
-        const canUndo = my && this.controller.canUndo();
+        // 待ったとヒントはローカル対戦だけ（オンラインのコントローラーはゲームの中身を持たない）
+        const local = !this.controller?.isOnline;
+        const canUndo = my && local && this.controller.canUndo();
         const endBtn = my ? `<button id="end-turn" class="btn primary"${view.mandatoryDone ? '' : ' disabled'}>番を終える</button>` : '';
         const hint = this.hinted(view);
-        const hintBtn = my ? `<button type="button" id="hint" class="icon-btn" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>` : '';
+        const hintBtn = my && local ? `<button type="button" id="hint" class="icon-btn" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>` : '';
         $('#mine').innerHTML = `
             <div class="mine-top">${card}${progress}
-                ${hintBtn}<button id="undo" class="icon-btn" aria-label="1手戻す" title="1手戻す"${canUndo ? '' : ' disabled'}>${icon('undo')}</button>${endBtn}</div>
+                ${hintBtn}${local ? `<button id="undo" class="icon-btn" aria-label="1手戻す" title="1手戻す"${canUndo ? '' : ' disabled'}>${icon('undo')}</button>` : ''}${endBtn}</div>
             <div class="tiles">${tiles}</div>`;
         if (hint?.type === 'end') $('#end-turn')?.classList.add('suggested');
         if (hint?.type === 'tile') $(`#mine [data-tile="${hint.tile}"]`)?.classList.add('suggested');
