@@ -3,7 +3,7 @@
  * 画面はビューだけを見て描く。操作はコントローラーの send(seat, command) に渡す
  */
 
-import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS } from './game-controller.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import {
     CITIES, NEIGHBORS, COLOR_NAMES, ROLES, EVENTS, LEVELS, INFECTION_RATES, MAX_OUTBREAKS, MAX_STATIONS, HAND_LIMIT,
@@ -12,6 +12,28 @@ import {
 import { mapSvg, miniMapSvg, shortestPath, DISEASE_COLORS } from './map.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+
+// オンラインのコントローラーを、画面が使うローカルの形（send(seat, command)・canControl(seat) など）に合わせる
+// オンラインでは自分の席だけを動かす。ヒント・任せる・自動で進める処理はない
+function onlineAdapter(net) {
+    const mySeat = () => net.getView()?.you;
+    return {
+        isOnline: true,
+        mode: 'team',
+        net,
+        getView: () => net.getView(),
+        canControl: (seat) => seat === mySeat(),
+        send: (seat, command) => seat === mySeat() && net.send(command),
+        get awaitingResponse() { return net.awaitingResponse; },
+        suggest: () => null,
+        assist: () => false,
+        scheduleCpu() {},
+        scheduleAuto() {},
+        stop: () => net.stop()
+    };
+}
 
 // 自分の操作の音（コマンドの種類ごと）
 const COMMAND_SOUND = {
@@ -105,6 +127,26 @@ export default class UI {
         });
         document.querySelectorAll('[data-icon]').forEach(el => { el.innerHTML = ICONS[el.dataset.icon]; });
         $('title-art').innerHTML = miniMapSvg();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
+        this.online = new NetplayLobby({
+            title: 'パンデミック',
+            game: 'pandemic',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: CPU_STEP_DELAY_MS,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [{ key: 'level', label: '難易度', options: [{ value: 'intro', label: '入門' }, { value: 'standard', label: '標準' }, { value: 'heroic', label: '英雄' }] }],
+            onStart: (net) => this.beginGame(this.controller?.net === net ? this.controller : onlineAdapter(net)),
+            onUpdate: () => this.update(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         this.bindTitle();
         this.bindGame();
         document.addEventListener('contextmenu', event => {
@@ -131,6 +173,7 @@ export default class UI {
             if (saved) this.startWith(saved);
         });
         $('open-help-title').addEventListener('click', () => this.openHelp());
+        $('online-button').addEventListener('click', () => this.online.open());
     }
 
     renderTitle() {
@@ -139,6 +182,7 @@ export default class UI {
         mark('level', 'level');
         mark('mode', 'mode');
         $('resume').hidden = !loadSavedGame();
+        $('online-button').hidden = !this.online.available;
     }
 
     showTitle() {
@@ -161,15 +205,9 @@ export default class UI {
     }
 
     startWith(setup) {
-        this.controller?.stop();
-        this.resultShown = false;
-        this.newsFrom = 0;
-        this.focus = null;
-        this.mover = null;
-        this.closeSheet();
-        this.setPick(null);
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.update(),
                 onError: (message) => {
                     music.play('error');
@@ -183,18 +221,32 @@ export default class UI {
             this.renderTitle();
             return;
         }
+        this.beginGame(controller);
+        controller.scheduleCpu();
+        controller.scheduleAuto();
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        this.resultShown = false;
+        this.newsFrom = 0;
+        this.focus = null;
+        this.mover = null;
+        this.closeSheet();
+        this.setPick(null);
+        this.controller = controller;
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.view = null;
         this.update();
-        this.controller.scheduleCpu();
-        this.controller.scheduleAuto();
     }
 
     // ---- ゲーム ----
 
     bindGame() {
-        $('home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
         $('open-help-game').addEventListener('click', () => this.openHelp());
         $('open-log').addEventListener('click', () => this.openLog());
         $('player-deck').addEventListener('click', () => this.openPlayerDeck());
@@ -427,9 +479,9 @@ export default class UI {
             b.disabled = !mine || (act !== 'pass' && !opts[act]);
             b.classList.toggle('ready', mine && act === 'cure' && !!opts.cure);
         });
-        $('assist').hidden = !this.controller || v.result || !v.actors.some(s => this.can(s)) || (this.controller.mode === 'team' && v.actors.some(s => v.players[s].isCPU));
+        $('assist').hidden = !this.controller || v.result || Boolean(this.controller.isOnline) || !v.actors.some(s => this.can(s)) || (this.controller.mode === 'team' && v.actors.some(s => v.players[s].isCPU));
         $('assist').disabled = false;
-        $('hint').hidden = !this.controller || !!v.result;
+        $('hint').hidden = !this.controller || !!v.result || Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         void me;
     }
 
@@ -796,8 +848,9 @@ export default class UI {
             title: v.result.won ? '勝利' : '敗北',
             html: `<p class="sheet-text">${reasons[v.result.reason]}</p><p class="sheet-sub">${LEVELS[v.level].name}・${v.players.length}人・${v.turnNo}手番目・治療薬 ${v.cures.filter(Boolean).length}色</p>`,
             items: [
-                { label: 'もう一度', primary: true, run: () => this.start() },
-                { label: 'ホーム', center: true, run: () => this.showTitle() }
+                // オンラインは、ロビーを出し、ホストの「もう一度」で再戦する
+                { label: 'もう一度', primary: true, run: () => (this.controller?.isOnline ? this.online.rematch() : this.start()) },
+                { label: 'ホーム', center: true, run: () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()) }
             ]
         });
     }

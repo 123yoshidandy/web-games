@@ -105,6 +105,16 @@
 
 電球（ヒント）を押すと、CPU の仲間と同じ判断で選んだ手を、短い文で知らせ、行き先の都市・押すボタン・カードを光らせる（打つのは自分）。隣の「CPU に1手任せる」とは別で、手は進めない。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。協力ゲームで、2〜4人。足りない席は CPU で埋められ、難易度を部屋の設定に持つ。オンラインでは自分の役割の駒だけを動かす。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'pandemic' })`。web-games の1つのスタックから `?game=pandemic` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -127,8 +137,6 @@ node scripts/cpu-match.mjs 200 4 all
 | `public/js/ui.js`・`map.js`・`help.js` | 画面・地図・遊び方 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（オフラインでも開ける） |
 | `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU だけの試合と、難易度ごとの勝率 |
 
-### オンライン対戦を入れるとき
-
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。協力ゲームなので手札は全員に見せ、ビューから隠すのはプレイヤーカードと感染カードの山の並びだけ（「予測」で並べ替えている間だけ、上の6枚を見せる）。イベントは誰の手番でも使えるので、操作を待っている人以外の操作も受け付ける（使えるかは `Game` が判定する）。難易度はロビーの設定（`settings.level`）で渡す。
