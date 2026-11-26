@@ -19,5 +19,8 @@
       "ボードゲーム",
       "ダイス"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }

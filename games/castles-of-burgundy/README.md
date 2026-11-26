@@ -173,6 +173,9 @@ npm test
 | `public/js/ui.js`・`art.js`・`art-data.js` | 画面・絵 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（オフラインでも開ける） |
 | `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/handler.js` | オンライン対戦のサーバーの入口（AWS Lambda） |
+| `public/js/online-config.js` | オンライン対戦の接続先 |
+| `public/js/netplay/` | netplay-kit のクライアントとロビーの画面の写し（同期で置く。手で直さない） |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と勝率 |
 
 テスト（`test/`）：
@@ -184,6 +187,13 @@ npm test
 - `game-controller.test.js`：CPU との対戦の進行、断られた操作の知らせ、保存からの再開
 - `pwa.test.js`：service worker が画面のファイルを全部先に読むこと、manifest とアイコン
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。ダイスはシードから決まる乱数で振る。隠すのはビュー（`createGameView`）の役目で、このゲームでは手元の情報（保管場所・商品・銀貨・労働者・ダイス）は公開なので、隠すのはタイルの山の並びと先のフェーズの商品だけ。
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'castles-of-burgundy' })`。web-games の1つのスタックから `?game=castles-of-burgundy` で呼ばれる）
+- ゲームの定義は `server/src/game-definition.js`（記録だけを保存して再現する。各席には、その席から見えるビューだけを送る）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
