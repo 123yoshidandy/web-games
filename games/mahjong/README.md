@@ -107,6 +107,14 @@ npm test -w games/mahjong
 
 テストは、点数表との突き合わせ（子・親のロンとツモ、本場）、代表的な手の役と符（平和・七対子・役牌・喰いタン・裏ドラ・清一色・数え役満・三色・一通・対々和・三暗刻・チャンタ・純チャン・混一色・小三元・二盃口・嶺上開花など）、役満、局の進行（ロン・ダブロン・三家和・ツモ・ポン・チー・食い替え・暗槓・フリテン・立直・流局・連荘・延長・飛び・和了止め）、記録からの再現、断った操作で状態が変わらないこと、CPU だけの対局が最後まで終わること、を確かめている。
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-ルールとビューは、netplay-kit の「ゲームの定義」の形（`server/src/game-definition.js`）で用意してある。netplay-kit の `sync.mjs` で部屋の処理を写し、この定義を `createHandler` と `startDevServer` に渡す。ロビーの設定は東風戦・半荘戦（`length`）。画面は、ローカル対戦と同じ `getView()` / `send()` の形のオンライン用のコントローラーを足す。鳴きの確認では複数の人が同時に答えるので、画面は自分の答えを送ったら、ほかの人を待つ表示にする。
+netplay-kit の「サーバーがゲームを進める型」。4人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+長さ（東風戦・半荘戦）はロビーで決める。鳴きの確認では複数の人が同時に答える。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'mahjong' })`。web-games の1つのスタックから `?game=mahjong` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）

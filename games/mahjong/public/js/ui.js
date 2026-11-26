@@ -6,7 +6,9 @@
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { music } from './music.js';
-import { DRAW_REASONS, roundName } from './game.js';
+import { DRAW_REASONS, roundName, PLAYER_COUNT } from './game.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 import { windName } from './tiles.js';
 import { handPoints } from './scoring.js';
 import { symbolsSvg, tileHtml, kindTileHtml, titleArtHtml } from './art.js';
@@ -50,6 +52,26 @@ export default class UI {
         $('symbols').innerHTML = symbolsSvg();
         $('title-art').innerHTML = titleArtHtml();
         $('help-body').innerHTML = helpHtml();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: '麻雀',
+            game: 'mahjong',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 600,
+            minPlayers: PLAYER_COUNT,
+            maxPlayers: PLAYER_COUNT,
+            settings: [{ key: 'length', label: '長さ', options: [{ value: 'east', label: '東風戦' }, { value: 'south', label: '半荘戦' }] }],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         this.bind();
     }
 
@@ -72,12 +94,13 @@ export default class UI {
             this.renderSetup();
         });
         $('start').addEventListener('click', () => this.startGame(null));
+        $('online-button').addEventListener('click', () => this.online.open());
         $('resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
             else this.renderSetup();
         });
-        $('home').addEventListener('click', () => this.showTitle());
+        $('home').addEventListener('click', () => this.goHome());
         $('open-help-title').addEventListener('click', () => this.openHelp());
         $('open-help-game').addEventListener('click', () => this.openHelp());
         $('close-help').addEventListener('click', () => this.closeHelp());
@@ -102,8 +125,14 @@ export default class UI {
             const button = event.target.closest('button[data-act]');
             if (!button) return;
             if (button.dataset.act === 'next') this.send({ type: 'next' });
-            if (button.dataset.act === 'again') this.startGame(null);
-            if (button.dataset.act === 'home') this.showTitle();
+            if (button.dataset.act === 'again') {
+                if (this.controller?.isOnline) this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+                else this.startGame(null);
+            }
+            if (button.dataset.act === 'home') {
+                if (this.controller?.isOnline) this.online.leave();
+                else this.showTitle();
+            }
         });
     }
 
@@ -125,6 +154,13 @@ export default class UI {
             button.setAttribute('aria-checked', String(button.dataset.level === this.settings.level));
         });
         $('resume').hidden = !loadSavedGame();
+        $('online-button').hidden = !this.online.available;
+    }
+
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    goHome() {
+        if (this.controller?.isOnline) return this.online.confirmLeave();
+        this.showTitle();
     }
 
     stopGame() {
@@ -135,14 +171,14 @@ export default class UI {
     }
 
     startGame(saved) {
-        this.stopGame();
         if (!saved) clearSavedGame();
         const setup = saved ?? {
             players: NAMES.map((name, i) => ({ name, isCPU: i !== 0 })),
             options: { length: this.settings.length, level: this.settings.level }
         };
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -153,7 +189,7 @@ export default class UI {
             // 保存が壊れていたら、新しく始める
             console.error(error);
             clearSavedGame();
-            this.controller = new LocalGameController({
+            controller = new LocalGameController({
                 players: NAMES.map((name, i) => ({ name, isCPU: i !== 0 })),
                 options: { length: this.settings.length, level: this.settings.level }
             }, { onUpdate: () => this.render(), onError: (message) => {
@@ -161,15 +197,23 @@ export default class UI {
                     this.toast(message);
                 } });
         }
+        this.beginGame(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.stopGame();
+        this.controller = controller;
+        this.hint = null;
         this.selected = null;
         this.riichiMode = false;
         this.chiOpen = false;
         this.revealedResult = null;
-        this.lastSeq = this.controller.game.eventSeq;
+        this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.render();
-        this.controller.scheduleCpu();
+        if (!this.controller.isOnline) this.controller.scheduleCpu();
     }
 
     send(command) {
@@ -208,7 +252,7 @@ export default class UI {
     // おすすめの手を示す。捨てる牌は選んでおき（もう一度押すと捨てる）、リーチは宣言牌を選んでおく。ほかはボタンを光らせる
     showHint() {
         const view = this.view;
-        const command = this.controller?.suggest();
+        const command = this.controller?.isOnline ? null : this.controller?.suggest();
         if (!view || !command) return;
         music.play('select');
         this.hint = { at: this.hintKey(view), command };
@@ -452,7 +496,8 @@ export default class UI {
             }
         }
         // 打牌と鳴きの場面には、ヒントのボタンを出す
-        if (!this.chiOpen && !this.riichiMode) rows.unshift('<button type="button" id="hint" class="act hint-button" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>');
+        // ヒントはローカル対戦だけ
+        if (!this.chiOpen && !this.riichiMode && !this.controller?.isOnline) rows.unshift('<button type="button" id="hint" class="act hint-button" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>');
         el.innerHTML = rows.length ? `${prompt}<div class="action-row">${rows.join('')}</div>` : '';
         this.markHint(view);
     }

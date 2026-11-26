@@ -30,6 +30,8 @@ window.visualViewport?.addEventListener('resize', fit);
 
 const ui = new UI();
 ui.showTitle();
+// 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+ui.online.boot();
 // 確かめるときに、ページの外から状態を見られるようにする
 window.__app = ui;
 
