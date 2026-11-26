@@ -12,6 +12,7 @@ import { CPU_LEVELS, bestBuildingPay } from './cpu-player.js';
 import { finalBonus, multiplierCounts, multiplierBase } from './scoring.js';
 import { symbolsSvg, sym, civCardHtml, buildingFaceHtml, buildingText, cardText, dieHtml, amountHtml } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'stone-age.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
@@ -102,7 +103,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -112,6 +116,7 @@ export default class UI {
             return;
         }
         this.view = null;
+        this.lastSeq = null;
         this.sel = null;
         this.info = null;
         this.decideKey = null;
@@ -242,6 +247,7 @@ export default class UI {
             }
             this.sel = { place, count: v.placed[v.you][place] };
             this.info = null;
+            music.play('select');
             this.render();
             return;
         }
@@ -256,6 +262,7 @@ export default class UI {
             const counts = v.placements.filter(p => p.place === this.sel?.place).map(p => p.count);
             const next = this.sel.count + (act === 'minus' ? -1 : 1);
             if (counts.includes(next)) this.sel.count = next;
+            music.play(counts.includes(next) ? 'select' : 'error');
             this.renderActions(v);
         } else if (act === 'place' && this.sel) {
             const { place, count } = this.sel;
@@ -286,10 +293,29 @@ export default class UI {
 
     // ---- ゲーム画面 ----
 
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、ラウンドの始まりは notify、自分の番に戻ったら turn、終わりは勝ち負け
+    // CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
+    playSound(v, prev, fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(v.you) ? 'win' : 'lose');
+        const mine = fresh.filter(e => e.seat === v.you).map(e => e.type);
+        if (mine.includes('roll') || mine.includes('diceAll')) return music.play('dice');
+        if (mine.includes('starve')) return music.play('pay');
+        if (['gain', 'civ', 'building', 'pickDie', 'choice2'].some(t => mine.includes(t))) return music.play('gain');
+        if (mine.includes('place')) return music.play('place');
+        if (fresh.some(e => e.type === 'round')) return music.play('notify');
+        if (v.actors.includes(v.you) && !prev.actors.includes(prev.you)) music.play('turn');
+    }
+
     render() {
         if (!this.controller) return;
         const v = this.controller.getView();
+        const prev = this.view;
         this.view = v;
+        // 始めた時点までの出来事は鳴らさない
+        const lastSeq = this.lastSeq;
+        this.lastSeq = v.events.at(-1)?.seq ?? 0;
+        if (lastSeq !== null && prev) this.playSound(v, prev, v.events.filter(e => e.seq > lastSeq));
         // 選んだ場所が、もう使えなくなっていたら消す
         if (this.sel) {
             const ok = v.phase === 'place' ? v.placements.some(p => p.place === this.sel.place) : v.resolvable.includes(this.sel.place);

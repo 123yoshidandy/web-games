@@ -214,3 +214,10 @@ export function runCpuStep(game, seat = game.actor(), profile = PROFILES.normal)
     ];
     return fallbacks.some(c => game.applyCommand(seat, c));
 }
+
+// ヒント：人が操作する番（行動か、相手の差し出しから選ぶ）に、CPU（揺れのない設定）が選ぶ手を返す。その席から見える情報だけで決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.isOver() || game.actor() !== seat) return null;
+    return chooseCpuCommand(game, seat, PROFILES.strong);
+}

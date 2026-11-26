@@ -9,7 +9,8 @@
 
 import { GEISHA, ACTIONS, ACTION_NAMES, POINTS_TO_WIN, GEISHAS_TO_WIN } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { LEVELS } from './cpu-player.js';
+import { LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, cardHtml, cardBackHtml, geishaHtml, chipHtml, actionTokenHtml, markerHtml } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
 
@@ -63,7 +64,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -133,6 +137,7 @@ export default class UI {
             dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
         });
 
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#hand').addEventListener('click', (event) => {
             const card = event.target.closest('[data-hand]');
             if (card) this.pickHand(Number(card.dataset.hand));
@@ -141,6 +146,7 @@ export default class UI {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled) return;
             if (button.dataset.act === 'cancel') {
+                music.play('cancel');
                 this.sel = [];
                 this.render();
             } else if (button.dataset.act === 'go') {
@@ -153,6 +159,7 @@ export default class UI {
             const option = event.target.closest('[data-option]');
             if (option) {
                 const index = Number(option.dataset.option);
+                music.play(this.pickSel === index ? 'cancel' : 'select');
                 this.pickSel = this.pickSel === index ? null : index;
                 this.render();
                 return;
@@ -211,6 +218,7 @@ export default class UI {
 
     pickHand(index) {
         if (!this.myTurn()) return;
+        music.play(this.sel.includes(index) ? 'cancel' : 'select');
         this.sel = this.sel.includes(index) ? this.sel.filter(i => i !== index) : [...this.sel, index];
         this.render();
     }
@@ -258,6 +266,58 @@ export default class UI {
 
         const played = roundEnd ? fresh.filter(e => e.seq < roundEnd.seq) : fresh;
         playEvents(played, before, { you: view.you });
+        this.playSound(fresh);
+        this.markHint();
+    }
+
+    // 1つの更新に1つの音。自分の行動は置く・取る、相手の行動は notify、自分の番になったら turn
+    playSound(fresh) {
+        const view = this.view;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === view.you ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'roundEnd')) return music.play('notify');
+        const acts = fresh.filter(e => ['secret', 'discard', 'offer', 'pick'].includes(e.type));
+        const last = acts.at(-1);
+        if (!last) return;
+        if (last.seat === view.you) return music.play(last.type === 'pick' ? 'gain' : 'place');
+        music.play(this.myTurn() || this.choosing() ? 'turn' : 'notify');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        if (!this.myTurn() && !this.choosing()) return;
+        const command = suggest(this.controller.game, this.view.you);
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        if (command.type === 'pick') {
+            this.pickSel = command.index;
+        } else {
+            // 出す札（同じ芸者の札もあるので、手札の位置を1枚ずつ割り当てる）
+            const cards = command.type === 'secret' ? [command.card] : command.type === 'compete' ? command.groups.flat() : command.cards;
+            const hand = this.me().hand;
+            const used = new Set();
+            this.sel = cards.map(card => {
+                const index = hand.findIndex((c, i) => c === card && !used.has(i));
+                used.add(index);
+                return index;
+            });
+        }
+        this.render();
+    }
+
+    // おすすめの操作のボタンに .recommended を付ける。盤面が進んだら消す
+    markHint() {
+        const can = this.myTurn() || this.choosing();
+        $('#hint').disabled = !can;
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        const hint = this.hint;
+        if (!hint || hint.at !== this.controller?.game.commands.length || !can) {
+            this.hint = null;
+            return;
+        }
+        $(hint.command.type === 'pick' ? '#offer [data-act="pick"]' : '#actions [data-act="go"]')?.classList.add('recommended');
     }
 
     renderTop() {

@@ -10,6 +10,7 @@ import { workersNeeded, placeProblem, knowledgeOf } from './rules.js';
 import { tileName } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, icon, resIcon, artKey, tileTag, hexHtml, dieSvg, goodsHtml } from './art.js';
 
 const SETTINGS_KEY = 'burgundy.settings';
@@ -123,7 +124,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -363,6 +367,7 @@ export default class UI {
             const tile = Number(storageEl.dataset.storage);
             if (!this.myTurn()) return this.toast(tileText(tile));
             this.sel.storage = this.sel.storage === tile ? null : tile;
+            music.play(this.sel.storage === null ? 'cancel' : 'select');
             this.sel.buy = false;
             if (this.sel.storage !== null) {
                 this.tab = 'estate';
@@ -383,6 +388,7 @@ export default class UI {
         if (die !== undefined) {
             const i = Number(die);
             this.sel.die = this.sel.die === i ? null : i;
+            music.play(this.sel.die === null ? 'cancel' : 'select');
             return this.render();
         }
         switch (act) {
@@ -667,10 +673,29 @@ export default class UI {
 
     // ---- 出来事の演出 ----
 
+    // 効果音：新しいできごとを見て、1回の更新に1つだけ、大事な順に選んで鳴らす
+    // 自分の手は点・売る・出荷（得る）、置く、買う・労働者（払う）、取る（引く）。ラウンドの始まりはさいころ、
+    // ほかの人の手のあとは自分の番か知らせ
+    playSounds(view, fresh) {
+        const me = view.you;
+        const mine = (...types) => fresh.some(e => types.includes(e.type) && e.seat === me && (e.amount === undefined || e.amount > 0 || e.type === 'workers'));
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === me ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'round')) return music.play('dice');
+        if (mine('vp', 'sell', 'ship')) return music.play('gain');
+        if (mine('place')) return music.play('place');
+        if (mine('buy') || fresh.some(e => e.type === 'workers' && e.seat === me && e.amount < 0)) return music.play('pay');
+        if (mine('take')) return music.play('draw');
+        if (mine('workers', 'mines')) return music.play('gain');
+        if (fresh.some(e => e.type === 'turn' && e.seat === me)) return music.play('turn');
+        if (fresh.some(e => e.seat !== undefined && e.seat !== me && e.type !== 'turn')) music.play('notify');
+    }
+
     playEvents(view, prev) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.playSounds(view, fresh);
         const vp = new Map();
         fresh.forEach(e => {
             if (e.type === 'vp') vp.set(e.seat, (vp.get(e.seat) ?? 0) + e.amount);
