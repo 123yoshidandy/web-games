@@ -8,7 +8,7 @@ import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
 
-const CPU_DELAY_MS = 520;       // CPU は1手ずつ、間を置いて打つ
+export const CPU_DELAY_MS = 520;       // CPU は1手ずつ、間を置いて打つ
 const CPU_QUICK_MS = 200;       // 見た目の変わらない手（再配置の終わりなど）
 const SAVE_KEY = 'small-world.save';
 
