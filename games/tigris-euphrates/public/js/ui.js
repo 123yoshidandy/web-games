@@ -9,7 +9,8 @@
  */
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS } from './cpu-player.js';
+import { CPU_LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
 import { COLORS, COLOR_INFO, DYNASTIES } from './data.js';
 import { COLS, ROWS, CELL_COUNT, RIVER, rowOf, colOf, squareCells } from './board.js';
 import { finalValues, compareFinal, cellName } from './game.js';
@@ -80,7 +81,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -139,6 +143,7 @@ export default class UI {
         $('#zoom').addEventListener('click', () => this.setZoom(!this.zoomed));
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-log').addEventListener('click', () => this.showLog());
 
         // ダイアログは外側のタップと「閉じる」で閉じる
@@ -292,6 +297,7 @@ export default class UI {
             return;
         }
         this.target = pick;
+        music.play('select');
         this.render();
     }
 
@@ -312,6 +318,7 @@ export default class UI {
         const b = event.target.closest('button');
         if (!b || b.disabled || !this.view) return;
         const { act, index, color } = b.dataset;
+        const before = JSON.stringify(this.sel);
         if (act === 'hand') {
             const i = Number(index);
             if (this.sel?.kind === 'swap') {
@@ -342,6 +349,7 @@ export default class UI {
         } else if (act === 'minus' || act === 'plus') {
             const have = this.me().hand.filter(x => x === this.view.conflict.color).length;
             this.support.count = Math.max(0, Math.min(have, this.support.count + (act === 'plus' ? 1 : -1)));
+            music.play('select');
         } else if (act === 'support') {
             this.send({ type: 'support', count: this.support.count });
             return;
@@ -355,6 +363,8 @@ export default class UI {
             this.send({ type: 'skip' });
             return;
         }
+        // 選ぶ・外す音（手札・指導者・災害・交換・パス）
+        if (['hand', 'leader', 'cat', 'swap', 'pass'].includes(act)) music.play(this.sel && JSON.stringify(this.sel) !== before ? 'select' : 'cancel');
         this.render();
     }
 
@@ -425,6 +435,7 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
         this.view = view;
         this.sim = simFromView(view);
         this.legalCache = null;
@@ -451,12 +462,15 @@ export default class UI {
         }
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        if (prev) this.playSound(view, prev, fresh);
+        if (fresh.length) this.hintCommand = null;
         this.renderStatus(view);
         this.renderOthers(view);
         this.renderBoard(view);
         this.renderMine(view);
         this.renderNote(view);
         this.renderDock(view);
+        this.markHint();
         this.announce(view, fresh);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer && !this.resultShown) {
@@ -675,6 +689,66 @@ export default class UI {
     }
 
     // 争いの結果・宝物・記念碑を短く知らせる
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、自分が答える番になったら turn、終わりは勝ち負け
+    // CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
+    playSound(view, prev, fresh) {
+        const me = view.you;
+        if (fresh.length === 0) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(me) ? 'win' : 'lose');
+        const resolve = fresh.findLast(e => e.type === 'resolve' && (e.winner === me || e.loser === me));
+        if (resolve) return music.play(resolve.winner === me ? 'capture' : 'pay');
+        const mine = fresh.filter(e => e.seat === me).map(e => e.type);
+        if (mine.includes('catastrophe')) return music.play('capture');
+        if (mine.includes('treasure') || mine.includes('monument')) return music.play('gain');
+        if (mine.includes('tile') || mine.includes('leader')) return music.play('place');
+        if (mine.includes('swap')) return music.play('shuffle');
+        if (mine.includes('withdraw')) return music.play('cancel');
+        if (view.answering.includes(me) && !prev.answering.includes(me)) music.play('turn');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.view ? suggest(this.view) : null;
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        // 置く手・交換・パスは、選んだ状態にする（「決める」で決められる）
+        if (command.type === 'tile') this.sel = { kind: 'tile', color: command.color };
+        if (command.type === 'leader') this.sel = { kind: 'leader', color: command.color };
+        if (command.type === 'catastrophe') this.sel = { kind: 'cat' };
+        if (['tile', 'leader', 'catastrophe'].includes(command.type)) this.target = command.cell;
+        if (command.type === 'pass') {
+            this.sel = { kind: 'pass' };
+            this.target = null;
+        }
+        if (command.type === 'swap') {
+            const used = new Set();
+            const picked = command.tiles.map(color => this.me().hand.findIndex((c, i) => c === color && !used.has(i)));
+            picked.forEach(i => used.add(i));
+            this.sel = { kind: 'swap', picked };
+            this.target = null;
+        }
+        if (command.type === 'support' && this.support) this.support.count = command.count;
+        this.render();
+        const text = {
+            tile: '光っているマスにタイルを置く', leader: '光っているマスに指導者を置く', catastrophe: '光っているマスに災害を置く',
+            swap: '選んだタイルを交換する', pass: 'パスする', support: `${command.count}枚出す`, war: '印の付いた争いから', monument: '印の付いた記念碑を建てる', skip: '記念碑を建てない'
+        }[command.type] ?? '';
+        this.toast(`おすすめ：${text}`);
+    }
+
+    // おすすめの手のボタンに印を付ける
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const selector = {
+            support: '[data-act="support"]', war: `[data-act="war"][data-color="${c.color}"]`, skip: '[data-act="skip"]',
+            monument: `[data-act="monument"][data-monument="${c.monument}"]`
+        }[c.type] ?? '[data-act="confirm"]';
+        document.querySelectorAll(selector).forEach(el => el.classList.add('recommended'));
+    }
+
     announce(view, fresh) {
         const name = (seat) => (seat === view.you ? 'あなた' : view.players[seat].name);
         fresh.forEach(e => {

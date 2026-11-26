@@ -273,6 +273,11 @@ export const cpuRandom = (game, seat) => createRandom((game.cpuSalt ^ Math.imul(
 
 // ---- 進める ----
 
+// ヒント：人のビューから、おすすめの手（CPU の「ふつう」が選ぶ手）を返す。答える番でなければ null
+export function suggest(view) {
+    return chooseCommand(view, 'normal');
+}
+
 export function nextCpuSeat(game) {
     return game.actors().find(seat => game.players[seat].isCPU) ?? null;
 }
