@@ -141,7 +141,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .subtitle { margin: 2px 0 12px; color: var(--muted); font-size: 14px; letter-spacing: .3em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 14px; }
 .setup-row { display: flex; align-items: center; gap: 12px; font-weight: 800; }
-.setup .buttons { display: flex; gap: 12px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 .stepper, .segment { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
 .step-btn { width: 40px; height: 36px; border: none; border-radius: 8px; background: rgba(255, 255, 255, .1); font-size: 20px; font-weight: 800; cursor: pointer; }
 .step-btn:disabled { opacity: .3; cursor: default; }

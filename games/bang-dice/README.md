@@ -118,8 +118,18 @@ npm test
 | `public/js/game-controller.js` | 人間1人と CPU のローカル対戦（途中経過の保存） |
 | `public/js/ui.js`・`art.js`・`help.js` | 画面・絵・遊び方 |
 | `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/handler.js` | オンライン対戦のサーバーの入口（AWS Lambda） |
+| `public/js/online-config.js` | オンライン対戦の接続先 |
+| `public/js/netplay/` | netplay-kit のクライアントとロビーの画面の写し（同期で置く。手で直さない） |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と勝率 |
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。バート・キャシディやペドロ・ラミレスの判断のように、手番の人以外が答える操作があるので、操作を待っている人は `game.actors()` で見る。
+netplay-kit の「サーバーがゲームを進める型」。3〜8人で、足りない席は CPU で埋められる。ほかの人の役割は、保安官と脱落した人のほかはビューに入れない。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'bang-dice' })`。web-games の1つのスタックから `?game=bang-dice` で呼ばれる）
+- ゲームの定義は `server/src/game-definition.js`（記録だけを保存して再現する。各席には、その席から見えるビューだけを送る）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
