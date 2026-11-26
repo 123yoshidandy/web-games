@@ -18,9 +18,12 @@ import { SUSPECTS, DETECTIVES, TOKENS, ACTION_NAMES, ROUNDS, HOURGLASSES_TO_WIN 
 import { TRACK, spaceCell } from './board.js';
 import { symbolsSvg, icon, districtShape, detectiveShape, actionIcon, portraitSvg } from './art.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const SETTINGS_KEY = 'mr-jack-pocket.settings';
 const RESULT_DELAY_MS = 1400;
+const CPU_ACTION_DELAY_MS = 900; // game-controller.js と同じ（オンラインの CPU の間）
 const NAME = Object.fromEntries(SUSPECTS.map(s => [s.key, s.name]));
 const DET_NAME = Object.fromEntries(DETECTIVES.map(d => [d.key, d.name]));
 const ROLE_NAME = ['ジャック側', '刑事側'];
@@ -60,6 +63,23 @@ export default class UI {
         this.sel = null;   // { action, who, steps, tile, rot, a, b }
         this.resultTimer = null;
         $('#symbols').innerHTML = symbolsSvg();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。2人で、足りない席は CPU
+        this.online = new NetplayLobby({
+            title: 'ミスター・ジャック・ポケット',
+            game: 'mr-jack-pocket',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: CPU_ACTION_DELAY_MS,
+            minPlayers: 2,
+            maxPlayers: 2,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.onControllerUpdate(),
+            onError: (message) => this.onControllerError(message),
+            onExit: () => {
+                this.stopGame();
+                this.showTitle();
+            }
+        });
         this.bindStatic();
         this.renderTitleArt();
         this.renderHelp();
@@ -72,21 +92,16 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
-                onUpdate: () => {
-                    this.render();
-                    this.updateSound();
-                },
-                onError: (message) => {
-                    music.play('error');
-                    this.toast(message);
-                }
+            controller = new LocalGameController(setup, {
+                onUpdate: () => this.onControllerUpdate(),
+                onError: (message) => this.onControllerError(message)
             });
         } catch (error) {
             console.error(error);
@@ -94,16 +109,37 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+        controller.scheduleCpu();
+    }
+
+    onControllerUpdate() {
+        this.render();
+        this.updateSound();
+    }
+
+    onControllerError(message) {
+        music.play('error');
+        this.toast(message);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        clearTimeout(this.resultTimer);
+        this.resultTimer = null;
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
         this.sel = null;
         this.resultShown = false;
         $('#toast').classList.remove('show');
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
-        this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
+        this.lastSeq = this.controller.getView()?.events.at(-1)?.seq ?? 0;
+        this.view = null;
         this.render();
         this.wasMine = this.myTurn();
-        this.endSounded = this.view.phase === 'end';
-        this.controller.scheduleCpu();
+        this.endSounded = this.view?.phase === 'end';
     }
 
     newGame() {
@@ -136,10 +172,19 @@ export default class UI {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#result-home').addEventListener('click', () => this.showTitle());
+        $('#again').addEventListener('click', () => {
+            if (this.controller?.isOnline) {
+                $('#result').close();
+                this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+                return;
+            }
+            this.newGame();
+        });
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#result-board').addEventListener('click', () => $('#result').close());
-        $('#home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-log').addEventListener('click', () => this.showLog());
@@ -311,6 +356,7 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        if (!view) return;
         this.view = view;
         if (!this.myTurn()) this.sel = null;
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
@@ -321,6 +367,7 @@ export default class UI {
         this.renderNote(view);
         this.renderActions(view);
         $('#hint').disabled = !this.myTurn();
+        $('#hint').hidden = Boolean(this.controller?.isOnline); // ヒントはローカル対戦だけ
         this.announce(view, fresh);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer && !this.resultShown) {
@@ -474,6 +521,7 @@ export default class UI {
     // コントローラーが進めたときの音。自分の手の音は押したときに鳴らすので、ここでは相手の手・自分の番・終わりだけ
     updateSound() {
         const view = this.view;
+        if (!view) return;
         const mine = this.myTurn();
         if (view.phase === 'end') {
             if (!this.endSounded) music.play(view.winner === view.you ? 'win' : 'lose');

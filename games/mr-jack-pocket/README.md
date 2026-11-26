@@ -80,6 +80,16 @@ CPU はビュー（自分から見てよい情報）だけを見て決めます�
 
 どの試合も止まらずに終わりました。1手を決めるのにかかる時間は、ふつうでも数ミリ秒です。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'mr-jack-pocket' })`。web-games の1つのスタックから `?game=mr-jack-pocket` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -97,7 +107,8 @@ npm run cpu-match -- 300 normal,easy      # CPU 同士の勝率（ジャック�
 | `public/js/cpu-player.js` | CPU |
 | `public/js/game-controller.js` | ローカル対戦のコントローラー（CPU の間合い、途中経過の保存） |
 | `public/js/ui.js`・`art.js`・`main.js` | 画面と絵 |
-| `server/src/game-definition.js` | netplay-kit 形式のオンライン対戦の定義（今はオンライン対戦を入れていない） |
+| `server/src/game-definition.js` | netplay-kit 形式のオンライン対戦の定義 |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `public/sw.js`・`manifest.webmanifest` | PWA |
 
 テストは、ルール（見通しと壁、目撃、各行動、ラウンドの順と行動タイルの面、勝ち負けと両方を同時に満たしたとき）、記録からの再現、ランダムな操作を浴びせても断った操作で状態が変わらないこと、CPU どうしの試合が強さとシードを変えても止まらないこと、ビューで隠すもの、オンライン対戦の定義、PWA の設定、オフラインでの起動（service worker）を確かめます。
