@@ -1,0 +1,78 @@
+name: 画面の検査
+
+# 全ゲームを、スマホ縦・スマホ横・PC の大きさでヘッドレス Chrome で開き、はみ出し・主要なボタン・開始・BGM・エラーを確かめる（scripts/layout-check.mjs）
+# 知らせるだけで、公開（pages.yml）は止めない。公開とは別に流れ、互いに待たない
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: layout-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 日本語の字体
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q fonts-noto-cjk
+      - name: Chrome（ランナーにあるものを、サンドボックスなしで起動する）
+        run: |
+          # Ubuntu 24.04 は、権限のないユーザー名前空間を制限していて、Chrome のサンドボックスが使えない
+          printf '#!/bin/sh\nexec /usr/bin/google-chrome --no-sandbox "$@"\n' > "$RUNNER_TEMP/chrome"
+          chmod +x "$RUNNER_TEMP/chrome"
+          echo "CHROME_PATH=$RUNNER_TEMP/chrome" >> "$GITHUB_ENV"
+          google-chrome --version
+      - name: 公開するファイルを集める
+        run: node scripts/build-site.mjs
+      - name: 画面の検査
+        run: node scripts/layout-check.mjs --site _site --sizes all --shard ${{ matrix.shard }}/4 --jobs 3 --out layout-check/shard-${{ matrix.shard }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: layout-check-${{ matrix.shard }}
+          path: layout-check/
+          if-no-files-found: ignore
+
+  report:
+    needs: check
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: layout-check-*
+          path: layout-check
+      - name: 結果の表
+        run: |
+          set +e
+          node scripts/layout-check.mjs --report layout-check > layout-check/results.md
+          status=$?
+          set -e
+          cat layout-check/results.md >> "$GITHUB_STEP_SUMMARY"
+          cat layout-check/results.md
+          exit $status
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: layout-check-results
+          path: layout-check/results.md
