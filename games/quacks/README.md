@@ -76,10 +76,21 @@
 | `public/js/cpu-player.js` | CPU |
 | `public/js/game-controller.js` | ローカル対戦の進行と保存 |
 | `public/js/ui.js`・`art.js`・`animator.js` | 画面・絵・動き |
-| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦 |
 
 自分が選ぶ場面の電球（ヒント）を押すと、ゆらぎのない CPU が選ぶ手を光らせる（引く・止める、占いやサイコロの選択肢、カラスで置く材料）。買い物では、買う材料・しずく・フラスコを選んでおき「買う」を光らせる。CPU と同じく、袋の並びはのぞかない。
+
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'quacks' })`。web-games の1つのスタックから `?game=quacks` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
 
 ## 開発
 

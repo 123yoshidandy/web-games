@@ -14,6 +14,8 @@ import {
 import { chipSvg, potSvg, icon, titleArt, rubyMark, dropMark, starMark, flaskMark } from './art.js';
 import { fly, land, explode, bump, rectOf, reducedMotion } from './animator.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 // 自分の操作の音：袋から引く・止める・選ぶ・取る・買う
 const COMMAND_SOUND = { draw: 'draw', stop: 'select', choose: 'select', pick: 'gain', shop: 'pay' };
@@ -63,6 +65,23 @@ export default class UI {
         this.potLengths = {};       // 前に描いた鍋の札の数（新しく入った札を弾ませる）
         this.holdSheetUntil = 0;    // 爆発などを見せている間は、シートを出さない
         this.timers = {};
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
+        this.online = new NetplayLobby({
+            title: 'インチキ薬師',
+            game: 'quacks',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 330,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.onUpdate(),
+            onError: (message) => this.onControllerError(message),
+            onExit: () => {
+                this.stopGame();
+                this.showTitle();
+            }
+        });
         this.bindStatic();
         $('#title-art').innerHTML = titleArt();
         $('#home').innerHTML = icon('home');
@@ -77,18 +96,16 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => {
-                    music.play('error');
-                    this.toast(message);
-                }
+                onError: (message) => this.onControllerError(message)
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -97,19 +114,37 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller, { resumed: Boolean(setup.commands) });
+        controller.scheduleCpu();
+    }
+
+    onControllerError(message) {
+        music.play('error');
+        this.toast(message);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    // resumed：続きから（今の回の占いと結果は見たことにする）
+    beginGame(controller, { resumed = false } = {}) {
+        if (this.controller !== controller) this.controller?.stop();
+        Object.values(this.timers).forEach(clearTimeout);
+        this.timers = {};
+        this.sheetKey = null;
+        this.manualSheet = null;
+        if ($('#sheet').open) $('#sheet').close();
+        this.controller = controller;
         this.view = this.controller.getView();
         this.lastSeq = this.view.events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は動かさない
         this.viewSeat = null;
         this.fortuneSeen = 0;
         // 続きからなら、今の回の占いと結果は見たことにする（ただし選択が残っていれば出る）
         const brewing = this.view.players[this.view.you].pot.length > 0 || this.view.phase !== 'fortune';
-        if (setup.commands && brewing) this.fortuneSeen = this.view.round;
+        if (resumed && brewing) this.fortuneSeen = this.view.round;
         this.summarySeen = 0;
         this.potLengths = {};
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
-        this.controller.scheduleCpu();
     }
 
     newGame() {
@@ -142,7 +177,9 @@ export default class UI {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#open-fortune').addEventListener('click', () => this.openManual('fortune-info'));
@@ -388,7 +425,8 @@ export default class UI {
             html = '<span class="act-label">ほかの人が買い物をしています</span>';
         }
         // 自分が引く番だけ、ヒントのボタンを出す
-        if (view.phase === 'brew' && p.brew && !p.brew.done && !$('#sheet').open) html = hintButton('data-act="hint"') + html;
+        // ヒントはローカル対戦だけ
+        if (view.phase === 'brew' && p.brew && !p.brew.done && !$('#sheet').open && !this.controller?.isOnline) html = hintButton('data-act="hint"') + html;
         $('#actions').innerHTML = html;
         this.markHint();
     }
@@ -493,7 +531,8 @@ export default class UI {
             bag: () => this.bagHtml()
         }[kind]?.() ?? '';
         // 自分が選ぶシートには、ヒントのボタンを足す
-        body.innerHTML = ['prompt', 'pick', 'shop'].includes(kind) || (kind === 'fortune' && this.view.me.prompt) ? html.replace('<div class="options">', `<div class="options">${hintButton('data-sheet="hint"')}`) : html;
+        const hintable = !this.controller?.isOnline && (['prompt', 'pick', 'shop'].includes(kind) || (kind === 'fortune' && this.view.me.prompt));
+        body.innerHTML = hintable ? html.replace('<div class="options">', `<div class="options">${hintButton('data-sheet="hint"')}`) : html;
         this.markHint();
     }
 
@@ -559,11 +598,13 @@ export default class UI {
             return;
         }
         if (action === 'again') {
-            this.newGame();
+            if (this.controller?.isOnline) this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+            else this.newGame();
             return;
         }
         if (action === 'home') {
-            this.showTitle();
+            if (this.controller?.isOnline) this.online.leave();
+            else this.showTitle();
             return;
         }
         this.sheetKey = null;
