@@ -30,6 +30,11 @@ const PUBLIC_ROOMS_LIMIT = 20;      // 公開の部屋の一覧に載せる数�
 // 観戦者ができる操作（ほかは code: 'spectator' で断る）
 const SPECTATOR_ACTIONS = ['ping', 'leave', 'stamp'];
 
+// ビューの中で、定義が since で切る（新しい分だけを運ぶ）ことのある配列。画面側（netplay-lobby.js）が、挙げたものを対戦の初めからためる
+const HISTORY_KEYS = ['logs', 'events'];
+// 定義ごと・ビューの種類（席・観戦者）ごとに、配列を since で切っているかを1回だけ調べて覚える（Lambda の呼び出しをまたいで使う）
+const historyKinds = new WeakMap();
+
 // 共通側が受け付ける操作（ゲームの定義の actions に同じ名前は使えない）
 export const RESERVED_ACTIONS = ['create', 'join', 'leave', 'ping', 'start', 'ready', 'backToLobby',
     'setSettings', 'addCpu', 'removeCpu', 'stamp', 'listRooms'];
@@ -87,6 +92,8 @@ export class RoomService {
     constructor({ game, store, send, createToken = () => crypto.randomUUID(), now = () => Date.now(), random = Math.random,
         connectionCache = new Map(), limiter = null }) {
         this.game = { ...DEFAULTS, ...game };
+        if (!historyKinds.has(game)) historyKinds.set(game, { player: {}, spectator: {} });
+        this.historyKinds = historyKinds.get(game);
         this.store = store;
         this.sendRaw = send;
         this.createToken = createToken;
@@ -691,19 +698,40 @@ export class RoomService {
         return this.lobbyKey(room) === before ? [] : this.lobbyMessages(room);
     }
 
+    // since（このビューを作った mark。なければ null）と、since で切っている配列の名前（history）も載せる
+    // 画面側（netplay-lobby.js）は、これを手がかりに、新しい分だけが届く logs・events を対戦の初めからの記録にためる
     stateMessage(room, game, seat, since, extra = {}) {
-        const view = this.game.view(game, seat, { since, room: this.lobbyState(room) });
+        const lobby = this.lobbyState(room);
+        const view = this.game.view(game, seat, { since, room: lobby });
+        const history = this.historyOf('player', view, since, () => this.game.view(game, seat, { since: null, room: lobby }));
         return {
             connectionId: room.players[seat].connectionId,
-            message: { type: 'state', matchId: room.matchId, view, ...extra }
+            message: { type: 'state', matchId: room.matchId, since: since ?? null, ...(history.length ? { history } : {}), view, ...extra }
         };
+    }
+
+    // ビューの logs・events のうち、since で切っているもの（since なしのビューと中身が違うもの）の名前
+    // まだ決まっていない配列だけ、since が正で、since なしのビューに中身があるときに1回比べて覚える
+    historyOf(kind, view, since, fullView) {
+        const known = this.historyKinds[kind];
+        let full = null;
+        for (const key of HISTORY_KEYS) {
+            if (key in known || !Array.isArray(view?.[key]) || !(since > 0)) continue;
+            full ??= fullView();
+            if (!Array.isArray(full?.[key]) || full[key].length === 0) continue;
+            known[key] = JSON.stringify(full[key]) !== JSON.stringify(view[key]);
+        }
+        return HISTORY_KEYS.filter(key => known[key] && Array.isArray(view?.[key]));
     }
 
     // 観戦者用のビュー（ゲームの定義の spectatorView。公開の情報だけ）
     spectatorStateMessage(room, game, spectator, since, extra = {}, view = null) {
+        const lobby = this.lobbyState(room);
+        const shown = view ?? this.game.spectatorView(game, { since, room: lobby });
+        const history = this.historyOf('spectator', shown, since, () => this.game.spectatorView(game, { since: null, room: lobby }));
         return {
             connectionId: spectator.connectionId,
-            message: { type: 'state', matchId: room.matchId, view: view ?? this.game.spectatorView(game, { since, room: this.lobbyState(room) }), ...extra }
+            message: { type: 'state', matchId: room.matchId, since: since ?? null, ...(history.length ? { history } : {}), view: shown, ...extra }
         };
     }
 

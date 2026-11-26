@@ -223,7 +223,7 @@ export default {
 | --- | --- |
 | `joined` | `{ roomCode, seat, token, playerId, spectator? }` 部屋に入った（再接続の情報として保存する）。観戦者は `seat: null`・`spectator: true` |
 | `lobby` | `{ roomCode, status, public, matchId, hostSeat, rematch, settings, players, spectators, seat, spectator? }` 部屋の状態。対戦中も、参加者・観戦者が変わるたびに届く。`seat` は受け取る人の今の席（観戦者は `null` で、`spectator: true`） |
-| `state` | `{ matchId, view, cpu? }` 自分のビュー（観戦者には `spectatorView` のビュー） |
+| `state` | `{ matchId, since, history?, view, cpu? }` 自分のビュー（観戦者には `spectatorView` のビュー）。`since` はビューを作った mark（なければ null）。`history` は、ビューの `logs`・`events` のうち定義が since で切っている（新しい分だけを運ぶ）配列の名前（1.11.0） |
 | `rooms` | `{ spectate, rooms: [{ roomCode, hostName, players, maxPlayers, settings, createdAt, spectators?, maxSpectators? }] }` 入れる公開の部屋の一覧（`listRooms` の返事）。観戦の一覧には `spectators`・`maxSpectators` が付く |
 | `error` | `{ message, code }`（`room_not_found`・`not_member`・`room_full`・`already_started`・`not_host`・`not_enough_players`・`cannot_start`・`rejected`・`busy`・`invalid`・`spectator`・`spectate_unavailable`・`spectators_full`） |
 | `left` / `pong` `{ clientTime }` / `stamp` `{ seat, stamp, spectator? }` | 退出した / ping の返事 / スタンプ（観戦者からは `seat: null` と `spectator: { id, name }`） |
@@ -330,6 +330,8 @@ web-games では、全ゲームを1つの WebSocket の API・Lambda・テーブ
 - `resolveOnlineServerUrl({ game, deployed })`：`?server=`、手元（localhost）なら `ws://localhost:8787`、なければ `deployed`。どれにも `?game=<game>` を付ける。`deployed` が空で手元でもなければ `null`（ゲームの側は「オンラインで遊ぶ」を隠す）
 - `NetplayLobby`：`open()`・`boot()`（招待URLか前回の部屋に入る）・`rematch()`（結果の「もう一度」）・`confirmLeave()`（対戦中の「ホーム」）・`leave()`。対戦が始まると `onStart(controller)`、ビューが届くと `onUpdate()`、操作を断られると `onError(message)`、部屋を出ると `onExit()`
 - `OnlineGameController`：`getView()`・`send(command)`（返事を待つ間は false）・`isOnline: true`。`hint`・`undo`・`pause`・`resume`・`stop` は何もしない
+- 記録をためる（1.11.0）：state の `history` に挙がった `logs`・`events` を、対戦の初めからためてから `getView()` で返す（ローカル対戦の getView() と同じく、記録の一覧は全部そろう）。`seq`・`n` の番号を持つ項目は番号で、番号のない項目は `since` の位置で重ねる。対戦（`matchId`）が変わったら捨てる。再接続のあとは、定義の `joinMark` より前の記録は戻らない。ゲームの側でためる処理（brass-birmingham・concordia・coup）は、そのままでも二重にはならない（番号や件数で重ねているため）。`createViewHistory()` を単独でも使える
+- RoomService は、配列を since で切っているかを、定義ごとに最初の1回だけ since なしのビューと比べて決める（`historyOf`）
 - 名前は `localStorage` の `netplay.name` に、全ゲームで共有して覚える
 
 ## 同期
