@@ -102,7 +102,8 @@ describe('CPU', () => {
     });
 
     it('1手番の考える時間は1秒より短い（ヘルメスでも）', () => {
-        const r = runMatches({ games: 2, profiles: ['normal', 'normal'], gods: ['hermes', 'demeter'] });
+        // ヘルメスの手番は打ち切りの近くまで考えるので、1局でも十分に長い手番が出る（2局だと CI の時間切れに近づく）
+        const r = runMatches({ games: 1, profiles: ['normal', 'normal'], gods: ['hermes', 'demeter'] });
         expect(r.slowest).toBeLessThan(1000);
     });
 });

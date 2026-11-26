@@ -219,10 +219,11 @@ function readReplies(scored, seat, deadline) {
 }
 
 // CPU の手番を最後まで進める（オンライン対戦・CPU 同士の対戦用）。選んだ列が通らなければ、通る操作を順に試す
-// 人の席のおすすめの1歩（ヒント）。CPU（ふつう）が考えた番の最初の1歩。画面に出すだけで、記録には入れない
-export function suggest(game, seat) {
+// 人の席のおすすめの1歩（ヒント）。CPU（既定はふつう）が考えた番の最初の1歩。画面に出すだけで、記録には入れない
+// profile は、テストで読みを浅くして速く回すためのもの（画面では渡さない）
+export function suggest(game, seat, profile = PROFILES.normal) {
     if (game.isOver() || seat !== game.current) return null;
-    return chooseCpuTurn(game, seat, PROFILES.normal)[0] ?? game.legalSteps()[0] ?? null;
+    return chooseCpuTurn(game, seat, profile)[0] ?? game.legalSteps()[0] ?? null;
 }
 
 export function runCpuStep(game, seat = game.current, profile = PROFILES.normal) {
