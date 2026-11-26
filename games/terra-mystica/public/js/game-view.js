@@ -7,9 +7,11 @@
 // seat：見る人の席（null なら観戦者）。since：このログの数より後だけを送る。events：演出用のイベントを入れるか
 export function createGameView(game, seat, { since = 0, events = true } = {}) {
     const { logs, events: allEvents, ...state } = game.state;
+    // シードは送らない（準備にしか使わないが、オンライン対戦で端末に乱数の元を渡さない。CPU はサーバーで考える）
+    const { seed, ...options } = game.options;
     return {
         you: seat,
-        options: structuredClone(game.options),
+        options: structuredClone(options),
         state: structuredClone({ ...state, logs: [], events: [] }),
         actors: game.actors(),
         waiting: game.waiting(),
