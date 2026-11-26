@@ -12,6 +12,7 @@ import { SIDE_MARK, SIDE_NAME, KAN, PIECE_NAME, squareName } from './notation.js
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, pieceHtml } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'shogi.settings';
 const RESULT_DELAY_MS = 900;
@@ -73,7 +74,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -191,8 +195,10 @@ export default class UI {
             }
             const same = this.selected.from === sq;
             this.selected = !same && p && sideOf(p) === v.current ? { from: sq } : null;
+            music.play(this.selected ? 'select' : 'cancel');
         } else if (p && sideOf(p) === v.current) {
             this.selected = { from: sq };
+            music.play('select');
         }
         this.render();
     }
@@ -200,6 +206,7 @@ export default class UI {
     onHand(type) {
         if (!this.myTurn()) return;
         this.selected = this.selected?.drop === type ? null : { drop: type };
+        music.play(this.selected ? 'select' : 'cancel');
         this.render();
     }
 
@@ -238,6 +245,7 @@ export default class UI {
 
     undo() {
         if (!this.controller?.undo()) return;
+        music.play('cancel');
         this.selected = null;
         clearTimeout(this.resultTimer);
         this.resultTimer = null;
@@ -410,9 +418,23 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
+        this.playSound(view, fresh);
         const move = [...fresh].reverse().find(e => e.type === 'move');
         if (move && !reduceMotion()) this.placed = move.to;
         if (move?.check && !view.over && !view.players[view.current].isCPU) this.toast('王手');
+    }
+
+    // 新しい出来事から効果音を1つ鳴らす。人の手は置く・取る音、CPU が指して自分の番になったら turn、終わりは勝ち負け
+    playSound(view, fresh) {
+        const end = fresh.find(e => e.type === 'end');
+        if (end) {
+            if (end.winner === null) return music.play('notify');
+            return music.play(view.twoPlayers || end.winner === view.you ? 'win' : 'lose');
+        }
+        const move = fresh.findLast(e => e.type === 'move');
+        if (!move) return;
+        if (view.players[move.seat].isCPU) return music.play('turn');
+        music.play(move.captured ? 'capture' : 'place');
     }
 
     // ---- ダイアログ ----

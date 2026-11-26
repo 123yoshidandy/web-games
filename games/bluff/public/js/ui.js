@@ -9,6 +9,7 @@
 import { STAR, FACES, FIELDS, position, isRaise, matches, bidText } from './bids.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 import { symbolsSvg, dieHtml, hiddenDie, faceSvg, cupSvg, titleArtSvg } from './art.js';
 
 const SETTINGS_KEY = 'bluff.settings';
@@ -70,7 +71,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -82,6 +86,7 @@ export default class UI {
         this.pick = null;
         this.reveal = new Set();
         this.resultShown = false;
+        this.soundSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
@@ -141,6 +146,7 @@ export default class UI {
         $('#faces').addEventListener('click', (event) => {
             const b = event.target.closest('button[data-face]');
             if (b && !b.disabled && this.pick) {
+                music.play('select');
                 this.pick = { ...this.pick, face: Number(b.dataset.face) };
                 this.reveal = new Set();
                 this.render();
@@ -186,6 +192,27 @@ export default class UI {
         this.controller.send(command);
     }
 
+    // 効果音：前の描画からのできごとを見て、1回の更新に1つだけ鳴らす
+    // 勝負（ブラフ！）は自分が失えば払う音、自分の指摘が当たれば取った音。自分の宣言は置く音、振り直しはさいころ
+    playSounds(v) {
+        const fresh = v.events.filter(e => e.seq > this.soundSeq);
+        if (!fresh.length) return;
+        this.soundSeq = fresh.at(-1).seq;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(v.you) ? 'win' : 'lose');
+        const challenge = fresh.find(e => e.type === 'challenge');
+        if (challenge) {
+            if (challenge.losses[v.you]) return music.play('pay');
+            return music.play(challenge.seat === v.you ? 'capture' : 'notify');
+        }
+        const mine = fresh.filter(e => e.seat === v.you);
+        if (mine.length && mine.length === fresh.filter(e => e.seat !== undefined).length) {
+            return music.play(mine.some(e => e.type === 'reroll') ? 'dice' : 'place');
+        }
+        if (fresh.some(e => e.type === 'round')) return music.play('dice');
+        music.play(this.myTurn() ? 'turn' : 'notify');
+    }
+
     myTurn() {
         const v = this.view;
         return !!v && v.phase === 'bid' && v.turn === v.you;
@@ -205,6 +232,7 @@ export default class UI {
             bid = { qty: field.qty, face: keep && faces.includes(keep) ? keep : faces[0] };
         }
         if (!isRaise(current, bid)) return;
+        music.play('select');
         this.pick = bid;
         this.reveal = new Set();
         this.render();
@@ -222,6 +250,7 @@ export default class UI {
             // 1個はカップに残す
             const inCup = dice.filter(x => !x.shown).length;
             if (inCup - this.reveal.size - 1 < 1) {
+                music.play('error');
                 this.toast('1個はカップに残します');
                 return;
             }
@@ -285,6 +314,7 @@ export default class UI {
         this.renderMe(view);
         this.renderFaces(view);
         this.renderActions(view);
+        this.playSounds(view);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !this.resultShown && !this.resultTimer) {
             this.resultTimer = setTimeout(() => {

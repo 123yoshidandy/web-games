@@ -11,6 +11,14 @@ import {
 } from './cities.js';
 import { mapSvg, miniMapSvg, shortestPath, DISEASE_COLORS } from './map.js';
 import { HELP_HTML } from './help.js';
+import { music } from './music.js';
+
+// 自分の操作の音（コマンドの種類ごと）
+const COMMAND_SOUND = {
+    drive: 'place', direct: 'place', charter: 'place', shuttle: 'place', dispatch: 'place', opsmove: 'place', build: 'place', event: 'place', forecast: 'place',
+    treat: 'capture', cure: 'gain', take: 'gain', retrieve: 'gain', give: 'pay', discard: 'pay',
+    draw: 'draw', infect: 'draw', intensify: 'shuffle', continue: 'select', pass: 'select'
+};
 
 const SETTINGS_KEY = 'pandemic.settings';
 const CPU_NAMES = ['ハル', 'ミナ', 'ソラ'];
@@ -163,7 +171,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.update(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -174,6 +185,7 @@ export default class UI {
         }
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
+        this.view = null;
         this.update();
         this.controller.scheduleCpu();
         this.controller.scheduleAuto();
@@ -226,7 +238,11 @@ export default class UI {
     }
 
     send(seat, command) {
-        return this.controller?.send(seat, command) ?? false;
+        this.sending = true;
+        const ok = this.controller?.send(seat, command) ?? false;
+        this.sending = false;
+        if (ok && !this.view?.result) music.play(COMMAND_SOUND[command.type] ?? 'place');
+        return ok;
     }
 
     // おすすめの手を、短い文で知らせ、行き先の都市・押すボタン・カードを光らせる（打つのは自分）
@@ -238,6 +254,7 @@ export default class UI {
             return;
         }
         this.hint = { at: hintKey(v), ...h };
+        music.play('select');
         this.toast(`おすすめ：${this.hintText(v, h.seat, h.command)}`);
         this.render();
     }
@@ -291,6 +308,7 @@ export default class UI {
         }
         if (this.pick && !this.isMyActions() && this.pick.needsActions) this.setPick(null);
         this.render();
+        this.playUpdateSound(prev);
         // 割り込み（捨てる・予測）はシートで聞く
         const discarder = v.phase === 'discard' ? v.actors.find(s => this.can(s)) : undefined;
         if (discarder !== undefined) this.openDiscard(discarder);
@@ -300,6 +318,21 @@ export default class UI {
             this.resultShown = true;
             setTimeout(() => this.openResult(), 600);
         }
+    }
+
+    // 1回の更新に1つの音。自分の操作の音は send で鳴らす。CPU の手は知らせ、自分のアクションの番になったらチャイム
+    playUpdateSound(prev) {
+        const v = this.view;
+        if (!prev) return;
+        if (v.result) {
+            if (!prev.result) music.play(v.result.won ? 'win' : 'lose');
+            return;
+        }
+        if (this.sending) return;
+        const wasMine = prev.phase === 'actions' && this.can(prev.current);
+        if (this.isMyActions() && !wasMine) music.play('turn');
+        else if (this.can(v.current) && v.phase !== 'actions') music.play('draw'); // 自分の番の「引く」「感染」を自動で進めた
+        else music.play('notify');
     }
 
     render() {

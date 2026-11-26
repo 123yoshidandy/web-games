@@ -12,6 +12,7 @@
 import { SIZE, COLORS, COLOR_NAMES, PIECES, PIECE_ORDER, SHARED, canPlaceCells, placedCells, anchors, legalMoves } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'blokus.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
@@ -82,7 +83,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -144,8 +148,14 @@ export default class UI {
             const button = event.target.closest('[data-piece]');
             if (button) this.select(button.dataset.piece);
         });
-        $('#rotate').addEventListener('click', () => this.turnPiece(rotateOrient));
-        $('#flip').addEventListener('click', () => this.turnPiece(flipOrient));
+        $('#rotate').addEventListener('click', () => {
+            music.play('select');
+            this.turnPiece(rotateOrient);
+        });
+        $('#flip').addEventListener('click', () => {
+            music.play('select');
+            this.turnPiece(flipOrient);
+        });
         $('#hint').addEventListener('click', () => this.showHint());
         $('#cancel').addEventListener('click', () => {
             this.selected = null;
@@ -266,6 +276,7 @@ export default class UI {
     select(piece) {
         const v = this.view;
         if (!this.isMyTurn() || !v.colors[v.current].pieces.includes(piece)) return;
+        music.play('select');
         const orient = this.orients[piece] ?? 0;
         const color = v.current;
         // 置ける位置があれば、そこに影を出す（同じ向きを優先）
@@ -340,8 +351,24 @@ export default class UI {
         this.renderBoard();
         this.renderTray();
         this.renderControls();
+        this.playSounds(v);
         this.lastSeq = v.events.at(-1)?.seq ?? this.lastSeq;
         this.maybeResult();
+    }
+
+    // 効果音：前の描画からのできごとを見て、1回の更新に1つだけ鳴らす
+    // 自分が置いたら置いた音、ほかの人の手のあとは自分の番か知らせ、終局は勝ち（同点は知らせ）・負け
+    playSounds(v) {
+        const fresh = v.events.filter(e => e.seq > this.lastSeq);
+        if (!fresh.length) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) {
+            if (!end.winners.includes(v.you)) return music.play('lose');
+            return music.play(end.winners.length > 1 ? 'notify' : 'win');
+        }
+        const places = fresh.filter(e => e.type === 'place');
+        if (places.length && places.every(e => e.seat === v.you)) return music.play('place');
+        music.play(this.isMyTurn() ? 'turn' : 'notify');
     }
 
     colorOwnerName(color) {
