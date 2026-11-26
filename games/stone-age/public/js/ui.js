@@ -7,7 +7,10 @@ import {
     CIV_CARDS, BUILDINGS, RESOURCES, RESOURCE_NAME, GATHER, RESOURCE_SPOTS, VILLAGE, PLACE_NAME,
     DIE_REWARD, MULTIPLIERS, MULTIPLIER_NAME, MULTIPLIER_BASE, resourceCount, buildingPoints
 } from './cards.js';
-import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame, CPU_DELAY_MS } from './game-controller.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS as ONLINE_MIN, MAX_PLAYERS as ONLINE_MAX } from './game.js';
 import { CPU_LEVELS, bestBuildingPay } from './cpu-player.js';
 import { finalBonus, multiplierCounts, multiplierBase } from './scoring.js';
 import { symbolsSvg, sym, civCardHtml, buildingFaceHtml, buildingText, cardText, dieHtml, amountHtml } from './art.js';
@@ -85,6 +88,26 @@ export default class UI {
         $('#symbols').innerHTML = symbolsSvg();
         $('#title-art').innerHTML = titleArtHtml();
         $('#help-body').innerHTML = helpHtml();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'ストーンエイジ',
+            game: 'stone-age',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: CPU_DELAY_MS,
+            minPlayers: ONLINE_MIN,
+            maxPlayers: ONLINE_MAX,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         this.bindStatic();
     }
 
@@ -95,13 +118,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -115,6 +139,17 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.stopGame();
+        else document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        this.hintCommand = null;
+        // ヒント（と待った）はローカル対戦だけ
+        document.querySelectorAll('#hint, #undo').forEach(el => { el.hidden = Boolean(controller.isOnline); });
         this.view = null;
         this.lastSeq = null;
         this.sel = null;
@@ -124,7 +159,13 @@ export default class UI {
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
-        this.controller.scheduleCpu();
+        if (!this.controller.isOnline) this.controller.scheduleCpu();
+    }
+
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    goHome() {
+        if (this.controller?.isOnline) return this.online.confirmLeave();
+        this.showTitle();
     }
 
     newGame() {
@@ -165,13 +206,18 @@ export default class UI {
             this.renderSetup();
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#result-home').addEventListener('click', () => this.showTitle());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            document.querySelectorAll('dialog[open]').forEach(d => d.close());
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#home').addEventListener('click', () => this.goHome());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#hint').addEventListener('click', () => this.showHint());

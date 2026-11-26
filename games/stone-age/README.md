@@ -156,6 +156,12 @@ npm test
 - `game-definition.test.js`：オンライン対戦の定義（操作の項目の絞り込み `sanitize`・断るときに状態を変えない・CPU・抜けた人）と、ビューで山の並び・伏せたカード・シードが漏れないこと
 - `pwa.test.js`：service worker が画面のファイルを全部先に読むこと、manifest とアイコン
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。サイコロの目はシードから決まるので、シードはビューに入れない。操作を待っている人はいつも0人か1人（`game.actors()`）で、ダイスのカードでは買った人以外の番も来る。端末から届いた操作は `sanitize` で種類ごとの項目だけを取り出してから `applyCommand` に渡す。
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'stone-age' })`。web-games の1つのスタックから `?game=stone-age` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
