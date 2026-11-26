@@ -66,6 +66,16 @@ node scripts/cpu-match.mjs 200 2 mixed
 
 ふつうの内訳の平均は、出口 21.6・道 6.8・線路 7.0・中央 4.8・減点 −9.2。慣れた人なら上回れるくらいの強さ。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜6人で、足りない席は CPU で埋められる（1人で遊ぶのはローカルだけ）。全員が同じダイスの目で同時に描く。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'railroad-ink' })`。web-games の1つのスタックから `?game=railroad-ink` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -86,9 +96,7 @@ npm test
 | `public/js/game-controller.js` | 人間1人と CPU のローカル対戦（途中経過の保存） |
 | `public/js/ui.js`・`art.js`・`help.js` | 画面・絵・遊び方 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（オフラインでも開ける） |
-| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と平均点・勝ち数 |
 
-### オンライン対戦を入れるとき
-
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。全員が同じラウンドを同時に描くので、操作を待っている人は複数いる（`game.actors()`）。隠す情報はないので、ビューは全員に同じものを送る。
