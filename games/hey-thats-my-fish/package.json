@@ -18,5 +18,8 @@
     "genres": [
       "ボードゲーム"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }
