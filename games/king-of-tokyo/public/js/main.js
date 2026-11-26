@@ -9,6 +9,9 @@ import { monsterSvg, monsterOf, dieSvg, icon, describeEvent } from './art.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'kingoftokyo.settings.v1', save: 'kingoftokyo.save.v1' };
@@ -49,7 +52,7 @@ const hintKey = () => `${view.turnNo}:${view.decision?.kind}:${view.events.at(-1
 
 // おすすめの手を、選んだ状態にして光らせる（残すダイス・買うカード・ダイアログの答え）
 function showHint() {
-    if (!mine() || !controller) return;
+    if (!mine() || !controller || controller.isOnline) return;
     const c = controller.suggest();
     if (!c) return;
     music.play('select');
@@ -101,6 +104,7 @@ function renderTitle() {
     document.querySelectorAll('#player-count button').forEach(b => b.setAttribute('aria-checked', String(Number(b.dataset.count) === settings.count)));
     document.querySelectorAll('#cpu-level button').forEach(b => b.setAttribute('aria-checked', String(b.dataset.level === settings.level)));
     $('resume').hidden = !store.load(KEYS.save);
+    $('online-button').hidden = !online.available;
 }
 
 function drawTitleArt() {
@@ -117,16 +121,24 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    controller?.stop();
-    document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    resultShown = false;
+    let local;
     try {
-        controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, { onUpdate, onError });
     } catch (error) {
         console.warn(error);
         store.remove(KEYS.save);
-        controller = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
+        local = new LocalGameController({ ...newSetup(), cpuDelay: CPU_DELAY }, { onUpdate, onError });
     }
+    beginGame(local);
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(next) {
+    if (controller !== next) controller?.stop();
+    document.querySelectorAll('dialog[open]').forEach(d => d.close());
+    resultShown = false;
+    hint = null;
+    controller = next;
     view = controller.getView();
     lastSeq = view.events.at(-1)?.seq ?? 0;
     ui = freshUi();
@@ -136,16 +148,42 @@ function startGame(setup) {
 }
 
 function saveProgress() {
-    if (!controller) return;
+    if (!controller || controller.isOnline) return; // オンライン対戦はサーバーが持つ
     if (controller.game.isOver()) store.remove(KEYS.save);
     else store.save(KEYS.save, controller.saveData());
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
     showScene('title');
 }
+
+// ヒントはローカル対戦だけ
+const hintButton = () => (controller?.isOnline ? '' : HINT_BUTTON);
+
+// ---------- オンライン対戦（入口とロビーは netplay-lobby.js の画面） ----------
+
+const online = new NetplayLobby({
+    title: 'キング・オブ・トーキョー',
+    game: 'king-of-tokyo',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: 750,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [{ key: 'cpuLevel', label: 'CPU の強さ', options: [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }] }],
+    onStart: (next) => beginGame(next),
+    onUpdate: () => onUpdate(),
+    onError: (message) => onError(message),
+    onExit: () => {
+        controller = null;
+        view = null;
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        showScene('title');
+    }
+});
 
 // ---------- 更新 ----------
 
@@ -309,7 +347,7 @@ function renderActions() {
         el.innerHTML = `
             ${changeCards.length ? `<div class="change-row">${changeCards.map(([k, l]) => `<button class="chip" data-change="${k}">${l}</button>`).join('')}</div>` : ''}
             <div class="btn-row">
-                ${HINT_BUTTON}
+                ${hintButton()}
                 <button class="secondary" data-act="reroll" ${o.canReroll || o.dweller ? '' : 'disabled'} ${rerollable(view.dice) ? '' : 'disabled'}>振り直す<small>${extra}</small></button>
                 <button class="primary" data-act="resolve">決定</button>
             </div>`;
@@ -321,7 +359,7 @@ function renderActions() {
         const others = (o.fromOthers?.length || o.top) ? '<button class="chip" data-act="otherBuys">ほかの買い方</button>' : '';
         const canBuy = ui.card && view.market.includes(ui.card) && o.costs[ui.card] <= me.energy;
         el.innerHTML = `${sel}<div class="btn-row">
-            ${HINT_BUTTON}
+            ${hintButton()}
             <button class="primary" data-act="buy" ${canBuy ? '' : 'disabled'}>買う</button>
             <button class="secondary" data-act="sweep" ${o.canSweep ? '' : 'disabled'}>流す<small>2⚡</small></button>
             <button class="tertiary" data-act="endBuy">終える</button>
@@ -397,7 +435,7 @@ function renderDecision() {
             break;
     }
     $('decide-title').textContent = title;
-    $('decide-body').innerHTML = `${body}<div class="hint-row">${HINT_BUTTON}</div>`;
+    $('decide-body').innerHTML = `${body}<div class="hint-row">${hintButton()}</div>`;
     if (!dialog.open) {
         controller?.pause();
         dialog.showModal();
@@ -502,6 +540,7 @@ function setup() {
     segment('player-count', d => { settings.count = Number(d.count); });
     segment('cpu-level', d => { settings.level = d.level; });
     $('start').addEventListener('click', () => startGame(newSetup()));
+    $('online-button').addEventListener('click', () => online.open());
     $('resume').addEventListener('click', () => startGame(store.load(KEYS.save) ?? newSetup()));
     $('open-help-title').addEventListener('click', () => openDialog('help-dialog'));
     $('open-help').addEventListener('click', () => openDialog('help-dialog'));
@@ -591,8 +630,16 @@ function setup() {
         const b = e.target.closest('[data-answer], [data-probe], [data-mimic], .pick');
         if (b) answerDecision(b);
     });
-    $('again').addEventListener('click', () => { $('result-dialog').close(); startGame(newSetup()); });
-    $('result-home').addEventListener('click', () => { $('result-dialog').close(); goHome(); });
+    $('again').addEventListener('click', () => {
+        $('result-dialog').close();
+        if (controller?.isOnline) online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        else startGame(newSetup());
+    });
+    $('result-home').addEventListener('click', () => {
+        $('result-dialog').close();
+        if (controller?.isOnline) online.leave();
+        else goHome();
+    });
 
     // ページの拡大を止める
     document.addEventListener('gesturestart', e => e.preventDefault());
@@ -601,9 +648,11 @@ function setup() {
     });
 
     showScene('title');
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
     registerServiceWorker();
     // 確かめるときに使う
-    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, startGame, send };
+    window.__app = { get controller() { return controller; }, get view() { return view; }, get ui() { return ui; }, online, startGame, send };
 }
 
 function registerServiceWorker() {
