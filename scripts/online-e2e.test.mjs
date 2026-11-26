@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createTestServer } from 'netplay-kit/server/testing.js';
-import { parseArgs, freePorts, createE2EPicker, publicDirOf } from './online-e2e.mjs';
+import { parseArgs, freePorts, createE2EPicker, publicDirOf, viewportOf } from './online-e2e.mjs';
 import { loadDefinition } from './dev-online.mjs';
 
 test('引数：ゲーム・手数・画面の置き場所', () => {
@@ -35,4 +35,9 @@ test('選んだ手は、サーバーの部屋の処理に受け付けられる�
         assert.equal(clients[seat].last('error'), undefined);
         assert.equal((await server.store.getRoom(clients.code)).version, room.version + 1);
     }
+});
+
+test('ページの大きさは、ゲームの向きに合わせる（横のゲームは 844×390、縦は 390×664）', () => {
+    assert.deepEqual(viewportOf('dominion'), { width: 844, height: 390 });
+    assert.deepEqual(viewportOf('azul'), { width: 390, height: 664 });
 });

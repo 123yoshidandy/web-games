@@ -6,6 +6,7 @@
 //   window.__app.online.controller.send() で送る。両方のページに届いたかを、部屋の版で確かめる
 // - 最後に、B の再読み込みで同じ席に戻ること、A が部屋を出ると B に届くこと、ページにエラーがないことを確かめる
 // - 結果は「OK／NG 項目」で出し、NG があれば終了コード1。画面の PNG は --shots のフォルダ（省くと一時フォルダ）に置く
+// - ページの大きさは、ゲームの向きに合わせて layout-check と同じスマホの大きさにする（横のゲームは 844×390）
 import http from 'node:http';
 import net from 'node:net';
 import { existsSync, statSync, createReadStream, readdirSync, readFileSync, mkdirSync, mkdtempSync } from 'node:fs';
@@ -15,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { launchChrome, createChecklist } from 'netplay-kit/tools/chrome.mjs';
 import { startMultiDevServer } from 'netplay-kit/server/dev-server.js';
 import { createMovePicker } from 'test-kit/picker.js';
+import { SIZES, phoneSize } from './layout-check-rules.mjs';
 import { loadDefinition } from './dev-online.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -55,6 +57,17 @@ export async function freePorts(n) {
 }
 
 export const publicDirOf = (game) => (existsSync(join(root, 'games', game, 'public')) ? join(root, 'games', game, 'public') : join(root, 'games', game));
+
+// ページの大きさ：ゲームの向き（manifest の orientation。package.json の standards.orientation が any なら any）に合わせて、
+// 画面の検査（layout-check）と同じスマホの大きさにする。横のゲームは 844×390、それ以外は 390×664
+export function viewportOf(game) {
+    const readJson = (file) => { try { return JSON.parse(readFileSync(file, 'utf8')); } catch { return {}; } };
+    const pkg = readJson(join(root, 'games', game, 'package.json'));
+    const manifest = readJson(join(publicDirOf(game), 'manifest.webmanifest'));
+    const orientation = pkg.standards?.orientation === 'any' ? 'any' : (manifest.orientation ?? 'any');
+    const { width, height } = SIZES[phoneSize(String(orientation).startsWith('landscape') ? 'landscape' : orientation)];
+    return { width, height };
+}
 
 // 席の一手を選ぶ。まず定義の CPU（どのゲームでも同じ形で動く）、選べなければゲームの suggest（形が違えば使わない）
 export async function createE2EPicker(definition, publicDir) {
@@ -110,6 +123,7 @@ export async function runE2E({ game, moves = 6, shots = null }) {
     const shotDir = shots ?? mkdtempSync(join(tmpdir(), 'online-e2e-'));
     mkdirSync(shotDir, { recursive: true });
 
+    const viewport = viewportOf(game);
     const [wsPort, webPort, chromePort] = await freePorts(3);
     const web = await serveStatic(publicDir, webPort);
     const dev = startMultiDevServer({ load: loadDefinition, port: wsPort, log: () => {} });
@@ -123,7 +137,8 @@ export async function runE2E({ game, moves = 6, shots = null }) {
     const type = (page, selector, value) => page.eval(`(() => { document.querySelector(${JSON.stringify(selector)}).value = ${JSON.stringify(value)}; return true; })()`);
     const lobbyOf = async (page) => JSON.parse(await page.eval('JSON.stringify(window.__app.online.controller?.lobby ?? null)'));
     const openPage = async (url, label) => {
-        const page = await chrome.openPage('about:blank', { onConsole: (text) => { if (text.startsWith('error')) consoleErrors.push(`${label}: ${text}`); } });
+        const page = await chrome.openPage('about:blank', { mobile: false, onConsole: (text) => { if (text.startsWith('error')) consoleErrors.push(`${label}: ${text}`); } });
+        await page.cdp('Emulation.setDeviceMetricsOverride', { ...viewport, deviceScaleFactor: 2, mobile: true });
         await page.cdp('Page.addScriptToEvaluateOnNewDocument', { source: COLLECT_ERRORS });
         await page.goto(url, { ready: READY });
         return page;
@@ -221,7 +236,7 @@ export async function runE2E({ game, moves = 6, shots = null }) {
         await dev.close();
         await new Promise((resolve) => web.close(resolve));
     }
-    console.log(`画面：${shotDir}`);
+    console.log(`画面：${shotDir}（${viewport.width}×${viewport.height}）`);
     return check.report();
 }
 
