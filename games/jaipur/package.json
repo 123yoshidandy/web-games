@@ -15,5 +15,8 @@
     "players": [
       2
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }
