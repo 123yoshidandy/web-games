@@ -1417,3 +1417,7 @@ button.link {
         display: none;
     }
 }
+
+/* ヒント（おすすめの手） */
+#hint:disabled { opacity: .35; cursor: default; }
+.recommended { outline: 3px solid #fff; outline-offset: 1px; box-shadow: 0 0 0 6px rgba(255, 196, 61, .75), 0 0 18px rgba(255, 196, 61, .8); }

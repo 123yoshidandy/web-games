@@ -2,7 +2,7 @@
  * 効果音と BGM（音声ファイルは使わず、Web Audio API でその場で合成する）
  *
  * - ブラウザの自動再生の制限があるので、最初のタップ（unlock）までは鳴らさない
- * - 効果音と BGM の ON/OFF は localStorage に保存する（初めは両方 ON）
+ * - 効果音と BGM の ON/OFF は localStorage に保存する（初めは両方 ON）。画面のサウンドのボタン1つで、まとめて切り替える
  * - 別のタブを見ている間は、音を止める
  *
  * 音色を素材の音声ファイルに差し替えるときは、このファイルの中身だけを変えればよい
@@ -52,12 +52,15 @@ export function onSoundSettingsChange(listener) {
     listeners.add(listener);
 }
 
-export function toggleSound(kind) {
-    settings = { ...settings, [kind]: !settings[kind] };
+// サウンドのボタン：どちらかが鳴っていれば両方消し、両方消えていれば両方つける
+export function toggleAllSound() {
+    const on = !(settings.effects || settings.bgm);
+    settings = { effects: on, bgm: on };
     saveSettings();
-    if (kind === 'bgm') settings.bgm ? startBgm() : stopBgm();
+    on ? startBgm() : stopBgm();
     listeners.forEach(listener => listener(getSoundSettings()));
 }
+
 
 // ===== 初期化 =====
 

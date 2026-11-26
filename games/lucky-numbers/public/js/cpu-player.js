@@ -83,3 +83,10 @@ export function runCpuStep(game) {
     if (!isCpuTurn(game)) return false;
     return game.applyCommand(game.currentPlayerIndex, chooseCpuCommand(game));
 }
+
+// ヒント：人の番に、CPU が選ぶ次の操作を返す（引く・取る・置く・捨てる）。場と自分の庭だけを見て決める
+// 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+export function suggest(game, seat) {
+    if (game.phase !== 'play' || game.currentPlayerIndex !== seat) return null;
+    return chooseCpuCommand(game);
+}

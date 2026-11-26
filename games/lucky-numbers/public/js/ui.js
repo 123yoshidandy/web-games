@@ -5,12 +5,13 @@
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { isLevel, DEFAULT_LEVEL } from './cpu-level.js';
+import { suggest } from './cpu-player.js';
 import OnlineGameController, { loadOnlineSession } from './online-controller.js';
 import { getServerUrl } from './online-config.js';
 import { SIZE, MIN_PLAYERS, MAX_PLAYERS, canPlace } from './game.js';
 import { element, cloverTile, renderPictureGarden } from './tiles.js';
 import { captureLayout, detectChanges, animateChanges, FLY_MS, SECOND_DELAY_MS } from './tile-motion.js';
-import { unlockSound, playEffect, toggleSound, getSoundSettings, onSoundSettingsChange } from './sound.js';
+import { unlockSound, playEffect, toggleAllSound, getSoundSettings, onSoundSettingsChange } from './sound.js';
 import NetplayClient from './netplay/netplay-client.mjs';
 
 const SETUP_KEY = 'lucky-numbers.setup'; // 開始画面で選んだ人数・名前・CPU・CPU の強さ
@@ -76,6 +77,7 @@ export default class UI {
         $('topbar').classList.toggle('hidden', onTitle);
         $('menu-button').classList.toggle('hidden', onTitle);
         $('help-button').classList.toggle('hidden', onTitle);
+        if (onTitle) $('hint').classList.add('hidden');
     }
 
     showSetup() {
@@ -426,6 +428,40 @@ export default class UI {
         this.playSounds(changes, this.lastView, view);
         this.lastView = view;
         this.scheduleAutoDraw(view);
+        this.markHint(view);
+    }
+
+    // ===== ヒント（手元の対戦だけ。オンラインでは出さない） =====
+
+    localGame() {
+        return this.controller instanceof LocalGameController ? this.controller.game : null;
+    }
+
+    // おすすめの操作を光らせる（場のタイル・自分の庭のマス・山札・捨てる）
+    showHint() {
+        const game = this.localGame();
+        const view = this.controller?.getView();
+        if (!game || !view?.isMyTurn) return;
+        const command = suggest(game, game.currentPlayerIndex);
+        if (!command) return;
+        this.hint = { at: game.commands.length, command };
+        this.markHint(view);
+    }
+
+    markHint(view) {
+        const game = this.localGame();
+        $('hint').classList.toggle('hidden', !game);
+        $('hint').disabled = !view.isMyTurn;
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        if (!this.hint || !game || this.hint.at !== game.commands.length || !view.isMyTurn) {
+            this.hint = null;
+            return;
+        }
+        const c = this.hint.command;
+        const target = c.type === 'take' ? $('table-tiles').children[c.index]
+            : c.type === 'place' ? document.querySelector(`#my-garden .grid > :nth-child(${c.row * SIZE + c.col + 1})`)
+                : $(c.type === 'draw' ? 'pool-button' : 'discard-button');
+        target?.classList.add('recommended');
     }
 
     // 起きたことに合わせて効果音を鳴らす（置く・場に出す音は、タイルが着く頃に鳴らす）。相手や CPU の手は小さめ
@@ -454,14 +490,13 @@ export default class UI {
         }
     }
 
-    // 効果音と BGM の切り替えボタンの表示を、設定に合わせる（上部のバーとトップ画面の両方）
+    // サウンドのボタン（BGM と効果音をまとめて切り替える）の表示を、設定に合わせる（上部のバーとトップ画面の両方）
+    // どちらかが鳴っていれば ON。ON/OFF は aria-pressed で伝え、文言は「サウンド」のまま
     renderSoundToggles(settings = getSoundSettings()) {
+        const on = settings.effects || settings.bgm;
         document.querySelectorAll('.sound-toggle').forEach(button => {
-            const on = settings[button.dataset.kind];
-            const label = button.dataset.kind === 'bgm' ? 'BGM' : '効果音';
             button.classList.toggle('off', !on);
             button.setAttribute('aria-pressed', String(on));
-            button.setAttribute('aria-label', `${label}を${on ? 'オフ' : 'オン'}にする`);
         });
     }
 
@@ -658,13 +693,14 @@ export default class UI {
             this.showSetup();
         });
         $('menu-button').addEventListener('click', () => this.goHome());
+        $('hint').addEventListener('click', () => this.showHint());
         $('pool-button').addEventListener('click', () => this.controller?.send({ type: 'draw' }));
 
         // 音は、ブラウザの制限で、最初に画面を触ったときから鳴らせる（触るたびに、止まっていれば再開する）
         document.addEventListener('pointerdown', unlockSound, true);
         document.addEventListener('keydown', unlockSound, true);
         document.querySelectorAll('.sound-toggle').forEach(button => {
-            button.addEventListener('click', () => toggleSound(button.dataset.kind));
+            button.addEventListener('click', () => toggleAllSound());
         });
         onSoundSettingsChange(settings => this.renderSoundToggles(settings));
         this.renderSoundToggles();
