@@ -4,10 +4,12 @@
  */
 
 import LocalGameController from './game-controller.js';
-import { DOMINOES, DIRS, KINGDOM_SIZE, TERRAIN_NAMES, BONUS, dominoCells } from './game.js';
+import { DOMINOES, DIRS, KINGDOM_SIZE, TERRAIN_NAMES, BONUS, dominoCells, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { measureBefore, playAfter } from './motion.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const CPU_NAMES = ['エドガー', 'マティルダ', 'オスカー'];
 const HUMAN_NAME = 'あなた';
@@ -107,6 +109,7 @@ function renderTitle() {
     for (const b of document.querySelectorAll('#level-select button')) b.classList.toggle('on', b.dataset.value === app.settings.level);
     for (const b of document.querySelectorAll('#rule-select button')) b.classList.toggle('on', !!app.settings.rules[b.dataset.rule]);
     $('#resume-button').hidden = !LocalGameController.loadSaved();
+    $('#online-button').hidden = !online.available;
 }
 
 function newSetup() {
@@ -116,22 +119,57 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    app.controller?.stop();
-    app.view = null;
-    app.place = { dir: 0, anchor: null, key: null };
-    if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, {
+    beginGame(new LocalGameController(setup, {
         onUpdate: () => update(),
         onError: () => {
             music.play('error');
             update();
         }
-    });
+    }));
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(controller) {
+    if (app.controller !== controller) app.controller?.stop();
+    app.view = null;
+    app.hint = null;
+    app.place = { dir: 0, anchor: null, key: null };
+    if ($('#result-dialog').open) $('#result-dialog').close();
+    app.controller = controller;
     showScene('game');
     update();
 }
 
+// ===== オンライン対戦（入口とロビーは netplay-lobby.js の画面） =====
+
+const online = new NetplayLobby({
+    title: 'キングドミノ',
+    game: 'kingdomino',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: 700,
+    minPlayers: MIN_PLAYERS,
+    maxPlayers: MAX_PLAYERS,
+    settings: [
+        { key: 'middleKingdom', label: '中王国', options: [{ value: false, label: 'なし' }, { value: true, label: 'あり' }] },
+        { key: 'harmony', label: '調和', options: [{ value: false, label: 'なし' }, { value: true, label: 'あり' }] }
+    ],
+    onStart: (controller) => beginGame(controller),
+    onUpdate: () => update(),
+    onError: (message) => {
+        music.play('error');
+        update();
+    },
+    onExit: () => {
+        app.controller = null;
+        for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+        showScene('title');
+    }
+});
+app.online = online;
+
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (app.controller?.isOnline) return online.confirmLeave();
     app.controller?.stop();
     app.controller = null;
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -177,6 +215,7 @@ function render(view) {
     const rounds = view.round + (view.next ? 1 : 0) + view.deckCount / view.kings.length;
     $('#round-label').textContent = view.phase === 'end' ? '終了' : `ラウンド ${view.round}/${rounds}`;
     $('#result-button').hidden = view.phase !== 'end';
+    $('#hint').hidden = Boolean(app.controller?.isOnline); // ヒントはローカル対戦だけ
     $('#hint').disabled = !myTurn(view);
     if (app.hint && app.hint.count !== view.commandCount) app.hint = null;
     if ($('#log-dialog').open) renderLog(view);
@@ -285,7 +324,7 @@ function placeHinted() {
 // おすすめの手を示す。置く番なら、その場所と向きを選んでおく（「置く」を押せば置ける）
 function showHint() {
     const view = app.view;
-    if (!view || !app.controller || !myTurn(view)) return;
+    if (!view || !app.controller || app.controller.isOnline || !myTurn(view)) return;
     const command = app.controller.suggest();
     if (!command) return;
     music.play('select');
@@ -525,6 +564,7 @@ function init() {
         renderTitle();
     });
     $('#start-button').addEventListener('click', () => startGame(newSetup()));
+    $('#online-button').addEventListener('click', () => online.open());
     $('#resume-button').addEventListener('click', () => {
         const saved = LocalGameController.loadSaved();
         if (saved) startGame(saved);
@@ -544,6 +584,11 @@ function init() {
         if (action === 'close-help') $('#help-dialog').close();
         if (action === 'result') showResult();
         if (action === 'close-result') $('#result-dialog').close();
+        if (action === 'rematch' && app.controller?.isOnline) {
+            $('#result-dialog').close();
+            online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+            return;
+        }
         if (action === 'rematch') {
             const setup = app.controller?.setup;
             $('#result-dialog').close();
@@ -566,6 +611,8 @@ function init() {
     });
 
     showScene('title');
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('sw.js').then(registration => {
