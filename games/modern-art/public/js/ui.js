@@ -5,7 +5,11 @@
 
 import { CARDS, ARTISTS, TYPES, END_COUNT, ROUNDS } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import { CPU_LEVELS } from './cpu-player.js';
+import { CPU_LEVELS, suggest } from './cpu-player.js';
+import { music } from './music.js';
+
+// 自分の操作の効果音（買ったときは、出来事から pay にする）
+const COMMAND_SOUNDS = { play: 'place', second: 'place', bid: 'place', price: 'place', buy: 'pay', pass: 'cancel' };
 import { symbolsSvg, cardHtml, artistMark, typeIcon } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
 
@@ -65,7 +69,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             console.error(error);
@@ -99,7 +106,13 @@ export default class UI {
 
     send(command) {
         if (!this.controller) return false;
-        const ok = this.controller.send(command);
+        this.sending = command;
+        let ok;
+        try {
+            ok = this.controller.send(command);
+        } finally {
+            this.sending = null;
+        }
         if (ok) this.selected = null;
         return ok;
     }
@@ -138,6 +151,7 @@ export default class UI {
             const button = event.target.closest('button[data-act]');
             if (button && !button.disabled) this.act(button.dataset.act, button.dataset);
         });
+        $('#hint').addEventListener('click', () => this.showHint());
         // 回の結果を見ている間は CPU を待たせ、閉じたら続ける。最後の回なら、続けて終わりの結果を出す
         $('#round').addEventListener('close', () => {
             this.controller?.setHold(false);
@@ -184,6 +198,7 @@ export default class UI {
             this.toast(`${ARTISTS[card.artist].name}・${TYPES[card.type].name}：${TYPES[card.type].text}`);
             return;
         }
+        music.play(this.selected === cardId ? 'cancel' : 'select');
         this.selected = this.selected === cardId ? null : cardId;
         this.render();
     }
@@ -197,6 +212,7 @@ export default class UI {
             case 'step': {
                 const { min, max } = this.amountRange(view);
                 this.amount = Math.min(max, Math.max(min, this.amount + Number(data.d)));
+                music.play('select');
                 this.renderActions(view);
                 break;
             }
@@ -221,8 +237,10 @@ export default class UI {
 
     render() {
         if (!this.controller) return;
+        const prev = this.view;
         const view = this.controller.getView();
         this.view = view;
+        this.playSound(prev, view);
         if (this.selected !== null && !this.selectable(view).includes(this.selected)) this.selected = null;
         // 競りが変わったら、付ける値を合わせ直す
         const key = view.auction ? `${view.lot.cards.join(',')}:${view.auction.type}:${view.auction.high}:${view.auction.price}` : null;
@@ -242,6 +260,54 @@ export default class UI {
         this.renderActions(view);
         if ($('#log').open) this.renderLog();
         this.checkRound(view);
+    }
+
+    // 1つの更新に1つの音。自分の操作は結果の音、ほかの人の手は notify、自分が操作する番になったら turn
+    playSound(prev, view) {
+        const last = view.events.at(-1)?.seq ?? 0;
+        if (!prev || this.soundController !== this.controller) {
+            this.soundController = this.controller;
+            this.soundSeq = last;
+            return;
+        }
+        const fresh = view.events.filter(e => e.seq > this.soundSeq);
+        this.soundSeq = last;
+        if (fresh.some(e => e.type === 'end')) return music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'round')) return music.play('notify');
+        const sold = fresh.find(e => e.type === 'sold');
+        if (sold?.taker === view.you && sold.price > 0) return music.play('pay');
+        if (sold?.seller === view.you && sold.taker !== view.you && sold.price > 0) return music.play('gain');
+        if (this.sending) return music.play(COMMAND_SOUNDS[this.sending.type] ?? 'place');
+        if (this.myAct(view) && !this.myAct(prev)) return music.play('turn');
+        if (fresh.length > 0 || prev.actors.join() !== view.actors.join()) music.play('notify');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const view = this.view;
+        if (!this.myAct(view)) return;
+        const command = suggest(this.controller.game, view.you);
+        if (!command) return;
+        music.play('select');
+        this.hint = { at: this.controller.game.commands.length, command };
+        if (command.type === 'play' || (command.type === 'second' && command.card !== null)) this.selected = command.card;
+        if (command.amount !== undefined) this.amount = command.amount;
+        this.render();
+    }
+
+    // おすすめの手のカードと操作のボタンに .recommended を付ける。盤面が進んだら消す
+    markHint(view) {
+        $('#hint').disabled = !this.myAct(view);
+        document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+        if (!this.hint || this.hint.at !== this.controller?.game.commands.length || !this.myAct(view)) {
+            this.hint = null;
+            return;
+        }
+        const c = this.hint.command;
+        const act = c.type === 'second' && c.card === null ? 'no-second' : c.type;
+        $(`#actions [data-act="${act}"]`)?.classList.add('recommended');
+        if (c.card !== undefined && c.card !== null) $(`#hand [data-card="${c.card}"]`)?.classList.add('recommended');
     }
 
     // 回が終わったら結果を出す（CPU は閉じるまで待つ）
@@ -378,6 +444,7 @@ export default class UI {
             html = `<span class="hint muted">所持金 ${me.money}</span>`;
         }
         $('#actions').innerHTML = html;
+        this.markHint(view);
     }
 
     // ---- ダイアログ ----

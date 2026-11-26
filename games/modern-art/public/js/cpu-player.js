@@ -217,3 +217,12 @@ export function runCpuStep(game) {
     if (command && game.applyCommand(seat, command)) return true;
     return fallbacks(game, seat).some(c => game.applyCommand(seat, c));
 }
+
+/**
+ * ヒント：人が操作する番に、CPU（ふつう）が選ぶ手を返す。その席から見える情報だけで決める
+ * 状態は変えず、ゲームの乱数も使わないので、記録の再現に影響しない
+ */
+export function suggest(game, seat) {
+    if (game.phase === 'end' || !game.actors().includes(seat)) return null;
+    return chooseCommand(createGameView(game, seat, { events: false }), 'normal');
+}
