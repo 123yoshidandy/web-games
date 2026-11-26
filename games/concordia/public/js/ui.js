@@ -4,7 +4,7 @@
  * カードを押すと説明と使い方が出る。使い方によって、地図の上の押せるもの（植民者・道・都市・州）を金色に光らせる
  */
 
-import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS } from './game-controller.js';
 import Game from './game.js';
 import { CARD_TYPES, GOODS, GOOD_NAMES, PRICE, BUILD_VALUE, DISPLAY_SURCHARGE, STORE_SIZE, BONUS_COINS, ROMAN, GOD_NAMES, GODS, COLONIST_MONEY_BASE } from './cards.js';
 import { CITY, ROAD, ROADS, PROVINCES, ROME } from './map.js';
@@ -12,6 +12,9 @@ import { renderMap } from './map-view.js';
 import { insertSymbols, goodIcon, cardText, godText, GOD_COLORS, PLAYER_COLORS } from './art.js';
 import { helpHtml } from './help.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 
 const SETTINGS_KEY = 'concordia.settings';
 const esc = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -53,6 +56,26 @@ export default class UI {
         this.sending = false;
         this.bindTitle();
         this.bindGame();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'コンコルディア',
+            game: 'concordia',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: CPU_STEP_DELAY_MS,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.begin(controller),
+            onUpdate: () => this.refresh(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                document.querySelectorAll('dialog[open]').forEach(d => d.close());
+                this.showTitle();
+            }
+        });
         $('help-body').innerHTML = helpHtml();
     }
 
@@ -81,6 +104,7 @@ export default class UI {
             saveSettings(this.settings);
         });
         $('start').addEventListener('click', () => this.startGame());
+        $('online-button').addEventListener('click', () => this.online.open());
         $('resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
@@ -103,6 +127,7 @@ export default class UI {
         $('screen-game').hidden = true;
         $('screen-title').hidden = false;
         $('resume').hidden = !loadSavedGame();
+        $('online-button').hidden = !this.online?.available;
         $('title-art').innerHTML = titleArt();
     }
 
@@ -114,9 +139,9 @@ export default class UI {
             options: {}
         };
         if (!saved) clearSavedGame();
-        this.controller?.stop();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.refresh(),
                 onError: (message) => {
                     music.play('error');
@@ -129,6 +154,14 @@ export default class UI {
             this.toast('続きを読み込めませんでした');
             return;
         }
+        this.begin(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    begin(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        this.controller = controller;
+        this.logHistory = [];
         this.mode = null;
         this.selected = null;
         this.resultShown = false;
@@ -136,17 +169,18 @@ export default class UI {
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.refresh();
-        this.controller.scheduleCpu();
+        if (!controller.isOnline) controller.scheduleCpu();
     }
 
     // ---- ゲーム画面の操作 ----
 
     bindGame() {
-        $('home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
         $('open-help-game').addEventListener('click', () => this.openDialog('help'));
         $('hint').addEventListener('click', () => this.showHint());
         $('open-log').addEventListener('click', () => {
-            $('log-list').innerHTML = this.view.logs.slice().reverse().map(l => `<li>${esc(l)}</li>`).join('');
+            $('log-list').innerHTML = this.logHistory.slice().reverse().map(l => `<li>${esc(l)}</li>`).join('');
             this.openDialog('log');
         });
         $('map').addEventListener('click', e => this.onMapClick(e));
@@ -168,10 +202,12 @@ export default class UI {
         });
         $('again').addEventListener('click', () => {
             this.closeDialog('result');
+            if (this.controller?.isOnline) return this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
             this.startGame();
         });
         $('result-home').addEventListener('click', () => {
             this.closeDialog('result');
+            if (this.controller?.isOnline) return this.online.leave();
             this.showTitle();
         });
         $('result-close').addEventListener('click', () => this.closeDialog('result'));
@@ -215,6 +251,10 @@ export default class UI {
     refresh() {
         if (!this.controller) return;
         this.view = this.controller.getView();
+        // オンライン対戦のビューは新しい記録だけを運ぶので、記録の一覧のためにためておく（logCount は全体の数）
+        const from = this.view.logCount - this.view.logs.length;
+        this.logHistory = this.logHistory.slice(0, from).concat(this.view.logs);
+        $('hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         if (!this.myTurn) {
             this.mode = null;
             this.selected = null;
