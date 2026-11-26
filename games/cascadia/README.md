@@ -139,5 +139,16 @@ python3 -m http.server 8000    # http://localhost:8000/ を開く（public/ へ�
 - `public/js/game-view.js`：プレイヤーから見てよい情報（山と袋は数だけ）
 - `public/js/cpu-player.js`：CPU。`game-controller.js`：ローカル対戦（CPU を間を置いて進め、途中経過を保存する）
 - `public/js/ui.js`・`art.js`・`cards.js`：画面と絵と説明の文
-- `server/src/game-definition.js`：オンライン対戦の部品 netplay-kit の「ゲームの定義」の形。今はオンライン対戦を入れていない。入れるときは、netplay-kit の `sync.mjs` で部屋の処理を写し、この定義を渡す
+- `server/src/game-definition.js`：オンライン対戦の部品 netplay-kit の「ゲームの定義」の形。`server/src/handler.js`（サーバーの入口）・`public/js/online-config.js`（接続先）・`public/js/netplay/`（netplay-kit の写し。手で直さない）は、下の「オンライン対戦」
 - `public/sw.js`・`manifest.webmanifest`：PWA。自分のファイルはネットワークを先に、Google Fonts はキャッシュを先に使う
+
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'cascadia' })`。web-games の1つのスタックから `?game=cascadia` で呼ばれる）
+- ゲームの定義は `server/src/game-definition.js`（記録だけを保存して再現する。各席には、その席から見えるビューだけを送る）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
