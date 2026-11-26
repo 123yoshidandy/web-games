@@ -3,7 +3,9 @@
  * 画面はビューだけを見て描く。操作はコントローラーの send() に送る
  */
 
-import LocalGameController from './game-controller.js';
+import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 import BoardView, { TILE_COLORS, improvementIcon } from './board.js';
 import {
     CARDS, SHAPES, COLOR_NAMES, IMPROVEMENTS, IMPROVEMENT_NAMES, CARD_TYPES, CARD_TYPE_NAMES, WEATHER_NAMES,
@@ -33,6 +35,29 @@ const app = {
     hint: null,        // ヒントのおすすめの手（画面だけ。記録には入れない）
     settings: { count: 2, level: 'normal', ...storage.load('settings', {}) }
 };
+
+// オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+const online = new NetplayLobby({
+    title: 'タケノコ',
+    game: 'takenoko',
+    serverUrl: getServerUrl(),
+    cpuStepDelayMs: CPU_STEP_DELAY_MS,
+    minPlayers: 2,
+    maxPlayers: 4,
+    settings: [],
+    onStart: (controller) => beginGame(controller),
+    onUpdate: () => update(),
+    onError: () => {
+        music.play('error');
+        update();
+    },
+    onExit: () => {
+        app.controller = null;
+        for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+        showScene('title');
+    }
+});
+app.online = online;
 
 const escapeHtml = text => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
 const same = (a, b) => a[0] === b[0] && a[1] === b[1];
@@ -109,6 +134,7 @@ function renderTitle() {
     for (const b of document.querySelectorAll('#count-select button')) b.classList.toggle('on', Number(b.dataset.value) === app.settings.count);
     for (const b of document.querySelectorAll('#level-select button')) b.classList.toggle('on', b.dataset.value === app.settings.level);
     $('#resume-button').hidden = !LocalGameController.loadSaved();
+    $('#online-button').hidden = !online.available;
 }
 
 function newSetup() {
@@ -118,14 +144,20 @@ function newSetup() {
 }
 
 function startGame(setup) {
-    app.controller?.stop();
-    app.view = null;
-    resetModes();
-    if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => {
+    beginGame(new LocalGameController(setup, { onUpdate: () => update(), onError: () => {
         music.play('error');
         update();
-    } });
+    } }));
+}
+
+// ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+function beginGame(controller) {
+    if (app.controller !== controller) app.controller?.stop();
+    app.view = null;
+    resetModes();
+    for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
+    app.controller = controller;
+    $('#hint').hidden = Boolean(controller.isOnline); // ヒントはローカル対戦だけ
     showScene('game');
     app.board.userMoved = false;
     app.board.tileCount = 0;
@@ -133,6 +165,8 @@ function startGame(setup) {
 }
 
 function goHome() {
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    if (app.controller?.isOnline) return online.confirmLeave();
     app.controller?.stop();
     app.controller = null;
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
@@ -549,6 +583,7 @@ function init() {
         renderTitle();
     });
     $('#start-button').addEventListener('click', () => startGame(newSetup()));
+    $('#online-button').addEventListener('click', () => online.open());
     $('#resume-button').addEventListener('click', () => {
         const saved = LocalGameController.loadSaved();
         if (saved) startGame(saved);
@@ -565,8 +600,10 @@ function init() {
         if (action === 'result') showResult();
         if (action === 'close-result') $('#result-dialog').close();
         if (action === 'rematch') {
-            const setup = app.controller?.setup;
             $('#result-dialog').close();
+            // オンライン対戦は、ロビーを出し、ホストの「もう一度」で再戦する
+            if (app.controller?.isOnline) return online.rematch();
+            const setup = app.controller?.setup;
             startGame(setup ? { players: setup.players, level: setup.level } : newSetup());
         }
     });
@@ -589,6 +626,8 @@ function init() {
 
     showScene('title');
     requestAnimationFrame(renderStaticArt);
+    // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
+    online.boot();
 
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
         navigator.serviceWorker.register('sw.js').then(registration => {

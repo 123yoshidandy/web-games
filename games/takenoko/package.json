@@ -7,6 +7,9 @@
     "test:watch": "vitest",
     "bench:cpu": "node tools/cpu-bench.mjs"
   },
+  "dependencies": {
+    "netplay-kit": "*"
+  },
   "portal": {
     "original": "Takenoko",
     "genres": [
