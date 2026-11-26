@@ -228,6 +228,12 @@ function randomCommand(view, random) {
     }
 }
 
+// ヒント：人のビューから、おすすめの手（CPU の「ふつう」が選ぶ手）を返す。自分が答える番でなければ null
+export function suggest(view) {
+    if (!view?.decision || view.decision.seat !== view.seat || view.phase === 'end') return null;
+    return chooseCommand(view, LEVELS.normal);
+}
+
 export const isCpuToAct = game => !game.isOver() && !!game.decision && game.players[game.decision.seat].isCPU;
 
 export function runCpuStep(game, levelOf = () => 'normal') {

@@ -9,6 +9,8 @@ import { STANDARD_PROJECTS, MILESTONES, AWARDS, MILESTONE_COST, AWARD_COSTS, RES
 import { boardSvg, tileName, effectLines, actionLines, reqText, vpText, tagsText, TYPE_NAMES, RES_SHORT, RES_COLORS, PLAYER_COLORS, RESOURCE_KIND, ONGOING_TEXT, describeEvent } from './art.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
+import { suggest } from './cpu-player.js';
+import { music } from './music.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'tm.settings.v1', save: 'tm.save.v1' };
@@ -28,6 +30,8 @@ let view = null;
 let ui = { key: null, keep: [], corp: null, sell: [] };
 let resultShown = false;
 let sheet = null; // いま開いているシートの種類
+let sending = false; // 自分の操作を送っている間（効果音は送った操作で決める）
+let soundSeq = 0;    // 効果音を決めるのに見た出来事の番号
 const camera = { scale: 1, x: 0, y: 0 };
 
 const nameOf = seat => (seat === view.seat ? 'あなた' : view.players[seat].name);
@@ -86,17 +90,133 @@ function goHome() {
 
 function onUpdate() {
     if (!controller) return;
+    const wasMine = !!mine();
     view = controller.getView();
+    if (!sending) playUpdate(wasMine);
     saveProgress();
     render();
 }
 
 function onError(message) {
+    music.play('error');
     const feed = $('panel').querySelector('.feed');
     if (feed) feed.innerHTML = `<span class="error">${esc(message)}</span>`;
 }
 
-const send = command => controller?.send(command);
+function send(command) {
+    if (!controller) return false;
+    sending = true;
+    let ok = false;
+    try {
+        ok = controller.send(command);
+    } finally {
+        sending = false;
+    }
+    if (ok) playSent(command);
+    return ok;
+}
+
+// ---------- 効果音 ----------
+
+const freshEvents = () => {
+    const fresh = view.events.filter(e => e.seq > soundSeq);
+    soundSeq = view.eventSeq;
+    return fresh;
+};
+const endSound = fresh => {
+    const end = fresh.find(e => e.type === 'end');
+    if (end) music.play(end.winners.includes(view.seat) ? 'win' : 'lose');
+    return !!end;
+};
+
+// 自分が送った操作の音（1つの操作に1つ）
+function playSent(command) {
+    if (endSound(freshEvents())) return;
+    const sound = {
+        play: 'place', cardAction: 'place', convertPlants: 'place', place: 'place', convertHeat: 'gain', unmi: 'gain',
+        milestone: 'gain', award: 'pay', setup: 'draw', research: 'draw', choose: 'select', pass: 'select',
+        standard: command.project === 'sellPatents' ? 'pay' : 'place',
+        finalGreenery: command.space === null ? 'cancel' : 'place',
+        target: command.seat === null || command.seat === view.seat ? 'cancel' : 'capture',
+        targetCard: command.seat === view.seat ? 'place' : 'capture'
+    }[command.type];
+    if (sound) music.play(sound);
+}
+
+// ほかの人が動いたときの音。自分の番になったら turn、世代が変わったら notify、終わりは勝ち負け
+// CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
+function playUpdate(wasMine) {
+    const fresh = freshEvents();
+    if (endSound(fresh)) return;
+    if (mine() && !wasMine) return music.play('turn');
+    if (fresh.some(e => e.type === 'generation')) music.play('notify');
+}
+
+// ---------- ヒント ----------
+
+function showHint() {
+    const command = suggest(view);
+    if (!command) {
+        const feed = $('panel').querySelector('.feed');
+        if (feed && view) feed.textContent = 'いまはあなたの番ではありません';
+        return;
+    }
+    ui.hint = command;
+    // 準備と研究は、おすすめのカードを選んだ状態にする（そのまま決められる）
+    if (command.type === 'setup') ui.corp = command.corp;
+    if (command.type === 'setup' || command.type === 'research') ui.keep = [...command.keep];
+    render();
+    const text = hintText(command);
+    const feed = $('panel').querySelector('.feed');
+    if (feed && text) feed.textContent = `おすすめ：${text}`;
+}
+
+function hintText(c) {
+    switch (c.type) {
+        case 'setup': return `企業「${cardOf(c.corp).name}」と、印の付いたカード`;
+        case 'research': return c.keep.length ? '印の付いたカードを買う' : 'カードを買わない';
+        case 'play': return `「${cardOf(c.card).name}」を出す（手札）`;
+        case 'cardAction': return `「${cardOf(c.card).name}」の行動（カードの行動）`;
+        case 'standard': return `${STANDARD_PROJECTS[c.project].name}（標準プロジェクト）`;
+        case 'milestone': return `${MILESTONES[c.key].name}を取る`;
+        case 'award': return `${AWARDS[c.key].name}に出資する`;
+        case 'convertPlants': return '植物で緑地を置く';
+        case 'convertHeat': return '熱で温度を上げる';
+        case 'unmi': return '3 M€で TR+1';
+        case 'pass': return 'パス';
+        case 'endTurn': return '手番を終える';
+        case 'place': case 'finalGreenery': return c.space === null ? '置かない' : '印の付いたマスに置く';
+        case 'target': return c.seat === null ? '選ばない' : `${nameOf(c.seat)}を選ぶ`;
+        case 'targetCard': return `${nameOf(c.seat)}の「${cardOf(c.card).name}」`;
+        case 'choose': return '印の付いた選び方';
+        default: return '';
+    }
+}
+
+// おすすめの手のボタン・カード・マスに印を付ける（シートを開くボタンと、シートの中の両方）
+function markHint() {
+    document.querySelectorAll('.recommended').forEach(el => el.classList.remove('recommended'));
+    const c = ui.hint;
+    if (!c) return;
+    const sheetButton = { play: 'openHand', cardAction: 'openActions', standard: 'openStandard', milestone: 'openMilestones', award: 'openMilestones' }[c.type];
+    const selectors = [
+        sheetButton && `[data-act="${sheetButton}"]`,
+        ['convertPlants', 'convertHeat', 'unmi', 'pass', 'endTurn'].includes(c.type) && `[data-act="${c.type}"]`,
+        c.type === 'play' && `[data-play="${c.card}"]`,
+        c.type === 'cardAction' && `[data-caction="${c.card}"][data-variant="${c.variant ?? 0}"]`,
+        c.type === 'standard' && `[data-standard="${c.project}"]`,
+        c.type === 'milestone' && `[data-milestone="${c.key}"]`,
+        c.type === 'award' && `[data-award="${c.key}"]`,
+        (c.type === 'place' || c.type === 'finalGreenery') && c.space !== null && `[data-space="${c.space}"]`,
+        c.type === 'finalGreenery' && c.space === null && '[data-act="finalSkip"]',
+        c.type === 'target' && `[data-target="${c.seat ?? 'none'}"]`,
+        c.type === 'choose' && `[data-choose="${c.index}"]`,
+        c.type === 'setup' && `[data-corp="${c.corp}"]`,
+        c.type === 'targetCard' && `[data-tcard="${view.decision.options.findIndex(o => o.seat === c.seat && o.card === c.card)}"]`,
+        ...((c.type === 'setup' || c.type === 'research') ? c.keep.map(k => `[data-card="${k}"]`) : [])
+    ].filter(Boolean);
+    selectors.forEach(s => document.querySelectorAll(s).forEach(el => el.classList.add('recommended')));
+}
 
 // ---------- 描画 ----------
 
@@ -112,6 +232,7 @@ function render() {
     // 準備と研究は、自分の番になったらシートを開く
     if ((mine('setup') || mine('research')) && sheet !== 'buy') openSheet('buy');
     else if (sheet) renderSheet();
+    markHint();
     if (view.phase === 'end' && !resultShown) {
         resultShown = true;
         setTimeout(showResult, 600);
@@ -192,6 +313,7 @@ function actionHtml() {
 function openSheet(kind) {
     sheet = kind;
     renderSheet();
+    markHint();
     const dialog = $('sheet-dialog');
     if (!dialog.open) { controller?.pause(); dialog.showModal(); }
 }
@@ -439,6 +561,7 @@ function setup() {
     $('open-help-title').addEventListener('click', () => openDialog('help-dialog'));
     $('open-help').addEventListener('click', () => openDialog('help-dialog'));
     $('open-log').addEventListener('click', openLog);
+    $('hint').addEventListener('click', showHint);
     $('open-players').addEventListener('click', () => openSheet('players'));
     $('home').addEventListener('click', goHome);
     $('panel').addEventListener('click', e => {

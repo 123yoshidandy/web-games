@@ -13,6 +13,10 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { LEVELS } from './cpu-player.js';
 import { symbolsSvg, cardHtml, chipHtml, cardBackHtml, shape, TACTIC_MARKS } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
+import { music } from './music.js';
+
+// 自分の操作の音：カードを出す・石を主張する・パス・戻す・番を終えて引く
+const COMMAND_SOUND = { play: 'place', claim: 'capture', pass: 'select', return: 'pay', end: 'draw' };
 
 const CPU_NAME = 'マクレガー';
 const AUTO_END_MS = 500;
@@ -82,8 +86,15 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onUpdate: () => {
+                    const previous = this.view;
+                    this.render();
+                    this.playUpdateSound(previous);
+                },
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -195,7 +206,23 @@ export default class UI {
     send(command) {
         this.resetSelection();
         this.hintCommand = null;
-        this.controller?.send(command);
+        this.sending = true;
+        const ok = this.controller?.send(command);
+        this.sending = false;
+        if (ok && this.view.phase !== 'end') music.play(COMMAND_SOUND[command.type] ?? 'place');
+    }
+
+    // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const view = this.view;
+        if (!previous) return;
+        if (view.phase === 'end') {
+            if (previous.phase !== 'end') music.play(view.winner === null ? 'notify' : view.winner === view.you ? 'win' : 'lose');
+            return;
+        }
+        if (this.sending) return;
+        const wasMine = previous.phase !== 'end' && previous.actor === previous.you;
+        music.play(view.actor === view.you && !wasMine ? 'turn' : 'notify');
     }
 
     renderSettings() {
@@ -256,12 +283,14 @@ export default class UI {
         if (this.myTurn('recruit')) {
             this.returnSel = this.returnSel.includes(index) ? this.returnSel.filter(i => i !== index)
                 : [...this.returnSel, index].slice(-2);
+            music.play('select');
             this.render();
             return;
         }
         if (!this.myTurn('play')) return;
         this.selCard = this.selCard === index ? null : index;
         this.target = null;
+        music.play(this.selCard === null ? 'cancel' : 'select');
         this.render();
         const card = this.selectedCard();
         if (card === 'recruiter' && !this.tacticBlock(card)) this.openRecruit();
@@ -520,6 +549,7 @@ export default class UI {
         if (!command) return this.toast('いまはあなたの番ではありません');
         this.resetSelection();
         this.hintCommand = command;
+        music.play('select');
         const hand = this.me().hand;
         if (command.type === 'play' && command.card !== 'recruiter') {
             this.selCard = hand.indexOf(command.card);

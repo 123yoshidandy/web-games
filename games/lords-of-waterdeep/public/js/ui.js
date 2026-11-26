@@ -10,6 +10,10 @@ import {
 import { meets } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
+import { music } from './music.js';
+
+// 自分の操作の効果音（依頼を果たしたら gain）
+const COMMAND_SOUNDS = { place: 'place', pick: 'gain', quest: 'draw', buy: 'pay', intrigue: 'place', opponent: 'select', option: 'select', target: 'select' };
 import { helpHtml, titleArtHtml } from './help.js';
 
 const SETTINGS_KEY = 'lords-of-waterdeep.settings';
@@ -145,7 +149,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -185,7 +192,12 @@ export default class UI {
         if (!this.controller) return false;
         this.sel = null;
         this.info = null;
-        return this.controller.send(command);
+        this.sending = command;
+        try {
+            return this.controller.send(command);
+        } finally {
+            this.sending = null;
+        }
     }
 
     renderSetup() {
@@ -290,6 +302,7 @@ export default class UI {
                 this.send({ type: 'place', space });
                 return;
             }
+            music.play('select');
             this.sel = space;
             this.info = null;
         } else {
@@ -305,6 +318,7 @@ export default class UI {
         if (!v || !(this.myPlacement() || v.pending?.seat === v.you)) return;
         const command = this.controller?.suggest();
         if (!command) return;
+        music.play('select');
         this.hint = { at: v.commandCount, command };
         if (command.type === 'place') {
             this.sel = command.space;
@@ -372,8 +386,10 @@ export default class UI {
 
     render() {
         if (!this.controller) return;
+        const prev = this.view;
         const v = this.controller.getView();
         this.view = v;
+        this.playSound(prev, v);
         if (this.sel && !v.legal.includes(this.sel)) this.sel = null;
         this.renderStatus(v);
         this.renderPlayers(v);
@@ -389,6 +405,21 @@ export default class UI {
         if (v.phase === 'over' && !this.resultTimer && !$('#result').open) {
             this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
         }
+    }
+
+    // 1つの更新に1つの音。自分の操作は結果の音、ほかの人の手は notify、自分が動ける番になったら turn
+    playSound(prev, v) {
+        if (!prev || prev.commandCount === v.commandCount) return;
+        if (v.phase === 'over') {
+            if (prev.phase !== 'over') music.play(v.winners.includes(v.you) ? 'win' : 'lose');
+            return;
+        }
+        if (this.sending) {
+            const done = this.sending.type === 'complete' && this.sending.quest;
+            return music.play(done ? 'gain' : COMMAND_SOUNDS[this.sending.type] ?? 'select');
+        }
+        const canAct = (view) => (!view.pending && view.legal.length > 0) || view.pending?.seat === view.you;
+        music.play(canAct(v) && !canAct(prev) ? 'turn' : 'notify');
     }
 
     renderStatus(v) {

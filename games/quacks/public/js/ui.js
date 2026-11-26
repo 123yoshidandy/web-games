@@ -13,6 +13,10 @@ import {
 } from './data.js';
 import { chipSvg, potSvg, icon, titleArt, rubyMark, dropMark, starMark, flaskMark } from './art.js';
 import { fly, land, explode, bump, rectOf, reducedMotion } from './animator.js';
+import { music } from './music.js';
+
+// 自分の操作の音：袋から引く・止める・選ぶ・取る・買う
+const COMMAND_SOUND = { draw: 'draw', stop: 'select', choose: 'select', pick: 'gain', shop: 'pay' };
 
 const SETTINGS_KEY = 'quacks.settings';
 const CPU_NAMES = ['グレタ', 'ハンス', 'ヒルデ'];
@@ -81,7 +85,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -183,7 +190,9 @@ export default class UI {
 
     send(command) {
         if (command.type === 'draw') this.viewSeat = null;
+        this.sending = command;
         this.controller?.send(command);
+        this.sending = null;
     }
 
     changeSetting(change) {
@@ -214,10 +223,28 @@ export default class UI {
 
     onUpdate() {
         if (!this.controller) return;
+        const previous = this.view;
         this.view = this.controller.getView();
         const fresh = this.view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = this.view.events.at(-1)?.seq ?? this.lastSeq;
         this.render(fresh);
+        this.playUpdateSound(previous, fresh);
+    }
+
+    // 1回の更新に1つの音。自分の操作はその音（引いて爆発したら払う音）。CPU が引くたびには鳴らさず、場面が変わったら知らせる
+    playUpdateSound(previous, fresh) {
+        const view = this.view;
+        if (!previous) return;
+        if (view.phase === 'end') {
+            if (previous.phase !== 'end') music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+        } else if (this.sending) {
+            const exploded = fresh.some(e => e.type === 'explode' && e.seat === view.you);
+            music.play(exploded ? 'pay' : COMMAND_SOUND[this.sending.type] ?? 'select');
+        } else if (view.round !== previous.round) {
+            music.play('shuffle');
+        } else if (view.phase !== previous.phase) {
+            music.play('notify');
+        }
     }
 
     render(events = []) {
@@ -482,6 +509,7 @@ export default class UI {
         const command = this.controller?.suggest();
         if (!command || !this.view) return;
         this.hint = { at: this.hintKey(), command };
+        music.play('select');
         if (command.type === 'shop') this.shopSel = { buy: [...command.buy], droplet: command.droplet, refill: command.refill };
         if ($('#sheet').open && this.sheetKey) this.renderSheet(this.sheetKey);
         this.renderActions();
@@ -509,9 +537,9 @@ export default class UI {
         }
         if (action === 'choose') {
             if (this.view.phase === 'fortune') this.fortuneSeen = this.view.round;
-            this.controller?.send({ type: 'choose', option: value });
+            this.send({ type: 'choose', option: value });
         }
-        if (action === 'pick') this.controller?.send({ type: 'pick', index: Number(value) });
+        if (action === 'pick') this.send({ type: 'pick', index: Number(value) });
         if (action === 'fortune-ok') this.fortuneSeen = this.view.round;
         if (action === 'close') {
             this.closeManual();
@@ -522,10 +550,11 @@ export default class UI {
         if (action === 'shop-drop') this.shopSel.droplet = Math.max(0, this.shopSel.droplet + Number(value));
         if (action === 'shop-refill') this.shopSel.refill = !this.shopSel.refill;
         if (action === 'shop-ok') {
-            this.controller?.send({ type: 'shop', ...this.shopSel });
+            this.send({ type: 'shop', ...this.shopSel });
             return;
         }
         if (action.startsWith('shop-')) {
+            music.play('select');
             this.renderSheet(this.sheetKey);
             return;
         }

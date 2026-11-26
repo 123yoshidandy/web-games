@@ -7,6 +7,7 @@ import LocalGameController from './game-controller.js';
 import { DOMINOES, DIRS, KINGDOM_SIZE, TERRAIN_NAMES, BONUS, dominoCells } from './game.js';
 import { measureBefore, playAfter } from './motion.js';
 import * as storage from './storage.js';
+import { music } from './music.js';
 
 const CPU_NAMES = ['エドガー', 'マティルダ', 'オスカー'];
 const HUMAN_NAME = 'あなた';
@@ -119,7 +120,13 @@ function startGame(setup) {
     app.view = null;
     app.place = { dir: 0, anchor: null, key: null };
     if ($('#result-dialog').open) $('#result-dialog').close();
-    app.controller = new LocalGameController(setup, { onUpdate: () => update(), onError: () => update() });
+    app.controller = new LocalGameController(setup, {
+        onUpdate: () => update(),
+        onError: () => {
+            music.play('error');
+            update();
+        }
+    });
     showScene('game');
     update();
 }
@@ -140,12 +147,25 @@ function update() {
     const moved = previous && view.commandCount === previous.commandCount + 1 ? view.lastMove : null;
     const before = measureBefore(moved);
     app.view = view;
+    playSound(view, previous, moved);
     render(view);
     playAfter(moved, before, view.viewer);
     if (view.phase === 'end' && previous && previous.phase !== 'end') setTimeout(showResult, 1200);
 }
 
 const myTurn = view => view.phase !== 'end' && view.currentSeat === view.viewer;
+
+// 1つの更新に1つの音。自分の手は取る・置く・捨てる、ほかの人の手は notify、自分の番になったら turn
+function playSound(view, previous, moved) {
+    if (!previous) return;
+    if (view.phase === 'end') {
+        if (previous.phase !== 'end') music.play(view.result?.winners.includes(view.viewer) ? 'win' : 'lose');
+        return;
+    }
+    if (!moved) return;
+    if (moved.seat === view.viewer) return music.play({ pick: 'draw', place: 'place', discard: 'pay' }[moved.type] ?? 'place');
+    music.play(myTurn(view) && !myTurn(previous) ? 'turn' : 'notify');
+}
 
 function render(view) {
     fitLayout(view);
@@ -268,6 +288,7 @@ function showHint() {
     if (!view || !app.controller || !myTurn(view)) return;
     const command = app.controller.suggest();
     if (!command) return;
+    music.play('select');
     app.hint = { count: view.commandCount, command };
     if (command.type === 'place') {
         app.place.anchor = { x: command.x, y: command.y };
@@ -327,6 +348,7 @@ function setPlace(anchor, dir) {
 
 function rotate() {
     const view = app.view;
+    music.play('select');
     const { anchor, dir } = app.place;
     if (anchor) {
         for (let i = 1; i <= 4; i++) {
@@ -343,6 +365,7 @@ function rotate() {
 // 王国のマスを押した：そのマスを含む置き方を選ぶ
 function tapCell(x, y) {
     const view = app.view;
+    music.play('select');
     const { anchor, dir } = app.place;
     if (anchor) {
         const ghostCells = dominoCells(anchor.x, anchor.y, dir);
