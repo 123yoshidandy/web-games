@@ -1,6 +1,8 @@
 // 変わったファイルから、テストを流すゲームと共通の部品を選ぶ
 // - games/<名前>/ が変わった → そのゲーム
-// - packages/<部品>/ が変わった → その部品と、それを package.json の依存に書いているゲーム
+// - packages/<部品>/ が変わった → その部品と、それを package.json の依存に書いているか、テスト（test/・tests/）で import しているゲーム
+//   （test-kit は、依存に書かずに import しているゲームが多いので、import も見る）
+// - ゲームの BGM の曲（sound/bgm.js）が変わった → そのゲームと、曲を検査する packages/sound
 // - 直下の package.json・package-lock.json・scripts/ が変わった → 全部
 // - それ以外（README・docs など）だけなら → なし
 // 使い方: node scripts/changed-games.mjs <比べる元のコミット>
@@ -14,7 +16,24 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const workspaces = (dir) => readdirSync(join(root, dir))
     .filter((name) => existsSync(join(root, dir, name, 'package.json')))
-    .map((name) => ({ path: `${dir}/${name}`, pkg: JSON.parse(readFileSync(join(root, dir, name, 'package.json'), 'utf8')) }));
+    .map((name) => ({
+        path: `${dir}/${name}`,
+        pkg: JSON.parse(readFileSync(join(root, dir, name, 'package.json'), 'utf8')),
+        imports: testImports(join(root, dir, name))
+    }));
+
+// test/・tests/ の JS が import している、パッケージの名前（'test-kit/pwa.js' なら test-kit）
+function testImports(workspaceDir) {
+    const names = new Set();
+    for (const testDir of ['test', 'tests'].map((sub) => join(workspaceDir, sub)).filter(existsSync)) {
+        for (const file of readdirSync(testDir, { recursive: true })) {
+            if (!/\.m?js$/.test(file)) continue;
+            const text = readFileSync(join(testDir, file), 'utf8');
+            for (const match of text.matchAll(/\bfrom\s+['"]([a-z][\w-]*)(?:\/[^'"]*)?['"]/g)) names.add(match[1]);
+        }
+    }
+    return [...names];
+}
 
 export function selectWorkspaces(changedFiles, { games = workspaces('games'), packages = workspaces('packages') } = {}) {
     const all = [...packages, ...games];
@@ -25,13 +44,14 @@ export function selectWorkspaces(changedFiles, { games = workspaces('games'), pa
     for (const file of changedFiles) {
         const [top, name] = file.split('/');
         if ((top === 'games' || top === 'packages') && name) selected.add(`${top}/${name}`);
+        if (top === 'games' && /\/js\/sound\/bgm\.js$/.test(file)) selected.add('packages/sound');
     }
     // 変わった共通の部品を使うゲームも流す
     for (const { path, pkg } of packages) {
         if (!selected.has(path)) continue;
         for (const game of games) {
             const deps = { ...game.pkg.dependencies, ...game.pkg.devDependencies };
-            if (pkg.name in deps) selected.add(game.path);
+            if (pkg.name in deps || game.imports?.includes(pkg.name)) selected.add(game.path);
         }
     }
     return all.filter(({ path, pkg }) => selected.has(path) && pkg.scripts?.test).map(({ path }) => path);

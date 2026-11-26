@@ -23,8 +23,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: ゲームをまたいだ確認
-        run: node scripts/check-games.mjs
+      - name: ゲームをまたいだ確認（標準の必須の項目は test.yml で見て、公開は止めない）
+        run: node scripts/check-games.mjs --skip-standards
       - name: 公開するファイルを集める
         run: node scripts/build-site.mjs
       - uses: actions/configure-pages@v5
