@@ -1,7 +1,6 @@
 /**
  * オンライン対戦に差し込むゲームの定義（netplay-kit の「ゲームの定義」の形）
- * 今はオンライン対戦を入れていない。入れるときは、netplay-kit の sync.mjs で部屋の処理（server/netplay/ など）を写し、
- * この定義を createHandler と startDevServer に渡す
+ * server/src/handler.js（AWS）と、web-games の npm run dev:online（手元のテスト用サーバー）が、この定義を使う
  *
  * 部屋には参加者・シード・操作の記録だけを保存し、操作を受けるたびに記録からゲームを再現する
  * 各プレイヤーには、そのプレイヤーから見える状態（ビュー）だけを送る。ほかの人の手札・ボーナスカードは送らない
@@ -15,6 +14,8 @@ export default {
     minPlayers: MIN_PLAYERS,
     maxPlayers: MAX_PLAYERS,
     allowCpu: true,
+    // 食べ物の「種子」（food.seed）は数で、乱数のシードではない（ビューのシードの検査から外す）
+    notRandomKeys: ['food.seed'],
 
     // シードは共通部品の乱数から作る（テストでは乱数を固定できる）
     create: ({ players, random }) => new Game(players, { seed: Math.floor(random() * 2 ** 32) }),

@@ -6,7 +6,7 @@
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { LEVELS, suggestSetup } from './cpu-player.js';
-import { paymentOptions } from './game.js';
+import { paymentOptions, MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import {
     birdOf, goalOf, FOODS, FOOD_NAMES, HABITATS, HABITAT_NAMES, EGG_COST, ROW_SIZE, ACTION_AMOUNTS, BONUS_COLUMNS, GOAL_POINTS
 } from './birds.js';
@@ -15,6 +15,8 @@ import {
 } from './art.js';
 import { createSeed } from './random.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 const $ = (id) => document.getElementById(id);
 const SETTINGS_KEY = 'wingspan.settings';
@@ -47,6 +49,23 @@ export default class UI {
         this.lastSeq = 0;
         this.resultShown = false;
         this.bind();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: 'ウイングスパン',
+            game: 'wingspan',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 650,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.begin(controller),
+            onUpdate: () => this.update(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => this.showTitle()
+        });
     }
 
     // ---- 画面の切り替え ----
@@ -64,6 +83,7 @@ export default class UI {
         $('cpu-count').innerHTML = [1, 2, 3, 4].map(n => `<button role="radio" data-cpus="${n}" aria-checked="${n === this.settings.cpus}">${n}</button>`).join('');
         $('level').innerHTML = Object.entries(LEVELS).map(([key, name]) => `<button role="radio" data-level="${key}" aria-checked="${key === this.settings.level}">${name}</button>`).join('');
         $('resume').hidden = !loadSavedGame();
+        $('online-button').hidden = !this.online?.available;
         $('title-art').innerHTML = titleArt();
     }
 
@@ -75,11 +95,7 @@ export default class UI {
 
     startGame(setup) {
         this.controller?.stop();
-        document.querySelectorAll('dialog[open]').forEach(d => d.close());
-        this.resultShown = false;
-        this.sel = {};
-        this.selStep = -1;
-        this.sheetKind = null;
+        this.controller = null;
         const listeners = {
             onUpdate: () => this.update(),
             onError: (message) => {
@@ -87,14 +103,27 @@ export default class UI {
                 this.toast(message);
             }
         };
-        this.hintCommand = null;
+        let controller;
         try {
-            this.controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, listeners);
+            controller = new LocalGameController({ ...setup, cpuDelay: CPU_DELAY }, listeners);
         } catch (error) {
             console.warn(error);
             clearSavedGame();
-            this.controller = new LocalGameController({ ...this.newSetup(), cpuDelay: CPU_DELAY }, listeners);
+            controller = new LocalGameController({ ...this.newSetup(), cpuDelay: CPU_DELAY }, listeners);
         }
+        this.begin(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    begin(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.resultShown = false;
+        this.sel = {};
+        this.selStep = -1;
+        this.sheetKind = null;
+        this.hintCommand = null;
+        this.controller = controller;
         this.view = this.controller.getView();
         this.lastSeq = this.view.events.at(-1)?.seq ?? 0;
         $('screen-title').hidden = true;
@@ -157,6 +186,7 @@ export default class UI {
     render() {
         const v = this.view;
         if (!v) return;
+        $('hint').hidden = Boolean(this.controller?.isOnline); // ヒントはローカル対戦だけ
         this.syncSel();
         this.playEvents();
         this.renderTop();
@@ -727,19 +757,25 @@ export default class UI {
             this.renderTitle();
         });
         $('start').addEventListener('click', () => this.startGame(this.newSetup()));
+        $('online-button').addEventListener('click', () => this.online.open());
         $('resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
         $('open-help-title').addEventListener('click', () => $('help').showModal());
         $('open-help-game').addEventListener('click', () => $('help').showModal());
         $('hint').addEventListener('click', () => this.showHint());
         $('open-log').addEventListener('click', () => this.openLog());
         $('goal-chip').addEventListener('click', () => this.openGoals());
         $('help').querySelector('.close').addEventListener('click', () => $('help').close());
-        $('again').addEventListener('click', () => this.startGame(this.newSetup()));
-        $('result-home').addEventListener('click', () => this.showTitle());
+        $('again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.startGame(this.newSetup());
+            document.querySelectorAll('dialog[open]').forEach(d => d.close());
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
+        $('result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
         $('result-board').addEventListener('click', () => $('result').close());
         // ダイアログの外を押したら閉じる（選択待ちは消さない）
         document.querySelectorAll('dialog').forEach(dialog => {

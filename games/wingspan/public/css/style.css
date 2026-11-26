@@ -79,6 +79,8 @@ button:disabled { cursor: default; opacity: .45; }
 .btn:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 rgba(0, 0, 0, .25); }
 .link { color: var(--muted); text-decoration: underline; padding: 6px; }
 .buttons { display: flex; gap: 8px; }
+/* タイトルのボタンは、狭い画面で折り返す（オンラインで遊ぶ） */
+#screen-title .buttons { flex-wrap: wrap; justify-content: center; }
 .buttons > * { flex: 1; }
 
 /* 光らせる（押せるもの） */
