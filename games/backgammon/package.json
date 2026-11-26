@@ -13,5 +13,8 @@
       "伝統ゲーム",
       "ダイス"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }
