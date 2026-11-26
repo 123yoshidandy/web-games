@@ -7,7 +7,7 @@
 
 import Game from './game.js';
 import { createGameView } from './game-view.js';
-import { runCpuStep, cpuActors, PROFILES } from './cpu-player.js';
+import { runCpuStep, cpuActors, suggest, PROFILES } from './cpu-player.js';
 import { addRecord } from './records.js';
 
 const CPU_DELAY_MS = [750, 1000];   // CPU が振る・書くまでの間（毎回少しずつ違う）
@@ -42,6 +42,11 @@ export default class LocalGameController {
         this.cpuTimer = null;
         this.recorded = this.game.isOver();
         this.save();
+    }
+
+    // ヒント：人のおすすめの手（人の番でなければ null）
+    hint() {
+        return suggest(this.game, this.humanSeat);
     }
 
     getView() {

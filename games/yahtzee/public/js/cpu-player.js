@@ -54,6 +54,12 @@ export function chooseCpuCommand(game, seat, profile = PROFILES.normal) {
     return decide(stateOf(game, seat), cpuRandom(game, seat), profile);
 }
 
+// ヒント：seat のおすすめの手（CPU の「ふつう」が選ぶ手）。seat の番でなければ null
+export function suggest(game, seat) {
+    if (game.phase === 'end' || !game.actors().includes(seat)) return null;
+    return chooseCpuCommand(game, seat, PROFILES.normal);
+}
+
 // seat の CPU に1手打たせる。決めた手が断られたら、記入できる最初の欄に書く（必ず前に進む）
 export function runCpuStep(game, seat, profile) {
     if (!game.actors().includes(seat)) return false;

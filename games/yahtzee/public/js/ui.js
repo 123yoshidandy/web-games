@@ -10,6 +10,7 @@ import { LEVELS } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { loadRecords, bestOf } from './records.js';
 import { dieSvg, miniDie, pipsSvg } from './art.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'yahtzee.settings';
 const MAX_CPUS = 3;
@@ -72,7 +73,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.onUpdate(),
-                onError: (message) => this.toast(message),
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                },
                 onRecord: (record) => { this.lastRecord = record; }
             });
         } catch (error) {
@@ -133,6 +137,7 @@ export default class UI {
         $('#home').addEventListener('click', () => this.showTitle());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
+        $('#hint').addEventListener('click', () => this.showHint());
         $('#open-records').addEventListener('click', () => this.showRecords());
 
         // ダイアログは外側のタップと「閉じる」で閉じる（結果は、外側では閉じない）
@@ -151,6 +156,7 @@ export default class UI {
             if (!die || !this.canHold()) return;
             const i = Number(die.dataset.die);
             this.held[i] = !this.held[i];
+            music.play(this.held[i] ? 'select' : 'cancel');
             this.renderDice();
             this.renderActions();
         });
@@ -165,6 +171,7 @@ export default class UI {
                 return;
             }
             this.selected = category;
+            music.play('select');
             this.renderSheet();
             this.renderActions();
         });
@@ -238,9 +245,50 @@ export default class UI {
         const fresh = this.view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = this.view.events.at(-1)?.seq ?? this.lastSeq;
         if (fresh.some(e => e.type === 'turn' || e.type === 'score')) this.resetTurn();
+        this.hintCommand = null;
+        this.playSound(fresh);
         this.render();
         this.animate(fresh, before);
         this.afterRender();
+    }
+
+    // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、ほかの人が書いたら notify、自分の番になったら turn、終わりは勝ち負け
+    playSound(fresh) {
+        const view = this.view;
+        if (fresh.length === 0) return;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winners.includes(view.you) ? 'win' : 'lose');
+        const score = fresh.find(e => e.type === 'score');
+        if (score?.seat === view.you) return music.play(score.points > 0 ? 'gain' : 'pay');
+        if (fresh.some(e => e.type === 'roll' && e.seat === view.you)) return music.play('dice');
+        const turn = fresh.find(e => e.type === 'turn');
+        if (turn?.seat === view.you) return music.play('turn');
+        if (score) music.play('notify');
+    }
+
+    // ---- ヒント ----
+
+    showHint() {
+        const command = this.controller?.hint();
+        if (!command) return this.toast('いまはあなたの番ではありません');
+        this.hintCommand = command;
+        // 残すサイコロ・書く欄を選んだ状態にする（下のボタンで決められる）
+        if (command.type === 'roll' && this.view.rolled) this.held = [...command.keep];
+        if (command.type === 'score') this.selected = command.category;
+        this.render();
+        const kept = command.keep?.filter(Boolean).length ?? 0;
+        this.toast(command.type === 'score'
+            ? `おすすめ：「${CATEGORY_NAMES[command.category]}」に書く`
+            : this.view.rolled ? `おすすめ：印の${kept}個を残して振る` : 'おすすめ：振る');
+    }
+
+    markHint() {
+        const c = this.hintCommand;
+        if (!c) return;
+        const selectors = c.type === 'score'
+            ? [`[data-cat="${c.category}"]`, '[data-act="score"]']
+            : ['[data-act="roll"]', ...(this.view.rolled ? c.keep.map((k, i) => (k ? `[data-die="${i}"]` : null)).filter(Boolean) : [])];
+        selectors.forEach(s => document.querySelectorAll(s).forEach(el => el.classList.add('recommended')));
     }
 
     animate(events, before) {
@@ -317,6 +365,7 @@ export default class UI {
         this.renderSheet();
         this.renderDice();
         this.renderActions();
+        this.markHint();
     }
 
     renderTop() {
