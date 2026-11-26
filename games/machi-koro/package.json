@@ -19,5 +19,8 @@
       "ダイス",
       "カードゲーム"
     ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
   }
 }

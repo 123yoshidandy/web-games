@@ -7,6 +7,9 @@ import { ESTABLISHMENTS, ESTABLISHMENT_ORDER, LANDMARKS, LANDMARK_ORDER, COLOR_N
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
+import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { symbolsSvg, cardHtml, chipHtml, landmarkHtml, artSvg, coinHtml, dieHtml, icon } from './art.js';
 
 const SETTINGS_KEY = 'machi-koro.settings';
@@ -47,6 +50,26 @@ export default class UI {
         this.openedPrompt = null;   // 自動で開いた選択（テレビ局・ビジネスセンター）。閉じても同じ選択では開き直さない
         this.tradePick = { take: null, give: null };
         this.resultTimer = null;
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
+        this.online = new NetplayLobby({
+            title: '街コロ',
+            game: 'machi-koro',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 900,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.render(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => {
+                this.controller = null;
+                this.showTitle();
+            }
+        });
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
         this.renderTitleArt();
@@ -60,13 +83,14 @@ export default class UI {
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
         this.renderSetup();
     }
 
     startGame(setup) {
-        this.stopGame();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
                 onError: (message) => {
                     music.play('error');
@@ -80,13 +104,28 @@ export default class UI {
             this.showTitle();
             return;
         }
+        this.beginGame(controller);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.stopGame();
+        else document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        this.hint = null;
         this.view = null;
         this.openedPrompt = null;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は動かさない
         this.render();
-        this.controller.scheduleCpu();
+        if (!this.controller.isOnline) this.controller.scheduleCpu();
+    }
+
+    // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+    goHome() {
+        if (this.controller?.isOnline) return this.online.confirmLeave();
+        this.showTitle();
     }
 
     newGame() {
@@ -120,13 +159,18 @@ export default class UI {
             this.renderSetup();
         });
         $('#start').addEventListener('click', () => this.newGame());
+        $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
             if (saved) this.startGame(saved);
         });
-        $('#again').addEventListener('click', () => this.newGame());
-        $('#result-home').addEventListener('click', () => this.showTitle());
-        $('#home').addEventListener('click', () => this.showTitle());
+        $('#again').addEventListener('click', () => {
+            if (!this.controller?.isOnline) return this.newGame();
+            $('#result').close();
+            this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+        });
+        $('#result-home').addEventListener('click', () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()));
+        $('#home').addEventListener('click', () => this.goHome());
         $('#open-help-title').addEventListener('click', () => $('#help').showModal());
         $('#open-help-game').addEventListener('click', () => $('#help').showModal());
         $('#status').addEventListener('click', () => this.showLog());
@@ -326,7 +370,8 @@ export default class UI {
             buttons = '<button class="btn ghost wide" data-act="pass">建てない</button>';
         }
         // ヒントのボタン（自分の番だけ）
-        const hint = this.myTurn() ? '<button type="button" id="hint" class="icon-btn" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>' : '';
+        // ヒントはローカル対戦だけ
+        const hint = this.myTurn() && !this.controller?.isOnline ? '<button type="button" id="hint" class="icon-btn" data-act="hint" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>' : '';
         $('#actions').innerHTML = `${coins}${hint}<div class="act-buttons">${buttons}</div>`;
         this.renderHint(view);
     }
@@ -334,7 +379,7 @@ export default class UI {
     // おすすめの手を示す。テレビ局とビジネスセンターは、開いて相手や取り替えを選んでおく
     showHint() {
         if (!this.myTurn()) return;
-        const command = this.controller?.suggest();
+        const command = this.controller?.isOnline ? null : this.controller?.suggest();
         if (!command) return;
         music.play('select');
         this.hint = { at: `${this.view.turn}:${this.view.phase}:${this.view.logs.length}`, command };
