@@ -10,6 +10,7 @@
 
 import { GOODS, CAMEL, PRECIOUS, NAMES, HAND_LIMIT, SEALS_TO_WIN, CAMEL_BONUS, GOODS_TOKENS, bonusSize } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import { music } from './music.js';
 import { symbolsSvg, icon, cardHtml, cardBackHtml, tokenHtml, sealHtml } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
 
@@ -48,7 +49,10 @@ export default class UI {
         try {
             this.controller = new LocalGameController(setup, {
                 onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -119,6 +123,7 @@ export default class UI {
             const button = event.target.closest('button[data-act]');
             if (!button || button.disabled) return;
             if (button.dataset.act === 'cancel') {
+                music.play('cancel');
                 this.hinted = false;
                 this.sel = emptySelection();
                 this.render();
@@ -169,6 +174,7 @@ export default class UI {
 
     pickMarket(index) {
         if (!this.myTurn()) return;
+        music.play('select');
         this.hinted = false;
         const card = this.view.market[index];
         if (card === CAMEL) {
@@ -184,6 +190,7 @@ export default class UI {
 
     pickHand(index) {
         if (!this.myTurn()) return;
+        music.play('select');
         this.hinted = false;
         const hand = this.me().hand;
         const sel = this.sel;
@@ -203,6 +210,7 @@ export default class UI {
 
     pickHerd() {
         if (!this.myTurn() || this.sel.market.length === 0) return;
+        music.play('select');
         this.hinted = false;
         // 押すたびに返すラクダを1頭ずつ増やし、群れの数を超えたら0に戻す
         const herd = this.me().herd;
@@ -259,6 +267,7 @@ export default class UI {
         if (!this.myTurn()) return;
         const command = this.controller.suggest();
         if (!command) return;
+        music.play('select');
         const hand = this.me().hand;
         const sel = emptySelection();
         if (command.type === 'camels') sel.camels = true;
@@ -301,6 +310,7 @@ export default class UI {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         const roundEnd = fresh.find(e => e.type === 'roundEnd');
+        this.playSound(fresh);
         if (roundEnd) {
             // ラウンドが終わったときは、新しいラウンドが配られているので動かさず、結果を出す。見ている間は CPU を止める
             this.controller.pause();
@@ -309,6 +319,18 @@ export default class UI {
         } else {
             playEvents(fresh, before, { you: view.you });
         }
+    }
+
+    // 1つの更新に1つの音。自分の手は取る・売る、相手の手は notify、自分の番になったら turn
+    playSound(fresh) {
+        const view = this.view;
+        const end = fresh.find(e => e.type === 'end');
+        if (end) return music.play(end.winner === view.you ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'roundEnd')) return music.play('notify');
+        const last = fresh.filter(e => ['take', 'camels', 'exchange', 'sell'].includes(e.type)).at(-1);
+        if (!last) return;
+        if (last.seat === view.you) return music.play(last.type === 'sell' ? 'gain' : last.type === 'exchange' ? 'place' : 'draw');
+        music.play(this.myTurn() ? 'turn' : 'notify');
     }
 
     // 選んでいたものが、場の変化で選べなくなったら外す

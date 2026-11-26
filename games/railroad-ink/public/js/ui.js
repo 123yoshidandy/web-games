@@ -10,6 +10,7 @@ import {
 } from './tiles.js';
 import { tileSvg, boardSvg, LINE_ICONS } from './art.js';
 import { HELP_HTML } from './help.js';
+import { music } from './music.js';
 
 const SETTINGS_KEY = 'railroad-ink.settings';
 const CPU_NAMES = ['ジョー', 'ハンク', 'ケイト', 'ビリー', 'モリー'];
@@ -135,8 +136,15 @@ export default class UI {
         this.round = 0;
         this.resultShown = false;
         this.controller = new LocalGameController(setup, {
-            onUpdate: () => this.render(),
-            onError: (message) => this.toast(message)
+            onUpdate: () => {
+                const previous = this.view;
+                this.render();
+                this.playUpdateSound(previous);
+            },
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            }
         });
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
@@ -209,19 +217,25 @@ export default class UI {
         if (!this.view.actors.includes(this.view.you)) return;
         if (this.sel.source === source) {
             this.sel = { source: null, o: 0, cell: null };
+            music.play('cancel');
         } else {
             this.sel = { source, o: 0, cell: this.sel.cell };
             this.fitOrientation();
+            music.play('select');
         }
         this.render();
     }
 
     tapCell(i) {
         if (!this.view.actors.includes(this.view.you)) return;
-        if (!this.sel.source) return this.toast('先に、上のダイスを選んでください');
+        if (!this.sel.source) {
+            music.play('error');
+            return this.toast('先に、上のダイスを選んでください');
+        }
         if (this.sel.cell === i && this.previewOk()) return this.place();
         this.sel.cell = i;
         this.fitOrientation();
+        music.play('select');
         this.render();
     }
 
@@ -246,6 +260,7 @@ export default class UI {
     turn(next) {
         if (!this.sel.source) return;
         this.sel.o = next(this.sel.o);
+        music.play('select');
         this.render();
     }
 
@@ -280,6 +295,7 @@ export default class UI {
         }
         this.sel = { source: command.source, o: command.o, cell: command.y * SIZE + command.x };
         this.hintEnd = false;
+        music.play('select');
         this.render();
         this.toast('おすすめ：この形をここに描く');
     }
@@ -287,7 +303,27 @@ export default class UI {
     send(command) {
         if (!this.controller) return false;
         this.hintEnd = false;
-        return this.controller.send(command);
+        this.sending = true;
+        const ok = this.controller.send(command);
+        this.sending = false;
+        // ラウンドを終えた音は、次のラウンドのダイス（playUpdateSound）にまかせる
+        if (ok && this.view.phase !== 'end' && command.type !== 'end') music.play(command.type === 'undo' ? 'cancel' : 'place');
+        return ok;
+    }
+
+    // 1回の更新に1つの音。新しいラウンドはダイス、ほかの人が描き終えたら知らせ、終わったら勝ち負け
+    playUpdateSound(previous) {
+        const view = this.view;
+        if (!previous) return;
+        if (view.phase === 'end') {
+            if (previous.phase !== 'end') music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+        } else if (view.round !== previous.round) {
+            music.play('dice');
+        } else if (this.sending) {
+            if (view.players[view.you].done && !previous.players[previous.you].done) music.play('select');
+        } else {
+            music.play('notify');
+        }
     }
 
     // ---- 描画 ----

@@ -10,6 +10,10 @@ import { fullText, shortText, kindText, powerText } from './card-text.js';
 import { actionIcon, chipIcon, swordIcon, titleArt, describeEvent, ACTION_BONUS, ACTION_SHORT, GOOD_COLORS } from './art.js';
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
+import { music } from './music.js';
+
+// 自分の操作の音：行動を選ぶ・捨てる・探索で残す・開発/入植・交易/消費/思わぬ収穫
+const COMMAND_SOUND = { action: 'place', startDiscard: 'pay', discard: 'pay', explore: 'draw', develop: 'place', settle: 'place', trade: 'gain', consume: 'gain', windfall: 'gain' };
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'rftg.settings.v1', save: 'rftg.save.v1' };
@@ -34,6 +38,7 @@ let ui = freshUi();
 let seenSeq = 0;
 let resultShown = false;
 let revealTimer = null;
+let sending = false; // 自分の操作を送っている間（その音は送った側で鳴らす）
 
 // ヒント：おすすめの手 { key, command }（その場面の間だけ）
 let hint = null;
@@ -57,6 +62,7 @@ function showHint() {
         Object.assign(ui, { use: d.options.findIndex(o => o.use === c.use), sel: [...(c.cards ?? [])], goods: [...(c.goods ?? [])], number: c.number ?? null });
     }
     hint = { key: ui.key, command: c };
+    music.play('select');
     render();
 }
 
@@ -143,17 +149,37 @@ function goHome() {
 
 function onUpdate() {
     if (!controller) return;
+    const previous = view;
     view = controller.getView();
     saveProgress();
     render();
+    playUpdateSound(previous);
+}
+
+// 1回の更新に1つの音。CPU の手は知らせ、自分が選ぶ番になったらチャイム、終わったら勝ち負け
+function playUpdateSound(previous) {
+    if (!previous) return;
+    if (view.phase === 'end') {
+        const winners = view.winners ?? [];
+        if (previous.phase !== 'end') music.play(!winners.includes(view.seat) ? 'lose' : winners.length > 1 ? 'notify' : 'win');
+        return;
+    }
+    if (sending) return;
+    music.play(view.decision && !previous.decision ? 'turn' : 'notify');
 }
 
 function onError(message) {
+    music.play('error');
     $('panel').querySelector('.feed')?.replaceChildren(Object.assign(document.createElement('span'), { className: 'error', textContent: message }));
 }
 
 function send(command) {
-    controller?.send(command);
+    if (!controller) return;
+    sending = true;
+    const ok = controller.send(command);
+    sending = false;
+    const passed = command.card === null || command.done;
+    if (ok && view.phase !== 'end') music.play(passed ? 'select' : COMMAND_SOUND[command.type] ?? 'place');
 }
 
 // ---------- 描画 ----------
@@ -528,6 +554,7 @@ function onHand(id) {
     } else if (d.kind === 'consume' && ui.use !== null && d.options[ui.use].discard) {
         ui.sel = toggle(ui.sel, id, d.options[ui.use].discard);
     }
+    music.play('select');
     render();
 }
 
@@ -544,6 +571,7 @@ function onTableau(id) {
     } else if (d?.kind === 'settle' && ui.place && view.options.tactics.includes(id)) ui.tactics = toggle(ui.tactics, id);
     else if (d?.kind === 'settle' && ui.place && id === view.options.colonyShip) ui.colonyShip = !ui.colonyShip;
     else return showCard(id);
+    music.play('select');
     render();
 }
 
@@ -555,7 +583,7 @@ function onAct(act) {
         case 'chooseAction': return send({ type: 'action', actions: ui.actions });
         case 'openExplore': ui.exploreOpen = true; return openDialog('explore-dialog');
         case 'pass': return send({ type: d.kind, card: null, pay: [] });
-        case 'cancelPlace': ui.place = null; ui.sel = []; ui.tactics = []; ui.colonyShip = false; ui.payMilitary = false; return render();
+        case 'cancelPlace': music.play('cancel'); ui.place = null; ui.sel = []; ui.tactics = []; ui.colonyShip = false; ui.payMilitary = false; return render();
         case 'payMilitary': ui.payMilitary = !ui.payMilitary; ui.sel = []; ui.tactics = []; if (!ui.payMilitary) ui.colonyShip = false; return render();
         case 'colonyShip': ui.colonyShip = !ui.colonyShip; ui.sel = []; return render();
         case 'place': {
@@ -608,7 +636,7 @@ function setup() {
     $('my-summary').addEventListener('click', () => showPlayer(view.seat));
     $('panel').addEventListener('click', e => {
         const a = e.target.closest('[data-action]');
-        if (a) { ui.actions = toggle(ui.actions, a.dataset.action, decision().count); if (decision().count === 1) ui.actions = [a.dataset.action]; return render(); }
+        if (a) { ui.actions = toggle(ui.actions, a.dataset.action, decision().count); if (decision().count === 1) ui.actions = [a.dataset.action]; music.play('select'); return render(); }
         const u = e.target.closest('[data-use]');
         if (u) { ui.use = Number(u.dataset.use); ui.goods = []; ui.sel = []; return render(); }
         const n = e.target.closest('[data-num]');
@@ -622,6 +650,7 @@ function setup() {
         const d = decision();
         ui.keep = toggle(ui.keep, b.dataset.keep, Math.min(d.keep, d.drawn.length));
         if (Math.min(d.keep, d.drawn.length) === 1) ui.keep = [b.dataset.keep];
+        music.play('select');
         renderExplore();
     });
     $('explore-ok').addEventListener('click', () => { $('explore-dialog').close(); send({ type: 'explore', keep: ui.keep }); });

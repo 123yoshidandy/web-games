@@ -15,6 +15,10 @@ import { key, placements } from './board.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, icon, toolIcon, pathSvg, startSvg, goalSvg, handCardHtml, CARD_W, CARD_H } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
+import { music } from './music.js';
+
+// 自分の操作の音：道を置く・捨てる・壊す・直す・地図・落石
+const COMMAND_SOUND = { path: 'place', discard: 'pay', break: 'capture', repair: 'gain', map: 'draw', rockfall: 'capture' };
 
 const SETTINGS_KEY = 'saboteur.settings';
 const CPU_NAMES = ['ガンツ', 'ボリ', 'ドルン', 'フィリ', 'ミルダ', 'トーリ', 'ノラ', 'ブロム', 'ヘルガ'];
@@ -75,8 +79,15 @@ export default class UI {
         this.stopGame();
         try {
             this.controller = new LocalGameController(setup, {
-                onUpdate: () => this.render(),
-                onError: (message) => this.toast(message)
+                onUpdate: () => {
+                    const previous = this.view;
+                    this.render();
+                    this.playUpdateSound(previous);
+                },
+                onError: (message) => {
+                    music.play('error');
+                    this.toast(message);
+                }
             });
         } catch (error) {
             // 保存が壊れていたら消して、タイトルに戻る
@@ -159,6 +170,7 @@ export default class UI {
             const id = Number(card.dataset.card);
             this.picked = this.picked === id ? null : id;
             this.repairTarget = null;
+            music.play(this.picked === null ? 'cancel' : 'select');
             this.render();
         });
         $('#screen-game').addEventListener('click', (event) => {
@@ -171,11 +183,13 @@ export default class UI {
             const act = button.dataset.act;
             if (act === 'rotate') {
                 this.rotated = !this.rotated;
+                music.play('select');
                 this.render();
             } else if (act === 'discard') {
                 this.send({ type: 'discard', card: this.picked });
             } else if (act === 'cancel') {
                 this.resetSelection();
+                music.play('cancel');
                 this.render();
             } else if (act === 'tool') {
                 this.send({ type: 'repair', card: this.picked, target: this.repairTarget, tool: button.dataset.tool });
@@ -212,7 +226,26 @@ export default class UI {
     send(command) {
         this.resetSelection();
         this.hintCommand = null;
-        this.controller?.send(command);
+        const round = this.view.round;
+        this.sending = true;
+        const ok = this.controller?.send(command);
+        this.sending = false;
+        // ラウンドが終わったときは、その音（playUpdateSound）だけにする
+        if (ok && this.view.phase !== 'end' && this.view.round === round) music.play(COMMAND_SOUND[command.type] ?? 'place');
+    }
+
+    // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
+    playUpdateSound(previous) {
+        const view = this.view;
+        if (!previous) return;
+        if (view.phase === 'end') {
+            if (previous.phase !== 'end') music.play(!view.winners.includes(view.you) ? 'lose' : view.winners.length > 1 ? 'notify' : 'win');
+        } else if (view.round !== previous.round) {
+            music.play('shuffle');
+        } else if (!this.sending) {
+            const wasMine = previous.phase === 'play' && previous.current === previous.you;
+            music.play(this.myTurn() && !wasMine ? 'turn' : 'notify');
+        }
     }
 
     // ---- 盤面の移動と拡大 ----
@@ -564,6 +597,7 @@ export default class UI {
         const command = this.myTurn() ? this.controller?.hint() : null;
         if (!command) return this.toast('いまはあなたの番ではありません');
         this.hintCommand = command;
+        music.play('select');
         this.picked = command.card;
         this.rotated = !!command.rotated;
         this.repairTarget = null;
