@@ -4,12 +4,14 @@
  * 置き方：手札を押して選び、光るマスを押す。または、手札から盤へ指で引っぱる。置いたタイルを押すと手札に戻る
  */
 
-import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS } from './game-controller.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { checkPlacements, keyOf, frontier, generateMoves, HAND_SIZE } from './board.js';
 import { tileDefs, tileGroup, tileSvg } from './art.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 // 自分の操作の音：並べて決める（点を得る）・交換する（袋に戻して引き直す）・パス
 const COMMAND_SOUND = { play: 'gain', trade: 'shuffle', pass: 'select' };
@@ -64,6 +66,23 @@ export default class UI {
         $('hint').innerHTML = ICONS.hint;
         $('open-log').innerHTML = ICONS.log;
         $('title-art').innerHTML = this.titleArt();
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
+        this.online = new NetplayLobby({
+            title: 'クワークル',
+            game: 'qwirkle',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: CPU_STEP_DELAY_MS,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.update(),
+            onError: (message) => {
+                music.play('error');
+                this.toast(message);
+            },
+            onExit: () => this.showTitle()
+        });
         this.bindTitle();
         this.bindGame();
         document.addEventListener('contextmenu', event => event.preventDefault());
@@ -99,12 +118,14 @@ export default class UI {
             if (saved) this.startWith(saved);
         });
         $('open-help-title').addEventListener('click', () => this.openHelp());
+        $('online-button').addEventListener('click', () => this.online.open());
     }
 
     renderTitle() {
         $('count').querySelectorAll('button').forEach(b => b.classList.toggle('on', Number(b.dataset.count) === this.settings.count));
         $('level').querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.level === this.settings.level));
         $('resume').hidden = !loadSavedGame();
+        $('online-button').hidden = !this.online.available;
     }
 
     showTitle() {
@@ -126,12 +147,9 @@ export default class UI {
     }
 
     startWith(setup) {
-        this.controller?.stop();
-        this.resultShown = false;
-        this.resetTurn();
-        this.closeSheet();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.update(),
                 onError: (message) => {
                     music.play('error');
@@ -145,11 +163,21 @@ export default class UI {
             this.renderTitle();
             return;
         }
+        this.beginGame(controller);
+        controller.scheduleCpu();
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        this.resultShown = false;
+        this.resetTurn();
+        this.closeSheet();
+        this.controller = controller;
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.view = null;
         this.update();
-        this.controller.scheduleCpu();
     }
 
     resetTurn() {
@@ -163,7 +191,8 @@ export default class UI {
     // ---- ゲーム ----
 
     bindGame() {
-        $('home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
         $('open-help-game').addEventListener('click', () => this.openHelp());
         $('undo').addEventListener('click', () => {
             this.hinted = false;
@@ -289,6 +318,7 @@ export default class UI {
         $('trade').disabled = !mine || !!v.firstSize || v.bagCount === 0;
         $('trade').classList.toggle('on', this.trading);
         $('hint').disabled = !mine;
+        $('hint').hidden = Boolean(this.controller?.isOnline); // ヒントはローカル対戦だけ
         const commit = $('commit');
         commit.classList.toggle('suggested', mine && this.hinted);
         if (this.trading) {
@@ -528,8 +558,9 @@ export default class UI {
             title: won ? (v.winners.length > 1 ? '引き分け' : 'あなたの勝ち') : `${escapeHtml(v.players[v.winners[0]].name)}の勝ち`,
             html: `<p class="sheet-text">${reason}</p><table class="score-table">${rows}</table>`,
             buttons: [
-                { label: 'もう一度', primary: true, run: () => this.start() },
-                { label: 'ホーム', run: () => this.showTitle() }
+                // オンラインは、ロビーを出し、ホストの「もう一度」で再戦する
+                { label: 'もう一度', primary: true, run: () => (this.controller?.isOnline ? this.online.rematch() : this.start()) },
+                { label: 'ホーム', run: () => (this.controller?.isOnline ? this.online.leave() : this.showTitle()) }
             ]
         });
     }

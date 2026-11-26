@@ -61,6 +61,16 @@ node scripts/cpu-match.mjs 200 2 mixed
 ふつうは、得点だけで選ぶ CPU にも勝ち越す（2人400試合で 219勝 176敗）。守りの減点を「5枚の列を残したら必ず −9点」のように強くすると、高得点の手を捨てて、かえって負け越した（87勝 109敗）。
 下の操作の列の電球（ヒント）を押すと、ふつうの CPU が選ぶ手を、そのまま選んだ状態にする（置く手は仮置き、交換は交換するタイルを選ぶ）。「決定」を押せば打てる。電球の左のボタンで、履歴を見られる。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜4人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'qwirkle' })`。web-games の1つのスタックから `?game=qwirkle` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -80,9 +90,7 @@ npm test
 | `public/js/game-controller.js` | 人間1人と CPU のローカル対戦（途中経過の保存） |
 | `public/js/ui.js`・`art.js`・`help.js` | 画面・タイルの絵・遊び方 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（オフラインでも開ける） |
-| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と平均点・勝ち数 |
 
-### オンライン対戦を入れるとき
-
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。各人のビューには自分の手札だけを入れ、ほかの人の手札と袋は枚数だけ（観戦者には誰の手札も見せない）。抜けた人の席は CPU（ふつう）が続ける。
