@@ -128,7 +128,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .lead { margin: 0 0 10px; font-size: 13px; color: var(--muted); }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .setup .setup-row { display: flex; align-items: center; gap: 12px; font-weight: 800; }
-.setup .buttons { display: flex; gap: 12px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
 
 /* ---- ゲーム画面 ---- */
 

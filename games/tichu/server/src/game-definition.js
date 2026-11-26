@@ -1,7 +1,6 @@
 /**
  * オンライン対戦に差し込むゲームの定義（netplay-kit の「ゲームの定義」の形）
- * 今はオンライン対戦を入れていない。入れるときは、netplay-kit の sync.mjs で部屋の処理（server/netplay/ など）を写し、
- * この定義を createHandler と startDevServer に渡す
+ * server/src/handler.js（AWS）と、web-games の npm run dev:online（手元のテスト用サーバー）が、この定義を使う
  *
  * 部屋には参加者・シード・操作の記録だけを保存し、操作を受けるたびに記録からゲームを再現する
  * 各プレイヤーには、そのプレイヤーから見える状態（ビュー）だけを送る。ほかの人の手札と、渡した札は送らない
@@ -25,8 +24,9 @@ export default {
 
     view: (game, seat, { since } = {}) => createGameView(game, seat, { since: since ?? 0 }),
     spectatorView: (game, { since } = {}) => createGameView(game, null, { since: since ?? 0 }),
-    mark: (game) => game.logs.length,
-    joinMark: (game) => Math.max(0, game.logs.length - 50),
+    // ビューは出来事（events）を番号（seq）で絞るので、印も出来事の番号にする（記録の文は毎回すべて送る）
+    mark: (game) => game.eventSeq,
+    joinMark: (game) => Math.max(0, game.eventSeq - 20),
 
     actions: {
         command({ game, seat, message, reject }) {
