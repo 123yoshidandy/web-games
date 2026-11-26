@@ -155,7 +155,6 @@
 
 ルールは、2015年の英語版の公式ルールブック（図書館の公開の PDF）、Board Game Arena の遊び方の説明、公式の FAQ を照らし合わせて決めた。カードの費用はルールブックでは絵なので、2つの実装（Board Game Arena 版の Material.php と、ajayeb の資料）で一致したものを使い、ルールブックの例（隊商宿は 2コイン・ガラス・パピルス、など）と ultraboardgames のルールの頁とも照らした。時代I〜III とギルドの費用・効果・連鎖17本、七不思議12枚、進歩トークン10種は、どの資料とも一致した。
 
-
 - 公式のルールブック（2015年英語版）：https://aadl.org/files/catalog_guides/7%20Wonders%20Duel.pdf
 - 公式の FAQ：https://www.rprod.com/en/7-wonders-duel/faq
 - Board Game Arena の遊び方（英語・日本語）：https://en.doc.boardgamearena.com/Gamehelpsevenwondersduel
@@ -244,6 +243,12 @@ npm test
 - `game-definition.test.js`：オンライン対戦の定義（受け付け・断る・保存と再現・CPU・抜けた人）と、ビューで隠すもの（裏のカード・抜いたカード・これからの山・使わない七不思議と進歩トークン・ドラフトの2回目・大図書館で引いた3枚・シード）
 - `pwa.test.js`：service worker が画面のファイルを全部先に読むこと、manifest とアイコン
 
-### オンライン対戦を入れるとき
+### オンライン対戦
 
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。ビュー（`createGameView`）が、裏のカードの中身・山の並び・使わない七不思議と進歩トークン・相手が大図書館で引いた3枚・シードを入れないので、各端末にはそのまま送ってよい。
+netplay-kit の「サーバーがゲームを進める型」。2人で、相手がいなければ CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'seven-wonders-duel' })`。web-games の1つのスタックから `?game=seven-wonders-duel` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）

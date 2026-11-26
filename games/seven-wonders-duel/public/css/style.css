@@ -340,7 +340,7 @@ button {
 .subtitle { margin: 0 0 8px; color: var(--muted); font-size: 15px; letter-spacing: .25em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .setup .row { display: flex; align-items: center; gap: 14px; font-weight: 800; }
-.setup .buttons { display: flex; gap: 12px; margin-top: 6px; }
+.setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 6px; }
 
 /* ---- ゲーム画面 ---- */
 
