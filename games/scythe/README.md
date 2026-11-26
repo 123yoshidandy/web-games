@@ -86,6 +86,16 @@ CPU 同士の対戦：
 node scripts/cpu-match.mjs 100 2 normal,easy
 ```
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜5人で、勢力と個人ボードは部屋が決め、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'scythe' })`。web-games の1つのスタックから `?game=scythe` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 素の HTML / CSS / JavaScript（ES Modules）で、ビルドはない。
@@ -109,7 +119,5 @@ npm test -w games/scythe
 | `public/js/board-view.js` | 地図の描画と、拡大・移動・タップ |
 | `public/js/ui.js` | 画面 |
 | `server/src/game-definition.js` | オンライン対戦（netplay-kit）用のゲームの定義 |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 
-### オンライン対戦を入れるとき
-
-ルールとビューは、netplay-kit の「ゲームの定義」の形（`server/src/game-definition.js`）で用意してある。戦闘では2人が同時に選ぶので、`game.actors()` が2人を返すことがある。netplay-kit の `sync.mjs` で部屋の処理を写し、この定義を `createHandler` と `startDevServer` に渡す。画面は、ローカル対戦と同じ `getView()` / `send()` の形のオンライン用のコントローラーを足す。

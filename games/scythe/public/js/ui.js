@@ -17,6 +17,8 @@ import { LEVELS } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import BoardView, { RES_COLORS, RES_GLYPH } from './board-view.js';
 import { music } from './music.js';
+import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { getServerUrl } from './online-config.js';
 
 // 自分の操作の音（書いていない行動は place）
 const COMMAND_SOUND = {
@@ -85,6 +87,20 @@ export default class UI {
         this.dialogKey = null;
         this.board = new BoardView($('#board'));
         this.board.onTap = (hex) => this.onHexTap(hex);
+        // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。勢力と個人ボードは部屋が決め、足りない席は CPU
+        this.online = new NetplayLobby({
+            title: '大鎌戦役',
+            game: 'scythe',
+            serverUrl: getServerUrl(),
+            cpuStepDelayMs: 500,
+            minPlayers: MIN_PLAYERS,
+            maxPlayers: MAX_PLAYERS,
+            settings: [],
+            onStart: (controller) => this.beginGame(controller),
+            onUpdate: () => this.update(),
+            onError: (message) => this.onControllerError(message),
+            onExit: () => this.showTitle()
+        });
         this.bindStatic();
     }
 
@@ -95,15 +111,19 @@ export default class UI {
         $('#count-up').addEventListener('click', () => this.changeCount(1));
         $('#start').addEventListener('click', () => this.start(false));
         $('#resume').addEventListener('click', () => this.start(true));
-        $('#home').addEventListener('click', () => this.showTitle());
+        // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
+        $('#home').addEventListener('click', () => (this.controller?.isOnline ? this.online.confirmLeave() : this.showTitle()));
         $('#again').addEventListener('click', () => {
             $('#result').close();
-            this.start(false);
+            if (this.controller?.isOnline) this.online.rematch(); // ロビーを出し、ホストの「もう一度」で再戦する
+            else this.start(false);
         });
         $('#result-home').addEventListener('click', () => {
             $('#result').close();
-            this.showTitle();
+            if (this.controller?.isOnline) this.online.leave();
+            else this.showTitle();
         });
+        $('#online-button').addEventListener('click', () => this.online.open());
         ['#open-help-title', '#open-help-game'].forEach(id => $(id).addEventListener('click', () => $('#help').showModal()));
         $('#hint').addEventListener('click', () => this.showHint());
         $('#last-log').addEventListener('click', () => this.openLog());
@@ -159,6 +179,7 @@ export default class UI {
         segment($('#faction'), [['random', 'おまかせ'], ...FACTION_KEYS.map(k => [k, `${factionDot(k)}${FACTIONS[k].name}`])], 'faction');
         segment($('#mat'), [['random', 'おまかせ'], ...MAT_KEYS.map(k => [k, `${MATS[k].no} ${MATS[k].name}`])], 'mat');
         $('#resume').hidden = !loadSavedGame();
+        $('#online-button').hidden = !this.online.available;
     }
 
     start(resume) {
@@ -174,14 +195,11 @@ export default class UI {
             const players = [me, ...CPU_NAMES.slice(0, s.cpus).map(name => ({ name, isCPU: true }))];
             setup = { players, options: {}, level: s.level };
         }
-        this.controller?.stop();
+        let controller;
         try {
-            this.controller = new LocalGameController(setup, {
+            controller = new LocalGameController(setup, {
                 onUpdate: () => this.update(),
-                onError: (message) => {
-                    music.play('error');
-                    this.toast(message);
-                }
+                onError: (message) => this.onControllerError(message)
             });
         } catch (error) {
             console.error(error);
@@ -189,7 +207,23 @@ export default class UI {
             this.toast('続きを読み込めませんでした');
             return;
         }
-        this.lastSeq = this.controller.game.eventSeq;
+        this.beginGame(controller);
+        controller.scheduleCpu();
+    }
+
+    onControllerError(message) {
+        music.play('error');
+        this.toast(message);
+    }
+
+    // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
+    beginGame(controller) {
+        if (this.controller !== controller) this.controller?.stop();
+        clearTimeout(this.resultTimer);
+        document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.controller = controller;
+        $('#hint').hidden = Boolean(controller.isOnline); // ヒントはローカル対戦だけ
+        this.lastSeq = controller.getView().events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は見せない
         this.sel = null;
         this.selKey = null;
         this.hintCommand = null;
@@ -200,7 +234,6 @@ export default class UI {
         this.board.resetZoom();
         this.view = null; // 前のゲームのビューと比べて音を鳴らさない
         this.update();
-        this.controller.scheduleCpu();
     }
 
     // ---- 更新 ----

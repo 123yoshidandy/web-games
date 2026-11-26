@@ -94,7 +94,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
     background: rgba(255, 255, 255, .05); font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
 }
 .seg.on { background: var(--paper); color: var(--ink); border-color: var(--paper); }
-.buttons { display: flex; justify-content: center; gap: 12px; margin-top: 6px; }
+.buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 6px; }
 .btn {
     padding: 11px 22px; border-radius: 10px; border: none; font-weight: 700; font-size: 15px; cursor: pointer;
 }
