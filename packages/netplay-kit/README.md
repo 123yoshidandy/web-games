@@ -54,6 +54,7 @@ export default {
     maxCpuSteps: 1000,        // CPU が止まらなくなったときの安全装置
     maxSpectators: 0,         // 観戦者の上限（つながっている人の数。既定 0 で観戦なし）。「観戦」の節を参照
     maxMessageLength: 8192,   // 端末から受け付けるメッセージの大きさの上限（JSON の文字数）
+    perfectInformation: false, // 隠れた情報も先の乱数もないゲーム（先手を決めるだけなど）なら true。部屋の処理は見ない。test-kit の testOnline が、ビューにシードがあっても落とさなくなる
     messagesPerSecond: 10,    // 1接続あたりの送信回数の上限（Lambda のメモリで数えるので目安）
     messagesBurst: 20,
 

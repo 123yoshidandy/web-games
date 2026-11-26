@@ -12,11 +12,29 @@
 //   humans        … 部屋に入る人の数（既定 2。足りない分は CPU で埋める）
 //   leaveContinues … 対戦中に抜けた人の席を CPU が引き継ぐか（既定 true。onPlayerGone で引き継がないゲームは false）
 //   maxMoves      … 終局まで打つ手の上限（既定 3000）
+// ビューの乱数：各席と観戦者のビューに、シードや乱数の状態（seed・rng・rngState など）が入っていれば落とす
+//   シードがあれば、端末で山札・手札の並びや、これから振るダイスの目を計算し直せてしまう
+//   隠れた情報も先の乱数もないゲーム（アバロン・コリドールなど）は、定義に perfectInformation: true を書けば調べない
 import { describe, it, expect } from 'vitest';
 import { createTestServer } from 'netplay-kit/server/testing.js';
 import { createMovePicker } from './picker.js';
 
 const TIMEOUT_MS = 120_000;
+
+// シードや乱数の状態らしいキー（seed・rng・rngState・randomState・prng・〜Seed・〜Rng など）
+const RANDOM_KEY = /^(seeds?|rngs?|rngState|randomState|prng|.+Seed|.+Rng|.+RngState)$/i;
+
+// ビューの中の、シードや乱数の状態らしいキーの場所（view.options.seed など）
+export function randomKeysIn(value, at = 'view', found = []) {
+    if (Array.isArray(value)) value.forEach((item, i) => randomKeysIn(item, `${at}[${i}]`, found));
+    else if (value && typeof value === 'object') {
+        for (const [key, item] of Object.entries(value)) {
+            if (RANDOM_KEY.test(key)) found.push(`${at}.${key}`);
+            randomKeysIn(item, `${at}.${key}`, found);
+        }
+    }
+    return found;
+}
 
 export function testOnline({ definition, suggest = null, pick = null, humans = 2, leaveContinues = true, maxMoves = 3000, seed = 1 }) {
     const minPlayers = definition.minPlayers ?? 2;
@@ -38,11 +56,11 @@ export function testOnline({ definition, suggest = null, pick = null, humans = 2
     const roomOf = (server, clients) => server.store.getRoom(clients.code);
 
     // seats の人だけで、終局まで（か maxMoves まで）打つ。断られた操作の数を返す
-    const playOut = async (server, clients, seats) => {
+    const playOut = async (server, clients, seats, limit = maxMoves) => {
         let moves = 0;
         let rejected = 0;
         let idle = 0;
-        while (moves < maxMoves) {
+        while (moves < limit) {
             const room = await roomOf(server, clients);
             if (room.status !== 'playing') break;
             const seat = seats.find(s => moveFor(room, s));
@@ -132,6 +150,21 @@ export function testOnline({ definition, suggest = null, pick = null, humans = 2
             const result = await playOut(server, clients, stayers);
             expect(result.rejected).toBe(0);
             expect(result.status).toBe('ended');
+        }, TIMEOUT_MS);
+
+        it.runIf(definition.perfectInformation !== true)('ビュー（各席・観戦者）に、シードや乱数の状態が入らない', async () => {
+            const server = createTestServer(definition, { seed });
+            const clients = await startRoom(server);
+            await playOut(server, clients, clients.map((_, seat) => seat), 10);
+            const found = new Set();
+            clients.forEach((client, seat) => client.all('state')
+                .forEach(message => randomKeysIn(message.view, `席${seat}のビュー`).forEach(key => found.add(key))));
+            const room = await roomOf(server, clients);
+            if (definition.spectatorView && room.game) {
+                const game = definition.restore ? definition.restore(structuredClone(room.game), room) : room.game;
+                randomKeysIn(definition.spectatorView(game, { since: null, room }), '観戦者のビュー').forEach(key => found.add(key));
+            }
+            expect([...found], 'ビューからシードを外す（隠れた情報も先の乱数もないなら、定義に perfectInformation: true）').toEqual([]);
         }, TIMEOUT_MS);
 
         it.runIf(Boolean(definition.spectatorView) && (definition.maxSpectators ?? 0) > 0)('観戦者には、観戦用のビューだけが届く', async () => {
