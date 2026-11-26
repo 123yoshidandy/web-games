@@ -15,6 +15,8 @@
 // ビューの乱数：各席と観戦者のビューに、シードや乱数の状態（seed・rng・rngState など）が入っていれば落とす
 //   シードがあれば、端末で山札・手札の並びや、これから振るダイスの目を計算し直せてしまう
 //   隠れた情報も先の乱数もないゲーム（アバロン・コリドールなど）は、定義に perfectInformation: true を書けば調べない
+//   名前がたまたま同じゲームの中の値（Wingspan の食べ物の「種子」food.seed など）は、定義の notRandomKeys に
+//   その場所の終わりの部分を書いて外す（例：notRandomKeys: ['food.seed']。配列の番号は書かない。外すのはその場所だけ）
 import { describe, it, expect } from 'vitest';
 import { createTestServer } from 'netplay-kit/server/testing.js';
 import { createMovePicker } from './picker.js';
@@ -23,23 +25,24 @@ const TIMEOUT_MS = 120_000;
 
 // シードや乱数の状態らしいキー（seed・rng・rngState・randomState・prng・〜Seed・〜Rng など）
 const RANDOM_KEY = /^(seeds?|rngs?|rngState|randomState|prng|.+Seed|.+Rng|.+RngState)$/i;
-const SEED_KEY = /seeds?$/i;
-const SEED_MIN = 65536; // シードは 2^32 までの大きな数。これより小さい数は、ゲームの中の数（Wingspan の食べ物の seed の数など）とみなす
+// 値が入っているか（null・undefined・false は、シードを持っていないとみなす）。数はどんなに小さくても数える（テストのシードは 1 や 2）
+const hasValue = (value) => value !== null && value !== undefined && value !== false;
 
-// その値が、シードや乱数の状態に見えるか（seed という名前でも、小さな数なら数えない）
-const looksRandom = (key, value) => {
-    if (value === null || value === undefined || typeof value === 'boolean') return false;
-    if (SEED_KEY.test(key) && typeof value === 'number') return Math.abs(value) >= SEED_MIN;
-    return true;
-};
+// keys（配列の番号を除いたキーの並び）が、外す場所の終わりの部分（'food.seed' など）と、区切りごとに一致するか
+const ignoredPath = (keys, ignore) => ignore.some((suffix) => {
+    const parts = suffix.split('.');
+    return parts.length <= keys.length && parts.every((part, i) => part === keys[keys.length - parts.length + i]);
+});
 
 // ビューの中の、シードや乱数の状態らしいキーの場所（view.options.seed など）
-export function randomKeysIn(value, at = 'view', found = []) {
-    if (Array.isArray(value)) value.forEach((item, i) => randomKeysIn(item, `${at}[${i}]`, found));
+// ignore：外す場所の終わりの部分（定義の notRandomKeys）
+export function randomKeysIn(value, at = 'view', found = [], { ignore = [] } = {}, keys = []) {
+    if (Array.isArray(value)) value.forEach((item, i) => randomKeysIn(item, `${at}[${i}]`, found, { ignore }, keys));
     else if (value && typeof value === 'object') {
         for (const [key, item] of Object.entries(value)) {
-            if (RANDOM_KEY.test(key) && looksRandom(key, item)) found.push(`${at}.${key}`);
-            randomKeysIn(item, `${at}.${key}`, found);
+            const path = [...keys, key];
+            if (RANDOM_KEY.test(key) && hasValue(item) && !ignoredPath(path, ignore)) found.push(`${at}.${key}`);
+            randomKeysIn(item, `${at}.${key}`, found, { ignore }, path);
         }
     }
     return found;
@@ -165,15 +168,18 @@ export function testOnline({ definition, suggest = null, pick = null, humans = 2
             const server = createTestServer(definition, { seed });
             const clients = await startRoom(server);
             await playOut(server, clients, clients.map((_, seat) => seat), 10);
+            const ignore = definition.notRandomKeys ?? [];
+            expect(Array.isArray(ignore) && ignore.every(key => typeof key === 'string' && key.trim() && !/[[\]]/.test(key)),
+                'notRandomKeys は、外す場所の終わりの部分の文字列の配列（例：[\'food.seed\']。配列の番号は書かない）').toBe(true);
             const found = new Set();
             clients.forEach((client, seat) => client.all('state')
-                .forEach(message => randomKeysIn(message.view, `席${seat}のビュー`).forEach(key => found.add(key))));
+                .forEach(message => randomKeysIn(message.view, `席${seat}のビュー`, [], { ignore }).forEach(key => found.add(key))));
             const room = await roomOf(server, clients);
             if (definition.spectatorView && room.game) {
                 const game = definition.restore ? definition.restore(structuredClone(room.game), room) : room.game;
-                randomKeysIn(definition.spectatorView(game, { since: null, room }), '観戦者のビュー').forEach(key => found.add(key));
+                randomKeysIn(definition.spectatorView(game, { since: null, room }), '観戦者のビュー', [], { ignore }).forEach(key => found.add(key));
             }
-            expect([...found], 'ビューからシードを外す（隠れた情報も先の乱数もないなら、定義に perfectInformation: true）').toEqual([]);
+            expect([...found], 'ビューからシードを外す（隠れた情報も先の乱数もないなら perfectInformation: true。名前が同じだけのゲームの値なら notRandomKeys）').toEqual([]);
         }, TIMEOUT_MS);
 
         it.runIf(Boolean(definition.spectatorView) && (definition.maxSpectators ?? 0) > 0)('観戦者には、観戦用のビューだけが届く', async () => {

@@ -55,6 +55,7 @@ export default {
     maxSpectators: 0,         // 観戦者の上限（つながっている人の数。既定 0 で観戦なし）。「観戦」の節を参照
     maxMessageLength: 8192,   // 端末から受け付けるメッセージの大きさの上限（JSON の文字数）
     perfectInformation: false, // 隠れた情報も先の乱数もないゲーム（先手を決めるだけなど）なら true。部屋の処理は見ない。test-kit の testOnline が、ビューにシードがあっても落とさなくなる
+    notRandomKeys: ['food.seed'], // 名前がシード・乱数と同じだけのゲームの値の場所（終わりの部分。配列の番号は書かない）。部屋の処理は見ない。testOnline のシードの検査がその場所だけを外す（Wingspan の食べ物の「種子」）
     messagesPerSecond: 10,    // 1接続あたりの送信回数の上限（Lambda のメモリで数えるので目安）
     messagesBurst: 20,
 
