@@ -125,6 +125,16 @@ node scripts/cpu-match.mjs 1000 2 easy,normal
 
 どの組み合わせでも、止まった試合はない。
 
+## オンライン対戦
+
+netplay-kit の「サーバーがゲームを進める型」。2〜5人で、足りない席は CPU で埋められる。対戦中に部屋を出た人の席は CPU が引き継ぐ。オンラインではヒントを出さない。
+
+- 手元で遊ぶ：web-games の直下で `npm run dev:online`（全ゲームのテスト用サーバー。ws://localhost:8787）を起動し、`public/` を localhost で開いて「オンラインで遊ぶ」
+- 入口とロビーの画面は、netplay-kit の `netplay-lobby.js`（`public/js/netplay/` の写し。ここでは直さない）
+- 接続先は `public/js/online-config.js`。`DEPLOYED_SERVER_URL` が空のあいだは、公開したページで「オンラインで遊ぶ」を出さない（web-games のサーバーをデプロイしたら書く）
+- サーバーの入口は `server/src/handler.js`（`createHandler(定義, { keyPrefix: 'ra' })`。web-games の1つのスタックから `?game=ra` で呼ばれる）
+- テストは `test/online.test.js`（test-kit の `testOnline` で、部屋の作成・開始・終局まで・再接続・退出を確かめる）
+
 ## 開発
 
 ```bash
@@ -144,7 +154,8 @@ npm test
 | `public/js/game-controller.js` | 人間1人と CPU のローカル対戦（途中経過の保存） |
 | `public/js/ui.js`・`art.js`・`art-data.js` | 画面・絵 |
 | `public/sw.js`・`manifest.webmanifest` | PWA（オフラインでも開ける） |
-| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形。まだつないでいない） |
+| `server/src/game-definition.js` | オンライン対戦用のゲームの定義（netplay-kit の形） |
+| `server/src/handler.js`・`public/js/online-config.js`・`public/js/netplay/` | オンライン対戦のサーバーの入口・接続先・netplay-kit の写し |
 | `scripts/cpu-match.mjs` | CPU 同士の対戦と勝率 |
 
 テスト（`test/`）：
@@ -156,6 +167,3 @@ npm test
 - `game-controller.test.js`：CPU との対戦の進行、断られた操作の知らせ、保存からの再開
 - `pwa.test.js`：service worker が画面のファイルを全部先に読むこと、manifest とアイコン
 
-### オンライン対戦を入れるとき
-
-netplay-kit の `scripts/sync.mjs` で部屋の処理を写し、`server/src/game-definition.js` を `createHandler` と `startDevServer` に渡す。部屋には参加者・シード・操作の記録だけを保存し、操作のたびに記録から再現する。操作を待っている人は `game.actors()`（ビューの `answering`）で見る（競りでは順に1人ずつ、災害では取った人）。隠すのはビュー（`createGameView`）の役目で、袋の並びはだれにも、ほかの人の裏の太陽駒の数字は本人以外に入れない。
