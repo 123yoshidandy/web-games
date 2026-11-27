@@ -5,6 +5,9 @@
  */
 
 import { MAX_BAMBOO } from './data.js';
+import * as Motion from './motion/motion.js';
+
+const SLIDE_MS = 420; // 庭師・パンダが進む長さ（普通の速さ）
 
 const R = 40;                     // 六角形の大きさ（中心から角まで）
 const SQ3 = Math.sqrt(3);
@@ -99,7 +102,7 @@ export default class BoardView {
                 html += `<path d="M${x - 16} ${y - 4} q8 -6 16 0 t16 0 M${x - 12} ${y + 8} q6 -5 12 0 t12 0" fill="none" stroke="#d6efff" stroke-width="2.4" stroke-linecap="round"/>`;
             } else {
                 if (t.irrigated) html += `<polygon class="ring" points="${hexPoints(x, y, R - 4.5)}"/>`;
-                html += bambooStack(x, y, t.color, Math.min(t.bamboo, MAX_BAMBOO));
+                html += `<g class="bamboo">${bambooStack(x, y, t.color, Math.min(t.bamboo, MAX_BAMBOO))}</g>`;
                 if (t.improvement) html += improvementIcon(t.improvement, x - 17, y + 19, 0.85);
             }
             html += '</g>';
@@ -138,8 +141,10 @@ export default class BoardView {
         const same = state.gardener[0] === state.panda[0] && state.gardener[1] === state.panda[1];
         const [gx, gy] = hexCenter(...state.gardener);
         const [px, py] = hexCenter(...state.panda);
-        html += gardenerToken(gx + (same ? -12 : 14), gy - 14);
-        html += pandaToken(px + (same ? 12 : -14), py - 14);
+        const pieces = { gardener: [gx + (same ? -12 : 14), gy - 14], panda: [px + (same ? 12 : -14), py - 14] };
+        // 動かすときは外側の g に CSS の transform をかける（内側の transform 属性はそのまま）
+        html += `<g class="piece-slot" data-piece="gardener">${gardenerToken(...pieces.gardener)}</g>`;
+        html += `<g class="piece-slot" data-piece="panda">${pandaToken(...pieces.panda)}</g>`;
         html += '</g>';
         this.svg.innerHTML = html;
         this.world = this.svg.querySelector('.world');
@@ -152,6 +157,38 @@ export default class BoardView {
         this.tileCount = state.tiles.length;
         this.lastBounds = bounds;
         this.apply();
+        const snapshot = { pieces, bamboo: new Map(state.tiles.map(t => [`${t.q},${t.r}`, t.bamboo])) };
+        if (this.prev) this.animateChanges(this.prev, snapshot);
+        this.prev = snapshot;
+    }
+
+    // 前に描いた盤との差を動かす：駒は前の位置から滑らせ、新しい区画ははねて出し、竹が変わった区画は目立たせる
+    // 新しい対戦を始めるときは prev を null にして、前の対戦との差を動かさない
+    animateChanges(prev, now) {
+        if (!Motion.enabled()) return;
+        for (const name of ['gardener', 'panda']) {
+            const [ox, oy] = prev.pieces[name];
+            const [nx, ny] = now.pieces[name];
+            if (Math.abs(ox - nx) < 0.5 && Math.abs(oy - ny) < 0.5) continue;
+            const el = this.svg.querySelector(`.piece-slot[data-piece="${name}"]`);
+            const length = Motion.ms(SLIDE_MS);
+            const animation = el?.animate([
+                { transform: `translate(${ox - nx}px, ${oy - ny}px)` },
+                { transform: `translate(${(ox - nx) / 2}px, ${(oy - ny) / 2 - 10}px)`, offset: 0.5 },
+                { transform: 'translate(0, 0)' }
+            ], { duration: length, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+            if (animation) Motion.track(animation, length);
+        }
+        for (const [key, bamboo] of now.bamboo) {
+            const [q, r] = key.split(',');
+            const tile = this.svg.querySelector(`.tile[data-q="${q}"][data-r="${r}"]`);
+            if (!prev.bamboo.has(key)) Motion.popIn(tile, { duration: 360 });
+            else if (prev.bamboo.get(key) !== bamboo) {
+                // 食べて竹がなくなったら区画を、残っていれば竹を目立たせる
+                const stack = tile?.querySelector('.bamboo');
+                Motion.pulse(bamboo > 0 ? stack : tile, { duration: 380, delay: 120, scale: bamboo > 0 ? 1.25 : 1.06 });
+            }
+        }
     }
 
     boundsOf(state, marks) {

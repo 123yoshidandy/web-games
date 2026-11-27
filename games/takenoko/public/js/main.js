@@ -16,6 +16,7 @@ import { rotations } from './game.js';
 import { progressOf } from './progress.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ'];
 const HUMAN_NAME = 'あなた';
@@ -162,6 +163,7 @@ function beginGame(controller) {
     showScene('game');
     app.board.userMoved = false;
     app.board.tileCount = 0;
+    app.board.prev = null; // 前の対戦の盤との差は動かさない
     update();
 }
 
@@ -204,13 +206,48 @@ function update() {
     if (previous && view.commandCount !== previous.commandCount) resetModes();
     app.view = view;
     recordLocalResult(view);
-    if (previous && view.commandCount !== previous.commandCount) playSound(view, previous);
+    const moved = previous && view.commandCount !== previous.commandCount;
+    if (moved) playSound(view, previous);
+    // 描き直す前に、引いた目標カードの飛び立つ場所（押したボタン）を測る
+    const drawFrom = moved ? drawSource(view) : null;
     render(view);
+    if (moved) animateHands(view, previous, drawFrom);
     scheduleAutoEnd(view);
     if (view.phase === 'end' && previous && previous.phase !== 'end') setTimeout(showResult, 1200);
 }
 
 const myTurn = view => view.phase === 'play' && view.current === view.viewer;
+
+// ===== 動き（盤の駒・区画・竹は board.js が前の盤との差から動かす） =====
+
+function drawSource(view) {
+    const move = view.lastMove;
+    if (move?.type !== 'drawObjective' || move.seat !== view.viewer) return null;
+    return Motion.rectOf(document.querySelector(`#actionbar [data-kind="${move.kind}"]`));
+}
+
+// 描き直したあと：引いた目標カードを手札へ、相手の手札の裏ははねて出し、点が増えたら目立たせる
+function animateHands(view, previous, drawFrom) {
+    if (!Motion.enabled()) return;
+    const before = previous.players[view.viewer]?.hand ?? [];
+    for (const id of view.players[view.viewer].hand) {
+        if (before.includes(id)) continue;
+        const card = document.querySelector(`#me .obj[data-card="${id}"]`);
+        if (drawFrom && card) Motion.fly(drawFrom, card, { content: card, hide: card, size: Motion.rectOf(card), duration: 420 });
+        else Motion.popIn(card, { duration: 320 });
+    }
+    for (const p of view.players) {
+        const old = previous.players[p.seat];
+        if (!old) continue;
+        const box = p.seat === view.viewer ? document.querySelector('#me') : document.querySelector(`#opponents .opp[data-seat="${p.seat}"]`);
+        if (!box) continue;
+        if (p.seat !== view.viewer && p.handTypes.length > old.handTypes.length) {
+            const backs = box.querySelectorAll('.backs .back');
+            Motion.popIn(backs[backs.length - 1], { duration: 320 });
+        }
+        if (p.score.total > old.score.total) Motion.pulse(box.querySelector('.me-score, .opp-score'), { duration: 380, scale: 1.25 });
+    }
+}
 
 // 進んだ1手から効果音を1つ鳴らす。自分の手はその音、自分の番に戻ったら turn、終わりは勝ち負け
 // CPU は1手ずつ速く打つので、CPU の手ごとには鳴らさない
@@ -583,6 +620,7 @@ function renderStaticArt() {
 function init() {
     $('#title-art').innerHTML = '<svg class="art-svg" xmlns="http://www.w3.org/2000/svg"></svg>';
     app.board = new BoardView($('#board'), { onTap: onBoardTap });
+    Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     $('#count-select').addEventListener('click', event => {
         const button = event.target.closest('button');
         if (!button) return;
