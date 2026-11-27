@@ -26,7 +26,6 @@
   },
   "standards": {
     "skip": {
-      "bgm": "独自の音（js/sound.js）を使い、packages/sound のエンジンは使わない（packages/sound/README.md の決まり）",
       "undo": "伏せたタイルを山から引くゲームで、1手戻すと引いて見えたタイルの情報を使えてしまう"
     }
   }

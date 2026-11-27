@@ -11,8 +11,8 @@ import { getServerUrl } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { SIZE, MIN_PLAYERS, MAX_PLAYERS, canPlace } from './game.js';
 import { element, cloverTile, renderPictureGarden } from './tiles.js';
-import { captureLayout, detectChanges, animateChanges, FLY_MS, SECOND_DELAY_MS } from './tile-motion.js';
-import { unlockSound, playEffect, toggleAllSound, getSoundSettings, onSoundSettingsChange } from './sound.js';
+import { captureLayout, detectChanges, animateChanges, FLY_MS } from './tile-motion.js';
+import { music } from './music.js';
 
 const SETUP_KEY = 'lucky-numbers.setup'; // 開始画面で選んだ人数・名前・CPU・CPU の強さ
 const TOAST_MS = 2500;
@@ -476,35 +476,34 @@ export default class UI {
         target?.classList.add('recommended');
     }
 
-    // 起きたことに合わせて効果音を鳴らす（置く・場に出す音は、タイルが着く頃に鳴らす）。相手や CPU の手は小さめ
+    // 起きたことに合わせて共通の効果音を鳴らす（置く・場に出す音は、タイルが着く頃に鳴らす）
+    // 自分の手は1つの操作に1つの音。相手や CPU の手は notify にまとめ、決着や自分の番が来たときは、そちらだけを鳴らす
     playSounds(changes, previous, view) {
         if (!previous) return;
         const land = (FLY_MS / 1000) * 0.9;
+        let othersMoved = false;
         changes.forEach(change => {
-            const quiet = change.playerId !== view.me?.id;
-            if (change.type === 'draw' || change.type === 'take') {
-                playEffect(change.type, change.number, { quiet });
-            } else if (change.type === 'discard') {
-                playEffect('discard', change.number, { quiet, delay: land });
-            } else if (change.type === 'place') {
-                playEffect('place', change.number, { quiet, delay: land });
-                if (change.replaced !== null) playEffect('replaced', change.replaced, { quiet, delay: land + SECOND_DELAY_MS / 1000 });
-            }
+            if (change.playerId !== view.me?.id) othersMoved = true;
+            else if (change.type === 'draw' || change.type === 'take') music.play('draw');
+            else if (change.type === 'discard') music.play('pay', { delay: land });
+            else if (change.type === 'place') music.play('place', { delay: land });
         });
         // 自分の番が来た（手番が自分に移ったときだけ。返事待ちから戻ったときは鳴らさない）
-        if (view.phase === 'play' && view.me && view.current === view.me && previous.currentPlayerId !== view.currentPlayerId) {
-            playEffect('myTurn', null, { delay: land + 0.1 });
-        }
-        // 決着（観戦しているときは、勝ちの音）
+        const myTurn = view.phase === 'play' && view.me && view.current === view.me && previous.currentPlayerId !== view.currentPlayerId;
         if (view.result && !previous.result) {
+            // 決着（観戦しているときは、勝ちの音）
             const won = !view.me || view.result.winnerIds.includes(view.me.id);
-            playEffect(won ? 'win' : 'lose', null, { delay: land + 0.2 });
+            music.play(won ? 'win' : 'lose', { delay: land + 0.2 });
+        } else if (myTurn) {
+            music.play('turn', { delay: land + 0.1 });
+        } else if (othersMoved) {
+            music.play('notify', { delay: land });
         }
     }
 
     // サウンドのボタン（BGM と効果音をまとめて切り替える）の表示を、設定に合わせる（上部のバーとトップ画面の両方）
     // どちらかが鳴っていれば ON。ON/OFF は aria-pressed で伝え、文言は「サウンド」のまま
-    renderSoundToggles(settings = getSoundSettings()) {
+    renderSoundToggles(settings = music.getSettings()) {
         const on = settings.effects || settings.bgm;
         document.querySelectorAll('.sound-toggle').forEach(button => {
             button.classList.toggle('off', !on);
@@ -708,15 +707,11 @@ export default class UI {
         $('hint').addEventListener('click', () => this.showHint());
         $('pool-button').addEventListener('click', () => this.controller?.send({ type: 'draw' }));
 
-        // 音は、ブラウザの制限で、最初に画面を触ったときから鳴らせる（触るたびに、止まっていれば再開する）
-        // タッチの pointerdown は操作に数えられないので、指を離したとき（touchend・click）にも呼ぶ
-        for (const type of ['pointerdown', 'touchend', 'click', 'keydown']) {
-            document.addEventListener(type, unlockSound, true);
-        }
+        // 音は、ブラウザの制限で、最初に画面を触ったときから鳴る（music.js の setup）。サウンドのボタンで BGM と効果音をまとめて切り替える
         document.querySelectorAll('.sound-toggle').forEach(button => {
-            button.addEventListener('click', () => toggleAllSound());
+            button.addEventListener('click', () => music.toggleAll());
         });
-        onSoundSettingsChange(settings => this.renderSoundToggles(settings));
+        music.onChange(settings => this.renderSoundToggles(settings));
         this.renderSoundToggles();
         $('discard-button').addEventListener('click', () => this.controller?.send({ type: 'discard' }));
 

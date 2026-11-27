@@ -13,7 +13,7 @@ const PRECACHE = [
     'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
     'css/style.css',
     'js/main.js', 'js/ui.js', 'js/game.js', 'js/game-view.js', 'js/game-controller.js',
-    'js/cpu-player.js', 'js/cpu-level.js', 'js/random.js', 'js/tiles.js', 'js/tile-motion.js', 'js/sound.js',
+    'js/cpu-player.js', 'js/cpu-level.js', 'js/random.js', 'js/tiles.js', 'js/tile-motion.js', 'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js',
     'js/online-controller.js', 'js/online-config.js',
     'js/netplay/netplay-client.mjs', 'js/netplay/user-stats.js', 'js/netplay/netplay-client.js'
 ];
