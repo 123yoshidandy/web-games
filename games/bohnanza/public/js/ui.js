@@ -12,6 +12,8 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate, dealHand } from './animator.js';
 
 const GAME = 'bohnanza';
 const SETTINGS_KEY = 'bohnanza.settings';
@@ -46,11 +48,15 @@ export default class UI {
         this.pick = 0;              // 植えるカード（もらった豆の何枚目か）
         this.form = null;           // 取引のダイアログの中身
         this.answeredKey = null;    // 答えた提案（返事が来るまで同じ提案を出し直さない）
-        this.resultTimer = null;
+        this.resultTimer = null;      // 終わりの表示を予約した取り消し関数（動き終わってから出す）
+        this.animSeq = 0;           // ここまでのできごとは動かし済み
         $('#symbols').innerHTML = symbolsSvg();
         $('#title-art').innerHTML = titleArtHtml();
         $('#help-body').innerHTML = helpHtml();
         this.bindStatic();
+        // 動きの速さ（普通・速い・なし）。タイトルと、遊び方のダイアログに置く
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'ボーナンザ',
@@ -108,9 +114,12 @@ export default class UI {
         this.form = null;
         this.answeredKey = null;
         this.soundSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
+        this.animSeq = this.soundSeq;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
+        if (this.view.commandCount === 0) dealHand();
+        // コントローラーは描く前に CPU を予約するので、配る動きを描いたあとで予約し直す（配り終わってから打つ）
         if (!controller.isOnline) controller.scheduleCpu();
     }
 
@@ -124,7 +133,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -314,6 +323,11 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const v = this.controller.getView();
+        const previous = this.view;
+        // 新しいできごとがあれば、描き直す前に位置を測り、描いたあとで動かす
+        const fresh = v.events.filter(e => e.seq > this.animSeq);
+        if (fresh.length) this.animSeq = fresh.at(-1).seq;
+        const before = fresh.length ? measure() : null;
         this.view = v;
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         const me = v.players[v.you];
@@ -327,9 +341,11 @@ export default class UI {
         this.syncAnswer(v);
         this.renderActions(v);
         this.playSounds(v);
+        animate(before, previous, v, fresh);
         if ($('#log').open) this.renderLog();
         if (v.phase === 'end' && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            // 動き終わってから結果を出す
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);

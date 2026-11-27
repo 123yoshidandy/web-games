@@ -192,3 +192,9 @@ dialog h2:focus-visible { outline: none; }
 
 /* ヒント：おすすめの印 */
 .recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）。人数の切り替え（.segmented）と同じ見た目にする */
+.motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .28); }
+.motion-setting .motion-speed button { min-width: 50px; height: 36px; padding: 0 10px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+.motion-setting .motion-speed button[aria-pressed="true"] { color: #2d1f04; background: var(--gold); }
+.help-setting { display: flex; align-items: center; justify-content: space-between; margin: 8px 0; font-weight: 800; }
