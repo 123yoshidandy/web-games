@@ -28,13 +28,16 @@
             <h1 class="logo">麻雀</h1>
             <p class="subtitle">リーチ麻雀・4人打ち</p>
             <div class="setup">
-                <div class="segment" id="length" role="radiogroup" aria-label="対局の長さ">
-                    <button data-length="east" role="radio">東風戦</button>
-                    <button data-length="south" role="radio">半荘戦</button>
-                </div>
-                <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ">
-                    <button data-level="easy" role="radio">やさしい</button>
-                    <button data-level="normal" role="radio">ふつう</button>
+                <div class="setup-options">
+                    <div class="segment" id="length" role="radiogroup" aria-label="対局の長さ">
+                        <button data-length="east" role="radio">東風戦</button>
+                        <button data-length="south" role="radio">半荘戦</button>
+                    </div>
+                    <div class="segment" id="level" role="radiogroup" aria-label="CPU の強さ">
+                        <button data-level="easy" role="radio">やさしい</button>
+                        <button data-level="normal" role="radio">ふつう</button>
+                    </div>
+                    <div id="motion-setting" class="motion-setting"></div>
                 </div>
                 <div class="buttons">
                     <button id="start" class="btn primary">対局開始</button>
@@ -105,6 +108,7 @@
         <div id="overlay-help" class="overlay" hidden>
             <div class="sheet help-sheet">
                 <div class="sheet-body help-body" id="help-body"></div>
+                <div id="motion-setting-help" class="motion-setting help-setting"></div>
                 <div class="buttons"><button class="btn secondary" id="close-help">閉じる</button></div>
             </div>
         </div>

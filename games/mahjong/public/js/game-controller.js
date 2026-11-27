@@ -7,10 +7,15 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, cpuActors, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_TURN_MS = [520, 820];  // CPU が打牌するまでの間（毎回少しずつ違う）
 const CPU_CALL_MS = 380;         // 鳴くかどうかを答えるまでの間
 const CPU_AFTER_CALL_MS = 900;   // 鳴き・立直・和了の声のあとは、見せる分だけ長く待つ
+// 牌が動くときは、動き終わってから数える。動きが間の代わりになるので短くする
+const MOTION_TURN_MS = [350, 600];
+const MOTION_CALL_MS = 300;
+const MOTION_AFTER_CALL_MS = 600;
 const SAVE_KEY = 'mahjong.save';
 
 export function loadSavedGame() {
@@ -37,7 +42,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.save();
     }
@@ -79,21 +84,24 @@ export default class LocalGameController {
 
     // 次に動く CPU を、間を置いて動かす。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
         const game = this.game;
+        const moving = Motion.enabled();
         if (cpuActors(game).length === 0) return;
         let delay;
         if (game.phase === 'result') {
             delay = 0; // 局の結果は、人が「次へ」を押すまで出しておく。CPU はすぐ答える
         } else if (game.phase === 'call') {
-            delay = CPU_CALL_MS;
+            delay = moving ? MOTION_CALL_MS : CPU_CALL_MS;
         } else {
-            const [min, max] = CPU_TURN_MS;
+            const [min, max] = moving ? MOTION_TURN_MS : CPU_TURN_MS;
             delay = min + Math.random() * (max - min);
         }
         const last = game.events.at(-1);
-        if (last?.type === 'call' && game.phase !== 'result') delay += CPU_AFTER_CALL_MS;
-        this.cpuTimer = setTimeout(() => {
+        if (last?.type === 'call' && game.phase !== 'result') delay += moving ? MOTION_AFTER_CALL_MS : CPU_AFTER_CALL_MS;
+        // 画面の動きが終わってから間をおいて打つ（動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             const progress = game.commands.length;
             try {
                 const seat = cpuActors(this.game)[0];
@@ -130,6 +138,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

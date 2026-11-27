@@ -13,6 +13,8 @@ import { getServerUrl, GAME } from './online-config.js';
 import { windName } from './tiles.js';
 import { handPoints } from './scoring.js';
 import { symbolsSvg, tileHtml, kindTileHtml, titleArtHtml } from './art.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate, dealHand } from './animator.js';
 
 const SETTINGS_KEY = 'mahjong.settings';
 const NAMES = ['あなた', '下家', '対面', '上家'];
@@ -53,6 +55,9 @@ export default class UI {
         $('symbols').innerHTML = symbolsSvg();
         $('title-art').innerHTML = titleArtHtml();
         $('help-body').innerHTML = helpHtml();
+        // 動きの速さ（普通・速い・なし）。タイトルと、遊び方に置く
+        Motion.mountSpeedSetting($('motion-setting'));
+        Motion.mountSpeedSetting($('motion-setting-help'));
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: '麻雀',
@@ -167,7 +172,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        Object.values(this.timers).forEach(clearTimeout);
+        Object.values(this.timers).forEach(timer => (typeof timer === 'function' ? timer() : clearTimeout(timer)));
         this.timers = {};
     }
 
@@ -214,6 +219,8 @@ export default class UI {
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.render();
+        if (this.controller.game?.commands.length === 0) dealHand();
+        // コントローラーは描く前に CPU を予約するので、配る動きを描いたあとで予約し直す（配り終わってから打つ）
         if (!this.controller.isOnline) this.controller.scheduleCpu();
     }
 
@@ -361,6 +368,9 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        // 新しいできごとがあれば、描き直す前に位置を測り、描いたあとで動かす
+        const fresh = view.events.filter(e => e.seq > this.lastSeq);
+        const before = fresh.length ? measure() : null;
         this.view = view;
         const o = view.options;
         if (!o || o.type !== 'turn') { this.selected = null; this.riichiMode = false; }
@@ -373,6 +383,7 @@ export default class UI {
         this.renderHand(view);
         this.renderActions(view);
         this.renderBubbles(view);
+        animate(before, view, fresh);
         this.renderResult(view);
         if (view.phase === 'end' && view.final) this.recordLocalResult(view.final.filter(f => f.rank === 1).map(f => f.seat)); // 東風・半荘の終了時、1位の席が勝ち
         this.autoActions(view);
@@ -567,7 +578,8 @@ export default class UI {
         if (this.revealedResult !== key) {
             overlay.hidden = true;
             if (!this.timers.reveal) {
-                this.timers.reveal = setTimeout(() => {
+                // 動き終わってから結果を出す
+                this.timers.reveal = Motion.afterIdle(() => {
                     this.timers.reveal = null;
                     this.revealedResult = key;
                     this.render();

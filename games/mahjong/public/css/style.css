@@ -558,3 +558,11 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 #hint:disabled { opacity: .35; }
 .suggested { outline: 3px solid #f5c542 !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(245, 197, 66, .35) !important; }
 .hint-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）。対局の長さの切り替え（.segment）と同じ見た目にする */
+.motion-setting .motion-speed { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-size: 14px; }
+.motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 12px; background: rgba(0, 0, 0, .3); border: 1px solid var(--panel-line); }
+.motion-setting .motion-speed button { min-width: 62px; height: 34px; border: 0; border-radius: 9px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+.motion-setting .motion-speed button[aria-pressed="true"] { background: var(--accent); color: #2a1d00; }
+.help-setting { display: flex; justify-content: center; margin: 8px 0; }
+.setup-options { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 12px; }
