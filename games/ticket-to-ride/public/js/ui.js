@@ -10,6 +10,7 @@ import { mapSvg, cardSvg, nearestRoute, PLAYER_COLORS, LINE_ICONS } from './art.
 import { HELP_HTML } from './help.js';
 import { suggest } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -80,6 +81,7 @@ export default class UI {
     // ---- タイトル ----
 
     bindTitle() {
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         $('count-down').addEventListener('click', () => this.changeCount(-1));
         $('count-up').addEventListener('click', () => this.changeCount(1));
         $('level').addEventListener('click', event => {
@@ -146,6 +148,7 @@ export default class UI {
         this.controller = controller;
         this.lastSeq = controller.getView().events.at(-1)?.seq ?? 0; // 始めた時点までの出来事は鳴らさない
         this.view = null;
+        this.cancelResult?.();
         this.hintCommand = null;
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
@@ -287,11 +290,14 @@ export default class UI {
         if (fresh.length > 0) this.hintCommand = null;
         const me = this.me();
         if (this.selected !== null && view.claimed[this.selected] !== null) this.selected = null;
+        // 市場とデッキの位置は、描き直す前に測る
+        const marketRects = Motion.captureRects($('market'), '[data-slot]', 'slot');
         this.renderPlayers(view);
         this.renderMap(view, me);
         this.renderMarket(view, me);
         this.renderHand(me);
         this.renderActions(view, me);
+        if (prev && fresh.length > 0) this.animateChanges(prev, view, me, marketRects);
         this.markHint();
         if (!me.offered && $('choose').open) $('choose').close();
         if (me.offered && !$('choose').open) {
@@ -302,8 +308,58 @@ export default class UI {
         if (view.phase === 'end') this.recordLocalResult(view);
         if (view.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.showResult(), 700);
+            this.cancelResult = Motion.afterIdle(() => this.showResult(), 700);
         }
+    }
+
+    // 描き直したあと：前のビューとの差を動かす（引いたカードは市場・山札から手札や相手の欄へ飛び、補充された札と取った路線は弾み、点と両数は変わると目立つ）
+    animateChanges(prev, view, me, marketRects) {
+        if (!Motion.enabled()) return;
+        const taker = prev.current;
+        const count = (p) => p.handCount;
+        const taken = [];
+        prev.faceUp.forEach((card, slot) => {
+            if (card !== null && card !== undefined && view.faceUp[slot] !== card) taken.push({ card, slot });
+        });
+        const deck = marketRects.get(String(DECK_SLOT)) ?? null;
+        const cardHtml = (color) => `<span class="mk-card" style="display:block;width:100%;height:100%">${cardSvg(color)}</span>`;
+        const flyCard = (color, from, to, i) => {
+            if (from && to) Motion.fly(from, to, { content: cardHtml(color), size: from, delay: i * 140, duration: 420 });
+        };
+        if (taker === me.id) {
+            // 自分の手札が増えた色を、取った市場の札か山札から手札へ
+            let i = 0;
+            const rest = [...taken];
+            HAND_ORDER.forEach((color, k) => {
+                const gained = (view.players[me.id].hand?.[color] ?? 0) - (prev.players[me.id].hand?.[color] ?? 0);
+                for (let n = 0; n < gained; n++) {
+                    const at = rest.findIndex(t => t.card === color);
+                    const from = at >= 0 ? marketRects.get(String(rest.splice(at, 1)[0].slot)) : deck;
+                    flyCard(color, from, $('hand').children[k], i++);
+                }
+            });
+        } else if (count(view.players[taker]) > count(prev.players[taker])) {
+            // 相手が取った札を、その人の欄へ（山札から引いた札は裏の見た目）
+            const to = $('players').children[taker];
+            const gained = count(view.players[taker]) - count(prev.players[taker]);
+            taken.slice(0, gained).forEach((t, i) => flyCard(t.card, marketRects.get(String(t.slot)), to, i));
+            for (let n = taken.length; n < gained; n++) {
+                if (deck && to) Motion.fly(deck, to, { content: '<span class="mk-deck" style="display:block;width:100%;height:100%"><span class="deck-back"></span></span>', size: deck, delay: n * 140, duration: 420 });
+            }
+        }
+        // 市場に補充された札
+        view.faceUp.forEach((card, slot) => {
+            if (card !== null && card !== undefined && card !== prev.faceUp[slot]) Motion.popIn($('market').querySelector(`[data-slot="${slot}"]`), { duration: 320, delay: 380 });
+        });
+        // 取られた路線の車両
+        view.claimed.forEach((owner, id) => {
+            if (owner === null || owner === undefined || prev.claimed[id] === owner) return;
+            $('map').querySelectorAll(`.m-route[data-route="${id}"] rect`).forEach((el, i) => Motion.popIn(el, { duration: 320, delay: i * 70 }));
+        });
+        view.players.forEach((p, i) => {
+            const old = prev.players[i];
+            if (old && (p.points !== old.points || p.trains !== old.trains)) Motion.pulse($('players').children[i]?.querySelector('.pl-num:last-child, .pl-num'), { duration: 380, scale: 1.25 });
+        });
     }
 
     // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、自分の番になったら turn、終わりは勝ち負け

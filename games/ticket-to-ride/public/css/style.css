@@ -111,6 +111,13 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .count-value { min-width: 52px; text-align: center; font-size: 17px; font-weight: 800; }
 .segment button { height: 36px; padding: 0 14px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; }
 .segment button.on { color: #3a2300; background: var(--accent); }
+/* 動きの速さ（共通の部品 motion の切り替え）を、ほかの切り替えと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; align-items: center; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); border: none; }
+#motion-setting .motion-speed button { height: 36px; padding: 0 14px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 14px; font-weight: 800; justify-content: center; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3a2300; background: var(--accent); }
+/* 取った路線の車両が弾む動きは、その形の中心を基準にする */
+#map .m-route rect { transform-box: fill-box; transform-origin: center; }
 
 /* ---- ゲーム画面 ---- */
 
