@@ -13,11 +13,15 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'cartographers';
 const SETTINGS_KEY = 'cartographers.settings';
 const CPU_NAMES = ['ルカ', 'ミラ', 'ノア'];
-const RESULT_DELAY_MS = 700;
+const RESULT_DELAY_MS = 700;   // 動きが終わってから数える
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 描いた地形がカードからマスへ
+const STAGGER_MS = 60;   // 何マスも描くときの間
 const MOUNTAIN_SET = new Set(MOUNTAINS.map(([r, c]) => r * SIZE + c));
 
 const $ = (selector) => document.querySelector(selector);
@@ -95,6 +99,8 @@ export default class UI {
         this.renderTitleArt();
         $('#help-coin').innerHTML = icon('coin');
         $('#help-clock').innerHTML = icon('clock');
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '動き' });
     }
 
     // ---- 画面の切り替え ----
@@ -151,7 +157,8 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
+        this.resultTimer = null;
         ['#scores', '#edict-detail', '#player-map'].forEach(id => { if ($(id).open) $(id).close(); });
     }
 
@@ -364,6 +371,9 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
+        // 描き直す前に、動きの出発点（カードの形）を測る
+        const before = prev && Motion.enabled() ? this.measure() : null;
         this.view = view;
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         const reveal = [...view.events].reverse().find(e => e.type === 'reveal');
@@ -386,7 +396,35 @@ export default class UI {
         this.renderCard();
         this.renderMap();
         this.renderActions();
+        if (before) this.animateUpdate(prev, view, before, fresh);
         this.afterRender();
+    }
+
+    // ---- 動き ----
+
+    measure() {
+        const from = $('#card .variant.on') ?? $('#card .variants') ?? $('#card');
+        return { card: Motion.rectOf(from), players: new Map([...document.querySelectorAll('#players .pchip')].map(el => [el.dataset.player, el.querySelector('b').textContent])) };
+    }
+
+    // 描かれたマスは、カードから地形が飛んで現れる。新しいカードは裏返り、得点・コインが変わったら弾む
+    animateUpdate(prev, view, before, drawn) {
+        const owner = view.monsterTarget ?? view.you;
+        drawn.filter(e => e.seat === owner).forEach(e => {
+            e.cells.forEach((cell, i) => {
+                const to = $(`#map .cell[data-cell="${cell}"]`);
+                if (!to) return;
+                if (!before.card) return Motion.popIn(to, { delay: i * STAGGER_MS });
+                const content = `<div class="t-${e.terrain}" style="background:var(--t);border-radius:6px;display:grid;place-items:center;color:#fff"><svg class="icon" style="width:72%;height:72%" viewBox="0 0 24 24"><use href="#icon-${e.terrain}"/></svg></div>`;
+                Motion.fly(before.card, to, { content, hide: to, size: { width: 36, height: 36 }, delay: i * STAGGER_MS, duration: FLY_MS });
+            });
+        });
+        if (view.events.some(e => e.seq > Math.max(0, ...(prev.events ?? []).map(x => x.seq)) && e.type === 'reveal')) Motion.flipCard($('#card'), { duration: 400 });
+        view.players.forEach(p => {
+            const old = before.players.get(String(p.id));
+            if (old === undefined || old === String(p.total)) return;
+            Motion.pulse($(`#players .pchip[data-player="${p.id}"] b`), { delay: FLY_MS, scale: 1.4, duration: 380 });
+        });
     }
 
     // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
@@ -408,8 +446,11 @@ export default class UI {
         // 季節が終わったら、その季節の得点を見せる
         if (me.seasons.length > this.seenSeasons) {
             this.seenSeasons = me.seasons.length;
-            clearTimeout(this.resultTimer);
-            this.resultTimer = setTimeout(() => this.showScores({ final: view.phase === 'end', season: me.seasons.length - 1 }), RESULT_DELAY_MS);
+            this.resultTimer?.();
+            const controller = this.controller;
+            this.resultTimer = Motion.afterIdle(() => {
+                if (this.controller === controller) this.showScores({ final: view.phase === 'end', season: me.seasons.length - 1 });
+            }, RESULT_DELAY_MS);
         }
     }
 

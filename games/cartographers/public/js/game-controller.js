@@ -7,8 +7,9 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, cpuSeats, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
-const CPU_DELAY_MS = 350;   // CPU は同じカードを同時に描くので、間を短めにして1人ずつ
+const CPU_DELAY_MS = 350;   // CPU は同じカードを同時に描くので、間を短めにして1人ずつ（動きが終わってから数える）
 const SAVE_KEY = 'cartographers.save';
 
 export function loadSavedGame() {
@@ -35,7 +36,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.save();
     }
 
@@ -77,9 +78,10 @@ export default class LocalGameController {
 
     // 描く必要のある CPU がいれば、間を置いて1人ずつ描かせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
         if (cpuSeats(this.game).length === 0) return;
-        this.cpuTimer = setTimeout(() => {
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 const seat = cpuSeats(this.game)[0];
                 if (seat !== undefined && !runCpuStep(this.game, seat)) {
@@ -107,6 +109,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
     }
 }

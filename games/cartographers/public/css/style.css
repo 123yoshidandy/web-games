@@ -118,6 +118,14 @@ button {
 
 .link { border: none; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px; }
 
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数・CPU と同じ見た目にする */
+.motion-setting .motion-speed { display: inline-flex; align-items: center; gap: 8px; }
+.motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+.motion-setting .motion-speed button { min-width: 44px; height: 44px; padding: 0 10px; border: none; border-radius: 8px; background: none; color: inherit; opacity: .7; font-size: 15px; font-weight: 800; cursor: pointer; }
+.motion-setting .motion-speed button[aria-pressed="true"] { color: #2a1d05; background: var(--gold); opacity: 1; }
+#motion-setting-help { margin-bottom: 8px; font-size: 14px; font-weight: 800; }
+/* 飛んでいる地形 */
+.motion-flyer { filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .45)); }
 .segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
 .segmented button {
     min-width: 56px;
@@ -343,11 +351,6 @@ button {
 .map .cell.g-farm { --gt: var(--t-farm); }
 .map .cell.g-water { --gt: var(--t-water); }
 .map .cell.g-monster { --gt: var(--t-monster); }
-.map .cell.fresh { animation: drawn .5s ease-out backwards; }
-@keyframes drawn {
-    0% { transform: scale(.4); opacity: 0; }
-    70% { transform: scale(1.1); opacity: 1; }
-}
 
 .actions { flex: none; display: flex; align-items: center; gap: 6px; height: 48px; }
 .act-label { flex: 1; min-width: 0; text-align: center; font-size: 13px; line-height: 1.3; }
@@ -423,7 +426,6 @@ dialog .buttons { display: flex; justify-content: center; gap: 12px; flex: none;
 .toast.show { opacity: 1; }
 
 @media (prefers-reduced-motion: reduce) {
-    .map .cell.fresh { animation: none; }
     .btn { transition: none; }
 }
 
