@@ -7,6 +7,7 @@ import { CARDS, RESOURCES, RESOURCE_NAMES, TYPES, BASIC_LOCATIONS, FOREST_LOCATI
 import { MIN_PLAYERS, MAX_PLAYERS, SEASON_NAMES, CITY_LIMIT, HAND_LIMIT } from './game.js';
 import { LEVELS, suggest } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
@@ -18,10 +19,16 @@ const SETTINGS_KEY = 'everdell.settings';
 const CPU_NAMES = ['リス', 'カエル', 'ネズミ'];
 const RESULT_DELAY_MS = 900;
 const FRESH_MS = 1600;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 出したカード・置いたワーカー
+const POP_MS = 280;      // 手札・草原の入れ替え
+const STAGGER_MS = 90;   // 何枚も動くときの間
 // 自分の操作の効果音
 const COMMAND_SOUNDS = { place: 'place', play: 'place', prepare: 'gain', pass: 'notify', answer: 'select' };
 
 const $ = (selector) => document.querySelector(selector);
+// 同じカードが何枚かあっても区別できるキー（「カード名#何枚目か」）。動きで、どの札がどこへ動いたかを追うのに使う
+const keyOf = (list, i) => `${list[i]}#${list.slice(0, i).filter(id => id === list[i]).length}`;
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
 // 文で説明する場所の短い名前
@@ -68,8 +75,9 @@ export default class UI {
         this.fresh = new Map();
         this.dismissedPrompt = null;
         this.selected = new Set();
-        this.resultTimer = null;
+        this.cancelResult = null;   // Motion.afterIdle の取り消す関数
         this.detailTarget = null;
+        Motion.mountSpeedSetting(document.querySelector('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'エバーデール',
@@ -159,7 +167,9 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
+        this.cancelResult = null;
+        Motion.cancelAll();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -297,6 +307,8 @@ export default class UI {
     onUpdate() {
         if (!this.controller) return;
         const before = { phase: this.view?.phase, myTurn: this.myTurn(), prompt: this.view?.prompt?.id };
+        // 描き直す前に、動きの出発点（手札・草原・山札・ワーカー・相手の位置）を測る
+        const snap = this.view && Motion.enabled() ? this.measure() : null;
         this.view = this.controller.getView();
         const freshEvents = this.view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = this.view.events.at(-1)?.seq ?? this.lastSeq;
@@ -308,8 +320,94 @@ export default class UI {
         });
         this.playSound(before, freshEvents);
         this.render();
+        if (snap) this.animate(snap, freshEvents);
         clearTimeout(this.freshTimer);
         this.freshTimer = setTimeout(() => this.clearFresh(), FRESH_MS);
+    }
+
+    // ---- 動き ----
+
+    statsOf(v) {
+        const me = v.players[v.you];
+        return {
+            res: Object.values(me.res).join(),
+            score: me.score.total,
+            workers: me.available,
+            opps: new Map(v.players.filter(p => p.id !== v.you).map(p => [p.id, [p.score.total, p.handCount, p.available, p.slots, p.season].join()]))
+        };
+    }
+
+    // 描き直す前の、動きの出発点
+    measure() {
+        const opp = new Map();
+        document.querySelectorAll('#opponents .opp[data-seat]').forEach(el => opp.set(Number(el.dataset.seat), Motion.rectOf(el)));
+        return {
+            hand: Motion.captureRects($('#hand'), '.card[data-key]', 'key'),
+            handIndex: Motion.captureRects($('#hand'), '.card[data-index]', 'index'),
+            meadow: Motion.captureRects($('#panel'), '.meadow .card[data-key]', 'key'),
+            meadowIndex: Motion.captureRects($('#panel'), '.meadow .card[data-index]', 'index'),
+            meadowShown: $('#panel').dataset.tab === 'meadow',
+            deck: Motion.rectOf(document.querySelector('#status .deck')),
+            workers: Motion.rectOf(document.querySelector('#mybar .my-workers')),
+            opp,
+            stats: this.statsOf(this.view)
+        };
+    }
+
+    // 出したカードは手札・草原（相手は席）から街へ、置いたワーカーは置き場へ飛び、引いたカードは山札や草原から手札へ飛ぶ。変わった資源・点・席は弾む
+    animate(snap, fresh) {
+        const v = this.view;
+        const me = v.you;
+        let settle = 0;
+        let k = 0;
+        const land = (to) => {
+            Motion.pulse(to, { delay: k * STAGGER_MS + FLY_MS, scale: 1.25, duration: 320 });
+            settle = Math.max(settle, k * STAGGER_MS + FLY_MS);
+            k++;
+        };
+        fresh.forEach(e => {
+            if (e.type === 'play') {
+                const sent = e.seat === me ? this.sending : null;
+                const index = sent?.type === 'play' ? String(sent.index) : null;
+                const key = `${e.card}#0`;
+                const from = e.from === 'meadow' ? (index !== null && sent.source === 'meadow' ? snap.meadowIndex.get(index) : snap.meadow.get(key))
+                    : e.seat === me ? (index !== null && sent.source === 'hand' ? snap.handIndex.get(index) : snap.hand.get(key))
+                        : snap.opp.get(e.seat);
+                const to = e.owner === me
+                    ? ($('#panel').dataset.tab === 'city' ? document.querySelector(`#panel [data-uid="${e.uid}"]`) : document.querySelector('.tab[data-tab="city"]'))
+                    : document.querySelector(`#opponents [data-seat="${e.owner}"]`);
+                if (!from || !to) return;
+                Motion.fly(from, to, { content: cardHtml(e.card), size: { width: 70, height: 48 }, duration: FLY_MS, delay: k * STAGGER_MS, hide: e.owner === me && $('#panel').dataset.tab === 'city' ? to : null });
+                land(to);
+            } else if (e.type === 'place') {
+                const from = e.seat === me ? snap.workers : snap.opp.get(e.seat);
+                const to = document.querySelector(`#panel [data-loc="${e.loc}"] .pl-workers`);
+                if (!from || !to) return;
+                Motion.fly(from, to, { content: workerIcon(e.seat), size: { width: 22, height: 22 }, duration: FLY_MS, delay: k * STAGGER_MS });
+                land(to);
+            }
+        });
+        // 手札：残ったカードは詰め、増えたカードは草原（なければ山札）から飛んでくる
+        const entering = [];
+        document.querySelectorAll('#hand .card[data-key]').forEach(el => {
+            if (!snap.hand.has(el.dataset.key)) entering.push(el);
+        });
+        Motion.flipFrom(snap.hand, $('#hand'), '.card[data-key]', 'key', { duration: POP_MS, enter: null });
+        entering.forEach((el, i) => {
+            const from = snap.meadow.get(el.dataset.key) ?? snap.deck;
+            Motion.fly(from, el, { content: el, hide: el, duration: FLY_MS, delay: i * STAGGER_MS });
+        });
+        // 草原：補充されたカードは弾んで出る
+        if (snap.meadowShown && $('#panel').dataset.tab === 'meadow') {
+            Motion.flipFrom(snap.meadow, $('#panel'), '.meadow .card[data-key]', 'key', { duration: POP_MS, enter: 'pop', stagger: 60 });
+        }
+        const now = this.statsOf(v);
+        if (now.res !== snap.stats.res) Motion.pulse(document.querySelector('#mybar .my-res'), { delay: settle, scale: 1.2, duration: 340 });
+        if (now.score !== snap.stats.score) Motion.pulse(document.querySelector('#mybar .my-score'), { delay: settle, scale: 1.3, duration: 340 });
+        if (now.workers !== snap.stats.workers) Motion.pulse(document.querySelector('#mybar .my-workers'), { delay: settle, scale: 1.2, duration: 340 });
+        now.opps.forEach((value, seat) => {
+            if (value !== snap.stats.opps.get(seat)) Motion.pulse(document.querySelector(`#opponents [data-seat="${seat}"] .opp-info`), { delay: settle, scale: 1.15, duration: 340 });
+        });
     }
 
     // 1つの更新に1つの音。相手の手は notify、自分の番になったら turn
@@ -401,8 +499,8 @@ export default class UI {
         this.refreshOpenSheets();
         this.markHint();
         if (this.view.phase === 'end' && !$('#result').open && !this.resultShown) {
-            clearTimeout(this.resultTimer);
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.cancelResult?.();
+            this.cancelResult = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
         if (this.view.phase !== 'end') this.resultShown = false;
     }
@@ -461,7 +559,7 @@ export default class UI {
     meadowHtml() {
         const v = this.view;
         return `<div class="grid4 meadow">${v.meadow.map((id, i) => id
-            ? cardHtml(id, { data: { src: 'meadow', index: i }, cls: this.playable('meadow', i) ? 'can' : '' })
+            ? cardHtml(id, { data: { src: 'meadow', index: i, key: keyOf(v.meadow, i) }, cls: this.playable('meadow', i) ? 'can' : '' })
             : '<span class="card empty"></span>').join('')}</div>`;
     }
 
@@ -566,7 +664,7 @@ export default class UI {
     renderHand() {
         const me = this.me();
         $('#hand').innerHTML = `<div class="hand-head">手札 ${me.hand.length}/${HAND_LIMIT}</div><div class="grid4 hand-cards">${me.hand.map((id, i) =>
-            cardHtml(id, { data: { src: 'hand', index: i }, cls: this.playable('hand', i) ? 'can' : '' })).join('')}</div>`;
+            cardHtml(id, { data: { src: 'hand', index: i, key: keyOf(me.hand, i) }, cls: this.playable('hand', i) ? 'can' : '' })).join('')}</div>`;
     }
 
     renderActions() {

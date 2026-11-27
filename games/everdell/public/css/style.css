@@ -231,6 +231,13 @@ dialog .focus-sink:focus, dialog .focus-sink:focus-visible { outline: none; }
 .count-value { min-width: 56px; text-align: center; font-size: 17px; font-weight: 800; }
 .segment button { min-width: 64px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-weight: 800; cursor: pointer; }
 .segment button.on { color: #3a2604; background: var(--accent); }
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; border-radius: 10px; background: rgba(0, 0, 0, .25); padding: 3px; gap: 4px; }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 36px; border-radius: 8px; color: var(--muted); font-weight: 800; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3a2604; background: var(--accent); }
+/* 飛んでいるカード・ワーカー */
+.motion-flyer { filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); }
 
 /* ---- ゲーム画面 ---- */
 
