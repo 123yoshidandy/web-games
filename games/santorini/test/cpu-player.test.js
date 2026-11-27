@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import Game from '../public/js/game.js';
 import { chooseCpuTurn, runCpuStep, PROFILES, evaluate, enumerateTurns } from '../public/js/cpu-player.js';
 import { cellOf, stepKey, GODS } from '../public/js/rules.js';
@@ -97,8 +97,15 @@ describe('CPU', () => {
     });
 
     it('ふつうは、やさしいに勝ち越す', () => {
-        const r = runMatches({ games: 30, profiles: ['normal', 'easy'] });
-        expect(r.wins[0]).toBeGreaterThan(r.wins[1]);
+        // 考える時間の打ち切り（Date.now）で結果が変わらないように、時計を止めて、調べる局面の数の上限だけで読ませる
+        // （マシンの速さに左右されず、同じシードなら同じ対局になる）
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            const r = runMatches({ games: 30, profiles: ['normal', 'easy'] });
+            expect(r.wins[0]).toBeGreaterThan(r.wins[1]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('1手番の考える時間は1秒より短い（ヘルメスでも）', () => {

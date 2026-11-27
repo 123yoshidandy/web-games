@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Game from '../public/js/game.js';
 import { decide, runCpuStep, think, wantsDraw, CPU_LEVELS, LEVELS } from '../public/js/cpu-player.js';
 import { createGameView } from '../public/js/game-view.js';
@@ -125,16 +125,23 @@ describe('引き分けの提案への答え', () => {
 });
 
 describe('CPU どうしの対戦', () => {
+    // 読みは局面の数で打ち切るが、時間（8秒）の安全弁もある。遅いマシンでは安全弁で読みが浅くなり、結果が変わりうる
+    // 対戦の間は Date.now を止めて安全弁を働かせず、局面の数だけで打ち切る（マシンの速さで手が変わらない）
+    // 遅いマシンでは時間だけがかかるので、上限を長めにとる
+    beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); });
+    afterEach(() => { vi.useRealTimers(); });
+    const MATCH_TIMEOUT = 240000;
+
     it('最後まで進み、強いほど勝ち越す（ふつう 対 やさしい）', () => {
         const r = runMatches({ games: 6, a: 'normal', b: 'easy' });
         expect(r.stuck).toBe(0);
         expect(r.winsA).toBeGreaterThan(r.winsB);
-    });
+    }, MATCH_TIMEOUT);
 
     // つよい 対 ふつう・とてもつよい 対 つよい は時間がかかるので、scripts/cpu-match.mjs で測る（README に結果を書く）
     it('つよい 対 やさしい も最後まで進み、つよいが全部勝つ', () => {
         const r = runMatches({ games: 2, a: 'strong', b: 'easy' });
         expect(r.stuck).toBe(0);
         expect(r.winsA).toBe(2);
-    });
+    }, MATCH_TIMEOUT);
 });

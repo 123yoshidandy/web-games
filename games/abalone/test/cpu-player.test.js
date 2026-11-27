@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import Game from '../public/js/game.js';
 import { chooseCpuCommand, runCpuStep, PROFILES, evaluate } from '../public/js/cpu-player.js';
 import { createState, cellAt, moveKey, BLACK, WHITE, EMPTY } from '../public/js/rules.js';
@@ -67,9 +67,16 @@ describe('CPU', () => {
     });
 
     it('ふつうは、やさしいに勝ち越す', () => {
-        const r = runMatches({ games: 10, profiles: ['normal', 'easy'] });
-        expect(r.wins[0]).toBeGreaterThan(r.wins[1]);
-        expect(r.captures[0]).toBeGreaterThan(r.captures[1]);
+        // 読みは時間（TIME_LIMIT_MS）でも打ち切るので、遅いマシンでは浅くなり、勝ち負けが変わりうる。
+        // 時計を止めて時間切れを起こさず、調べる局面の数（NODE_BUDGET）だけで打ち切る（マシンの速さによらず同じ結果になる）
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            const r = runMatches({ games: 10, profiles: ['normal', 'easy'] });
+            expect(r.wins[0]).toBeGreaterThan(r.wins[1]);
+            expect(r.captures[0]).toBeGreaterThan(r.captures[1]);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('1手の考える時間は1秒より短い', () => {

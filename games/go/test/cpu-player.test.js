@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import Game from '../public/js/game.js';
 import { decide, runCpuStep, isCpuTurn, cpuSeat, PLAYOUTS, CPU_LEVELS } from '../public/js/cpu-player.js';
 import { createGameView } from '../public/js/game-view.js';
@@ -35,10 +35,17 @@ describe('CPU', () => {
         }
     });
 
+    // 読みは回数で終わるが、時間（maxMs）の安全弁もある。遅い端末で時間で打ち切られて結果が変わらないように、
+    // Date を止めて、回数だけで読ませる（端末の速さによらず、毎回同じ対局になる）
     it('ふつうは、やさしいに勝ち越す（9路）', () => {
-        const r = runMatches({ games: 4, a: 'normal', b: 'easy', size: 9, seedBase: 11 });
-        expect(r.finished).toBe(4);
-        expect(r.winsA).toBeGreaterThanOrEqual(3);
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            const r = runMatches({ games: 4, a: 'normal', b: 'easy', size: 9, seedBase: 11 });
+            expect(r.finished).toBe(4);
+            expect(r.winsA).toBeGreaterThanOrEqual(3);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 
     it('相手がパスし、今終わっても勝っているならパスする', () => {

@@ -72,11 +72,13 @@ describe('CPU', () => {
         expect(MATE).toBeGreaterThan(10000);
     });
 
+    // 時計のない試合では、読みは局面の数だけで打ち切る（maxMs を渡さない）ので、マシンの速さで結果は変わらない
+    // 遅いマシンでは時間だけがかかるので、上限を長めにとる
     it('CPU どうしの試合が最後まで進み、ふつうがやさしいに勝ち越す', () => {
         const r = runMatches({ games: 4, a: 'normal', b: 'easy', maxPly: 300 });
         expect(r.stuck).toBe(0);
         expect(r.winsA).toBeGreaterThan(r.winsB);
-    });
+    }, 240000);
 
     it('記録から再現できる（CPU の手も同じ入口を通る）', () => {
         const game = new Game([{ isCPU: true, cpuLevel: 'easy' }, { isCPU: true, cpuLevel: 'normal' }]);

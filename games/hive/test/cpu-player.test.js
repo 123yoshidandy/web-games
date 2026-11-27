@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import Game from '../public/js/game.js';
 import { createState, legalActions, applyAction, actionKey, neighbors } from '../public/js/rules.js';
 import { chooseCpuCommand, runCpuStep, scoreActions, PROFILES, isCpuTurn, TIME_LIMIT_MS } from '../public/js/cpu-player.js';
@@ -103,9 +103,16 @@ describe('CPU', () => {
     });
 
     it('ふつうはやさしいに勝ち越し、やさしいはでたらめに勝ち越す', () => {
-        const a = runMatches({ games: 6, profiles: ['normal', 'easy'] });
-        expect(a.wins[0]).toBeGreaterThan(a.wins[1]);
-        const b = runMatches({ games: 6, profiles: ['easy', 'random'] });
-        expect(b.wins[0]).toBeGreaterThanOrEqual(5);
+        // 考える時間の打ち切り（Date.now）で結果が変わらないように、時計を止めて2手先まで読み切らせる
+        // （マシンの速さに左右されず、同じシードなら同じ対局になる）
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            const a = runMatches({ games: 6, profiles: ['normal', 'easy'] });
+            expect(a.wins[0]).toBeGreaterThan(a.wins[1]);
+            const b = runMatches({ games: 6, profiles: ['easy', 'random'] });
+            expect(b.wins[0]).toBeGreaterThanOrEqual(5);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });
