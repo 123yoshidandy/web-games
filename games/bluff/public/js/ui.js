@@ -14,12 +14,17 @@ import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
+import * as Motion from './motion/motion.js';
 import { symbolsSvg, dieHtml, hiddenDie, faceSvg, cupSvg, titleArtSvg } from './art.js';
 
 const GAME = 'bluff';
 const SETTINGS_KEY = 'bluff.settings';
 const CPU_NAMES = ['ハンス', 'グレタ', 'カール', 'リーナ', 'オットー'];
-const RESULT_DELAY_MS = 1400;
+const RESULT_DELAY_MS = 1400;   // 動きが終わってから数える
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 宣言の印が席から盤へ
+const DICE_MS = 380;     // ダイスが転がる
+const STAGGER_MS = 70;   // 何個も現れるときの間
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -76,6 +81,8 @@ export default class UI {
             onExit: () => this.showTitle()
         });
         this.renderHelp();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '動き' });
     }
 
     // ---- 画面の切り替え ----
@@ -133,7 +140,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -335,6 +342,9 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
+        // 描き直す前に、動きの出発点（席）を測る
+        const before = prev && Motion.enabled() ? this.measure() : null;
         this.view = view;
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         const key = `${view.phase}:${view.round}:${view.turn}:${view.history.length}`;
@@ -350,15 +360,73 @@ export default class UI {
         this.renderMe(view);
         this.renderFaces(view);
         this.renderActions(view);
+        if (before) this.animateUpdate(prev, view, before);
         this.playSounds(view);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !this.resultShown && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            const controller = this.controller;
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
+                if (this.controller !== controller) return;
                 this.resultShown = true;
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // ---- 動き ----
+
+    measure() {
+        const seats = new Map();
+        document.querySelectorAll('#seats .seat[data-seat]').forEach(el => seats.set(Number(el.dataset.seat), Motion.rectOf(el.querySelector('.cup') ?? el)));
+        return { seats };
+    }
+
+    // ダイスが転がって現れる
+    tumble(el, delay) {
+        if (!Motion.enabled() || !el) return;
+        const length = Motion.ms(DICE_MS);
+        const animation = el.animate([
+            { transform: 'rotate(-220deg) scale(.4)', opacity: 0 },
+            { transform: 'rotate(18deg) scale(1.12)', opacity: 1, offset: 0.7 },
+            { transform: 'rotate(0) scale(1)', opacity: 1 }
+        ], { duration: length, delay: Motion.ms(delay), easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' });
+        Motion.track(animation, length + Motion.ms(delay));
+    }
+
+    // 前のビューから増えた出来事を動かす（events の seq で見る）
+    // ほかの人の宣言は、その人の席から盤のマスへ印が飛ぶ。振り直し・新しいラウンドでは自分のダイスが転がり、疑ったあとは全員のダイスが現れる
+    animateUpdate(prev, v, before) {
+        const lastSeq = Math.max(0, ...(prev.events ?? []).map(e => e.seq));
+        const fresh = (v.events ?? []).filter(e => e.seq > lastSeq);
+        fresh.forEach(e => {
+            if (e.type === 'bid' && e.seat !== v.you) {
+                const from = before.seats.get(e.seat);
+                const to = $('#board .marker:not(.pick)');
+                if (from && to) Motion.fly(from, to, { content: dieHtml(e.face, { cls: 'marker' }), hide: to, size: { width: 28, height: 28 }, duration: FLY_MS });
+            } else if (e.type === 'reroll' && e.seat !== v.you) {
+                document.querySelectorAll(`#seats .seat[data-seat="${e.seat}"] .die.shown`).forEach((el, i) => Motion.popIn(el, { delay: i * STAGGER_MS }));
+            } else if (e.type === 'round') {
+                document.querySelectorAll('#seats .cup').forEach((el, i) => Motion.popIn(el, { delay: i * STAGGER_MS }));
+            } else if (e.type === 'challenge') {
+                // 全員のダイスをあらわにする。そのあと、数と失った数を弾ませる
+                const dice = [...document.querySelectorAll('#seats .seat-dice .die')];
+                dice.forEach((el, i) => Motion.popIn(el, { delay: i * 40 }));
+                const wait = Math.min(dice.length * 40, 500);
+                Motion.pulse($('#status .count'), { delay: wait, scale: 1.5, duration: 400 });
+                document.querySelectorAll('.loss').forEach(el => Motion.pulse(el, { delay: wait + 200, scale: 1.5, duration: 400 }));
+            }
+        });
+        // 自分のダイス：新しいラウンド・振り直しで変わったものが転がる
+        const mine = v.players[v.you]?.dice;
+        if (!mine) return;
+        const oldMine = prev.round === v.round ? prev.players[prev.you]?.dice : null;
+        let n = 0;
+        document.querySelectorAll('#me .die[data-die]').forEach(el => {
+            const i = Number(el.dataset.die);
+            if (oldMine && oldMine[i] && oldMine[i].value === mine[i].value) return;
+            this.tumble(el, n++ * 50);
+        });
     }
 
     // ダイスの並び（結果のときは、そのラウンドの全部の目。合うダイスに印）
@@ -381,7 +449,7 @@ export default class UI {
             const out = p.count === 0 && !(view.reveal && view.reveal.dice[p.id].length);
             const loss = view.phase !== 'bid' && view.reveal?.losses[p.id];
             // 1行目：名前と、このラウンドの最新の宣言（結果のときは失った数）。2行目：カップとダイス
-            return `<div class="seat${turn ? ' turn' : ''}${out ? ' out' : ''}">
+            return `<div data-seat="${p.id}" class="seat${turn ? ' turn' : ''}${out ? ' out' : ''}">
                 <div class="seat-head"><span class="name">${escapeHtml(p.name)}</span>${loss ? `<span class="loss">−${loss}</span>` : (last && view.phase === 'bid' ? bidHtml(last) : '')}</div>
                 <div class="seat-body">${out ? '<span class="muted">脱落</span>' : `${cupSvg(p.count)}<div class="seat-dice">${this.diceRow(view, p.id, 'mini')}</div>`}</div>
             </div>`;
