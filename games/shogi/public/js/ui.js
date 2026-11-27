@@ -5,6 +5,8 @@
  * - 持ち駒を押すと、打てる升に点が付く
  * - 直前の手の升を色で示す。王手のときは玉の升を赤くする
  * - 自分の側を盤の下に描く（CPU 戦で後手を選ぶと、盤を回して描く）。2人で遊ぶときは先手が下
+ * - 持ち時間があるときは、持ち駒の帯の右に残りの時間を出す。時計の数字だけを短い間隔で描き直す（残り10秒で色を変え、知らせの音を1回鳴らす）
+ *   CPU 戦では、アプリが隠れている間は時計を止める。オンラインでは止めず、相手の時計が0になったらサーバーに確かめてもらう（ping）
  */
 
 import { SIZE, SENTE, GOTE, HAND_TYPES, PROMOTE, sideOf, typeOf } from './rules.js';
@@ -12,27 +14,32 @@ import { SIDE_MARK, SIDE_NAME, KAN, PIECE_NAME, squareName } from './notation.js
 import LocalGameController, { loadSavedGame, clearSavedGame, CPU_MOVE_MS } from './game-controller.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
-import { PLAYERS } from './game.js';
+import { PLAYERS, CLOCK_PRESETS } from './game.js';
+import { reading, isLow, formatClock } from './clock.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, pieceHtml } from './art.js';
 import { music } from './music.js';
 
 const SETTINGS_KEY = 'shogi.settings';
 const RESULT_DELAY_MS = 900;
-const REASON_TEXT = { checkmate: '詰み', resign: '投了', repetition: '千日手', 'perpetual-check': '連続王手の千日手' };
+const REASON_TEXT = { checkmate: '詰み', resign: '投了', repetition: '千日手', 'perpetual-check': '連続王手の千日手', timeout: '時間切れ' };
+const CLOCK_TICK_MS = 100;
+const FLAG_PING_MS = 1000;   // オンラインで時計が0になったあと、サーバーに時間切れを確かめてもらう間隔
+const CLOCK_OPTIONS = Object.entries(CLOCK_PRESETS).map(([value, preset]) => ({ value, label: preset.label }));
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function loadSettings() {
-    const defaults = { mode: 'cpu', level: 'normal', side: 0 };
+    const defaults = { mode: 'cpu', level: 'normal', side: 0, clock: 'none' };
     try {
         const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
         return {
             mode: ['cpu', 'two'].includes(saved.mode) ? saved.mode : defaults.mode,
             level: CPU_LEVELS.includes(saved.level) ? saved.level : defaults.level,
-            side: [0, 1].includes(saved.side) ? saved.side : defaults.side
+            side: [0, 1].includes(saved.side) ? saved.side : defaults.side,
+            clock: Object.hasOwn(CLOCK_PRESETS, saved.clock) ? saved.clock : defaults.clock
         };
     } catch {
         return defaults;
@@ -56,6 +63,9 @@ export default class UI {
         this.lastSeq = 0;
         this.resultTimer = null;
         this.resultShown = false;
+        this.clockTimer = null;
+        this.lowWarned = null;    // 残り10秒の音を鳴らした手番（同じ手番では1回だけ）
+        this.lastFlagPing = 0;
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: '将棋',
@@ -64,7 +74,7 @@ export default class UI {
             cpuStepDelayMs: CPU_MOVE_MS,
             minPlayers: PLAYERS,
             maxPlayers: PLAYERS,
-            settings: [],
+            settings: [{ key: 'clock', label: '持ち時間', options: CLOCK_OPTIONS }],
             onStart: (controller) => this.beginGame(controller),
             onUpdate: () => this.render(),
             onError: (message) => {
@@ -80,6 +90,11 @@ export default class UI {
         this.bindStatic();
         this.renderTitleArt();
         this.renderHelp();
+        // アプリが隠れている間は、CPU 戦の時計を止める（オンラインのコントローラーの pause・resume は何もしない）
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) this.controller?.pause?.();
+            else this.controller?.resume?.();
+        });
     }
 
     // ---- 画面の切り替え ----
@@ -127,6 +142,9 @@ export default class UI {
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         this.render();
         if (!this.controller.isOnline) this.controller.scheduleCpu();
+        if (document.hidden) controller.pause?.();
+        clearInterval(this.clockTimer);
+        this.clockTimer = setInterval(() => this.updateClocks(), CLOCK_TICK_MS);
     }
 
     // オンライン対戦は、確かめてから部屋を出る（抜けた席は CPU が引き継ぐ）
@@ -137,16 +155,19 @@ export default class UI {
 
     newGame() {
         const { mode, level, side } = this.settings;
+        const clock = CLOCK_PRESETS[this.settings.clock]?.clock ?? null;
         const players = mode === 'two'
             ? [{ name: '先手', isCPU: false }, { name: '後手', isCPU: false }]
             : [{ name: 'あなた', isCPU: false }, { name: 'CPU', isCPU: true, cpuLevel: level }];
         if (mode === 'cpu' && side === 1) players.reverse();
-        this.startGame({ players, options: {} });
+        this.startGame({ players, options: clock ? { clock } : {} });
     }
 
     stopGame() {
         this.controller?.stop();
         this.controller = null;
+        clearInterval(this.clockTimer);
+        this.clockTimer = null;
         clearTimeout(this.resultTimer);
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
@@ -163,6 +184,7 @@ export default class UI {
         pick('#mode', 'mode');
         pick('#cpu-level', 'level');
         pick('#side', 'side', Number);
+        pick('#clock', 'clock');
         $('#start').addEventListener('click', () => this.newGame());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
@@ -299,11 +321,15 @@ export default class UI {
     // ---- タイトル・遊び方 ----
 
     renderSetup() {
-        const { mode, level, side } = this.settings;
+        const { mode, level, side, clock } = this.settings;
+        if (!$('#clock').children.length) {
+            $('#clock').innerHTML = CLOCK_OPTIONS.map(o => `<button type="button" role="radio" data-value="${o.value}">${o.label}</button>`).join('');
+        }
         const mark = (selector, value) => document.querySelectorAll(`${selector} button`).forEach(b => b.setAttribute('aria-checked', String(b.dataset.value === String(value))));
         mark('#mode', mode);
         mark('#cpu-level', level);
         mark('#side', side);
+        mark('#clock', clock);
         document.querySelectorAll('.cpu-only').forEach(el => el.classList.toggle('off', mode !== 'cpu'));
     }
 
@@ -328,6 +354,9 @@ export default class UI {
             <p>同じ局面が4回現れると千日手で、引き分けです。ただし王手をかけ続けた千日手は、王手をかけた側の負けです。勝てないと思ったら、旗のボタンで投了できます。</p>
             <h3>操作</h3>
             <p>自分の駒を押すと、動ける升に点が付きます。点の升を押すと指します。持ち駒は、押してから打つ升を押します。成れるときは「成る／成らない」を選びます。上のボタンで、棋譜を見る・待った（CPU 戦ではあなたの手と CPU の手をまとめて戻す）・投了ができます。</p>
+            <h3>持ち時間</h3>
+            <p>タイトル画面（オンラインはロビー）で選べます。<strong>切れ負け</strong>（3分・5分・10分）は、持ち時間を使い切ると負けです。<strong>3分+10秒</strong>・<strong>10分+30秒</strong>は、持ち時間を使い切ったあと、1手10秒・30秒の<strong>秒読み</strong>になります。秒読みの間に指せば、次の手もまた10秒・30秒から数えます。秒読みを超えると負けです。</p>
+            <p>時計は手番の側の分が減ります。残り10秒で時計が赤くなり、音で知らせます。秒読みに入ると、時計に「秒読み」と出ます。CPU 戦では、アプリを閉じている間は時計が止まります（オンラインでは止まりません）。</p>
             <h3>CPU の強さ</h3>
             <p>やさしい・ふつう・つよい・とてもつよい の4つ。強いほど先の手まで読みます。</p>`;
     }
@@ -397,10 +426,55 @@ export default class UI {
                 const sel = mine && this.selected?.drop === t ? ' sel' : '';
                 return `<button class="chip${sel}" data-drop="${t}" ${mine ? '' : 'disabled'} aria-label="${PIECE_NAME[t]}${n > 1 ? ` ${n}枚` : ''}">${pieceHtml(side, t, { flipped: side !== bottom })}${n > 1 ? `<span class="n">${n}</span>` : ''}</button>`;
             }).join('');
-            el.innerHTML = `<span class="who${active ? ' active' : ''}">${this.sideLabel(side)}</span><span class="chips">${chips || '<span class="none">持ち駒なし</span>'}</span>`;
+            const clock = view.clock ? `<span class="clock" data-clock-seat="${side}"></span>` : '';
+            el.innerHTML = `<span class="who${active ? ' active' : ''}">${this.sideLabel(side)}</span><span class="chips">${chips || '<span class="none">持ち駒なし</span>'}</span>${clock}`;
         };
         draw(1 - bottom, $('#hand-top'));
         draw(bottom, $('#hand-bottom'));
+        this.updateClocks();
+    }
+
+    // ---- 持ち時間 ----
+
+    // 時計の今の時刻（オンラインはサーバーの時刻に合わせる）
+    clockNow() {
+        const c = this.controller;
+        if (!c) return Date.now();
+        return c.isOnline ? c.net.serverNow() : c.clockNow();
+    }
+
+    // 時計の数字だけを描き直す。手番の時計は、手番が始まった時刻からの経過を引いて出す
+    // 秒読みに入ったら、その手の秒読みの残りを出し、「秒読み」の印を付ける
+    updateClocks() {
+        const v = this.view;
+        if (!v?.clock || !this.controller) return;
+        const { config, sides, running, startedAt } = v.clock;
+        const elapsed = running !== null && startedAt !== null ? Math.max(0, this.clockNow() - startedAt) : 0;
+        let runningRead = null;
+        document.querySelectorAll('[data-clock-seat]').forEach(el => {
+            const seat = Number(el.dataset.clockSeat);
+            const read = reading(config, sides[seat], seat === running ? elapsed : 0);
+            if (seat === running) runningRead = read;
+            const text = `${formatClock(read.shown)}${read.byoyomi && read.periods > 1 ? `×${read.periods}` : ''}`;
+            if (el.textContent !== text) el.textContent = text;
+            el.classList.toggle('byoyomi', read.byoyomi || (config.byoyomi > 0 && sides[seat].main === 0));
+            el.classList.toggle('running', seat === running && !v.over);
+            el.classList.toggle('low', !v.over && isLow(read) && (seat === running || read.total === 0));
+            el.classList.toggle('paused', seat === running && Boolean(v.clockPaused));
+        });
+        if (running === null || v.over || !runningRead) return;
+        // 自分の時計（2人で遊ぶときは手番の人の時計）が残り10秒になったら、手番ごとに1回知らせる
+        const mine = v.twoPlayers || running === v.you;
+        const key = `${v.ply}:${running}:${startedAt}`;
+        if (mine && isLow(runningRead) && runningRead.total > 0 && this.lowWarned !== key) {
+            this.lowWarned = key;
+            music.play('notify');
+        }
+        // オンラインで時計が0になったら、サーバーに時間切れを確かめてもらう（相手が指さないときも終わるように）
+        if (this.controller.isOnline && runningRead.total === 0 && Date.now() - this.lastFlagPing >= FLAG_PING_MS) {
+            this.lastFlagPing = Date.now();
+            this.controller.net.ping();
+        }
     }
 
     renderBoard(view) {
@@ -500,6 +574,7 @@ export default class UI {
         const reason = REASON_TEXT[v.reason] ?? '';
         const loser = v.winner === null ? null : 1 - v.winner;
         const detail = v.reason === 'resign' ? `${SIDE_NAME[loser]}の投了`
+            : v.reason === 'timeout' ? `${SIDE_NAME[loser]}の時間切れ`
             : v.reason === 'perpetual-check' ? `${SIDE_NAME[loser]}の${reason}`
                 : reason;
         $('#result-text').innerHTML = `${escapeHtml(detail)}<small>まで${v.ply}手</small>`;

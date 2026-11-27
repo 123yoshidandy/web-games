@@ -5,6 +5,7 @@
  *   王手をかけられた局面は、深さが尽きても1手延ばす（詰みを見落としにくくする）
  * - 打ち切りは局面の数（nodeLimit）で決める。時間では打ち切らない（端末の速さで手が変わらないように。テストで再現できるように）
  *   最低の深さ（depth）は必ず読み切る（ただし nodeLimit の2倍で打ち切り、それまでに読んだ手から選ぶ）
+ *   持ち時間のある対局だけは、maxMs（ミリ秒）でも打ち切る（時間切れにならないように。maxMs がなければ時間は見ない）
  * - 千日手：対局で現れた局面と、読みの途中の局面に戻る手は 0 点（引き分け）とする
  */
 
@@ -74,11 +75,17 @@ class Searcher {
         this.opt = opt;
         this.nodes = 0;
         this.limit = Infinity;
+        this.deadline = Infinity;   // 読みを打ち切る時刻（maxMs があるときだけ）
         this.qDepth = opt.qDepth ?? 6;
         this.seen = opt.seen ?? new Set();
         this.path = [];
         this.killers = Array.from({ length: MAX_PLY + 1 }, () => [0, 0]);
         this.history = new Int32Array(128 * 81);
+    }
+
+    // 時間で打ち切るか（時刻は局面 1024 個ごとに見る）
+    timeUp() {
+        return this.deadline !== Infinity && (this.nodes & 1023) === 0 && Date.now() >= this.deadline;
     }
 
     // 手の並べ替えの点
@@ -103,7 +110,7 @@ class Searcher {
     }
 
     negamax(depth, alpha, beta, ply) {
-        if (++this.nodes > this.limit) throw new Abort();
+        if (++this.nodes > this.limit || this.timeUp()) throw new Abort();
         const pos = this.pos;
         const key = pos.key;
         if (this.seen.has(key) || this.path.includes(key)) return 0;
@@ -175,7 +182,7 @@ class Searcher {
 
     // 取る手と成る手だけを読む
     quiesce(alpha, beta, ply, qd) {
-        if (++this.nodes > this.limit) throw new Abort();
+        if (++this.nodes > this.limit || this.timeUp()) throw new Abort();
         const pos = this.pos;
         const stand = evaluate(pos);
         if (stand >= beta) return stand;
@@ -218,6 +225,7 @@ class Searcher {
 
     run() {
         const opt = this.opt;
+        if (opt.maxMs > 0) this.deadline = Date.now() + opt.maxMs;
         const root = this.pos.legalMoves();
         if (!root.length) return { scored: [], depth: 0, nodes: 0 };
         let order = this.sortMoves(root, 0, 0);

@@ -6,7 +6,7 @@ import { sqOf } from '../public/js/rules.js';
 import { snapshot, newGame } from './helpers.js';
 
 const ctxFor = (game, seat, command) => {
-    const ctx = { game, seat, message: { command }, rejected: null, ignored: false };
+    const ctx = { game, seat, message: { command }, rejected: null, ignored: false, now: () => 0 };
     ctx.reject = (reason) => { ctx.rejected = reason; };
     ctx.ignore = () => { ctx.ignored = true; };
     return ctx;

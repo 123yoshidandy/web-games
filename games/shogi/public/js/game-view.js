@@ -10,6 +10,17 @@ export const moveInfo = (m) => (isDrop(m)
     ? { from: null, to: moveTo(m), drop: dropType(m), promote: false }
     : { from: moveFrom(m), to: moveTo(m), drop: null, promote: isPromote(m) });
 
+// 持ち時間（時計なしは null）。startedAt は手番が始まった時刻（ローカルは端末の時刻、オンラインはサーバーの時刻）
+export function clockView(game) {
+    if (!game.clock) return null;
+    return {
+        config: { ...game.clockConfig },
+        sides: game.clock.map(side => ({ ...side })),
+        running: game.clockSeat(),
+        startedAt: game.turnStartedAt ?? null
+    };
+}
+
 export function createGameView(game, seat, { since = 0 } = {}) {
     const over = game.isOver();
     const myTurn = !over && seat !== null && seat !== undefined && game.current === seat;
@@ -30,6 +41,7 @@ export function createGameView(game, seat, { since = 0 } = {}) {
         winner: game.winner,
         reason: game.reason,
         over,
+        clock: clockView(game),
         logs: game.logs.slice(Math.max(0, since)),
         logCount: game.logs.length,
         events: game.events.map(e => structuredClone(e))

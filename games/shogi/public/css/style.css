@@ -101,6 +101,10 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
     color: var(--muted); font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
 .segmented button[aria-checked="true"] { color: #2a1a05; background: var(--gold); }
+.clock-setting { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.clock-caption { color: var(--muted); font-size: 12px; font-weight: 700; }
+.segmented.clocks { display: inline-grid; grid-template-columns: repeat(3, 1fr); }
+.segmented.clocks button { height: 32px; font-size: 14px; }
 
 /* ---- タイトル ---- */
 
@@ -112,6 +116,22 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; }
 .setup .off { visibility: hidden; }
 .setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 4px; }
+/* 少し低い画面：ロゴを小さくして、持ち時間の行の分を空ける */
+@media (max-height: 600px) {
+    .logo { margin-top: 0; font-size: 46px; }
+    .subtitle { margin-bottom: 4px; }
+}
+/* オンラインのロビーの持ち時間：6つを1行に詰めると文字が折れるので、3つずつに折り返す */
+.netplay-lobby .np-segment { flex-wrap: wrap; }
+.netplay-lobby .np-segment button { flex: 1 0 30%; white-space: nowrap; }
+/* 低い画面（横持ちのスマホ）：飾りを省き、持ち時間を1行に並べて、タイトル画面を収める */
+@media (max-height: 480px) {
+    #screen-title { gap: 4px; padding: 8px 16px; }
+    .title-art, .subtitle { display: none; }
+    .logo { margin: 0; font-size: 36px; }
+    .setup { gap: 8px; }
+    .segmented.clocks { grid-template-columns: repeat(6, auto); }
+}
 
 /* ---- 対局の画面 ---- */
 
@@ -146,6 +166,19 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .hand .who.active { color: var(--gold-light); }
 .hand .chips { flex: 1; min-width: 0; display: flex; align-items: center; gap: 2px; }
 .hand .none { color: rgba(192, 171, 142, .55); font-size: 12px; }
+/* 持ち時間（帯の右端）。手番の時計は明るく、残り10秒で赤くする。秒読みに入ったら上に小さく「秒読み」 */
+.hand .clock {
+    position: relative; flex: none; min-width: 3.4em; padding: 1px 6px; border-radius: 6px; text-align: center;
+    color: var(--muted); background: rgba(0, 0, 0, .3); font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.3;
+}
+.hand .clock.byoyomi::before {
+    content: '秒読み'; position: absolute; left: 0; right: 0; bottom: 100%; color: var(--gold-light); font-size: 9px; font-weight: 700; line-height: 1.1; text-align: center;
+}
+.hand .clock.running { color: #2a1a05; background: var(--gold-light); }
+.hand .clock.low { color: #fff; background: var(--red); }
+.hand .clock.paused { opacity: .55; }
+/* 時計の分だけ狭いときは、持ち駒の札を少し重ねて収める */
+.hand .chip { flex-shrink: 1; min-width: 24px; }
 .chip {
     --cw: 30px;
     position: relative; display: grid; place-items: center; flex: none; width: 34px; height: 38px; padding: 0; border: none; border-radius: 6px;

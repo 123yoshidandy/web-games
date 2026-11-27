@@ -9,6 +9,7 @@
  * - つよい：3手読み
  * - とてもつよい：必ず3手、局面の上限まで深く（6手まで）
  * 局面の上限は、スマホで1手数秒以内に収まるように決めた（README に測った値を書く）
+ * 持ち時間があるときは、残りの時間から1手に使う時間を決め（clock.js の cpuBudget）、読みをその時間で打ち切る（時間切れにならない）
  */
 
 import { Position } from './rules.js';
@@ -16,6 +17,9 @@ import { createRandom } from './random.js';
 import { analyze, MATE } from './engine.js';
 import { moveInfo } from './game-view.js';
 import { REPETITION, repetitionWinner } from './game.js';
+import { cpuBudget } from './clock.js';
+
+const THINK_SHARE = 0.7;   // 1手の時間のうち、読みに使う割合（残りは手を見せる間と、やり取りの分）
 
 export const CPU_LEVELS = ['easy', 'normal', 'strong', 'expert'];
 export const LEVELS = {
@@ -26,6 +30,19 @@ export const LEVELS = {
 };
 
 export const isCpuTurn = (game) => !game.isOver() && game.players[game.current]?.isCPU;
+
+// 持ち時間があるとき、手番の側がこの1手に使ってよい時間。時計なしは null
+export function clockBudget(game) {
+    const seat = game.clockSeat();
+    if (seat === null) return null;
+    return cpuBudget(game.clockConfig, game.clock[seat], { moves: 40 });
+}
+
+// 読みを打ち切る時間（時計なしは null。局面の数だけで打ち切る）
+const thinkMs = (game) => {
+    const budget = clockBudget(game);
+    return budget === null ? null : Math.max(10, Math.floor(budget * THINK_SHARE));
+};
 
 const cpuRandom = (pos, ply) => createRandom(((pos.h1 ^ Math.imul(ply + 1, 0x9E3779B1)) >>> 0));
 
@@ -48,17 +65,19 @@ function repetitionScores(game, pos, moves) {
 }
 
 // 局面を読んで、手ごとの点を返す
-export function think(game, level = 'normal') {
+// clock：持ち時間があれば、手番の側の残りの時間で読みを打ち切る（ヒントは時計を見ない）
+export function think(game, level = 'normal', { clock = true } = {}) {
     const opt = LEVELS[level] ?? LEVELS.normal;
     const pos = game.pos.clone();
     const moves = pos.legalMoves();
     const seen = new Set(game.history.map(sfen => Position.fromSfen(sfen).key));
-    return analyze(pos, { ...opt, seen, fixed: repetitionScores(game, pos, moves) });
+    const maxMs = clock ? thinkMs(game) : null;
+    return analyze(pos, { ...opt, seen, fixed: repetitionScores(game, pos, moves), ...(maxMs === null ? {} : { maxMs }) });
 }
 
-export function chooseMove(game, level = 'normal') {
+export function chooseMove(game, level = 'normal', options = {}) {
     const opt = LEVELS[level] ?? LEVELS.normal;
-    const { scored } = think(game, level);
+    const { scored } = think(game, level, options);
     if (!scored.length) return null;
     const random = cpuRandom(game.pos, game.ply);
     let best = null;
@@ -80,23 +99,32 @@ export function toCommand(m) {
     return info.drop ? { type: 'drop', piece: info.drop, to: info.to } : { type: 'move', from: info.from, to: info.to, promote: info.promote };
 }
 
-export function decide(game, level = 'normal') {
-    const m = chooseMove(game, level);
+export function decide(game, level = 'normal', options = {}) {
+    const m = chooseMove(game, level, options);
     return m === null ? null : toCommand(m);
 }
 
 // 人の番のおすすめの手（ヒント）。CPU（つよい）と同じ読み。画面に出すだけで、記録には入れない
 export function suggest(game, seat) {
     if (game.isOver() || game.current !== seat) return null;
-    return decide(game, 'strong');
+    return decide(game, 'strong', { clock: false });
 }
 
 // CPU の番なら1手指す。指せたら true
-export function runCpuStep(game) {
+// elapsed：持ち時間があるとき、この手番に CPU がかけた時間（考える前までの分。考えた時間は足して記録する）
+// 時間を使い切っていたら、時間切れで終える
+export function runCpuStep(game, { elapsed = 0 } = {}) {
     if (!isCpuTurn(game)) return false;
     const seat = game.current;
+    const started = Date.now();
     const command = decide(game, game.players[seat].cpuLevel ?? 'normal');
-    if (command && game.applyCommand(seat, command)) return true;
+    return applyDecision(game, seat, command, elapsed + (Date.now() - started));
+}
+
+// 決めた手を指す。断られたら、指せる手の先頭で必ず進める
+export function applyDecision(game, seat, command, elapsed = 0) {
+    if (game.isFlagged(elapsed)) return game.timeout(seat, elapsed);
+    if (command && game.applyCommand(seat, command, elapsed)) return true;
     const fallback = game.legalMoves()[0];
-    return fallback !== undefined && game.applyCommand(seat, toCommand(fallback));
+    return fallback !== undefined && game.applyCommand(seat, toCommand(fallback), elapsed);
 }
