@@ -19,6 +19,8 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff, flyIn } from './anim.js';
 import { MAX_PLAYERS } from './game.js';
 
 const GAME = 'agricola';
@@ -26,6 +28,15 @@ const SETTINGS_KEY = 'agricola.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
 export const COLORS = ['#d9473b', '#3d7dd8', '#9a5ad1', '#e2a52a'];
 const RESULT_DELAY_MS = 900;
+
+// 動きの目印：行動スペースは「使われているか｜たまった資源」、数は欄ごとの何番目か、農場はマスの中身
+const SPACE_MOTION = {
+    key: el => el.dataset.space,
+    value: el => `${el.classList.contains('taken') ? 'taken' : 'free'}|${el.querySelector('.sp-goods')?.textContent ?? ''}`
+};
+const AMOUNTS = '#players .pl-stats > .amt, #me .me-row > .amt';
+const amountKey = el => `${el.closest('.pl')?.dataset.seat ?? 'me'}:${[...el.parentElement.querySelectorAll(':scope > .amt')].indexOf(el)}`;
+const FARM_MOTION = { key: el => el.dataset.cell, value: el => el.innerHTML };
 const HOUSE_NAME = { wood: '木の家', clay: 'レンガの家', stone: '石の家' };
 const RES_ORDER = ['wood', 'clay', 'reed', 'stone', 'grain', 'veg'];
 
@@ -67,6 +78,7 @@ export default class UI {
         $('#title-art').innerHTML = titleArtHtml();
         $('#help-body').innerHTML = helpHtml();
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'アグリコラ',
@@ -148,7 +160,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -442,6 +454,10 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const v = this.controller.getView();
+        // 手が進んだときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+        const prev = this.view;
+        const moved = Boolean(prev) && v.commandCount !== prev.commandCount;
+        const before = moved ? this.captureMotion() : null;
         this.view = v;
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         if (this.sel && (!this.myTurn() || !v.legalSpaces.includes(this.sel.space))) this.sel = null;
@@ -454,12 +470,44 @@ export default class UI {
         this.renderActions(v);
         if ($('#log').open) this.renderLog();
         this.playSounds(v);
+        if (moved) this.animateMotion(v, before);
+        // 結果の画面は、最後の手の動きが終わってから出す
         if (v.phase === 'end' && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // ---- 動き（描き直しの前後の差） ----
+
+    // 描き直す前：行動スペース（置いた人とたまった資源）・各プレイヤーの数・農場のマス
+    captureMotion() {
+        return {
+            spaces: snapshot($('#board'), '.space', SPACE_MOTION),
+            amounts: snapshot(document, AMOUNTS, { key: amountKey }),
+            farm: snapshot($('#farm'), '[data-cell]', FARM_MOTION)
+        };
+    }
+
+    // 描いたあと：置いたワーカーはその人の欄から飛ばし、たまった資源・数が変わったら目立たせ、
+    // 農場の変わったマスと、新しく出たラウンドのスペースは、はねて出す
+    animateMotion(v, before) {
+        animateDiff(before.spaces, $('#board'), '.space', {
+            ...SPACE_MOTION,
+            change: (el, id, old) => {
+                const by = v.spaces.find(s => s.id === id)?.by ?? null;
+                if (by !== null && !old.value.startsWith('taken')) flyIn(el.querySelector('.tok'), this.playerPanel(v, by));
+                else Motion.pulse(el.querySelector('.sp-goods') ?? el, { duration: 380, scale: 1.15 });
+            }
+        });
+        animateDiff(before.amounts, document, AMOUNTS, { key: amountKey });
+        animateDiff(before.farm, $('#farm'), '[data-cell]', { ...FARM_MOTION, enter: null, change: el => Motion.popIn(el, { duration: 320 }) });
+    }
+
+    playerPanel(v, seat) {
+        return seat === v.you ? $('#me .me-row') : $(`#players .pl[data-seat="${seat}"]`);
     }
 
     renderStatus(v) {
