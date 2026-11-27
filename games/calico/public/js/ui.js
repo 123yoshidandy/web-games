@@ -17,6 +17,7 @@ import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { symbolsSvg, patchSvg, tileSvg, goalSvg, goalTileSvg, catSvg, buttonSvg, patternSwatch, colorSwatch, hexPoints, COLOR_INFO } from './art.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'calico';
 const SETTINGS_KEY = 'calico.settings';
@@ -89,9 +90,14 @@ export default class UI {
         this.draft = null;   // 下書きのマス
         this.goalPicks = [];
         this.fresh = new Set();
-        this.resultTimer = null;
+        this.resultTimer = () => {}; // 結果を出す予約を取り消す関数
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'キャリコ',
@@ -170,8 +176,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
-        this.resultTimer = null;
+        this.resultTimer();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -304,6 +309,7 @@ export default class UI {
             if (e.type === 'place') this.fresh.add(`${e.seat}:${e.cell}`);
         });
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        if (this.fresh.size) Motion.hold(350); // 置いた模様の現れる動き（CSS）が終わるまで CPU を待たせる
         if (!this.canPlace()) this.clearSelection();
         if (this.sel !== null && this.sel >= (view.players[view.you].hand?.length ?? 0)) this.clearSelection();
         if (prev && prev.current !== view.current && view.current === view.you) this.viewSeat = view.you;
@@ -315,8 +321,8 @@ export default class UI {
         this.renderNote();
         this.maybeAskGoals();
         if (view.phase === 'end' && prev && prev.phase !== 'end') {
-            clearTimeout(this.resultTimer);
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.resultTimer();
+            this.resultTimer = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
     }
 

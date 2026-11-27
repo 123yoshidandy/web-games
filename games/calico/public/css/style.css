@@ -79,7 +79,7 @@ button {
     font-size: 16px;
     font-weight: 800;
     cursor: pointer;
-    transition: transform .08s, box-shadow .08s;
+    transition: transform calc(.08s * var(--motion-scale, 1)), box-shadow calc(.08s * var(--motion-scale, 1));
 }
 .btn.primary { color: #fff; background: linear-gradient(#a587c4, var(--plum)); box-shadow: 0 4px 0 var(--plum-deep); }
 .btn.secondary { color: #fff; background: linear-gradient(#d3ad80, var(--tan)); box-shadow: 0 4px 0 var(--tan-deep); }
@@ -123,12 +123,12 @@ button {
 .patch-hex { stroke: rgba(60, 40, 40, .28); stroke-width: .6; }
 .patch.edge { opacity: .78; }
 .patch.last .patch-hex { stroke: var(--glow); stroke-width: 3; vector-effect: non-scaling-stroke; }
-.patch.drop { animation: drop .35s ease-out backwards; }
+.patch.drop { animation: drop calc(.35s * var(--motion-scale, 1)) ease-out backwards; }
 @keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
 .patch.draft { opacity: .92; pointer-events: none; }
 .patch.draft .patch-hex { stroke: var(--glow); stroke-width: 3; stroke-dasharray: 7 4; vector-effect: non-scaling-stroke; }
 .cell { fill: rgba(255, 255, 255, .55); stroke: rgba(110, 80, 70, .3); stroke-width: 1.2; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke; }
-.cell.on { fill: rgba(255, 240, 210, .65); stroke: var(--glow); stroke-width: 2; stroke-dasharray: none; cursor: pointer; animation: hint 1.4s ease-in-out infinite; }
+.cell.on { fill: rgba(255, 240, 210, .65); stroke: var(--glow); stroke-width: 2; stroke-dasharray: none; cursor: pointer; animation: hint calc(1.4s * var(--motion-scale, 1)) ease-in-out infinite; }
 @keyframes hint { 50% { fill: rgba(255, 224, 168, .8); } }
 .goal-hex { fill: #fbf6ec; stroke: rgba(110, 80, 70, .35); stroke-width: .6; }
 .goal-stitch { fill: none; stroke: rgba(143, 107, 179, .45); stroke-width: .5; stroke-dasharray: 1.2 1; }
@@ -230,7 +230,7 @@ button {
 .tiles button { display: grid; place-items: center; width: 50px; height: 54px; padding: 0; border: none; border-radius: 10px; background: none; cursor: pointer; }
 .tiles button:disabled { cursor: default; }
 .tiles button.sel { background: rgba(240, 167, 58, .25); box-shadow: 0 0 0 2px var(--glow); }
-.tiles.choose button:not(:disabled) { animation: pick 1.4s ease-in-out infinite; }
+.tiles.choose button:not(:disabled) { animation: pick calc(1.4s * var(--motion-scale, 1)) ease-in-out infinite; }
 @keyframes pick { 50% { background: rgba(240, 167, 58, .28); } }
 .tiles .back { width: 40px; height: 44px; border-radius: 8px; background: repeating-linear-gradient(45deg, #d8c9e6 0 4px, #e9def2 4px 8px); }
 .confirm { min-width: 0; width: 56px; height: 52px; margin-left: auto; padding: 0; --ico: 26px; }
@@ -302,7 +302,7 @@ dialog h2:focus-visible { outline: none; }
     transform: translateX(-50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s;
+    transition: opacity calc(.2s * var(--motion-scale, 1));
 }
 .toast.show { opacity: 1; }
 
@@ -332,3 +332,8 @@ dialog h2:focus-visible { outline: none; }
 
 /* ヒント：おすすめの印 */
 .recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択肢と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(110, 80, 70, .12); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #fff; background: var(--plum); }
