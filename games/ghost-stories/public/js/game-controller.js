@@ -10,6 +10,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { suggest, runCpuStep, isCpuTurn } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_STEP_DELAY_MS = 650;
 const SAVE_KEY = 'ghost-stories.save';
@@ -40,7 +41,7 @@ export default class LocalGameController {
             : new Game(setup.players, setup.options);
         this.setup = { seed: this.game.options.seed };
         this.humanSeat = Math.max(0, this.game.players.findIndex(p => !p.isCPU));
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.save();
     }
 
@@ -93,9 +94,10 @@ export default class LocalGameController {
 
     // CPU の僧の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する（3回続けて進まなければ番を終える）
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (!isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        // 盤やカードの動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             const count = this.game.commands.length;
             try {
                 runCpuStep(this.game);
@@ -127,6 +129,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

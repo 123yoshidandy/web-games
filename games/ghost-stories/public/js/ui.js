@@ -14,6 +14,7 @@ import {
 } from './art.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -148,6 +149,7 @@ export default class UI {
     // ---- タイトル ----
 
     bindTitle() {
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         const seg = (id, key) => $(id).addEventListener('click', event => {
             const button = event.target.closest('button');
             if (!button) return;
@@ -231,6 +233,7 @@ export default class UI {
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.view = null;
+        this.cancelResult?.();
         this.update();
     }
 
@@ -303,10 +306,13 @@ export default class UI {
             this.selected = key ? this.defaultTargets(v) : [];
         }
         if (prev && prev.logTotal !== v.logTotal) this.recommend = null;
+        // 僧の位置は、描き直す前に測る
+        const before = Motion.captureRects($('board'), '.pawn', 'key');
         this.render();
+        if (prev && prev.logTotal !== v.logTotal) this.animateChanges(prev, v, before);
         if (v.result && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.showResult(), 700);
+            this.cancelResult = Motion.afterIdle(() => this.showResult(), 700);
         }
     }
 
@@ -358,6 +364,33 @@ export default class UI {
         this.renderDock(v);
     }
 
+    // 描き直したあと：前のビューとの差を動かす（僧はタイルからタイルへ滑り、現れた幽霊・呪い・仏像は弾み、気・道教の駒・山の数は変わると目立ち、振った出目は弾んで出る）
+    animateChanges(prev, v, before) {
+        if (!Motion.enabled()) return;
+        const board = $('board');
+        Motion.flipFrom(before, board, '.pawn', 'key', { duration: 380, enter: null });
+        v.slots.forEach((s, i) => {
+            const old = prev.slots[i];
+            const cell = board.querySelector(`.slot[data-slot="${i}"]`);
+            if (s && (!old || old.card !== s.card)) Motion.popIn(cell?.firstElementChild, { duration: 380, delay: 120 });
+            else if (!s && v.buddhaAt[i] && !prev.buddhaAt[i]) Motion.popIn(cell?.querySelector('.buddha'), { duration: 360 });
+            else if (s && old && old.res !== s.res) Motion.pulse(cell?.firstElementChild, { duration: 360, scale: 1.12 });
+        });
+        v.tiles.forEach((t, i) => {
+            if (t.haunted && !prev.tiles[i]?.haunted) Motion.popIn(board.querySelector(`.tile[data-tile="${i}"] .curse-seal`), { duration: 380, delay: 120 });
+        });
+        v.players.forEach((p, i) => {
+            const old = prev.players[i];
+            const panel = board.querySelector(`.monk-panel[data-monk="${i}"]`);
+            if (!old || !panel) return;
+            if (p.qi !== old.qi) Motion.pulse(panel.querySelector('.mp-qi'), { duration: 380, scale: 1.25 });
+            if (p.tao.join() !== old.tao.join() || p.buddhas !== old.buddhas) Motion.pulse(panel.querySelector('.mp-tao'), { duration: 380, scale: 1.25 });
+        });
+        if (v.deckCount !== prev.deckCount) Motion.pulse($('stats').querySelector('.stat'), { duration: 380, scale: 1.25 });
+        if (v.hauntedCount !== prev.hauntedCount) Motion.pulse($('stats').children[2], { duration: 380, scale: 1.25 });
+        if (v.dice && (!prev.dice || prev.logTotal !== v.logTotal)) $('tray').querySelectorAll('.die').forEach((die, k) => Motion.popIn(die, { duration: 320, delay: k * 80 }));
+    }
+
     renderStats(v) {
         const until = v.untilIncarnation === null ? (v.result?.won ? '祓った' : '出現') : `あと${v.untilIncarnation}枚`;
         $('stats').innerHTML = `
@@ -391,7 +424,7 @@ export default class UI {
                 <span class="t-name">${info.name}</span>
                 ${t.key === 'prayer' && v.prayer !== null ? `<span class="prayer-dot" style="--pc:${COLOR_HEX[v.prayer]}" title="祈りの色"></span>` : ''}
                 ${t.key === 'temple' ? `<span class="temple-count" title="仏堂の仏像">${'●'.repeat(v.temple)}</span>` : ''}
-                <span class="t-monks">${monks.map(p => `<span class="pawn ${p.id === v.current ? 'active' : ''}">${monkSvg(p.id)}</span>`).join('')}</span>
+                <span class="t-monks">${monks.map(p => `<span class="pawn ${p.id === v.current ? 'active' : ''}" data-key="monk${p.id}">${monkSvg(p.id)}</span>`).join('')}</span>
                 ${haunters.map(c => `<span class="haunter">${haunterSvg(c)}</span>`).join('')}
                 ${t.haunted ? '<span class="curse-seal" aria-hidden="true">呪</span>' : ''}
             </button>`);
