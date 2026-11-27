@@ -6,14 +6,19 @@
  *
  * CPU の読みは重い（19路で1秒ほど）ので、ブラウザでは Web Worker（cpu-worker.js）で考えさせ、画面を止めない
  * Worker が使えない環境（テスト）では、その場で考える
+ *
+ * 持ち時間：手番が始まった時刻（端末の時刻）を game.turnStartedAt に入れ、操作のたびにかかった時間を渡す
+ * 時間を使い切ったら、タイマーで時間切れにする。CPU 戦では、アプリが隠れている間（pause〜resume）時計を止める（2人で遊ぶときは止めない）
+ * 「続きから」と待ったでは、その手番の時計は0から数え直す
  */
 
 import Game from './game.js';
-import { createGameView } from './game-view.js';
-import { runCpuStep, isCpuTurn, cpuSeat } from './cpu-player.js';
+import { createGameView, clockView } from './game-view.js';
+import { runCpuStep, applyDecision, isCpuTurn, cpuSeat, clockBudget } from './cpu-player.js';
 
-const CPU_MOVE_MS = 450;      // 前の手が見えるように、少し待ってから考え始める
+const CPU_MOVE_MS = 450;      // 前の手が見えるように、少し待ってから考え始める（持ち時間が少ないときは縮める）
 const CPU_CONFIRM_MS = 250;
+const FLAG_SLACK_MS = 5;      // 時間切れのタイマーを、ちょうどの時刻より少しあとにする
 const SAVE_KEY = 'go.save';
 
 export function loadSavedGame() {
@@ -43,8 +48,12 @@ function createWorker() {
 
 export default class LocalGameController {
     // setup: { players, options } か、保存した { players, options, commands }。listeners: onUpdate()・onError(message)
-    constructor(setup, listeners = {}) {
+    // now：時計の時刻（テストで差し替える）
+    constructor(setup, listeners = {}, { now = () => Date.now() } = {}) {
         this.listeners = listeners;
+        this.wallNow = now;
+        this.pausedAt = null;     // 時計を止めた時刻（止めていなければ null）
+        this.flagTimer = null;
         this.game = setup.commands
             ? Game.replay(setup.players, setup.options ?? {}, setup.commands)
             : new Game(setup.players, setup.options ?? {});
@@ -64,7 +73,19 @@ export default class LocalGameController {
                 this.scheduleCpu();
             }
         });
+        this.game.turnStartedAt = this.clockNow();
         this.save();
+        this.scheduleFlag();
+    }
+
+    // 時計の今の時刻（止めている間は、止めた時刻のまま）
+    clockNow() {
+        return this.pausedAt ?? this.wallNow();
+    }
+
+    // 時計が進んでいる席が、この手番にかけた時間
+    elapsed() {
+        return this.clockNow() - this.game.turnStartedAt;
     }
 
     get twoPlayers() {
@@ -81,6 +102,7 @@ export default class LocalGameController {
         view.canUndo = this.undoLength() !== null;
         view.thinking = this.thinking;
         view.twoPlayers = this.twoPlayers;
+        view.clockPaused = this.pausedAt !== null;
         return view;
     }
 
@@ -98,11 +120,15 @@ export default class LocalGameController {
         if (this.game.isOver() || !command) return false;
         const seat = this.seatFor(command);
         if (!this.humanSeats.includes(seat)) return false;
+        if (this.game.isFlagged(this.elapsed())) {
+            this.flag();
+            return false;
+        }
         const before = this.game.persist();
         let ok;
         try {
-            ok = this.game.applyCommand(seat, command);
-            // 2人で1台なら、確定は2人分まとめて行う
+            ok = this.game.applyCommand(seat, command, this.elapsed());
+            // 2人で1台なら、確定は2人分まとめて行う（死に石を決める段階なので、時計は止まっている）
             if (ok && command.type === 'confirm' && this.twoPlayers) {
                 this.humanSeats.filter(s => !this.game.agreed[s] && !this.game.isOver()).forEach(s => this.game.applyCommand(s, command));
             }
@@ -142,9 +168,54 @@ export default class LocalGameController {
     }
 
     afterChange() {
+        this.game.turnStartedAt = this.clockNow();
         this.save();
         this.listeners.onUpdate?.();
         this.scheduleCpu();
+        this.scheduleFlag();
+    }
+
+    // ---- 持ち時間 ----
+
+    // 時計が進んでいれば、時間切れの時刻にタイマーを置く
+    scheduleFlag() {
+        clearTimeout(this.flagTimer);
+        this.flagTimer = null;
+        const limit = this.game.clockLimit();
+        if (limit === null || this.pausedAt !== null) return;
+        this.flagTimer = setTimeout(() => this.flag(), Math.max(0, limit - this.elapsed()) + FLAG_SLACK_MS);
+    }
+
+    // 時間を使い切っていたら、時間切れで終える
+    flag() {
+        const seat = this.game.clockSeat();
+        if (seat === null) return false;
+        const elapsed = this.elapsed();
+        if (!this.game.isFlagged(elapsed)) {
+            this.scheduleFlag();
+            return false;
+        }
+        this.cancelThinking();
+        this.game.timeout(seat, elapsed);
+        this.afterChange();
+        return true;
+    }
+
+    // アプリが隠れたら、CPU 戦の時計を止める（2人で遊ぶときと、時計なし・時計が止まっているときは止めない）
+    pause() {
+        if (this.pausedAt !== null || this.twoPlayers || this.game.clockSeat() === null) return;
+        this.pausedAt = this.wallNow();
+        clearTimeout(this.flagTimer);
+        this.flagTimer = null;
+        this.listeners.onUpdate?.();
+    }
+
+    resume() {
+        if (this.pausedAt === null) return;
+        this.game.turnStartedAt += this.wallNow() - this.pausedAt;
+        this.pausedAt = null;
+        this.scheduleFlag();
+        this.listeners.onUpdate?.();
     }
 
     cancelThinking() {
@@ -157,7 +228,10 @@ export default class LocalGameController {
     scheduleCpu() {
         clearTimeout(this.cpuTimer);
         if (this.thinking || !isCpuTurn(this.game)) return;
-        const delay = this.game.phase === 'scoring' ? CPU_CONFIRM_MS : CPU_MOVE_MS;
+        // 持ち時間が少ないときは、手を見せる間も縮める
+        const budget = clockBudget({ clock: clockView(this.game), size: this.game.size, moveNumber: this.game.moveNumber });
+        const delay = this.game.phase === 'scoring' ? CPU_CONFIRM_MS
+            : budget === null ? CPU_MOVE_MS : Math.min(CPU_MOVE_MS, Math.floor(budget * 0.2));
         this.cpuTimer = setTimeout(() => this.stepCpu(), delay);
     }
 
@@ -176,7 +250,7 @@ export default class LocalGameController {
             return;
         }
         try {
-            runCpuStep(this.game);
+            runCpuStep(this.game, { elapsed: this.elapsed() });
         } catch (error) {
             console.error(error);
         } finally {
@@ -194,7 +268,10 @@ export default class LocalGameController {
             return;
         }
         try {
-            if (!command || !this.game.applyCommand(pending.seat, command)) runCpuStep(this.game);
+            // 考えている間に時間を使い切っていたら、時間切れで終える。断られたら、いちばん単純な答え（パス）で進める
+            // 答えがなければ（Worker の中の例外）、その場で考え直す
+            if (command) applyDecision(this.game, pending.seat, command, this.elapsed());
+            else runCpuStep(this.game, { elapsed: this.elapsed() });
         } catch (error) {
             console.error(error);
         } finally {
@@ -203,6 +280,8 @@ export default class LocalGameController {
     }
 
     afterCpu() {
+        this.game.turnStartedAt = this.clockNow();
+        this.scheduleFlag();
         this.save();
         try {
             this.listeners.onUpdate?.();
@@ -220,6 +299,8 @@ export default class LocalGameController {
 
     stop() {
         this.cancelThinking();
+        clearTimeout(this.flagTimer);
+        this.flagTimer = null;
         this.worker?.terminate();
         this.worker = null;
     }

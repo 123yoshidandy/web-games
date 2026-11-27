@@ -22,7 +22,7 @@ describe('オンライン対戦（囲碁）', () => {
         const server = createTestServer(definition);
         const [a, b] = await server.createRoom(['くろ', 'しろ']);
         await a.send('setSettings', { settings: { size: '13' } });
-        expect(b.last('lobby').settings).toEqual({ size: '13' });
+        expect(b.last('lobby').settings).toEqual({ size: '13', clock: 'none' });
         await a.send('start');
         expect(b.last('state').view.size).toBe(13);
     });

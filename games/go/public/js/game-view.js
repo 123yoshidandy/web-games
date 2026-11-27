@@ -5,6 +5,16 @@
 
 import { colorOf } from './rules.js';
 
+export function clockView(game) {
+    if (!game.clock) return null;
+    return {
+        config: { ...game.clockConfig },
+        sides: game.clock.map(side => ({ ...side })),
+        running: game.clockSeat(),
+        startedAt: game.turnStartedAt ?? null
+    };
+}
+
 export function createGameView(game, seat, { since = 0 } = {}) {
     const over = game.isOver();
     const scoring = game.phase === 'scoring';
@@ -31,6 +41,8 @@ export function createGameView(game, seat, { since = 0 } = {}) {
         // 死に石を決める段階と、数えて終わったあと：地の持ち主と点
         owner: score ? score.owner : null,
         score: score ? { black: score.black, white: score.white, diff: score.diff } : null,
+        // 持ち時間（時計なしは null）。startedAt は手番が始まった時刻（ローカルは端末の時刻、オンラインはサーバーの時刻）
+        clock: clockView(game),
         result: game.result ? structuredClone(game.result) : null,
         winner: game.winner,
         over,

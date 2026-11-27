@@ -80,6 +80,10 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 }
 .segmented button[aria-checked="true"] { color: #2a1d05; background: var(--gold); }
 .segmented .stone { width: 18px; height: 18px; }
+.clock-setting { display: flex; align-items: center; gap: 8px; }
+.clock-caption { color: var(--muted); font-size: 12px; font-weight: 700; }
+.segmented.clocks { display: inline-grid; grid-template-columns: repeat(3, auto); }
+.segmented.clocks button { height: 30px; font-size: 14px; }
 
 .steppers { display: flex; gap: 10px; }
 .stepper { display: inline-flex; align-items: center; gap: 2px; height: 40px; padding: 3px 3px 3px 10px; border-radius: 10px; background: rgba(0, 0, 0, .35); box-shadow: inset 0 0 0 1px rgba(217, 180, 90, .15); }
@@ -118,6 +122,19 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .player.active .name { color: var(--gold-light); }
 .player.thinking { animation: think 1.2s ease-in-out infinite; }
 .player.won { box-shadow: inset 0 0 0 2px var(--gold-light); background: rgba(217, 180, 90, .24); }
+/* 持ち時間（帯の右端）。手番の時計は明るく、残り10秒で赤くする */
+.player .clock {
+    flex: none; margin-left: auto; min-width: 3.4em; padding: 1px 6px; border-radius: 6px; text-align: center; white-space: nowrap;
+    color: var(--muted); background: rgba(0, 0, 0, .3); font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.player .clock.running { color: #2a1d05; background: var(--gold-light); }
+.player .clock.low { color: #fff; background: #c0392b; }
+.player .clock.paused { opacity: .55; }
+/* 時計を出すときは、狭いスマホでも名前とアゲハマが読めるように詰める */
+.players.timed .player { gap: 6px; padding: 0 7px; }
+.players.timed .player .stone { width: 22px; height: 22px; }
+.players.timed .player .clock { min-width: 0; padding: 1px 4px; font-size: 15px; }
+.players.timed .player .sub { font-size: 11px; }
 @keyframes think { 50% { background: rgba(217, 180, 90, .05); } }
 
 .play-area { flex: 1 1 0; min-height: 0; container-type: size; display: grid; place-items: center; }
@@ -187,7 +204,10 @@ dialog .link { align-self: center; padding: 2px 8px; }
 }
 .toast.show { opacity: 1; }
 
-/* 低い画面では、タイトルの絵を小さくする */
+/* 低い画面では、タイトルの絵を小さくする（持ち時間の行の分も入るように） */
+@media (max-height: 760px) {
+    .title-art { width: min(110px, 15dvh); height: min(110px, 15dvh); }
+}
 @media (max-height: 600px) {
     .title-art { width: 96px; height: 96px; }
     .logo { font-size: 36px; }
@@ -216,3 +236,7 @@ dialog .link { align-self: center; padding: 2px 8px; }
 #hint:disabled { opacity: .35; cursor: default; }
 .recommended { outline: 3px solid #fff; outline-offset: 1px; box-shadow: 0 0 0 6px rgba(255, 210, 87, .7), 0 0 18px rgba(255, 210, 87, .8); }
 #board .recommended { fill: none; stroke: #ffd257; outline: none; box-shadow: none; }
+
+/* オンラインのロビー：持ち時間の選択肢が多いので、折り返して3つずつ並べる（ラベルの途中で改行しない） */
+.netplay-lobby .np-segment { flex-wrap: wrap; }
+.netplay-lobby .np-segment button { flex: 1 0 30%; white-space: nowrap; }

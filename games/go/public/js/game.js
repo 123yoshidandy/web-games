@@ -17,6 +17,12 @@
  * - resume：死に石を決める段階から、打つ段階に戻る
  * - confirm：死に石を決める段階で、今の指定でよいと伝える。2人そろったら終わり
  * - resign：投了（打つ段階と死に石を決める段階。手番でなくてもよい）
+ *
+ * 持ち時間（options.clock。clock.js）
+ * - 時計が進むのは、打つ段階の手番の人だけ。死に石を決める段階では、どちらの時計も止める
+ * - 操作のたびに、かかった時間（ミリ秒）を記録に残す。秒読みは、打つ・パスのたびに数え直す
+ * - 時間切れは記録の { type: 'timeout' }（端末からは送れない）。相手の勝ち
+ * - 時刻は持たない。手番が始まった時刻（turnStartedAt）は、コントローラーとサーバーが外から入れる
  */
 
 import {
@@ -24,6 +30,7 @@ import {
     scoreJapanese, handicapPoints, MAX_HANDICAP, sqName, COLOR_NAME
 } from './rules.js';
 import { ownership, boardSeed } from './engine.js';
+import { normalizeClock, createClockSides, limitOf, spend } from './clock.js';
 
 export const PLAYERS = 2;
 const MAX_LOGS = 800;
@@ -34,7 +41,18 @@ export const COMMAND_FIELDS = { move: ['sq'], pass: [], mark: ['sq', 'dead'], re
 
 export const DEFAULT_OPTIONS = { size: 19, komi: 6.5, handicap: 0 };
 
-// オプションを確かめてそろえる（変な値は断る）
+// 持ち時間の選び方（タイトル画面とロビー。この順に並べる。名前を '3' のような数字だけにすると、オブジェクトの中で 'none' より前に並んでしまう）。切れ負けと、日本式の秒読み（持ち時間を使い切ったら、1手30秒の秒読みを3回まで）
+export const CLOCK_PRESETS = {
+    none: { label: 'なし', clock: null },
+    '3m': { label: '3分', clock: { main: 180000 } },
+    '5m': { label: '5分', clock: { main: 300000 } },
+    '10m': { label: '10分', clock: { main: 600000 } },
+    '5m+30x3': { label: '5分+30秒×3', clock: { main: 300000, byoyomi: 30000, periods: 3 } },
+    '10m+30x3': { label: '10分+30秒×3', clock: { main: 600000, byoyomi: 30000, periods: 3 } }
+};
+export const clockOption = (key) => (Object.hasOwn(CLOCK_PRESETS, key) ? CLOCK_PRESETS[key].clock : null);
+
+// オプションを確かめてそろえる（変な値は断る）。持ち時間（clock）は、あるときだけ入れる
 export function normalizeOptions(options = {}) {
     const size = options.size ?? DEFAULT_OPTIONS.size;
     if (!SIZES.includes(size)) throw new Error('盤の大きさが正しくありません');
@@ -42,14 +60,18 @@ export function normalizeOptions(options = {}) {
     if (!Number.isInteger(handicap) || handicap < 0 || handicap === 1 || handicap > MAX_HANDICAP[size]) throw new Error('置き石の数が正しくありません');
     const komi = options.komi ?? DEFAULT_OPTIONS.komi;
     if (typeof komi !== 'number' || !Number.isFinite(komi) || Math.abs(komi) > 50 || Math.round(komi * 2) !== komi * 2) throw new Error('コミが正しくありません');
-    return { size, komi, handicap };
+    const clock = normalizeClock(options.clock);
+    return clock ? { size, komi, handicap, clock } : { size, komi, handicap };
 }
 
 export default class Game {
-    // players: [{ name, isCPU, cpuLevel }]（席0：黒、席1：白）。options: { size, komi, handicap }
+    // players: [{ name, isCPU, cpuLevel }]（席0：黒、席1：白）。options: { size, komi, handicap, clock（なければ時計なし） }
     constructor(players, options = {}) {
         if (players.length !== PLAYERS) throw new Error('2人で遊びます');
         this.options = normalizeOptions(options);
+        this.clockConfig = this.options.clock ? { ...this.options.clock } : null;
+        this.clock = this.clockConfig ? createClockSides(this.clockConfig) : null;
+        this.turnStartedAt = null;  // 手番が始まった時刻（コントローラーとサーバーが入れる。記録には入れない）
         this.players = players.map((p, id) => ({ id, name: String(p.name ?? `プレイヤー${id + 1}`), isCPU: !!p.isCPU, cpuLevel: p.cpuLevel ?? null }));
         const { size, handicap } = this.options;
         this.size = size;
@@ -66,7 +88,7 @@ export default class Game {
         this.dead = [];
         this.agreed = [false, false];
         this.lastMove = null;                               // { seat, sq（パスは -1）, captured }
-        this.result = null;                                 // { winner（席。持碁は null）, reason: 'score' | 'resign', score }
+        this.result = null;                                 // { winner（席。持碁は null）, reason: 'score' | 'resign' | 'timeout', score }
         this.commands = [];
         this.logs = [];
         this.events = [];
@@ -102,7 +124,59 @@ export default class Game {
         return scoreJapanese(this.board, this.size, { dead: this.dead, prisoners: this.prisoners, komi: this.options.komi });
     }
 
-    applyCommand(playerId, command) {
+    // ---- 持ち時間 ----
+
+    // 時計が進んでいる席（打つ段階の手番の人。時計なし・死に石を決める段階・終わったあとは null）
+    clockSeat() {
+        if (!this.clock || this.phase !== 'play') return null;
+        return this.current;
+    }
+
+    // 手番を始めてから、時間切れになるまでの時間（時計が進んでいなければ null）
+    clockLimit() {
+        const seat = this.clockSeat();
+        return seat === null ? null : limitOf(this.clockConfig, this.clock[seat]);
+    }
+
+    // 手番を始めて elapsed ミリ秒たったら、時間切れか
+    isFlagged(elapsed) {
+        const limit = this.clockLimit();
+        return limit !== null && elapsed >= limit;
+    }
+
+    // 時間切れで終える（相手の勝ち）。seat は時計が進んでいる席
+    timeout(seat, elapsed) {
+        this.lastError = null;
+        if (seat !== this.clockSeat()) return this.fail('時間切れにできません');
+        const ms = Math.max(0, Math.round(elapsed) || 0);
+        if (ms < this.clockLimit()) return this.fail('まだ時間があります');
+        const winner = 1 - seat;
+        this.clock[seat] = { main: 0, periods: 0 };
+        this.commands.push({ playerId: seat, command: { type: 'timeout' }, ms });
+        this.phase = 'end';
+        this.result = { winner, reason: 'timeout', score: null };
+        this.log(`${this.players[seat].name}：時間切れ。${resultText(this)}`);
+        this.pushEvent({ type: 'end', winner, reason: 'timeout' });
+        return true;
+    }
+
+    // 操作を受け付ける。elapsed：時計が進んでいる席が、この手番にかけた時間（ミリ秒。時計なしなら見ない）
+    // 時間を使い切っていたら断る（呼ぶ側が先に timeout で終える）
+    applyCommand(playerId, command, elapsed = 0) {
+        const seat = this.clockSeat();
+        const ms = Math.max(0, Math.round(elapsed) || 0);
+        if (seat !== null && ms >= this.clockLimit()) return this.fail('時間切れです');
+        const count = this.commands.length;
+        const ok = this.applyAction(playerId, command);
+        if (ok && this.clock && this.commands.length > count) {
+            // 死に石を決める段階の操作は、時計が止まっているので 0 として残す
+            this.commands.at(-1).ms = seat === null ? 0 : ms;
+            if (seat !== null) this.clock[seat] = spend(this.clockConfig, this.clock[seat], ms).side;
+        }
+        return ok;
+    }
+
+    applyAction(playerId, command) {
         this.lastError = null;
         if (this.isOver()) return this.fail('対局は終わっています');
         if (playerId !== 0 && playerId !== 1) return this.fail('席が正しくありません');
@@ -247,10 +321,12 @@ export default class Game {
         };
     }
 
+    // 記録から再現する。ms（かかった時間）のない古い記録は 0 として読む
     static replay(players, options, commands) {
         const game = new Game(players, options);
-        commands.forEach(({ playerId, command }, index) => {
-            if (!game.applyCommand(playerId, command)) throw new Error(`操作 ${index} を再現できませんでした: ${game.lastError}`);
+        commands.forEach(({ playerId, command, ms = 0 }, index) => {
+            const ok = command?.type === 'timeout' ? game.timeout(playerId, ms) : game.applyCommand(playerId, command, ms);
+            if (!ok) throw new Error(`操作 ${index} を再現できませんでした: ${game.lastError}`);
         });
         return game;
     }
@@ -277,13 +353,14 @@ export function estimateDead(board, size, komi = 0) {
     return dead.sort((a, b) => a - b);
 }
 
-// 「黒の3目半勝ち」「白の中押し勝ち」「持碁」
+// 「黒の3目半勝ち」「白の中押し勝ち」「白の時間切れ勝ち」「持碁」
 export function resultText(game) {
     const r = game.result;
     if (!r) return '';
     if (r.winner === null) return '持碁';
     const color = COLOR_NAME[colorOf(r.winner)];
     if (r.reason === 'resign') return `${color}の中押し勝ち`;
+    if (r.reason === 'timeout') return `${color}の時間切れ勝ち`;
     return `${color}の${marginText(Math.abs(r.score.diff))}勝ち`;
 }
 
