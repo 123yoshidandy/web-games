@@ -7,10 +7,15 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_ACTION_DELAY_MS = 600; // CPU が出す・獲得する・攻撃する前は、前の手が見えるように待つ
 const CPU_CHOICE_DELAY_MS = 500; // 効果で選ぶものに答えるとき
 const CPU_TURN_DELAY_MS = 900;   // CPU の手番の始め（あなたの手番の終わりが見えるように）
+// カードが動くときは、動き終わってから数える。動きが間の代わりになるので短くする
+const MOTION_ACTION_DELAY_MS = 350;
+const MOTION_CHOICE_DELAY_MS = 350;
+const MOTION_TURN_DELAY_MS = 600;
 const SAVE_KEY = 'star-realms.save';
 
 export function loadSavedGame() {
@@ -37,7 +42,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = Math.max(0, this.game.players.findIndex(p => !p.isCPU));
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.save();
     }
@@ -80,12 +85,15 @@ export default class LocalGameController {
 
     // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
         if (!isCpuTurn(this.game)) return;
         const last = this.game.commands.at(-1);
-        const delay = this.game.prompts.length ? CPU_CHOICE_DELAY_MS
-            : (!last || last.playerId !== this.game.current) ? CPU_TURN_DELAY_MS : CPU_ACTION_DELAY_MS;
-        this.cpuTimer = setTimeout(() => {
+        const moving = Motion.enabled();
+        const delay = this.game.prompts.length ? (moving ? MOTION_CHOICE_DELAY_MS : CPU_CHOICE_DELAY_MS)
+            : (!last || last.playerId !== this.game.current) ? (moving ? MOTION_TURN_DELAY_MS : CPU_TURN_DELAY_MS) : (moving ? MOTION_ACTION_DELAY_MS : CPU_ACTION_DELAY_MS);
+        // 画面の動きが終わってから間をおいて打つ（動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 const before = this.game.commands.length;
                 runCpuStep(this.game);
@@ -117,6 +125,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

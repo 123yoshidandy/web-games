@@ -14,6 +14,8 @@ import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, cardHtml, icon, emblem } from './art.js';
 import { cardLines, effectsText, typeName } from './card-text.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate } from './animator.js';
 
 const SETTINGS_KEY = 'star-realms.settings';
 const CPU_NAMES = { easy: 'アルタイル', normal: 'ベガ' };
@@ -86,6 +88,9 @@ export default class UI {
             }
         });
         this.bindStatic();
+        // 動きの速さ（普通・速い・なし）。タイトルと、遊び方のダイアログに置く
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '' });
         this.renderTitleArt();
         this.renderHelp();
     }
@@ -156,7 +161,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -423,6 +428,10 @@ export default class UI {
         if (!this.controller) return;
         const view = this.controller.getView();
         this.recordLocalResult(view);
+        // 新しいできごとがあれば、描き直す前に位置を測り、描いたあとで動かす
+        const moved = this.lastSeq !== null && (view.events.at(-1)?.seq ?? 0) !== this.lastSeq;
+        const before = moved ? measure() : null;
+        const previous = this.view;
         this.view = view;
         // 始めた時点までの出来事は鳴らさない
         const lastSeq = this.lastSeq;
@@ -432,6 +441,7 @@ export default class UI {
         this.renderZones(view);
         this.renderRow(view);
         this.renderHand(view);
+        animate(before, previous, view);
         const last = view.logs.at(-1) ?? '';
         $('#ticker').textContent = last;
         this.syncPrompt(view);
@@ -440,7 +450,8 @@ export default class UI {
         this.markHint();
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            // 動き終わってから結果を出す
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
