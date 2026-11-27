@@ -328,6 +328,7 @@ export class NetplayLobby {
     }
 
     // 入口（名前・部屋を作る・参加できる部屋の一覧）を出す。部屋はすべて公開で、部屋番号は画面に出さない
+    // 待っている部屋がなく、名前がわかれば、そのまま部屋を作る（名前がなければ入口のまま）
     // invited: 招待URLの部屋に入る画面（名前と「参加する」「戻る」だけ）
     open({ roomCode = null, invited = false } = {}) {
         if (!this.available) return;
@@ -340,7 +341,7 @@ export class NetplayLobby {
         this.ref('join-row').hidden = !invited;
         this.show('menu');
         if (invited && !this.savedName()) this.ref('name').focus();
-        if (!invited) this.findRooms();
+        if (!invited) this.findRooms({ autoCreate: true });
     }
 
     // 結果の「もう一度」：ロビーを出す（ホストが「ゲーム開始」で再戦する）
@@ -499,7 +500,8 @@ export class NetplayLobby {
         }
     }
 
-    async findRooms() {
+    // autoCreate: 待っている部屋がなく、名前がわかれば、そのまま部屋を作る（入口を開いたときだけ。「一覧を更新」では作らない）
+    async findRooms({ autoCreate = false } = {}) {
         const list = this.ref('rooms');
         list.replaceChildren(this.item('探しています…'));
         const stale = () => this.mode !== 'menu';  // 返事を待つ間に、部屋を作った・入った・閉じた
@@ -508,6 +510,7 @@ export class NetplayLobby {
             if (stale()) return;
             if (!rooms.length) {
                 list.replaceChildren(this.item('待っている部屋はありません'));
+                if (autoCreate && this.savedName() && this.ref('name').value.trim()) this.create();
                 return;
             }
             list.replaceChildren(...rooms.map(room => {

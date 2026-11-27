@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, afterEach, beforeEach, beforeAll, afterAll } from 'vitest';
 import { resolveOnlineServerUrl, OnlineGameController, NetplayLobby } from '../client/netplay-lobby.js';
 import NetplayClient from '../client/netplay-client.mjs';
 import { startDevServer } from '../server/dev-server.js';
@@ -102,6 +102,7 @@ describe('NetplayLobby の画面（部屋はすべて公開で、部屋番号は
         expect(text).toContain('あお の部屋');
         expect(text).toContain('1/4人・勝ち数：3勝');
         expect(text).not.toContain(code);
+        expect(lobby.mode).toBe('menu'); // 待っている部屋があれば、自分では作らない
 
         // 一覧の部屋を押すと入れる。待合室にも部屋番号は出ない
         lobby.ref('rooms').querySelector('button').click();
@@ -113,7 +114,7 @@ describe('NetplayLobby の画面（部屋はすべて公開で、部屋番号は
     });
 
     it('入口の「戻る」は、部屋に入っていなければ、一覧を取るための接続を閉じて入口を閉じるだけ（onExit は呼ばない）', async () => {
-        dom = installFakeDom({ storage: { 'netplay.name': 'あお' } });
+        dom = installFakeDom(); // 名前がわからないので、部屋がなくても自分では作らない
         let exited = 0;
         const lobby = newLobby({ onExit: () => { exited++; } });
         lobby.open();
@@ -128,9 +129,10 @@ describe('NetplayLobby の画面（部屋はすべて公開で、部屋番号は
     });
 
     it('部屋を作ると公開の部屋になり、待合室と招待の文に部屋番号を出さない（招待URLには入る）', async () => {
-        dom = installFakeDom({ storage: { 'netplay.name': 'あお' } });
+        dom = installFakeDom();
         const lobby = newLobby();
         lobby.open();
+        lobby.ref('name').value = 'あお';
         lobby.root.querySelector('[data-act="create"]').click();
         await waitFor(() => lobby.mode === 'lobby');
         const code = lobby.controller.lobby.roomCode;
@@ -178,5 +180,72 @@ describe('NetplayLobby の画面（部屋はすべて公開で、部屋番号は
         expect(await second.boot()).toBe(true);
         await waitFor(() => second.mode === 'lobby' && host.lobby.players.length === 3);
         expect(visibleText(card(second))).not.toContain(code);
+    });
+});
+
+describe('NetplayLobby の入口：待っている部屋がなければ、すぐに部屋を作る', () => {
+    let dev;
+    let url;
+    let dom;
+    const opened = [];
+
+    // ほかのテストの部屋が一覧に混ざらないように、テストごとにサーバーを立てる
+    beforeEach(() => {
+        const port = 23787 + Math.floor(Math.random() * 1000);
+        dev = startDevServer(raceGame, { port, log: () => {} });
+        url = `ws://localhost:${port}`;
+    });
+    afterEach(() => {
+        opened.splice(0).forEach(item => item.close());
+        dom?.restore();
+        dom = null;
+        dev.close();
+    });
+
+    const newLobby = () => {
+        const lobby = new NetplayLobby({ title: 'はやとき', game: 'race', serverUrl: url, storageKey: 'test.lobby.auto' });
+        opened.push({ close: () => lobby.controller?.net.close() });
+        return lobby;
+    };
+    const newClient = (storageKey) => {
+        const client = new NetplayClient({ serverUrl: url, storageKey });
+        opened.push(client);
+        return client;
+    };
+
+    it('名前がわかれば、一覧が空のときは、開くだけで部屋を作って待合室に入る（1部屋だけ）', async () => {
+        dom = installFakeDom({ storage: { 'netplay.name': 'あお' } });
+        const lobby = newLobby();
+        lobby.open();
+        await waitFor(() => lobby.mode === 'lobby');
+        expect(lobby.controller.lobby.public).toBe(true);
+        expect(lobby.controller.isHost()).toBe(true);
+        const rooms = await newClient('test.lobby.auto.finder').listRooms();
+        expect(rooms.map(room => room.hostName)).toEqual(['あお']);
+    });
+
+    it('名前がわからなければ、部屋を作らずに入口のまま（名前を入れて「部屋を作る」を押す）', async () => {
+        dom = installFakeDom();
+        const lobby = newLobby();
+        lobby.open();
+        await waitFor(() => visibleText(lobby.ref('rooms')).includes('待っている部屋はありません'));
+        expect(lobby.mode).toBe('menu');
+        expect(lobby.controller.net.isInRoom()).toBe(false);
+    });
+
+    it('「一覧を更新」では、一覧が空でも部屋を作らない', async () => {
+        dom = installFakeDom({ storage: { 'netplay.name': 'あお' } });
+        const host = newClient('test.lobby.auto.host');
+        await host.createRoom('みどり');
+        await waitFor(() => host.lobby);
+        const lobby = newLobby();
+        lobby.open();
+        await waitFor(() => lobby.ref('rooms').querySelector('button'));
+        host.leave(); // 待っている部屋がなくなる
+        lobby.root.querySelector('[data-act="find"]').click();
+        await waitFor(() => visibleText(lobby.ref('rooms')).includes('待っている部屋はありません'));
+        await new Promise(resolve => setTimeout(resolve, 100));
+        expect(lobby.mode).toBe('menu');
+        expect(lobby.controller.net.isInRoom()).toBe(false);
     });
 });
