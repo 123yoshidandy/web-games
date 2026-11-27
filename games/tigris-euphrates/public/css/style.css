@@ -346,3 +346,11 @@ dialog h2:focus-visible { outline: none; }
 
 /* ヒントのおすすめ */
 .btn.recommended { box-shadow: 0 0 0 2px #7fe8ff, 0 0 12px rgba(127, 232, 255, .6); }
+
+/* 動きの速さ（共通の部品 motion の切り替え）を、人数・CPU の切り替えと同じ見た目にする。動く部品は、その形の中心を基準に拡大する */
+#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border: none; border-radius: 10px; background: rgba(0, 0, 0, .3); overflow: visible; }
+#motion-setting .motion-speed button { min-width: 44px; min-height: 0; height: 36px; padding: 0 10px; border-radius: 8px; justify-content: center; font-size: 15px; font-weight: 800; color: var(--muted); }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #2e2203; background: var(--gold); }
+[data-mk] { transform-box: fill-box; transform-origin: center; }
+.hand-count[data-mk], .chip [data-mk] { display: inline-block; }

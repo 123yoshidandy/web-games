@@ -11,6 +11,8 @@
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS, suggest } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import * as PieceMotion from './piece-motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -62,9 +64,10 @@ export default class UI {
         this.target = null;    // 下書きのマス
         this.support = null;   // 争いで出す枚数 { key, count }
         this.zoomed = false;
-        this.resultTimer = null;
+        this.cancelResult = null;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'チグリス・ユーフラテス',
@@ -126,6 +129,7 @@ export default class UI {
         this.target = null;
         this.support = null;
         this.setZoom(false);
+        this.animateNext = false; // 前の対戦の盤との差も動かさない
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         const view = this.controller.getView();
@@ -144,8 +148,8 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
-        this.resultTimer = null;
+        this.cancelResult?.();
+        this.cancelResult = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -498,19 +502,24 @@ export default class UI {
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (prev) this.playSound(view, prev, fresh);
         if (fresh.length) this.hintCommand = null;
+        // 描き直す前に駒・点の位置を測り、描いたあとで前との差を動かす
+        const before = this.animateNext ? PieceMotion.measure($('#screen-game')) : null;
+        this.animateNext = true;
         this.renderStatus(view);
         this.renderOthers(view);
         this.renderBoard(view);
         this.renderMine(view);
         this.renderNote(view);
         this.renderDock(view);
+        PieceMotion.animate(before, $('#screen-game'));
         this.markHint();
         this.announce(view, fresh);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end') this.recordLocalResult(view);
-        if (view.phase === 'end' && !$('#result').open && !this.resultTimer && !this.resultShown) {
-            this.resultTimer = setTimeout(() => {
-                this.resultTimer = null;
+        if (view.phase === 'end' && !$('#result').open && !this.cancelResult && !this.resultShown) {
+            // 盤の動きが終わってから出す
+            this.cancelResult = Motion.afterIdle(() => {
+                this.cancelResult = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
@@ -538,7 +547,7 @@ export default class UI {
             const current = view.phase !== 'end' && (view.current === p.id || view.answering.includes(p.id));
             return `<div class="other ${current ? 'current' : ''}" style="--seat:${SEAT_COLORS[p.id]}">
                 ${dynastySvg(this.dynasty(p.id), p.id)}<span class="name">${escapeHtml(p.name)}</span>
-                <span class="meta"><span class="hand-count" title="手札">${p.handCount}</span><span class="cats" title="大災害">${'<i></i>'.repeat(p.catastrophes)}</span></span>
+                <span class="meta"><span class="hand-count" title="手札" data-mk="hc-${p.id}" data-mv="${p.handCount}">${p.handCount}</span><span class="cats" title="大災害">${'<i></i>'.repeat(p.catastrophes)}</span></span>
             </div>`;
         }).join('');
     }
@@ -561,18 +570,19 @@ export default class UI {
             if (!x) return;
             const { x: px, y: py } = xy(c);
             const cls = recent.has(c) ? 'recent' : '';
+            // 描き直しの前後で見分けられるように包む（piece-motion.js）。タイルは手札から、指導者は前のマスから飛ぶ
             if (x.kind === 'tile') {
-                pieces += tileShape(x.color, px, py, cls);
+                pieces += `<g data-mk="t-${c}" data-mg="tile-${x.color}" data-mr="sink">${tileShape(x.color, px, py, cls)}</g>`;
                 if (view.treasures.includes(c)) pieces += treasureShape(px, py);
             } else if (x.kind === 'leader') {
-                pieces += leaderShape(x.color, x.seat, this.dynasty(x.seat), px, py, cls);
+                pieces += `<g data-mk="ld-${c}" data-mg="ld-${x.seat}-${x.color}">${leaderShape(x.color, x.seat, this.dynasty(x.seat), px, py, cls)}</g>`;
             } else if (x.kind === 'cat') {
-                pieces += catastropheShape(px, py);
+                pieces += `<g data-mk="cat-${c}">${catastropheShape(px, py)}</g>`;
             } else if (x.kind === 'mon' && !drawnMon.has(x.id)) {
                 drawnMon.add(x.id);
                 const m = view.monuments[x.id];
                 const top = xy(m.cell);
-                pieces += monumentShape(m.colors, top.x, top.y);
+                pieces += `<g data-mk="mon-${x.id}">${monumentShape(m.colors, top.x, top.y)}</g>`;
                 squareCells(m.cell).forEach(cell => { if (view.treasures.includes(cell)) pieces += treasureShape(xy(cell).x, xy(cell).y); });
             }
         });
@@ -634,8 +644,8 @@ export default class UI {
 
     renderMine(view) {
         const me = this.me();
-        const chips = COLORS.map(c => `<span class="chip">${tileSvg(c)}<b>${me.scores[c]}</b></span>`).join('');
-        $('#mine').innerHTML = `${dynastySvg(this.dynasty(view.you), view.you)}<span class="chips">${chips}<span class="chip">${treasureSvg()}<b>${me.treasures}</b></span></span>`;
+        const chips = COLORS.map(c => `<span class="chip">${tileSvg(c)}<b data-mk="score-${c}" data-mv="${me.scores[c]}">${me.scores[c]}</b></span>`).join('');
+        $('#mine').innerHTML = `${dynastySvg(this.dynasty(view.you), view.you)}<span class="chips">${chips}<span class="chip">${treasureSvg()}<b data-mk="score-treasure" data-mv="${me.treasures}">${me.treasures}</b></span></span>`;
     }
 
     renderNote(view) {
@@ -699,9 +709,11 @@ export default class UI {
         } else {
             const acting = this.waitingFor('action');
             const s = this.sel;
+            const seen = {};
             const hand = (me.hand ?? []).map((c, i) => {
+                seen[c] = (seen[c] ?? 0) + 1;
                 const on = s?.kind === 'swap' ? s.picked.includes(i) : s?.kind === 'tile' && s.color === c && me.hand.indexOf(c) === i;
-                return `<button class="slot ${on ? 'selected' : ''}" data-act="hand" data-index="${i}" ${acting ? '' : 'disabled'} aria-label="${COLOR_INFO[c].tile}">${tileSvg(c)}</button>`;
+                return `<button class="slot ${on ? 'selected' : ''}" data-mk="hand-${c}-${seen[c]}" data-mg="tile-${c}" data-mr="src" data-act="hand" data-index="${i}" ${acting ? '' : 'disabled'} aria-label="${COLOR_INFO[c].tile}">${tileSvg(c)}</button>`;
             }).join('');
             const command = acting ? this.pendingCommand() : null;
             const onBoard = s?.kind === 'leader' && me.leaders[s.color] !== null;
