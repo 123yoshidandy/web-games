@@ -1,0 +1,31 @@
+{
+  "name": "ghost-stories",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs 300 all"
+  },
+  "portal": {
+    "original": "Ghost Stories",
+    "genres": [
+      "ボードゲーム",
+      "協力",
+      "ダイス"
+    ],
+    "minutes": [
+      30,
+      60
+    ],
+    "weight": 3
+  },
+  "standards": {
+    "skip": {
+      "undo": "除霊や薬草屋のダイス・呪いのダイス・山から引く幽霊があり、戻すと出目や引きを選び直せるため"
+    }
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  }
+}

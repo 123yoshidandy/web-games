@@ -1,0 +1,22 @@
+{
+    "name": "ゴーストストーリーズ",
+    "short_name": "ゴーストストーリーズ",
+    "description": "4人の僧で、3×3 の村を幽霊から守る協力ゲーム。仲間を CPU に任せるか、1人で4人を動かして遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": [
+        "fullscreen",
+        "standalone"
+    ],
+    "orientation": "portrait",
+    "background_color": "#15131f",
+    "theme_color": "#15131f",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
