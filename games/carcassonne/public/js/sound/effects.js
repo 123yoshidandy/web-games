@@ -1,4 +1,4 @@
-// packages/sound 0.3.0 からコピーしたファイル。ここでは直さず、packages/sound で直してから同期する
+// packages/sound 0.4.0 からコピーしたファイル。ここでは直さず、packages/sound で直してから同期する
 /**
  * すべてのゲームで使う共通の効果音（packages/sound）
  * engine.js のあとに読む。Sound.register('common', { effects }) で登録し、どのゲームのプレイヤーからも sound.play('<名前>') で鳴らせる

@@ -58,6 +58,10 @@ export default {
         progress: (game) => game.commands.length
     },
 
+    // 利用者ごとの記録：協力ゲームなので、全員が同じ結果（クリアなら勝ち、失敗なら負け）
+    // 画面の勝ち・負けの扱いと同じ：花火が爆発した（ミス3回）なら負け、それ以外の終わりは勝ち
+    result: (game) => (game.isOver ? { coop: true, won: game.endReason !== 'mistakes' } : null),
+
     // 対戦中に部屋を出た人の席は、CPU が代わりに続ける（ルールは CPU かどうかに関係しないので、記録の再現はずれない）
     // 切断は戻ってくるかもしれないので待つ
     onPlayerGone(ctx, { seat, reason }) {

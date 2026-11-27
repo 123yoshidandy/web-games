@@ -11,7 +11,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS, suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { symbolsSvg, sphere, cardHtml, cardBackHtml, tileHtml, icon, typeIcon } from './art.js';
 import { captureAnchors, playEvents, resetTicker } from './animator.js';
 
@@ -493,6 +494,7 @@ export default class UI {
             }, AUTO_PASS_DELAY_MS);
         }
         if (view.phase === 'end' && !$('#result').open) {
+            this.recordLocalResult(view);
             clearTimeout(this.resultTimer);
             this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
         }
@@ -682,6 +684,16 @@ export default class UI {
             <h3>保管庫（${p.archive.length}/${p.limits.archive}）</h3><div class="detail-row">${archive}</div>
             <h3>機械</h3><div class="machine detail">${columns}</div>`;
         $('#player-detail').showModal();
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view.winners?.length) return;
+        if (this.recordedId === controller.game.options.seed) return;
+        this.recordedId = controller.game.options.seed;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: outcomeFromWinners(view.winners, view.you, view.players.length) });
     }
 
     showResult() {

@@ -8,10 +8,12 @@ import { MIN_PLAYERS, MAX_PLAYERS, SEASON_NAMES, CITY_LIMIT, HAND_LIMIT } from '
 import { LEVELS, suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, icon, workerIcon, resHtml, costHtml, cardHtml, cardDetailHtml, typeChip, PLAYER_COLORS } from './art.js';
 
+const GAME = 'everdell';
 const SETTINGS_KEY = 'everdell.settings';
 const CPU_NAMES = ['リス', 'カエル', 'ネズミ'];
 const RESULT_DELAY_MS = 900;
@@ -830,7 +832,19 @@ export default class UI {
         list.scrollTop = list.scrollHeight;
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view || !(view.phase === 'end')) return;
+        const id = `${GAME}-${controller.game.options.seed}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        recordResult({ game: GAME, id, outcome: outcomeFromWinners(view.winners, view.you, view.players.length) });
+    }
+
     showResult() {
+        this.recordLocalResult(this.view);
         const v = this.view;
         if (!v || v.phase !== 'end') return;
         this.resultShown = true;

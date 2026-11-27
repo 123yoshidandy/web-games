@@ -57,6 +57,9 @@ export default {
         progress: (game) => game.commands.length
     },
 
+    // 利用者ごとの記録：協力ゲームなので、全員が同じ結果（クリアなら勝ち、失敗なら負け）
+    result: (game) => (game.result ? { coop: true, won: Boolean(game.result.won) } : null),
+
     // 対戦中に部屋を出た人の席は、CPU が代わりに続ける。切断は戻ってくるかもしれないので待つ
     onPlayerGone(ctx, { seat, reason }) {
         if (reason !== 'left' || ctx.game.isOver()) return ctx.ignore();

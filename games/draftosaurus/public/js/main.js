@@ -13,8 +13,10 @@ import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 
+const GAME = 'draftosaurus';
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'draftosaurus.settings.v1', save: 'draftosaurus.save.v1' };
 const CPU_NAMES = ['ミナ', 'ケン', 'ソラ', 'ハル'];
@@ -460,8 +462,22 @@ function openPark(seat) {
     openDialog('park-dialog');
 }
 
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）
+let recordedId = null;
+function recordLocalResult() {
+    if (!controller || controller.isOnline || !view?.scores) return;
+    if (view.players.filter(player => !player.isCPU).length !== 1) return;
+    const id = `${GAME}-${controller.game.options.seed}`;
+    if (recordedId === id) return;
+    recordedId = id;
+    const winners = view.ranking.filter(r => r.rank === 1).map(r => r.seat);
+    recordResult({ game: GAME, id, outcome: outcomeFromWinners(winners, view.seat, view.players.length) });
+}
+
 function showResult() {
     if (!view?.scores || scene !== 'game') return;
+    recordLocalResult();
     const winners = view.ranking.filter(r => r.rank === 1).map(r => r.seat);
     $('result-title').textContent = winners.length === 1 && winners[0] === view.seat ? 'あなたの勝ち' : `${winners.map(nameOf).join('と')}の勝ち`;
     // 合計は名前のすぐ右に（狭い画面で、右へはみ出して隠れないように）

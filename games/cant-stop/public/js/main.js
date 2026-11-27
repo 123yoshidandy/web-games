@@ -10,7 +10,8 @@ import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'cantstop.settings.v1', save: 'cantstop.save.v1' };
@@ -113,7 +114,10 @@ function beginGame(next) {
     lastMove = [...view.events].reverse().find(e => e.type === 'move') ?? null;
     showScene('game');
     render();
-    if (view.phase === 'end') showResultSoon(0);
+    if (view.phase === 'end') {
+        recordLocalResult();
+        showResultSoon(0);
+    }
     saveProgress();
 }
 
@@ -180,6 +184,7 @@ function onUpdate() {
             if (e.claimed.length > 0) showBanner(`${name}が ${e.claimed.join('・')} の列を取った`, 'claim', PLAYER_COLORS[e.seat]);
         } else if (e.type === 'end') {
             showBanner(`${name}の勝ち`, 'claim', PLAYER_COLORS[e.winner]);
+            recordLocalResult();
             showResultSoon(RESULT_DELAY_MS);
         }
     });
@@ -412,6 +417,18 @@ function setupDialogs() {
         });
     });
     $('help-content').innerHTML = helpMarkup();
+}
+
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）
+let recordedId = null;
+function recordLocalResult() {
+    if (!controller || controller.isOnline || controller.humanSeat < 0 || !controller.game.isOver()) return;
+    const game = controller.game;
+    const id = `${GAME}-${game.options.seed}`;
+    if (recordedId === id) return;
+    recordedId = id;
+    recordResult({ game: GAME, id, outcome: outcomeFromWinners([game.winner], controller.humanSeat, game.players.length) });
 }
 
 function showResultSoon(delay) {

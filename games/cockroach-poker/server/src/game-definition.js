@@ -50,6 +50,9 @@ export default {
 
     isOver: (game) => game.isOver(),
 
+    // 勝ち負けの記録：負けるのは「同じ虫を4枚そろえた人」だけ。ほかの人は全員勝ち（順位は負けた人が下、ほかは同じ）
+    result: (game) => (game.loser === null ? null : { ranks: game.players.map((_, seat) => (seat === game.loser ? 2 : 1)) }),
+
     cpu: {
         needsStep: (game) => isCpuTurn(game),
         step: (game) => runCpuStep(game),

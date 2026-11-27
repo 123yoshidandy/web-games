@@ -12,7 +12,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { LEVELS, suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { symbolsSvg, cardHtml, cardBackHtml, geishaHtml, chipHtml, actionTokenHtml, markerHtml } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
 
@@ -293,6 +294,7 @@ export default class UI {
         if (roundEnd) {
             // ラウンドが終わったら、新しいラウンドは配られている。結果を見ている間は、終わったときの列を描き、CPU を止める
             this.frozen = { ...roundEnd, gameOver: fresh.some(e => e.type === 'end') };
+            if (this.frozen.gameOver) this.recordLocalResult(this.frozen);
             this.controller.pause();
             clearTimeout(this.dialogTimer);
             this.dialogTimer = setTimeout(() => this.showRoundResult(), ROUND_DIALOG_DELAY_MS);
@@ -525,6 +527,14 @@ export default class UI {
             <tfoot><tr><td class="total">${event.points[1 - you]}点・${event.geishas[1 - you]}人</td><th>合計</th><td class="total">${event.points[you]}点・${event.geishas[you]}人</td></tr></tfoot>
         </table>
         <div class="secrets"><span>${escapeHtml(rival.name)}の秘密</span>${secret(1 - you)}<span class="sep"></span><span>あなたの秘密</span>${secret(you)}</div>`;
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(event) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || event.winner === undefined || event.winner === null) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: outcomeFromWinners([event.winner], this.view.you, this.view.players.length) });
     }
 
     showRoundResult() {

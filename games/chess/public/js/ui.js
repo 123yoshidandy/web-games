@@ -15,8 +15,10 @@ import { reading, isLow, formatClock } from './clock.js';
 import { symbolsSvg, pieceSvg, PIECE_NAME, COLOR_NAME } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 
+const GAME = 'chess';
 const SETTINGS_KEY = 'chess.settings';
 const RESULT_DELAY_MS = 900;
 const LEVEL_NAMES = { easy: 'やさしい', normal: 'ふつう', strong: 'つよい', expert: 'とてもつよい' };
@@ -204,7 +206,7 @@ export default class UI {
             ? [{ name: '白', isCPU: false }, { name: '黒', isCPU: false }]
             : [{ name: 'あなた', isCPU: false }, { name: 'CPU', isCPU: true, cpuLevel: level }];
         if (mode === 'cpu' && color === 'b') players.reverse();
-        this.startGame({ players, options: clock ? { clock } : {} });
+        this.startGame({ players, options: { ...(clock ? { clock } : {}), startedAt: Date.now() } });
     }
 
     stopGame() {
@@ -649,7 +651,24 @@ export default class UI {
 
     // ---- ダイアログ ----
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id は始めた時刻から作る（同じ対戦を2回数えない。始めた時刻は保存に持たせる）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view?.over || !view.result) return;
+        if (controller.humanSeats.length !== 1) return;
+        const startedAt = controller.game.options.startedAt;
+        if (!startedAt) return;
+        const id = `${GAME}-${startedAt}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        const { winner } = view.result;
+        const outcome = winner === null ? 'draw' : winner === controller.humanSeats[0] ? 'win' : 'loss';
+        recordResult({ game: GAME, id, outcome });
+    }
+
     showResult() {
+        this.recordLocalResult(this.view);
         const v = this.view;
         if (!v || !v.over || !v.result) return;
         this.resultShown = true;

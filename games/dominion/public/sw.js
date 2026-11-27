@@ -21,7 +21,7 @@ const PRECACHE = [
     'js/card-helpers.js', 'js/card-types.js', 'js/card.js', 'js/cpu-player.js', 'js/game-allies.js',
     'js/game-controller.js', 'js/game-landscapes.js', 'js/game-menagerie.js', 'js/game-nocturne.js',
     'js/game-plunder.js', 'js/game-realtime.js', 'js/game-rising-sun.js', 'js/game-view.js', 'js/game.js',
-    'js/main.js', 'js/music.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs',
+    'js/main.js', 'js/music.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/user-stats.js',
     'js/online-config.js', 'js/online-controller.js', 'js/player.js', 'js/press-handler.js', 'js/random.js',
     'js/sound/bgm.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/ui-controller.js', 'js/ui-event-handler.js',
     'js/ui-modal.js', 'js/ui-view.js'

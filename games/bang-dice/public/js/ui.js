@@ -10,8 +10,10 @@ import { installSymbols, faceSvg, icon, LINE_ICONS } from './art.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 
+const GAME = 'bang-dice';
 const SETTINGS_KEY = 'bang-dice.settings';
 const CPU_NAMES = ['ジョー', 'ハンク', 'ケイト', 'ビリー', 'モリー', 'ネッド', 'エラ'];
 const SIDE_NAMES = { law: '保安官と副保安官', outlaw: '無法者', renegade: '裏切り者', deputy: '副保安官' };
@@ -544,7 +546,19 @@ export default class UI {
         this.openDialog('player-dialog');
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view || !(view.phase === 'end')) return;
+        const id = `${GAME}-${controller.game.options.seed}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        recordResult({ game: GAME, id, outcome: outcomeFromWinners(view.winners, view.you, view.players.length) });
+    }
+
     showResult() {
+        this.recordLocalResult(this.view);
         const view = this.controller?.getView();
         if (!view || view.phase !== 'end') return;
         const won = view.winners.includes(view.you);

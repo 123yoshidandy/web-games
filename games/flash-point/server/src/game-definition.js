@@ -60,6 +60,9 @@ export default {
         progress: (game) => game.commands.length
     },
 
+    // 利用者ごとの記録：協力ゲームなので、全員が同じ結果（クリアなら勝ち、失敗なら負け）
+    result: (game) => (game.result ? { coop: true, won: Boolean(game.result.won) } : null),
+
     // 対戦中に部屋を出た人の席は、CPU が代わりに続ける。切断は戻ってくるかもしれないので待つ
     // isCPU は persist の players に入るので、部屋を保存して読み直しても CPU のまま。ルールは isCPU を見ない
     onPlayerGone(ctx, { seat, reason }) {

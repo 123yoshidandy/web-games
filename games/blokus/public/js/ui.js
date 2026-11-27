@@ -14,8 +14,10 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 
+const GAME = 'blokus';
 const SETTINGS_KEY = 'blokus.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
 const RESULT_DELAY_MS = 900;
@@ -519,7 +521,19 @@ export default class UI {
         }, RESULT_DELAY_MS);
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view || !(view.phase === 'end')) return;
+        const id = `${GAME}-${controller.game.options.seed}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        recordResult({ game: GAME, id, outcome: outcomeFromWinners(view.winners, view.you, view.players.length) });
+    }
+
     showResult() {
+        this.recordLocalResult(this.view);
         const v = this.view;
         const me = v.you;
         const winners = v.winners;

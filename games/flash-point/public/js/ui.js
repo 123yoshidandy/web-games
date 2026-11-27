@@ -14,7 +14,8 @@ import { boardSvg, titleArt, PLAYER_COLORS } from './render.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 // オンラインのコントローラーを、画面が使うローカルの形（send(seat, command)・canControl(seat) など）に合わせる
 // オンラインでは自分の席だけを動かす。ヒント・待った・任せる・自動で終える処理はない
@@ -300,6 +301,7 @@ export default class UI {
         else if (this.sheetKind === 'role') this.closeSheet();
         if (v.result && !this.resultShown) {
             this.resultShown = true;
+            this.recordLocalResult(v);
             setTimeout(() => this.openResult(), 700);
         }
     }
@@ -590,6 +592,14 @@ export default class UI {
 
     openHelp() {
         this.openSheet({ title: '遊び方', html: HELP_HTML, close: '閉じる', wide: true });
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // 協力ゲームなので、クリアなら勝ち、失敗なら負け。id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view?.result) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: view.result.won ? 'win' : 'loss' });
     }
 
     openResult() {

@@ -19,7 +19,8 @@ import MapView from './map-view.js';
 import { industryBadge } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 
 const SETTINGS_KEY = 'brass-birmingham.settings';
 const CPU_NAMES = ['ワット', 'ボールトン', 'ダーウィン'];
@@ -173,6 +174,7 @@ export default class UI {
         }
         if (this.view.current !== this.view.seat) this.mode = null;
         this.render();
+        this.recordLocalResult(this.view);
         if (this.view.over) setTimeout(() => this.showResult(), 700);
     }
 
@@ -747,6 +749,18 @@ export default class UI {
         this.openDialog('#log');
         const list = $('#log-list');
         list.scrollTop = list.scrollHeight;
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view || !(view.over)) return;
+        if (controller.humanSeat < 0) return;
+        const id = `${GAME}-${controller.game.options.seed}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        recordResult({ game: GAME, id, outcome: outcomeFromWinners(view.results.filter(r => r.rank === 1).map(r => r.seat), controller.humanSeat, view.players.length) });
     }
 
     showResult() {

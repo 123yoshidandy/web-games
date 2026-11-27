@@ -83,6 +83,13 @@ export default {
 
     isOver: (game) => game.phase === 'end',
 
+    // 勝ち負けの記録：勝利点の多い順（game.result は点の高い順の { playerId, points }。同点は同じ順位）
+    result: (game) => {
+        if (!Array.isArray(game.result)) return null;
+        const points = new Map(game.result.map(entry => [entry.playerId, entry.points]));
+        return { ranks: game.players.map(player => 1 + game.result.filter(entry => entry.points > points.get(player.id)).length) };
+    },
+
     // CPUの手番・CPUへの選択待ち（支配のターン中は、支配したプレイヤーで判断する）
     cpu: {
         needsStep: (game) => isCpuToMove(game),

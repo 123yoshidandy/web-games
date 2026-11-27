@@ -8,10 +8,12 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { symbolsSvg, cardHtml, backHtml, roleTag, coinHtml } from './art.js';
 
+const GAME = 'coup';
 const SETTINGS_KEY = 'coup.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン', 'ユイ'];
 const RESULT_DELAY_MS = 900;
@@ -438,7 +440,20 @@ export default class UI {
         $('#log-list').innerHTML = this.logHistory.slice(-150).map(text => `<li>${escapeHtml(text)}</li>`).join('');
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view || view.winner === null) return;
+        if (view.players.filter(player => !player.isCPU).length !== 1) return;
+        const id = `${GAME}-${controller.game.options.seed}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        recordResult({ game: GAME, id, outcome: view.winner === view.you ? 'win' : 'loss' });
+    }
+
     showResult() {
+        this.recordLocalResult(this.view);
         const v = this.view;
         if (!v || v.winner === null) return;
         $('#result-title').textContent = v.winner === v.you ? 'あなたの勝ち' : `${v.players[v.winner].name}の勝ち`;

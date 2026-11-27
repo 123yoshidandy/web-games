@@ -10,8 +10,10 @@ import { commonSymbol, SYMBOL_NAMES } from './deck.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 
+const GAME = 'dobble';
 const CPU_NAMES = ['ミナ', 'ソウタ', 'リオ'];
 const HUMAN_NAME = 'あなた';
 const LEVELS = [{ value: 'easy', label: 'やさしい' }, { value: 'normal', label: 'ふつう' }, { value: 'hard', label: 'つよい' }];
@@ -212,6 +214,7 @@ function update() {
 
     if (view.phase === 'end' && !app.resultShown) {
         app.resultShown = true;
+        recordLocalResult(view);
         onFinished(view);
         setTimeout(() => showResult(), previous ? RESULT_DELAY_MS : 0);
     }
@@ -439,6 +442,21 @@ function loadBest() {
 }
 
 // 終わった：タイムアタックなら、ベストに入れる（ヒントの5秒を足したタイム）
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）
+let recordedId = null;
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline || controller.isReplay || !view.result) return;
+    if (view.players.filter(player => !player.isCPU).length !== 1) return;
+    const id = `${GAME}-${controller.setup.seed}`;
+    if (recordedId === id) return;
+    recordedId = id;
+    // ひとりで遊ぶ（タイムアタック）は勝ち負けがないので、回数だけ数える
+    const outcome = view.players.length === 1 ? null : outcomeFromWinners(view.result.winners, controller.humanSeat, view.players.length);
+    recordResult({ game: GAME, id, outcome });
+}
+
 function onFinished(view) {
     if (app.controller?.isOnline || app.controller?.isReplay || view.mode !== 'solo') return;
     const entry = { time: view.result.time, date: new Date().toISOString().slice(0, 10) };

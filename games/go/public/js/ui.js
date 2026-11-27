@@ -16,7 +16,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS, LEVEL_NAMES, suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { resultText, marginText, PLAYERS, CLOCK_PRESETS } from './game.js';
 import { reading, isLow, formatClock } from './clock.js';
 import { toSgf, sgfFileName } from './sgf.js';
@@ -484,6 +485,7 @@ export default class UI {
         }
         if (this.pending !== null && view.board[this.pending] !== 0) this.pending = null;
         this.playEvents(view, prev);
+        if (prev && !prev.over && view.over) this.recordLocalResult(view);
         this.renderPlayers(view);
         this.renderBoard();
         this.renderActions(view);
@@ -500,6 +502,17 @@ export default class UI {
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // CPU 戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id は対局を始めた時刻（保存に持たせる。続きからでも同じ）から作る。持碁は引き分け
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view.result) return;
+        if (view.players.filter(p => !p.isCPU).length !== 1) return;
+        const winner = view.result.winner;
+        const winners = winner === null || winner === undefined ? [0, 1] : [winner];
+        recordResult({ game: GAME, id: `${GAME}-${controller.matchId}`, outcome: outcomeFromWinners(winners, view.you, view.players.length) });
     }
 
     nameOf(seat) {

@@ -11,11 +11,13 @@ import OnlineGameController from './online-controller.js';
 
 // ヒントを出した場面か（ログ・フェーズ・手札・残りの行動などが同じ間だけ、印を付け直す）
 const hintKey = (view) => [view.logsFrom + view.logs.length, view.phase, view.me?.hand?.length, view.me?.actions, view.me?.buys, view.me?.coffers].join(':');
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { loadSavedGame } from './game-controller.js';
 import { music } from './music.js';
 
 // 表示設定はブラウザに保存し、次回以降も引き継ぐ
+const GAME = 'dominion';
 const SETTINGS_KEY = 'dominion.settings';
 const DEFAULT_SETTINGS = {
     stackHand: false, // 手札の同じカードを重ねて表示する
@@ -433,10 +435,26 @@ class UIController {
         this.modal.showPrompt(prompt, view);
     }
     
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id は始めた時刻から作る（同じ対戦を2回数えない。始めた時刻は保存に持たせる）
+    recordLocalResult(view) {
+        const controller = this.gameController;
+        if (this.isOnline() || !view.result || !controller.setup) return;
+        if (view.players.filter(player => !player.isCPU).length !== 1) return;
+        const id = `${GAME}-${controller.setup.options.seed}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        const top = Math.max(...view.result.map(entry => entry.points));
+        const winners = view.result.filter(entry => entry.points === top).map(entry => entry.playerId);
+        const human = view.players.find(player => !player.isCPU);
+        recordResult({ game: GAME, id, outcome: outcomeFromWinners(winners, human.id, view.players.length) });
+    }
+
     // ゲームが終わったら結果を1回だけ表示する
     syncResult(view) {
         if (!view.result || this.isResultShown) return;
         this.isResultShown = true;
+        this.recordLocalResult(view);
         this.modal.showGameResults(view.result, {
             online: this.isOnline(),
             isHost: this.isOnline() && this.gameController.isHost()

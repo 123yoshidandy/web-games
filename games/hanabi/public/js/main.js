@@ -9,7 +9,8 @@ import * as storage from './storage.js';
 import { suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
@@ -155,7 +156,18 @@ function update() {
     playSound(view, previous, moved);
     render(view);
     if (moved && from) flyCard(moved, from);
-    if (view.phase === 'end' && previous && previous.phase !== 'end') setTimeout(showResult, 1300);
+    if (view.phase === 'end' && previous && previous.phase !== 'end') {
+        recordLocalResult(view);
+        setTimeout(showResult, 1300);
+    }
+}
+
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// 協力ゲームなので、花火が爆発したら負け、それ以外は勝ち（画面の音・表示と同じ）。id はシードから作る
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline) return;
+    recordResult({ game: GAME, id: `${GAME}-${controller.setup.seed}`, outcome: view.endReason === 'mistakes' ? 'loss' : 'win' });
 }
 
 const myTurn = view => view.phase !== 'end' && view.current === view.viewer;

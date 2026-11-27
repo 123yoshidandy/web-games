@@ -12,10 +12,12 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { helpHtml, titleArtHtml } from './help.js';
 
 // 自分の操作の効果音
+const GAME = 'dune-imperium';
 const COMMAND_SOUNDS = { agent: 'place', reveal: 'draw', buy: 'gain', plot: 'place', combat: 'place', pass: 'select', done: 'select', choose: 'select' };
 
 const SETTINGS_KEY = 'dune-imperium.settings';
@@ -853,7 +855,20 @@ export default class UI {
         list.scrollTop = list.scrollHeight;
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view || view.phase !== 'over') return;
+        if (view.players.filter(player => !player.isCPU).length !== 1) return;
+        const id = `${GAME}-${controller.game.options.seed}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        recordResult({ game: GAME, id, outcome: outcomeFromWinners(view.winners, view.you, view.players.length) });
+    }
+
     showResult() {
+        this.recordLocalResult(this.view);
         const v = this.view;
         if (!v || v.phase !== 'over') return;
         const won = v.winners.includes(v.you);

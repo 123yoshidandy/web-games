@@ -10,8 +10,10 @@ import { symbolsSvg, sym, amountHtml, beanCard, fieldHtml } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 
+const GAME = 'bohnanza';
 const SETTINGS_KEY = 'bohnanza.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
 export const COLORS = ['#d9473b', '#3d7dd8', '#9a5ad1', '#e2a52a', '#2fa39a'];
@@ -599,7 +601,19 @@ export default class UI {
         $('#player').showModal();
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view || !(view.phase === 'end')) return;
+        const id = `${GAME}-${controller.game.options.seed}`;
+        if (this.recordedId === id) return;
+        this.recordedId = id;
+        recordResult({ game: GAME, id, outcome: outcomeFromWinners(view.winners, view.you, view.players.length) });
+    }
+
     showResult() {
+        this.recordLocalResult(this.view);
         const v = this.view;
         if (!v || v.phase !== 'end') return;
         const winners = v.winners.map(id => v.players[id].name);

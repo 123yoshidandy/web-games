@@ -52,6 +52,7 @@ export default class LocalGameController {
     constructor(setup, listeners = {}, { now = () => Date.now() } = {}) {
         this.listeners = listeners;
         this.wallNow = now;
+        this.matchId = setup.matchId ?? now();   // 利用者ごとの記録の id 用（同じ対局なら、続きからでも同じ）
         this.pausedAt = null;     // 時計を止めた時刻（止めていなければ null）
         this.flagTimer = null;
         this.game = setup.commands
@@ -293,7 +294,7 @@ export default class LocalGameController {
     save() {
         try {
             if (this.game.isOver()) localStorage.removeItem(SAVE_KEY);
-            else localStorage.setItem(SAVE_KEY, JSON.stringify(this.game.persist()));
+            else localStorage.setItem(SAVE_KEY, JSON.stringify({ ...this.game.persist(), matchId: this.matchId }));
         } catch { /* 保存できない環境でも遊べるようにする */ }
     }
 
