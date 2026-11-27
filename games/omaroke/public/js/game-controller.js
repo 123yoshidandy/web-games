@@ -4,6 +4,7 @@
  * 操作のたびに { players, options, commands } を保存し、「続きから」で記録から再現する
  */
 
+import * as Motion from './motion/motion.js';
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
@@ -36,7 +37,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.paused = false;
         this.save();
         this.scheduleCpu();
@@ -80,9 +81,10 @@ export default class LocalGameController {
 
     // CPU の番なら、間を置いて 1 手打たせる。例外が出ても必ず次を予約する（決めた手が通らなければ、単純な手で進める）
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (this.paused || !isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        // 動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 runCpuStep(this.game);
             } catch (error) {
@@ -106,7 +108,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 
     // ダイアログ（遊び方・記録・詳しい説明）を開いている間は、CPU を止める

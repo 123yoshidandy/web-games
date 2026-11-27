@@ -9,6 +9,8 @@ import { spritesMarkup, icon, cardArt, monArt, titleArt } from './art.js';
 import { helpMarkup } from './help.js';
 import { createSeed } from './random.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import * as PieceMotion from './piece-motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -37,7 +39,7 @@ let controller = null;
 let view = null;
 let prevView = null;
 let ui = freshUi();
-let resultTimer = null;
+let cancelResult = null;
 let sending = false; // 自分の操作を送っている間（その音は送った側で鳴らす）
 
 // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
@@ -57,7 +59,7 @@ const online = new NetplayLobby({
     onError: (message) => onError(message),
     onExit: () => {
         controller = null;
-        clearTimeout(resultTimer);
+        cancelResult?.();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         showScene('title');
     }
@@ -116,10 +118,11 @@ function startGame(setup) {
 function beginGame(next) {
     if (controller !== next) controller?.stop();
     document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    clearTimeout(resultTimer);
+    cancelResult?.();
     controller = next;
     view = controller.getView();
     prevView = null;
+    animateNext = false; // 前の対戦の画面との差も動かさない
     ui = freshUi();
     showScene('game');
     render();
@@ -131,7 +134,7 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
-    clearTimeout(resultTimer);
+    cancelResult?.();
     showScene('title');
 }
 
@@ -155,11 +158,13 @@ function onUpdate() {
     prevView = view;
     view = controller.getView();
     render();
+    animateHits();
     playUpdateSound();
     recordLocalResult();
     if (view.phase === 'end' && prevView?.phase !== 'end') {
-        clearTimeout(resultTimer);
-        resultTimer = setTimeout(showResult, RESULT_DELAY_MS);
+        cancelResult?.();
+        // 動きが終わってから出す
+        cancelResult = Motion.afterIdle(showResult, RESULT_DELAY_MS);
     }
 }
 
@@ -183,8 +188,16 @@ function onError(message) {
 function send(command) {
     ui = { ...freshUi(), key: ui.key };
     sending = true;
+    // 使うカードは、手札から相手（自分）の欄へ飛ばす（描き直す前に位置と見た目を覚える）
+    const cardEl = command.type === 'play' ? document.querySelector(`#hand [data-card="${command.card}"]`) : null;
+    const from = Motion.rectOf(cardEl);
+    const html = cardEl?.outerHTML;
     const ok = controller.send(command);
     sending = false;
+    if (ok && from && command.target !== undefined) {
+        const to = command.target === view.you ? $('me') : document.querySelector(`#rivals [data-seat="${command.target}"]`);
+        Motion.fly(from, to, { content: html, duration: 420 });
+    }
     if (ok && view.phase !== 'end') music.play(command.type === 'play' || command.type === 'band' ? 'place' : 'select');
 }
 
@@ -332,6 +345,9 @@ function render() {
     if (ui.key !== key) ui = { ...freshUi(), key, choose: ui.choose };
     // 選んでいたカードが手札からなくなったら、選び直す
     if (ui.card !== null && !view.hand?.some(c => c.id === ui.card)) ui.card = null;
+    // 描き直す前に手札・枚数・HP の位置を測り、描いたあとで前との差を動かす
+    const before = animateNext ? PieceMotion.measure($('screen-game')) : null;
+    animateNext = true;
     renderTop();
     renderRivals();
     renderTicker();
@@ -340,6 +356,27 @@ function render() {
     renderHand();
     renderChoose();
     renderHint();
+    PieceMotion.animate(before, $('screen-game'));
+}
+
+let animateNext = false;
+
+// ダメージは、手を打った人から受けた人へ飛ぶ。自分の手のカードは send() が手札から飛ばす
+function animateHits() {
+    if (!prevView || !Motion.enabled() || prevView.phase !== 'play') return;
+    const actor = prevView.turn?.seat;
+    const boxOf = seat => (seat === view.you ? $('me') : document.querySelector(`#rivals [data-seat="${seat}"]`));
+    view.players.forEach(p => {
+        const old = prevView.players[p.id];
+        const before = old?.pokemon[old.battle];
+        const now = p.pokemon[p.battle];
+        if (!before || !now || before.id !== now.id || now.hp >= before.hp || p.id === actor || actor === view.you) return;
+        const from = boxOf(actor);
+        const to = boxOf(p.id);
+        if (!from || !to) return;
+        const size = { width: 44, height: 28 };
+        Motion.fly(from, to, { content: `<div class="hit-chip">-${before.hp - now.hp}</div>`, size, duration: 420, lift: false });
+    });
 }
 
 function renderTop() {
@@ -349,7 +386,7 @@ function renderTop() {
     else text = view.turn.seat === view.you ? 'あなたの番' : `${nameOf(view.turn.seat)}の番`;
     $('turn-info').innerHTML = `<b>${text}</b>`;
     const w = view.lastWeather;
-    $('deck-info').innerHTML = `${w ? `<span class="weather" title="さっきのおてんき：${WEATHERS[w.weather].name}">${icon(w.weather)}</span>` : ''}<span class="deck">${icon('deck')}${view.deckCount}</span>`;
+    $('deck-info').innerHTML = `${w ? `<span class="weather" title="さっきのおてんき：${WEATHERS[w.weather].name}">${icon(w.weather)}</span>` : ''}<span class="deck" data-mk="deck" data-mv="${view.deckCount}">${icon('deck')}${view.deckCount}</span>`;
 }
 
 function roleIcon(p) {
@@ -389,7 +426,7 @@ function renderRivals() {
         else {
             const bench = p.pokemon.length > 1 ? p.pokemon[1 - p.battle] : null;
             body = `<span class="rv-mon">${monArt(m.id, 'mon-art small')}<span class="rv-mon-name">${POKEMON[m.id].name}</span></span>
-                <span class="rv-foot">${statusChip(m)}${m.item ? `<span class="item-chip" title="${CARDS[m.item].name}">${icon(m.item)}</span>` : ''}${bench ? `<span class="bench-chip${bench.fainted ? ' fainted' : ''}${hpClass(seat, 1 - p.battle)}">${monArt(bench.id, 'mon-art tiny')}${bench.fainted ? '×' : bench.hp}</span>` : ''}<span class="rv-hand">${icon('hand')}${p.handCount}</span></span>`;
+                <span class="rv-foot">${statusChip(m)}${m.item ? `<span class="item-chip" title="${CARDS[m.item].name}">${icon(m.item)}</span>` : ''}${bench ? `<span class="bench-chip${bench.fainted ? ' fainted' : ''}${hpClass(seat, 1 - p.battle)}">${monArt(bench.id, 'mon-art tiny')}${bench.fainted ? '×' : bench.hp}</span>` : ''}<span class="rv-hand" data-mk="rvh-${seat}" data-mv="${p.handCount}">${icon('hand')}${p.handCount}</span></span>`;
         }
         const hp = m && view.phase !== 'choose' ? `<span class="rv-hp${hpClass(seat, p.battle)}">${m.hp}<small>/${m.maxHp}</small></span>` : '';
         return `<button type="button" class="${cls}" data-seat="${seat}">
@@ -426,7 +463,7 @@ function renderMe() {
     const bench = me.pokemon.length > 1 ? me.pokemon[1 - me.battle] : null;
     const canSwitch = view.options?.canSwitch && ui.card === null && !ui.band;
     $('me').innerHTML = `<button type="button" class="me-card${targets.includes(view.you) ? ' targetable' : ''}${!me.alive ? ' out' : ''}${view.turn?.seat === view.you && view.phase === 'play' ? ' turn' : ''}" data-seat="${view.you}">
-        <span class="me-top">${roleHtml}<span class="me-hand">${icon('hand')}${me.handCount}</span></span>
+        <span class="me-top">${roleHtml}<span class="me-hand" data-mk="meh" data-mv="${me.handCount}">${icon('hand')}${me.handCount}</span></span>
         <span class="me-mon${hpClass(view.you, me.battle)}">
             ${monArt(m.id)}
             <span class="me-info">
@@ -552,7 +589,7 @@ function renderHand() {
             view.options && !ui.band && !usable ? 'idle' : '',
             !view.options && !trimming ? 'idle' : ''
         ];
-        return cardButton(c, cls, `data-card="${c.id}"`);
+        return cardButton(c, cls, `data-card="${c.id}" data-mk="hc-${c.id}"`);
     }).join('');
 }
 
@@ -715,6 +752,7 @@ function setup() {
     });
 
     $('online-button').addEventListener('click', () => online.open());
+    Motion.mountSpeedSetting($('motion-setting'), { label: '' });
     showScene('title');
     online.boot(); // 招待の URL（?room=）から入る、または前の部屋に戻る
     registerServiceWorker();
