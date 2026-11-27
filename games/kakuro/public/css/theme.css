@@ -1,0 +1,6 @@
+/* カックロの色（共通の css/style.css の変数を上書きする）：紙の地に、青緑の差し色 */
+:root {
+    --accent: #17707a;
+    --accent-strong: #0f525a;
+    --accent-soft: rgba(23, 112, 122, .13);
+}
