@@ -14,11 +14,16 @@ import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'sevenwonders.settings.v1', save: 'sevenwonders.save.v1' };
 const CPU_NAMES = ['ジャン', 'マリー', 'ピエール', 'ソフィ', 'ルイ', 'アンナ'];
 const REVEAL_AUTO_CLOSE_MS = 5000;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 選んだカードが自分の都市へ
+const POP_MS = 280;      // 手札が配られる・入れ替わる
+const STAGGER_MS = 50;   // 何枚も動くときの間
 const COLOR_ORDER = ['brown', 'grey', 'blue', 'yellow', 'red', 'green', 'purple'];
 // 確かめるときだけ、URL の ?cpuDelay=ミリ秒 で CPU の間隔を縮められる
 const CPU_DELAY = Number(new URLSearchParams(location.search).get('cpuDelay')) || undefined;
@@ -45,6 +50,7 @@ let seenSeq = 0;
 let ui = { card: null, buildPay: 0, wonderPay: 0, key: null };
 let revealTimer = null;
 let resultPending = false;
+let pendingMotion = null; // 公開のダイアログを閉じたあとに流す動き（ダイアログの下では見えないため）
 let lastAction = null; // 自分が最後に選んだ手（効果音を選ぶ）
 
 const nameOf = seat => (seat === view.seat ? 'あなた' : view.players[seat].name);
@@ -69,6 +75,8 @@ const online = new NetplayLobby({
     onExit: () => {
         controller = null;
         view = null;
+        pendingMotion = null;
+        Motion.cancelAll();
         clearTimeout(revealTimer);
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         showScene('title');
@@ -130,12 +138,15 @@ function beginGame(next) {
     document.querySelectorAll('dialog[open]').forEach(d => d.close());
     clearTimeout(revealTimer);
     resultPending = false;
+    pendingMotion = null;
     controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = { card: null, buildPay: 0, wonderPay: 0, key: null };
     showScene('game');
     render();
+    // 最初の手札は、順に出る
+    Motion.flipFrom(new Map(), $('hand'), '.hand-card[data-card]', 'card', { duration: POP_MS, stagger: STAGGER_MS, enter: 'pop' });
     if (view.phase === 'end') showResult();
     saveProgress();
 }
@@ -165,6 +176,8 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
+    pendingMotion = null;
+    Motion.cancelAll();
     clearTimeout(revealTimer);
     showScene('title');
 }
@@ -173,6 +186,8 @@ function goHome() {
 
 function onUpdate() {
     if (!controller) return;
+    // 描き直す前に、動きの出発点（手札の位置・選んだカード・コインと点）を測る
+    const before = view && Motion.enabled() && !pendingMotion ? snapshot() : null;
     view = controller.getView();
     const fresh = view.events.filter(e => e.seq > seenSeq);
     seenSeq = view.eventSeq;
@@ -180,9 +195,59 @@ function onUpdate() {
     if (fresh.some(e => e.type === 'end')) resultPending = true;
     playSound(fresh);
     if (reveals.length) showReveal(reveals);
-    else if (resultPending && !$('reveal-dialog').open) showResult();
+    else if (resultPending && !$('reveal-dialog').open) Motion.afterIdle(showResult, 300);
     saveProgress();
     render();
+    if (before) {
+        const run = () => animateUpdate(before, fresh);
+        if (reveals.length) pendingMotion = run;
+        else run();
+    }
+}
+
+// ---------- 動き ----------
+
+function statsOf(v) {
+    const me = v.players[v.seat];
+    return { mine: [me.city.coins, me.shields, me.score.total].join(), seats: new Map(v.players.map(p => [p.id, [p.city.coins, p.shields].join()])) };
+}
+
+function snapshot() {
+    const choice = view.myChoice;
+    const el = choice ? document.querySelector(`#hand [data-card="${choice.card}"]`) : null;
+    return {
+        hand: Motion.captureRects($('hand'), '.hand-card[data-card]', 'card'),
+        played: el ? { action: choice.action, rect: Motion.rectOf(el), html: el.outerHTML } : null,
+        stats: statsOf(view)
+    };
+}
+
+function runPendingMotion() {
+    const run = pendingMotion;
+    pendingMotion = null;
+    run?.();
+}
+
+// 公開のあと：選んだカードは自分の都市へ飛び、手札は新しい札が順に出る。変わったコインと点は弾む
+function animateUpdate(before, fresh) {
+    if (!view) return;
+    let settle = 0;
+    if (before.played && fresh.some(e => e.type === 'reveal')) {
+        const target = { build: '#my-city .counts', wonder: '#my-city .stages', discard: '#my-city .city-head' }[before.played.action];
+        const to = target && document.querySelector(target);
+        if (to) {
+            Motion.fly(before.played.rect, to, { content: before.played.html, duration: FLY_MS });
+            Motion.pulse(to, { delay: FLY_MS, scale: 1.12, duration: 320 });
+            settle = FLY_MS;
+        }
+    }
+    Motion.flipFrom(before.hand, $('hand'), '.hand-card[data-card]', 'card', { duration: POP_MS, stagger: STAGGER_MS, enter: 'pop' });
+    const now = statsOf(view);
+    if (now.mine !== before.stats.mine) Motion.pulse(document.querySelector('#my-city .city-stats'), { delay: settle, scale: 1.2, duration: 360 });
+    now.seats.forEach((value, seat) => {
+        if (seat === view.seat || value === before.stats.seats.get(seat)) return;
+        Motion.pulse(document.querySelector(`#neighbors [data-seat="${seat}"] .nb-stats`), { delay: settle, scale: 1.2, duration: 360 });
+    });
 }
 
 // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、全員の手が開いて次を選べるようになったら turn、終わりは勝ち負け
@@ -417,7 +482,8 @@ function setupDialogs() {
         dialog.addEventListener('close', () => {
             if (dialog.id === 'reveal-dialog') {
                 clearTimeout(revealTimer);
-                if (resultPending) setTimeout(showResult, 200);
+                runPendingMotion();
+                if (resultPending) Motion.afterIdle(showResult, 200);
             }
             if (![...document.querySelectorAll('dialog')].some(d => d.open)) controller?.resume();
         });
@@ -516,6 +582,7 @@ function showResult() {
 function setup() {
     drawTitleArt();
     setupDialogs();
+    Motion.mountSpeedSetting($('motion-setting'), { label: '' });
     const segment = (id, apply) => $(id).addEventListener('click', e => {
         const b = e.target.closest('button');
         if (!b) return;
