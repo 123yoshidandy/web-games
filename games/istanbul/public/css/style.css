@@ -164,6 +164,11 @@ svg.mini { width: 13px; height: 13px; flex: none; display: block; }
 .segment button { width: 86px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
 .segment.three button { width: 76px; }
 .segment button.on { color: #2a1a04; background: var(--accent); }
+/* 動きの速さ（共通の部品 motion の切り替え）を、ほかの切り替えと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); border: none; }
+#motion-setting .motion-speed button { width: 76px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; justify-content: center; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #2a1a04; background: var(--accent); }
 
 /* ---- ゲーム画面 ---- */
 

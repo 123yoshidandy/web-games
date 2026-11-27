@@ -15,6 +15,7 @@ import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
+import * as Motion from './motion/motion.js';
 import { GOOD_COLORS, PLAYER_COLORS, goodIcon, anyIcon, rubyIcon, coinIcon, cardIcon, merchantToken, assistantToken, familyToken } from './art.js';
 
 const SETTINGS_KEY = 'istanbul.settings';
@@ -117,6 +118,7 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         this.renderTitleArt();
     }
 
@@ -161,6 +163,7 @@ export default class UI {
         this.lastSeq = this.view.events.at(-1)?.seq ?? 0;
         this.lastLog = this.view.logCount;
         this.moveCard = null;
+        this.resultTimer?.();
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
@@ -183,7 +186,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         ['#result', '#sheet', '#log'].forEach(id => { if ($(id).open) $(id).close(); });
     }
 
@@ -267,15 +270,19 @@ export default class UI {
         if (!this.controller) return;
         this.wasMyTurn = !!this.view && this.myTurn() && this.view.phase !== 'end';
         const wasEnd = this.view?.phase === 'end';
+        const prev = this.view;
+        // 商人・助手・家族の位置は、描き直す前に測る
+        const before = Motion.captureRects($('#board'), '.tok[data-key]', 'key');
         this.view = this.controller.getView();
         const view = this.view;
         if (view.turn !== view.you || view.step.stage !== 'move') this.moveCard = null;
         this.announce();
         this.render();
+        if (prev) this.animateChanges(prev, view, before);
         if (view.phase === 'end') {
             if (!wasEnd) this.recordLocalResult(view);
-            clearTimeout(this.resultTimer);
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.resultTimer?.();
+            this.resultTimer = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
     }
 
@@ -326,6 +333,34 @@ export default class UI {
         this.renderPrompt();
         this.renderMe();
         this.markHint();
+    }
+
+    // 描き直したあと：前のビューとの差を動かす（商人・助手・家族・総督・密輸人は場所から場所へ滑り、リラ・ルビー・品物・カードの増減は目立つ）
+    animateChanges(prev, view, before) {
+        if (!Motion.enabled() || !prev.players) return;
+        Motion.flipFrom(before, $('#board'), '.tok[data-key]', 'key', { duration: 380, enter: 'pop' });
+        const me = view.players[view.you];
+        const old = prev.players[view.you];
+        if (old) {
+            const mine = $('#me');
+            if (me.lira !== old.lira) Motion.pulse(mine.querySelector('.me-stat'), { duration: 380, scale: 1.3 });
+            if (me.rubies !== old.rubies) Motion.pulse(mine.querySelector('.ruby-stat'), { duration: 420, scale: 1.4 });
+            GOODS.forEach((g, i) => {
+                if (me.goods[g] !== old.goods[g]) Motion.pulse(mine.querySelectorAll('.cart-cell')[i], { duration: 380, scale: 1.3 });
+            });
+            if (me.cards.length > old.cards.length) [...mine.querySelectorAll('.hand-card')].slice(old.cards.length).forEach(el => Motion.popIn(el, { duration: 340 }));
+        }
+        view.players.filter(p => p.id !== view.you).forEach((p, i) => {
+            const was = prev.players[p.id];
+            const box = $('#opponents').children[i];
+            if (!was || !box) return;
+            if (p.rubies !== was.rubies) Motion.pulse(box.querySelector('.ruby-stat'), { duration: 420, scale: 1.4 });
+            if (p.lira !== was.lira) Motion.pulse(box.querySelectorAll('.opp-stat')[1], { duration: 380, scale: 1.3 });
+            GOODS.forEach((g, k) => {
+                if (p.goods[g] !== was.goods[g]) Motion.pulse(box.querySelectorAll('.g-num')[k], { duration: 380, scale: 1.4 });
+            });
+            if (p.cardCount !== was.cardCount) Motion.pulse(box.querySelectorAll('.opp-stat')[2], { duration: 380, scale: 1.3 });
+        });
     }
 
     colorOf(seat) {
@@ -446,16 +481,18 @@ export default class UI {
     tokensAt(place) {
         const view = this.view;
         const parts = [];
+        // 動かす駒には data-key を付ける（FLIP で前の位置から動かすため）
+        const keyed = (html, key) => html.replace('<span ', `<span data-key="${key}" `);
         view.players.forEach(p => {
-            if (p.merchant === place) parts.push(merchantToken(this.colorOf(p.id), p.stack, `tok merchant${p.id === view.you ? ' you' : ''}`));
+            if (p.merchant === place) parts.push(keyed(merchantToken(this.colorOf(p.id), p.stack, `tok merchant${p.id === view.you ? ' you' : ''}`), `m${p.id}`));
         });
-        view.neutrals.forEach(x => { if (x === place) parts.push(`<span class="tok merchant neutral" style="--c:${NEUTRAL_COLOR}"></span>`); });
+        view.neutrals.forEach((x, i) => { if (x === place) parts.push(`<span data-key="n${i}" class="tok merchant neutral" style="--c:${NEUTRAL_COLOR}"></span>`); });
         view.players.forEach(p => {
-            p.assistants.filter(x => x === place).forEach(() => parts.push(assistantToken(this.colorOf(p.id))));
+            p.assistants.forEach((x, i) => { if (x === place) parts.push(keyed(assistantToken(this.colorOf(p.id)), `a${p.id}-${i}`)); });
         });
-        view.players.forEach(p => { if (p.family === place) parts.push(familyToken(this.colorOf(p.id))); });
-        if (view.governor === place) parts.push('<span class="tok npc gov">総</span>');
-        if (view.smuggler === place) parts.push('<span class="tok npc smug">密</span>');
+        view.players.forEach(p => { if (p.family === place) parts.push(keyed(familyToken(this.colorOf(p.id)), `f${p.id}`)); });
+        if (view.governor === place) parts.push('<span data-key="gov" class="tok npc gov">総</span>');
+        if (view.smuggler === place) parts.push('<span data-key="smug" class="tok npc smug">密</span>');
         return parts.join('');
     }
 
