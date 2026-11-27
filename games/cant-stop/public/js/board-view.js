@@ -4,6 +4,7 @@
  */
 
 import { COLUMNS, COLUMN_LENGTH } from './game.js';
+import * as Motion from './motion/motion.js';
 
 export const PLAYER_COLORS = ['#e0483a', '#2f74d8', '#2fa35a', '#efbe2c'];
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -128,7 +129,7 @@ export default class BoardView {
             const g = svgEl('g', { class: 'bust-mark' });
             g.innerHTML = `<path d="M${x - 9} ${y - 9}l18 18M${x + 9} ${y - 9}l-18 18"/>`;
             this.layers.fx.appendChild(g);
-            setTimeout(() => g.remove(), 1400);
+            setTimeout(() => g.remove(), Motion.ms(1400));
         });
     }
 
@@ -139,6 +140,6 @@ export default class BoardView {
             width: COL_W - 2, height: COLUMN_LENGTH[col] * CELL_H, rx: 7
         });
         this.layers.fx.appendChild(g);
-        setTimeout(() => g.remove(), 1600);
+        setTimeout(() => g.remove(), Motion.ms(1600));
     }
 }

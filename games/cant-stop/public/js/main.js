@@ -12,6 +12,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'cantstop.settings.v1', save: 'cantstop.save.v1' };
@@ -104,8 +105,8 @@ function startGame(setup) {
 // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
 function beginGame(next) {
     if (controller !== next) controller?.stop();
-    clearTimeout(resultTimer);
-    clearTimeout(autoTimer);
+    resultTimer?.();
+    autoTimer?.();
     if ($('result-dialog').open) $('result-dialog').close();
     controller = next;
     hint = null;
@@ -133,8 +134,8 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
-    clearTimeout(resultTimer);
-    clearTimeout(autoTimer);
+    resultTimer?.();
+    autoTimer?.();
     showScene('title');
 }
 
@@ -153,8 +154,8 @@ const online = new NetplayLobby({
     onError: (message) => onError(message),
     onExit: () => {
         controller = null;
-        clearTimeout(resultTimer);
-        clearTimeout(autoTimer);
+        resultTimer?.();
+        autoTimer?.();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         showScene('title');
     }
@@ -172,11 +173,13 @@ function onUpdate() {
         if (e.type === 'roll') {
             rolling = true;
             lastMove = null;
-            setTimeout(() => { rolling = false; renderPanel(); }, 420);
+            Motion.hold(420); // さいころの転がる動き（CSS）が終わるまで CPU を待たせる
+            setTimeout(() => { rolling = false; renderPanel(); }, Motion.ms(420));
         } else if (e.type === 'move') {
             lastMove = e;
         } else if (e.type === 'bust') {
             boardView.showBust(e.lost);
+            Motion.hold(600);
             showBanner('バースト！', 'bust');
             lastMove = null;
         } else if (e.type === 'stop') {
@@ -228,7 +231,7 @@ const mine = () => view && view.phase !== 'end' && view.current === view.seat;
 // ---------- 操作 ----------
 
 function send(command) {
-    clearTimeout(autoTimer);
+    autoTimer?.();
     if (!controller || !mine()) return;
     controller.send(command);
 }
@@ -269,15 +272,15 @@ function markHint() {
 
 // できることが 1 つだけなら、少し間を置いて自動で行う（手番の初めに振る、進め方が 1 つだけ）
 function scheduleAuto() {
-    clearTimeout(autoTimer);
+    autoTimer?.();
     if (!mine() || document.querySelector('dialog[open]')) return;
     const key = view.eventSeq;
     const again = () => controller && view.eventSeq === key && mine();
     // 前の人のバーストや止めた結果を見る間を取ってから振る
     const lastType = view.events.at(-1)?.type;
     const rollDelay = lastType === 'bust' || lastType === 'stop' ? AUTO_DELAY_MS + 900 : AUTO_DELAY_MS;
-    if (view.phase === 'roll') autoTimer = setTimeout(() => again() && roll(), rollDelay);
-    else if (view.phase === 'choose' && view.options.length === 1) autoTimer = setTimeout(() => again() && chooseOption(0), AUTO_DELAY_MS + 250);
+    if (view.phase === 'roll') autoTimer = Motion.afterIdle(() => again() && roll(), rollDelay);
+    else if (view.phase === 'choose' && view.options.length === 1) autoTimer = Motion.afterIdle(() => again() && chooseOption(0), AUTO_DELAY_MS + 250);
 }
 
 // ---------- 描画 ----------
@@ -399,7 +402,7 @@ function renderDice(my, playing) {
 function openDialog(id) {
     const dialog = $(id);
     if (dialog.open) return;
-    clearTimeout(autoTimer);
+    autoTimer?.();
     controller?.pause();
     dialog.showModal();
 }
@@ -432,8 +435,8 @@ function recordLocalResult() {
 }
 
 function showResultSoon(delay) {
-    clearTimeout(resultTimer);
-    resultTimer = setTimeout(showResult, delay);
+    resultTimer?.();
+    resultTimer = Motion.afterIdle(showResult, delay);
 }
 
 function showResult() {
@@ -456,6 +459,11 @@ function setup() {
     drawTitleArt();
     boardView = new BoardView($('board'));
     setupDialogs();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
 
     $('player-count').addEventListener('click', e => {
         const b = e.target.closest('button');
