@@ -1,0 +1,6 @@
+/* スリザーリンクの色（共通の css/style.css の変数を上書きする）：紙の地に、深い緑の差し色 */
+:root {
+    --accent: #3d7a45;
+    --accent-strong: #2b5c32;
+    --accent-soft: rgba(61, 122, 69, .12);
+}

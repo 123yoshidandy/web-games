@@ -1,0 +1,12 @@
+{
+  "version": "1.14.0",
+  "commit": "0d5a750",
+  "serverDir": null,
+  "clientDir": "public/js/netplay",
+  "files": {
+    "public/js/netplay/netplay-client.js": "236862b6d2570bbb8053450c6510edf279bebe8f0dabbdfd229562758582b75b",
+    "public/js/netplay/netplay-client.mjs": "9fa731524a9aeea0b4e29ecababac162c615bf4d9b1f471af7a64675cd0f2847",
+    "public/js/netplay/netplay-lobby.js": "a2e85a2a6c3b83c7c3be91c1894dd9dee83a9c835e16ac5bb9920013eecee01b",
+    "public/js/netplay/user-stats.js": "687e94e4589ed1385ab641659979c136d5b5230920afc2210aadba8e398e5931"
+  }
+}
