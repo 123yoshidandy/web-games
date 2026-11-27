@@ -11,7 +11,7 @@ import { recordResult } from './netplay/user-stats.js';
 const MODE_STORAGE_KEY = 'wordle-mode';
 const GAME_STORAGE_KEY = 'wordle-game'; // 1人プレイの途中経過（モード・シード・入れた単語）
 const RESULT_DELAY_MS = 1500; // 最後の行をめくり終えてから結果を出すまで
-const FLIP_MS = 450; // 1マスをめくる時間（styles.css の .flip と同じ）
+const FLIP_MS = 450; // 1マスをめくる時間（css/style.css の .flip と同じ）
 const FLIP_STAGGER_MS = 200; // となりのマスをめくり始めるまで
 
 // キーの並び（右から あ か さ … の五十音。空文字は空き、BLANK は空白のキー）。濁音・半濁音・小さい字は「゛゜小」で切り替える
@@ -704,7 +704,7 @@ function setupModal(modalId, closeId, ...openButtonIds) {
 
 // ===== 初期化 =====
 
-// 画面を拡大させない（ふつうは styles.css の touch-action で止まる。iOS は viewport の user-scalable を無視するので、2本指の操作を止める）
+// 画面を拡大させない（ふつうは css/style.css の touch-action で止まる。iOS は viewport の user-scalable を無視するので、2本指の操作を止める）
 // document 全体の touchmove は止めない（passive でない touchmove があると、スクロールの始まりが遅れるため）
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { suggest, evaluateGuess, pickAnswer, createRandom, MAX_ROWS, MODES } from '../js/logic.js';
+import { suggest, evaluateGuess, pickAnswer, createRandom, MAX_ROWS, MODES } from '../public/js/logic.js';
 
 describe('ヒント（suggest）', () => {
     it('これまでの判定にすべて合う候補をすすめ、続けると答えにたどり着く', () => {

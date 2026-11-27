@@ -6,7 +6,7 @@
 
 - コマンドは web-games の直下で実行する：`npm install`（直下で1回）、`npm test -w games/wordle`、`npm run dev:server -w games/wordle`、`npm run build:server -w games/wordle`、`npm run deploy:server -w games/wordle`
 - 部屋の仕組みのサーバー側は、web-games の `packages/netplay-kit/server/` を `netplay-kit/server/*.js` として import する（写しは持たない。esbuild で Lambda 用に1つにまとめる）
-- 画面側の `js/netplay/` は netplay-kit の写し（ビルドの仕組みがないため）。直すときは netplay-kit で直し、直下で `node packages/netplay-kit/scripts/sync.mjs games/wordle` を実行する（`check` を付けると、手で直されていないかを確かめる）。版は `netplay-kit.lock.json`
+- 画面側の `public/js/netplay/` は netplay-kit の写し（ビルドの仕組みがないため）。直すときは netplay-kit で直し、直下で `node packages/netplay-kit/scripts/sync.mjs games/wordle` を実行する（`check` を付けると、手で直されていないかを確かめる）。版は `netplay-kit.lock.json`
 - 公開先は https://123yoshidandy.github.io/web-games/wordle/ になる予定。サーバーの自動デプロイ（GitHub Actions）は、web-games の直下にまとめる予定で、今はない。サーバーを1つにまとめる計画は `docs/server-merge.md`
 - 下の説明のうち、リポジトリ単体のときの手順（`.github/workflows/`・GitHub Pages への公開など）は、もとのリポジトリでの話
 
@@ -20,10 +20,10 @@
 - 続きから：1人プレイの途中経過（モード・答えを決めるシード・入れた単語）を端末に保存し、タイトルの「続きから」で再開できる。答えはシード付きの乱数から作り直すので、答えそのものは保存しない。決着したら消える
 - プレイ中は左上の家のボタンでタイトルへ戻る（オンライン対戦中は出さず、「部屋」から部屋を出るとタイトルに戻る）
 - 5文字の日本語（ひらがな）単語を推測するゲーム
-  - ことばの答えの一覧（`js/words.js`）は、食べ物・生き物・自然・暮らしの道具・行事・学校・場所・あいさつなど、よく知られた言葉を約340語選んで五十音順に並べたもの。小さい字（ゃ・っ など）も1文字に数える。固有名詞や知られていない言葉は入れない
+  - ことばの答えの一覧（`public/js/words.js`）は、食べ物・生き物・自然・暮らしの道具・行事・学校・場所・あいさつなど、よく知られた言葉を約340語選んで五十音順に並べたもの。小さい字（ゃ・っ など）も1文字に数える。固有名詞や知られていない言葉は入れない
   - 入力できる言葉の辞書はない。ひらがな5文字なら何でも決定できる（対戦でも、ひらがな5文字かだけを確かめる）
 - ポケモンモード：全世代のポケモンの名前（カタカナ）を当てる。名前の文字数（2〜6文字）は伏せ、マスはいつも6つ。短い名前は後ろを空白で埋めた形が答えで、空白も1文字として判定する（空白のキーで入れる。物理キーボードではスペース）。図鑑にある名前＋後ろの空白だけ入力できる
-  - 名前の一覧（`js/pokemon-names.js`）は PokeAPI の `pokemon_species_names.csv` から作成。記号や数字を含む名前（ニドラン♀、ポリゴン２、タイプ：ヌル、カプ・コケコなど）は除外している
+  - 名前の一覧（`public/js/pokemon-names.js`）は PokeAPI の `pokemon_species_names.csv` から作成。記号や数字を含む名前（ニドラン♀、ポリゴン２、タイプ：ヌル、カプ・コケコなど）は除外している
 - オンライン対戦（2〜4人）：全員が同じ答えを当てる。毎ラウンド全員が1つずつ答えを出し、そろったらいっせいに全員の結果（文字と色）を公開する。そのラウンドで当てた人の勝ち（同じラウンドなら同着）、10ラウンドで誰も当てられなければ引き分け
   - 答えの判定はサーバーで行い、答えは決着するまで端末に送らない
   - 部屋はすべて公開で、参加できる部屋の一覧か招待URLで参加する（部屋番号は画面に出さない）。ことば／ポケモンはロビーでホストが選ぶ。対戦後は全員が「もう1回」を押すと再戦する
@@ -51,28 +51,30 @@
 ## 技術スタック
 
 - 画面：HTML / CSS / JavaScript（ES Modules、ビルドなし）
-- オンライン対戦：[netplay-kit](../../packages/netplay-kit) の共通部品（サーバー側は web-games の `packages/netplay-kit` を import し、画面側は `js/netplay/` にコピー。版は `netplay-kit.lock.json`）
+- オンライン対戦：[netplay-kit](../../packages/netplay-kit) の共通部品（サーバー側は web-games の `packages/netplay-kit` を import し、画面側は `public/js/netplay/` にコピー。版は `netplay-kit.lock.json`）
 - テスト：Vitest（Node 22）
 
 ## フォルダ構成
 
-- `index.html` / `styles.css`：画面
-- `js/main.js`：タイトル画面・1人プレイ（途中経過の保存）と盤面の表示
-- `js/logic.js`：判定とシード付きの乱数（画面とサーバーで共通）
-- `js/online.js`：オンライン対戦の部屋と通信
-- `js/online-config.js`：本番のサーバーの URL
-- `js/words.js` / `js/pokemon-names.js`：答えの一覧
-- `sw.js` / `manifest.webmanifest`：ホーム画面に追加したときの設定と、オフラインで開くためのキャッシュ（自分のファイルはネットワークを先に使う）
+公開するファイルは `public/` にまとめる（ほかのゲームと同じ形。URL は `/wordle/` のまま）。
+
+- `public/index.html` / `public/css/style.css`：画面
+- `public/js/main.js`：タイトル画面・1人プレイ（途中経過の保存）と盤面の表示
+- `public/js/logic.js`：判定とシード付きの乱数（画面とサーバーで共通）
+- `public/js/online.js`：オンライン対戦の部屋と通信
+- `public/js/online-config.js`：本番のサーバーの URL（`resolveOnlineServerUrl` が ?game=wordle を付ける）
+- `public/js/words.js` / `public/js/pokemon-names.js`：答えの一覧
+- `public/sw.js` / `public/manifest.webmanifest`：ホーム画面に追加したときの設定と、オフラインで開くためのキャッシュ（自分のファイルはネットワークを先に使う）
 - `server/src/game-definition.js`：オンライン対戦の中身（netplay-kit のゲームの定義）
 - `server/template.yaml` / `server/samconfig.toml`：AWS SAM の設定（スタック `wordle-online`、東京リージョン）
 - `test/`：テスト
 
 ## 開発
 
-ES Modules を使うので、`index.html` をファイルとして直接開くのではなく、HTTP サーバーで配信して開きます。
+ES Modules を使うので、`public/index.html` をファイルとして直接開くのではなく、HTTP サーバーで配信して開きます。
 
 ```bash
-python3 -m http.server 8080   # http://localhost:8080/ を開く
+python3 -m http.server 8000 -d public   # http://localhost:8000/ を開く
 ```
 
 オンライン対戦を手元で試すときは、テスト用サーバーも動かします（localhost で開くと ws://localhost:8787 につながる）。
@@ -89,6 +91,6 @@ npm test
 npm run deploy:server         # esbuild でまとめて sam deploy（変更セットを確認してから反映）
 ```
 
-デプロイしたら、出力された `WebSocketUrl` を `js/online-config.js` の `ONLINE_DEPLOYED_SERVER_URL` に書きます。書くまでは、公開ページに「対戦」ボタンは出ません。
+デプロイしたら、出力された `WebSocketUrl` を `public/js/online-config.js` の `DEPLOYED_SERVER_URL` に書きます（?game= は付けない）。書くまでは、公開ページに「対戦」ボタンは出ません。
 
 netplay-kit を新しい版にするときは、web-games の直下で `node packages/netplay-kit/scripts/sync.mjs games/wordle` を実行します（画面側の写しが更新されます。サーバー側は import しているので、そのまま新しい版になります）。コピーしたファイルは直接直しません。

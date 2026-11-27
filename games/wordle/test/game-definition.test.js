@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createTestServer } from 'netplay-kit/server/testing.js';
 import game from '../server/src/game-definition.js';
-import { POKEMON_NAMES } from '../js/pokemon-names.js';
-import { trimBlanks } from '../js/logic.js';
+import { POKEMON_NAMES } from '../public/js/pokemon-names.js';
+import { trimBlanks } from '../public/js/logic.js';
 
 // 部屋を作って対戦を始め、各人の接続と答えを返す
 async function startMatch(names = ['あお', 'みどり'], settings = null) {

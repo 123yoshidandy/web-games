@@ -7,10 +7,10 @@ const CACHE = 'wordle-v1';
 // 同じサイトにほかのゲームも並ぶので、消すのはこのゲームの古い版のキャッシュだけにする
 const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
-const PRECACHE = ['./', 'index.html', 'styles.css', 'manifest.webmanifest',
+const PRECACHE = ['./', 'index.html', 'css/style.css', 'manifest.webmanifest',
     'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
     'js/main.js', 'js/logic.js', 'js/words.js', 'js/pokemon-names.js', 'js/online.js', 'js/online-config.js',
-    'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/user-stats.js',
+    'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/netplay-lobby.js', 'js/netplay/user-stats.js',
     'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js'];
 
 self.addEventListener('install', event => {

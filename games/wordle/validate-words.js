@@ -1,5 +1,5 @@
 // 単語リストの各単語の文字数を検証する
-import { ANSWER_WORDS } from './js/words.js';
+import { ANSWER_WORDS } from './public/js/words.js';
 
 console.log('単語リストの検証:');
 console.log('-------------------');

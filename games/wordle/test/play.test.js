@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     BLANK, MAX_ROWS, baseKana, evaluateGuess, gameResult, keyToLetter, strongerStatus, submitError
-} from '../js/logic.js';
+} from '../public/js/logic.js';
 
 const C = 'correct';
 const P = 'present';

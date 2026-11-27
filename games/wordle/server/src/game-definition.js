@@ -9,7 +9,7 @@
  */
 
 import { GameError } from 'netplay-kit/server/room-service.js';
-import { MAX_ROWS, MODES, boardWidth, checkGuess, evaluateGuess, pickAnswer, trimBlanks } from '../../js/logic.js';
+import { MAX_ROWS, MODES, boardWidth, checkGuess, evaluateGuess, pickAnswer, trimBlanks } from '../../public/js/logic.js';
 
 export default {
     minPlayers: 2,

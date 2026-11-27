@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { BLANK, baseKana, boardWidth, checkGuess, createRandom, cycleVariant, evaluateGuess, pickAnswer, toHiragana, toKatakana, trimBlanks, usesBlank } from '../js/logic.js';
-import { ANSWER_WORDS } from '../js/words.js';
-import { POKEMON_NAMES } from '../js/pokemon-names.js';
+import { BLANK, baseKana, boardWidth, checkGuess, createRandom, cycleVariant, evaluateGuess, pickAnswer, toHiragana, toKatakana, trimBlanks, usesBlank } from '../public/js/logic.js';
+import { ANSWER_WORDS } from '../public/js/words.js';
+import { POKEMON_NAMES } from '../public/js/pokemon-names.js';
 
 describe('evaluateGuess', () => {
     it('位置も合う・位置違い・含まれないを判定する', () => {
