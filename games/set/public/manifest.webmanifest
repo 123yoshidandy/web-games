@@ -1,0 +1,19 @@
+{
+    "name": "SET（セット）",
+    "short_name": "SET",
+    "description": "81枚のカードから、3枚の「セット」を誰よりも早く見つける。タイムアタック・CPU 対戦・オンライン対戦",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "orientation": "portrait",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#231a45",
+    "theme_color": "#231a45",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

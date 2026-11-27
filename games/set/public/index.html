@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#231a45">
+    <title>SET（セット）</title>
+    <meta name="description" content="81枚のカードから、3枚の「セット」を誰よりも早く見つける。タイムアタック・CPU 対戦・オンライン対戦">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="SET">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- カードの図柄（形と、しまの模様）。カードは use で使い回す -->
+    <svg id="card-defs" width="0" height="0" aria-hidden="true" focusable="false"></svg>
+
+    <main>
+        <!-- タイトル -->
+        <section id="screen-title" class="screen title-screen">
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <h1 class="logo">SET</h1>
+            <p class="logo-sub">3枚の「セット」を、誰よりも早く</p>
+            <div class="panel">
+                <div class="row"><span class="row-label">モード</span>
+                    <div id="mode-select" class="segmented" role="radiogroup" aria-label="モード">
+                        <button type="button" role="radio" data-mode="solo">タイムアタック</button>
+                        <button type="button" role="radio" data-mode="cpu">CPU 対戦</button>
+                    </div>
+                </div>
+                <div class="row" id="cpu-row"><span class="row-label">CPU</span>
+                    <div id="cpu-count" class="segmented" role="radiogroup" aria-label="CPU の人数">
+                        <button type="button" role="radio" data-count="1">1人</button>
+                        <button type="button" role="radio" data-count="2">2人</button>
+                        <button type="button" role="radio" data-count="3">3人</button>
+                    </div>
+                </div>
+                <div class="row" id="level-row"><span class="row-label">強さ</span>
+                    <div id="level-select" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                        <button type="button" role="radio" data-level="hard">つよい</button>
+                    </div>
+                </div>
+                <div class="row" id="best-row"><span class="row-label">ベスト</span><span id="best-time" class="best-time">—</span></div>
+                <div class="row"><span class="row-label">色の印</span>
+                    <div id="mark-select" class="segmented" role="radiogroup" aria-label="色の印">
+                        <button type="button" role="radio" data-marks="off">なし</button>
+                        <button type="button" role="radio" data-marks="on">あり</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" type="button" class="primary">ゲーム開始</button>
+                    <button id="resume" type="button" class="secondary" hidden>続きから</button>
+                </div>
+                <!-- オンライン対戦の接続先がないとき（デプロイ前の公開ページ）は隠す -->
+                <div class="buttons" id="online-row" hidden>
+                    <button id="online" type="button" class="secondary">オンラインで遊ぶ</button>
+                </div>
+                <div class="title-links">
+                    <button id="open-help-title" type="button" class="link">遊び方</button>
+                    <button type="button" class="link sound-toggle" aria-pressed="true">サウンド</button>
+                    <a class="link portal-link" href="../">← ゲーム一覧</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ゲーム -->
+        <section id="screen-game" class="screen game-screen" hidden>
+            <header class="topbar">
+                <button id="home" type="button" class="icon-button" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div class="status">
+                    <span id="clock" class="clock">0:00.0</span>
+                    <span id="replay-label" class="replay-label" hidden>リプレイ</span>
+                </div>
+                <button id="speed" type="button" class="icon-button speed" aria-label="速さ" title="速さ" hidden>×2</button>
+                <button id="hint" type="button" class="icon-button" aria-label="ヒント" title="ヒント"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/></svg></button>
+                <button id="log-button" type="button" class="icon-button" aria-label="ログ" title="ログ">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>
+                </button>
+                <button type="button" class="icon-button sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg></button>
+                <button id="open-help-game" type="button" class="icon-button" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 3.8"/><path d="M12 17.2v.1"/></svg>
+                </button>
+            </header>
+
+            <div id="players" class="players"></div>
+            <div id="board-wrap" class="board-wrap">
+                <div id="board" class="board"></div>
+                <div id="lock" class="lock" hidden><span id="lock-text">あと 3.0 秒</span></div>
+            </div>
+            <footer class="infobar">
+                <span id="deck-count">山札 69</span>
+                <button id="result-button" type="button" class="small-button" hidden>結果</button>
+                <span id="found-count">セット 0</span>
+            </footer>
+            <div id="toast" class="toast" hidden></div>
+        </section>
+    </main>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2>遊び方</h2><button type="button" class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <div id="help" class="help">
+                <p>場に並んだカードから、<b>セット</b>になる3枚を見つけて取ります。早い者勝ちです。</p>
+                <h3>カード</h3>
+                <p>カードには4つの特徴があり、それぞれ3通りです。</p>
+                <ul class="traits">
+                    <li><b>数</b>：1・2・3</li>
+                    <li><b>形</b>：ダイヤ・カプセル・なみ</li>
+                    <li><b>塗り</b>：塗り・しま・白抜き</li>
+                    <li><b>色</b>：朱・緑・青</li>
+                </ul>
+                <h3>セット</h3>
+                <p>3枚の組で、4つの特徴のどれも「3枚とも同じ」か「3枚とも違う」ならセットです。1つでも「2枚だけ同じ」があればセットではありません。</p>
+                <div class="example"><div id="help-set" class="example-cards"></div><p class="example-note ok">セット：数も形も塗りも色も、全部違う</p></div>
+                <div class="example"><div id="help-set2" class="example-cards"></div><p class="example-note ok">セット：数と形と塗りは同じ、色は全部違う</p></div>
+                <div class="example"><div id="help-miss" class="example-cards"></div><p class="example-note ng">セットではない：色が2枚だけ同じ</p></div>
+                <h3>進み方</h3>
+                <ul>
+                    <li>12枚が並んで始まります。カードを3枚タップすると、その3枚を取りにいきます</li>
+                    <li>セットなら1点。空いた所に山札から足します</li>
+                    <li>セットでなければ1点減り、3秒は取れません</li>
+                    <li>場にセットがないときは、自動で3枚足します</li>
+                    <li>山札がなくなり、場にセットが残っていなければ終わりです</li>
+                </ul>
+                <h3>モード</h3>
+                <ul>
+                    <li><b>タイムアタック</b>：1人で、全部のセットを取り切るまでのタイムを競います。ヒントを使うとベストに残りません</li>
+                    <li><b>CPU 対戦</b>：CPU と早い者勝ち。点の多い人の勝ち。ヒントを使うと1点減ります</li>
+                    <li><b>オンライン</b>：同じ場を見て早い者勝ち。サーバーに先に届いた組が取ります</li>
+                </ul>
+                <h3>コツ</h3>
+                <p>2枚を決めれば、セットになる3枚目は1通りに決まります。「この2枚なら3枚目は…」と探すと速くなります。</p>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- ログ -->
+    <dialog id="log" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2>ログ</h2><button type="button" class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <ol id="log-list" class="log-list"></ol>
+        </div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2 id="result-title">結果</h2><button type="button" class="icon-button close" aria-label="盤面を見る" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <p id="result-sub" class="result-sub"></p>
+            <table class="result-table"><thead><tr><th></th><th>名前</th><th>セット</th><th>ミス</th><th>点</th></tr></thead><tbody id="result-body"></tbody></table>
+            <ol id="best-list" class="best-list" hidden></ol>
+            <div class="buttons">
+                <button id="again" type="button" class="primary">もう一度</button>
+                <button id="replay" type="button" class="secondary">リプレイ</button>
+                <button id="result-home" type="button" class="secondary">ホーム</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

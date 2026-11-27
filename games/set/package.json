@@ -1,0 +1,28 @@
+{
+  "name": "set",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "portal": {
+    "original": "SET",
+    "aliases": [
+      "セット"
+    ],
+    "genres": [
+      "カードゲーム",
+      "パズル"
+    ]
+  },
+  "standards": {
+    "skip": {
+      "undo": "早い者勝ちのリアルタイムのゲームで、取った組を戻すと時間を巻き戻せてしまう"
+    }
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  }
+}
