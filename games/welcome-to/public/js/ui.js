@@ -18,8 +18,14 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const SETTINGS_KEY = 'welcome-to.settings';
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // カードから家へ
+const FLIP_MS = 380;     // カードがめくれる
+const STAGGER_MS = 110;  // 何枚も動くときの間
+const RESULT_DELAY_MS = 600;   // 動きが終わってから数える
 const CPU_NAMES = ['ベティ', 'フランク', 'ドリス', 'ハロルド', 'ルース'];
 const STREET_NAMES = ['上', '中', '下'];
 
@@ -64,6 +70,9 @@ export default class UI {
         $('open-help-game').innerHTML = LINE_ICONS.help;
         $('open-others').innerHTML = LINE_ICONS.people;
         $('undo').innerHTML = LINE_ICONS.undo;
+        this.flying = new Set();   // 飛んでいる最中の家（描き直しても番号を隠し続ける）
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('motion-setting-help'), { label: '動き' });
         $('help-body').innerHTML = HELP_HTML;
         $('title-art').innerHTML = this.titleArt();
         this.bindTitle();
@@ -142,6 +151,8 @@ export default class UI {
     showTitle() {
         this.controller?.stop();
         this.controller = null;
+        this.cancelResult?.();
+        this.cancelResult = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('screen-game').hidden = true;
         this.renderTitle();
@@ -167,6 +178,9 @@ export default class UI {
     // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
     begin(controller) {
         if (this.controller !== controller) this.controller?.stop();
+        this.cancelResult?.();
+        this.cancelResult = null;
+        this.flying.clear();
         this.sel = { num: null, eff: null, value: null };
         this.turnNo = 0;
         this.resultShown = false;
@@ -422,6 +436,8 @@ export default class UI {
         if (!this.controller) return;
         const view = this.controller.getView();
         const prev = this.view;
+        // 描き直す前に、動きの出発点（選んだカード・得点の欄）を測る
+        const before = prev && Motion.enabled() ? this.measure() : null;
         this.view = view;
         $('hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         if (prev && !this.sending) this.playUpdate();
@@ -445,11 +461,68 @@ export default class UI {
         this.renderTracks(view, me);
         this.renderActions(view, me);
         this.markHint();
+        if (before) this.animateUpdate(prev, view, before);
 
         if (view.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.showResult(), 600);
+            const controller = this.controller;
+            this.cancelResult = Motion.afterIdle(() => {
+                this.cancelResult = null;
+                if (this.controller === controller) this.showResult();
+            }, RESULT_DELAY_MS);
         }
+    }
+
+    // ---- 動き ----
+
+    measure() {
+        const picked = document.querySelector('#cards .card.selected, #cards .card.as-num');
+        return {
+            card: picked ? { rect: Motion.rectOf(picked), el: picked } : null,
+            marks: [...$('tracks').querySelectorAll('.chip, .estate')].map(el => el.innerHTML)
+        };
+    }
+
+    // 書いた番号は、選んだカードから家へ飛ぶ。飛んでいる間、家の番号は隠す（描き直しても隠し続ける）
+    hideFlying() {
+        this.flying.forEach(key => {
+            const [street, house] = key.split(':');
+            $('sheet').querySelectorAll(`g[data-street="${street}"][data-house="${house}"] text`).forEach(el => { el.style.visibility = 'hidden'; });
+        });
+    }
+
+    // 前のビューから増えた出来事（events の seq で見る）を動かす
+    // 新しい手番ではカードがめくれ、自分が書いた家へはカードが飛び、都市計画の達成・得点・家並みや記録の欄の変化は弾む
+    animateUpdate(prev, v, before) {
+        const lastSeq = Math.max(0, ...(prev.events ?? []).map(e => e.seq));
+        const fresh = (v.events ?? []).filter(e => e.seq > lastSeq);
+        let settle = 0;
+        fresh.forEach(e => {
+            if (e.type === 'build' && e.seat === v.you && before.card) {
+                const key = `${e.street}:${e.house}`;
+                const to = $('sheet').querySelector(`g[data-street="${e.street}"][data-house="${e.house}"]`);
+                if (!to) return;
+                this.flying.add(key);
+                this.hideFlying();
+                Motion.fly(before.card.rect, to, { content: before.card.el, duration: FLY_MS }).then(() => {
+                    this.flying.delete(key);
+                    $('sheet').querySelectorAll(`g[data-street="${e.street}"][data-house="${e.house}"] text`).forEach(el => { el.style.visibility = ''; });
+                });
+                settle = FLY_MS;
+            } else if (e.type === 'plan' && e.seat === v.you) {
+                Motion.pulse($('plans').querySelector(`.plan[data-plan="${e.plan}"]`), { delay: settle, scale: 1.12, duration: 420 });
+            }
+        });
+        if (v.turnNo !== prev.turnNo) {
+            document.querySelectorAll('#cards .card').forEach((el, i) => Motion.flipCard(el, { duration: FLIP_MS, delay: i * STAGGER_MS }));
+        }
+        const old = prev.players[prev.you]?.score?.total;
+        const now = v.players[v.you]?.score?.total;
+        if (old !== undefined && now !== undefined && old !== now) Motion.pulse($('total').querySelector('b'), { delay: settle, scale: 1.4, duration: 400 });
+        // 記録の欄（プール・温度・ビス・断り・家並み）で変わったもの
+        [...$('tracks').querySelectorAll('.chip, .estate')].forEach((el, i) => {
+            if (before.marks[i] !== undefined && before.marks[i] !== el.innerHTML) Motion.pulse(el, { delay: settle, scale: 1.25, duration: 380 });
+        });
     }
 
     renderCards(view, me) {
@@ -505,6 +578,7 @@ export default class UI {
         if (mode === 'bis') opts.bisTargets = new Set(bisSpots(me.sheet).map(b => `${b.street}:${b.house}`));
         this.targetCount = opts.targets?.size ?? 0;
         $('sheet').innerHTML = sheetSvg(me.sheet, opts);
+        this.hideFlying();
     }
 
     renderTracks(view, me) {

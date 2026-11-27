@@ -137,6 +137,14 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .logo { margin: 18px 0 0; font-family: var(--logo); font-size: 46px; font-weight: 400; line-height: 1.1; color: var(--accent); text-shadow: 0 3px 0 rgba(0, 0, 0, .35); text-align: center; }
 .subtitle { margin: 0 0 12px; color: var(--muted); font-size: 14px; letter-spacing: .3em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数・CPU と同じ見た目にする */
+.motion-setting .motion-speed { display: inline-flex; align-items: center; gap: 8px; }
+.motion-setting .motion-speed-options { display: inline-flex; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+.motion-setting .motion-speed button { height: 44px; padding: 0 14px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; }
+.motion-setting .motion-speed button[aria-pressed="true"] { color: #3a2800; background: var(--accent); }
+#motion-setting-help { margin-bottom: 8px; color: var(--muted); font-size: 14px; font-weight: 800; }
+/* 飛んでいるカード */
+.motion-flyer { filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); }
 .setup-row { display: flex; align-items: center; gap: 12px; font-weight: 800; }
 .setup-row.off { opacity: .4; }
 .setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
