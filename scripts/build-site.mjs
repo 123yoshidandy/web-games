@@ -4,6 +4,7 @@
 // - ゲームの一覧の入口のページ _site/index.html を、各ゲームの manifest と portal の情報（scripts/portal/metadata.mjs）から作る。
 //   検索・絞り込みの JS は scripts/portal/ から _site/portal/ に写す
 //   ログイン（名前だけ）と「自分の記録」の JS（scripts/portal/stats.js）も写し、netplay-kit の user-stats.js を横に置く（docs/user-stats.md）
+//   「いま立っている部屋」（全ゲームの待っている部屋。scripts/portal/rooms.js）も写す
 // - service worker が先に読むファイルが、写した先にすべてあるかを確かめる
 // 使い方: node scripts/build-site.mjs
 import { readdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, cpSync } from 'node:fs';
@@ -65,7 +66,7 @@ if (errors.length > 0) {
 }
 
 mkdirSync(join(site, PORTAL_DIR));
-for (const file of ['filter.js', 'page.js', 'stats.js', 'stats-view.js']) cpSync(join(root, 'scripts', 'portal', file), join(site, PORTAL_DIR, file));
+for (const file of ['filter.js', 'page.js', 'stats.js', 'stats-view.js', 'rooms.js', 'rooms-view.js']) cpSync(join(root, 'scripts', 'portal', file), join(site, PORTAL_DIR, file));
 // ログインと「自分の記録」は、ゲームと同じ netplay-kit の画面側の部品を使う（docs/user-stats.md）
 cpSync(join(root, 'packages', 'netplay-kit', 'client', 'user-stats.js'), join(site, PORTAL_DIR, 'user-stats.js'));
 
@@ -173,6 +174,15 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         .vs li { display: flex; gap: 6px; align-items: baseline; }
         .vs .cpu { font-size: 0.65rem; padding: 0 5px; border-radius: 999px; border: 1px solid var(--line); }
         .vs-record { margin-left: auto; white-space: nowrap; }
+        #rooms { max-width: 1080px; margin: 0 auto; padding: 8px 16px 0; }
+        #rooms[hidden] { display: none; }
+        #rooms h2 { margin: 0 0 6px; font-size: 0.9rem; color: var(--muted); }
+        #rooms-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+        #rooms-list a { display: flex; align-items: baseline; gap: 8px; padding: 10px 12px; min-height: 44px; border-radius: 10px; background: var(--card); color: inherit; text-decoration: none; border-left: 4px solid var(--accent); box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); }
+        #rooms-list a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .room-game { font-weight: 600; font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .room-host { flex: 1 1 auto; min-width: 0; font-size: 0.8rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .room-count { font-size: 0.8rem; font-weight: 600; color: var(--accent); white-space: nowrap; font-variant-numeric: tabular-nums; }
         @media (max-width: 480px) {
             #filters, #filter-groups { gap: 8px; }
             .group { flex-wrap: nowrap; align-items: flex-start; gap: 8px; }
@@ -205,6 +215,10 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         <div class="stats-head"><h2 id="stats-title">自分の記録</h2><button type="button" id="stats-close">閉じる</button></div>
         <div id="stats-body"></div>
     </dialog>
+    <section id="rooms" aria-labelledby="rooms-title" hidden>
+        <h2 id="rooms-title">いま立っている部屋</h2>
+        <ul id="rooms-list"></ul>
+    </section>
     <section id="filters" aria-label="検索と絞り込み" hidden>
         <form role="search">
             <input type="search" id="q" placeholder="名前で探す（例：かたん、Azul）" aria-label="ゲームの名前で探す" autocomplete="off" enterkeyhint="search">
@@ -231,6 +245,7 @@ ${cards}
     </main>
     <script type="module" src="${PORTAL_DIR}/page.js"></script>
     <script type="module" src="${PORTAL_DIR}/stats.js"></script>
+    <script type="module" src="${PORTAL_DIR}/rooms.js"></script>
 </body>
 </html>
 `);

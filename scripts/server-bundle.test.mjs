@@ -27,6 +27,7 @@ export class PutCommand extends Command {}
 export class DeleteCommand extends Command {}
 export class ScanCommand extends Command {}
 export class TransactWriteCommand extends Command {}
+export class QueryCommand extends Command {}
 const copy = (item) => item && structuredClone(item);
 // 利用者ごとの記録（dynamo-stats-store.js）：印の Put（なければだけ）と、SET・ADD の Update を、まとめて行う
 const transact = ({ TransactItems }) => {
@@ -49,6 +50,15 @@ const transact = ({ TransactItems }) => {
 };
 const send = async (command) => {
     if (command instanceof TransactWriteCommand) return transact(command.input);
+    // 索引 OpenRooms（openList が鍵、openAt の新しい順）だけをまねる
+    if (command instanceof QueryCommand) {
+        const { IndexName, ExpressionAttributeValues: v, Limit } = command.input;
+        if (IndexName !== 'OpenRooms') throw new Error('偽の DynamoDB が知らない索引: ' + IndexName);
+        const Items = [...fake.items.values()].filter((item) => item.openList === v[':open'] && item.expiresAt > v[':now'])
+            .sort((a, b) => b.openAt - a.openAt).slice(0, Limit)
+            .map(({ pk, openList, openAt, code, expiresAt, lobbyEntry }) => copy({ pk, openList, openAt, code, expiresAt, lobbyEntry }));
+        return { Items };
+    }
     const { Key, Item, ConditionExpression, ExpressionAttributeValues: values = {} } = command.input;
     if (command instanceof GetCommand) return { Item: copy(fake.items.get(Key.pk)) };
     if (command instanceof DeleteCommand) { fake.items.delete(Key.pk); return {}; }
@@ -173,6 +183,18 @@ test('記録の API（stats-handler.mjs）：ローカルの結果を受け取�
     assert.equal(response.statusCode, 200);
     assert.deepEqual(JSON.parse(response.body).games.azul, { plays: 1, wins: 1, losses: 0, draws: 0, online: 0, vs: [] });
     assert.ok(fake.items.has('RESULT#local:azul:バンドル:azul-bundle-1'));
+});
+
+test('全ゲームの待っている部屋（GET /rooms）：作った部屋が出て、つながっている人がいなくなると消える', async () => {
+    const rooms = async () => JSON.parse((await statsHandler({ rawPath: '/rooms', requestContext: { http: { method: 'GET' } } })).body).rooms;
+    await handler(event('$connect', 'c-rooms', { game: 'seven-wonders' }));
+    await handler(event('$default', 'c-rooms', { body: JSON.stringify({ action: 'create', name: 'まつ' }) }));
+    const code = fake.items.get('CONN#c-rooms').roomCode;
+    const listed = (await rooms()).find((room) => room.game === 'seven-wonders');
+    assert.deepEqual(listed && { ...listed, createdAt: typeof listed.createdAt },
+        { game: 'seven-wonders', roomCode: code, hostName: 'まつ', players: 1, maxPlayers: 7, createdAt: 'number' });
+    await handler(event('$disconnect', 'c-rooms'));
+    assert.equal((await rooms()).some((room) => room.roomCode === code && room.game === 'seven-wonders'), false);
 });
 
 test('全ゲームの chunk が読み込めて、つなげる', async () => {

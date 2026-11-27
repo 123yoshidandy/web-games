@@ -9,7 +9,8 @@ vi.mock('@aws-sdk/lib-dynamodb', () => {
     const command = (name) => class { constructor(input) { this.name = name; this.input = input; } };
     return {
         DynamoDBDocumentClient: { from: () => null },
-        GetCommand: command('Get'), PutCommand: command('Put'), DeleteCommand: command('Delete'), ScanCommand: command('Scan')
+        GetCommand: command('Get'), PutCommand: command('Put'), DeleteCommand: command('Delete'), ScanCommand: command('Scan'),
+        QueryCommand: command('Query')
     };
 });
 

@@ -336,6 +336,12 @@ web-games では、全ゲームを1つの WebSocket の API・Lambda・テーブ
 - HTTP API：`stats-handler.js`（`GET /stats?name=`・`POST /results`）。`startMultiDevServer` は同じポートの HTTP で、メモリの保存先で受け持つ
 - 画面：`client/user-stats.js`（ログイン・ローカル対戦の結果の待ち行列と送り直し・記録の読み込み）。デプロイしたら `DEPLOYED_STATS_URL` に API の URL を書いて同期する
 
+### 全ゲームの待っている部屋（1.14.0）
+
+- `RoomService` は部屋を保存するたびに、ゲームごとの一覧と同じ条件（公開・ロビー・満員でない・人がつながっている）で、載せる部屋にだけ `openList`（`'OPEN'`）・`openAt`・`lobbyEntry`（ホスト名・人数・定員）を付ける
+- `DynamoStore.listOpenRooms` は、`openList`・`openAt` を鍵にした索引 `OpenRooms` を1回 Query する（テーブルを Scan しない）。`MemoryStore.listOpenRooms` も同じ形
+- `createStatsHandler({ store, rooms })` に保存先を渡すと `GET /rooms` を受ける。画面は `user-stats.js` の `fetchOpenRooms`。入るときは招待URLと同じ `<ゲーム>/?room=<部屋番号>`
+
 ## 入口とロビーの画面（netplay-lobby.js、1.10.0）
 
 どのゲームでも同じ入口（名前・部屋を作る・参加できる部屋の一覧）とロビー（参加者・CPU の追加と外す・設定・開始・招待URL・退出）を、`body` の下に重ねて出す。ゲームの画面の作りに依らない（CSS は `.netplay-lobby` の下だけ。色は `--np-bg`・`--np-fg`・`--np-accent` などで変えられる）。使い方はファイルの先頭のコメント。

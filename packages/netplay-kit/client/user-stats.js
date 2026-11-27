@@ -173,6 +173,20 @@ export async function fetchStats(name = currentUser(), { fetchImpl = globalThis.
     }
 }
 
+// 全ゲームの、ロビーで人を待っている部屋（入口のページの「いま立っている部屋」）。読めなければ null
+// [{ game, roomCode, hostName, players, maxPlayers, createdAt }]（新しい順）。入るときは <ゲーム>/?room=<部屋番号>（招待URLと同じ）
+export async function fetchOpenRooms({ fetchImpl = globalThis.fetch, url = resolveStatsUrl() } = {}) {
+    if (!url || typeof fetchImpl !== 'function') return null;
+    try {
+        const response = await fetchImpl(`${url}/rooms`);
+        if (!response.ok) return null;
+        const { rooms } = await response.json();
+        return Array.isArray(rooms) ? rooms : null;
+    } catch {
+        return null;
+    }
+}
+
 // ブラウザで読み込まれたら、残っている結果を送り、通信が戻ったときにも送る
 if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
     window.addEventListener('online', () => flushResults());

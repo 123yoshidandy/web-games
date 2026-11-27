@@ -6,7 +6,7 @@
  * from に別の MemoryStore を渡すと、その保存場所を共有する（1つのテーブルに複数のゲームを入れる形をまねる）
  */
 
-import { ConflictError } from './room-service.js';
+import { ConflictError, OPEN_LIST, openRoomOf } from './room-service.js';
 
 const clone = (value) => (value === undefined ? undefined : structuredClone(value));
 
@@ -48,6 +48,18 @@ export class MemoryStore {
             .filter(([key, room]) => key === this.roomKey(room.code)
                 && room.isPublic && room.status === status && room.expiresAt > nowSeconds)
             .map(([, room]) => clone(room));
+    }
+
+    // 全ゲームの、ロビーで人を待っている部屋（新しい順。DynamoStore の listOpenRooms と同じ形）
+    // 共有の保存場所のキーは「ゲーム#部屋番号」なので、そこからゲームの名前を取る（頭のない部屋は載せない）
+    async listOpenRooms(nowSeconds = Math.floor(Date.now() / 1000), { limit = 50 } = {}) {
+        this.reads++;
+        return [...this.rooms.entries()]
+            .filter(([, room]) => room.openList === OPEN_LIST && room.expiresAt > nowSeconds)
+            .map(([key, room]) => openRoomOf({ ...room, pk: `ROOM#${key}` }))
+            .filter(Boolean)
+            .sort((a, b) => (b.createdAt ?? 0) - (a.createdAt ?? 0))
+            .slice(0, limit);
     }
 
     async getConnection(connectionId) {

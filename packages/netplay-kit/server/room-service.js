@@ -27,6 +27,16 @@ const MAX_RETRIES = 3;              // 同時に操作されて保存がぶつ�
 const MAX_CODE_ATTEMPTS = 10;       // 部屋番号が使用中の部屋とぶつかったときに作り直す回数
 const CONNECTION_CACHE_SIZE = 1000;
 const PUBLIC_ROOMS_LIMIT = 20;      // 公開の部屋の一覧に載せる数（新しく作られた順）
+// ゲームをまたいだ部屋の一覧（入口のページ）に載せる部屋に付ける印。DynamoDB では、この項目を鍵にした索引（OpenRooms）で引く
+export const OPEN_LIST = 'OPEN';
+
+// 保存した部屋（pk = ROOM#ゲーム#部屋番号）から、ゲームをまたいだ一覧の1行を作る（ゲームの名前のないキーは載せない）
+export function openRoomOf(item) {
+    const match = /^ROOM#([a-z0-9][a-z0-9-]*)#(\d+)$/.exec(item?.pk ?? '');
+    if (!match || !item.lobbyEntry) return null;
+    const { hostName = '', players = 0, maxPlayers = 0 } = item.lobbyEntry;
+    return { game: match[1], roomCode: match[2], hostName, players, maxPlayers, createdAt: item.openAt ?? null };
+}
 // 観戦者ができる操作（ほかは code: 'spectator' で断る）
 const SPECTATOR_ACTIONS = ['ping', 'leave', 'stamp'];
 
@@ -583,6 +593,7 @@ export class RoomService {
         room.version = previousVersion + 1;
         room.expiresAt = this.expiresAt();
         if (justEnded) room.reportedMatchId = room.matchId;
+        this.markOpenListing(room);
         try {
             await this.store.putRoom(room, previousVersion, Math.floor(this.now() / 1000));
         } catch (error) {
@@ -591,6 +602,24 @@ export class RoomService {
             throw error;
         }
         if (justEnded) await this.reportMatchEnd(room);
+    }
+
+    // ゲームをまたいだ部屋の一覧に載せるか（ゲームごとの一覧 listPublicRooms と同じ条件：公開・ロビー・満員でない・人がつながっている）
+    // 載せる部屋にだけ openList・openAt・lobbyEntry を付け、ほかは外す（保存先は部屋をそのまま保存するので、索引は疎になる）
+    // lobbyEntry は一覧に出す分だけ（token などを索引に写さない）。定員はゲームの定義にしかないので、ここで書く
+    markOpenListing(room) {
+        const active = this.activePlayers(room);
+        const open = Boolean(room.isPublic) && room.status === 'lobby' && active.length < this.game.maxPlayers
+            && room.players.some(player => !player.isCPU && !player.left && player.connectionId);
+        if (!open) {
+            delete room.openList;
+            delete room.openAt;
+            delete room.lobbyEntry;
+            return;
+        }
+        room.openList = OPEN_LIST;
+        room.openAt = room.createdAt ?? this.now();
+        room.lobbyEntry = { hostName: room.players[this.hostSeat(room)]?.name ?? '', players: active.length, maxPlayers: this.game.maxPlayers };
     }
 
     // 知らせる側（記録）の失敗で、対戦の処理を止めない

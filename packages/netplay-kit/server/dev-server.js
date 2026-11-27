@@ -10,7 +10,8 @@
  * 複数のゲームを1つのサーバーで動かすとき（web-games の npm run dev:online）:
  *   startMultiDevServer({ load: (name) => そのゲームの定義（なければ null） });
  *   画面は ws://localhost:8787?game=<ゲームの名前> につなぐ。AWS の router.js と同じく、ゲームは接続の URL で選ぶ
- *   同じポートの HTTP で、利用者ごとの記録の API（stats-handler.js の GET /stats・POST /results）も受け持つ（保存先はメモリ）
+ *   同じポートの HTTP で、利用者ごとの記録の API（stats-handler.js の GET /stats・POST /results）と、
+ *   全ゲームの待っている部屋の一覧（GET /rooms）も受け持つ（保存先はメモリ）
  *   対戦が終わると、AWS と同じく人の席の結果を記録する（stats.js）
  */
 
@@ -109,7 +110,8 @@ export function startMultiDevServer({ load, port = Number(process.env.PORT ?? 87
         return services.get(name);
     };
 
-    const web = http.createServer(serveStats(createStatsHandler({ store: stats, log: (entry) => log(JSON.stringify(entry)) })));
+    // GET /rooms は、全ゲームが共有する部屋の保存場所から読む（AWS では索引 OpenRooms を引く）
+    const web = http.createServer(serveStats(createStatsHandler({ store: stats, rooms: shared, log: (entry) => log(JSON.stringify(entry)) })));
     const server = new WebSocketServer({ server: web });
     web.listen(port);
     server.on('connection', (socket, request) => {

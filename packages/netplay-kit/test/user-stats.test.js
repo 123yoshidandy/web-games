@@ -100,6 +100,16 @@ describe('そのほか', () => {
         globalThis.location = new URL('https://example.github.io/web-games/azul/');
     });
 
+    it('待っている部屋の一覧を GET /rooms で読み、読めなければ null', async () => {
+        const rooms = [{ game: 'azul', roomCode: '1234', hostName: 'あお', players: 1, maxPlayers: 4 }];
+        const ok = { calls: [], fetchImpl: async (url) => { ok.calls.push(url); return { ok: true, status: 200, json: async () => ({ rooms }) }; } };
+        expect(await stats.fetchOpenRooms({ fetchImpl: ok.fetchImpl, url: 'https://api.example' })).toEqual(rooms);
+        expect(ok.calls).toEqual(['https://api.example/rooms']);
+        expect(await stats.fetchOpenRooms({ fetchImpl: fakeFetch([404]).fetchImpl, url: 'https://api.example' })).toBeNull();
+        expect(await stats.fetchOpenRooms({ fetchImpl: fakeFetch(['offline']).fetchImpl, url: 'https://api.example' })).toBeNull();
+        expect(await stats.fetchOpenRooms({ fetchImpl: ok.fetchImpl, url: null })).toBeNull();
+    });
+
     it('記録の読み込みに失敗したら null', async () => {
         expect(await fetchStats('あお', { fetchImpl: fakeFetch([500]).fetchImpl, url: 'https://api.example' })).toBeNull();
         expect(await fetchStats('あお', { fetchImpl: fakeFetch(['offline']).fetchImpl, url: 'https://api.example' })).toBeNull();

@@ -4,6 +4,9 @@
  *   POST /results            ローカル対戦（CPU・ひとり）の結果を1つ受け取る
  *                            本文 { id, name, game, outcome }。outcome は win / loss / draw / null（回数だけ）
  *                            同じ id は2回目から数えない（端末は届いたか分からなければ送り直す）
+ *   GET  /rooms              全ゲームの、ロビーで人を待っている部屋（入口のページの「いま立っている部屋」）
+ *                            rooms（listOpenRooms を持つ保存先。DynamoStore・MemoryStore）を渡したときだけ
+ *                            { rooms: [{ game, roomCode, hostName, players, maxPlayers, createdAt }] }（新しい順）
  * 本文が読めない・形が違うものは 400 で断る（端末は送り直さずに捨てる）
  *
  * 使い方（web-games の server/src/stats-handler.js）:
@@ -54,12 +57,18 @@ export function localRecord(body, now = Date.now()) {
     return { id: `local:${body.game}:${nameKey(name)}:${body.id}`, game: body.game, at: now, entries: [{ name, outcome, online: false, vs: [] }] };
 }
 
-export function createStatsHandler({ store, now = () => Date.now(), log = (entry) => console.log(JSON.stringify(entry)) }) {
+const OPEN_ROOMS_LIMIT = 30; // 入口のページに出す部屋の数
+
+export function createStatsHandler({ store, rooms = null, now = () => Date.now(), log = (entry) => console.log(JSON.stringify(entry)) }) {
     return async (event) => {
         const method = event.requestContext?.http?.method ?? event.httpMethod ?? 'GET';
         const path = (event.rawPath ?? event.path ?? '/').replace(/\/+$/, '') || '/';
         try {
             if (method === 'OPTIONS') return reply(204);
+            if (method === 'GET' && path.endsWith('/rooms') && rooms) {
+                const open = await rooms.listOpenRooms(Math.floor(now() / 1000), { limit: OPEN_ROOMS_LIMIT });
+                return reply(200, { rooms: open.slice(0, OPEN_ROOMS_LIMIT) });
+            }
             if (method === 'GET' && path.endsWith('/stats')) {
                 const name = event.queryStringParameters?.name ?? '';
                 if (!nameKey(name)) return reply(400, { error: '名前がありません' });

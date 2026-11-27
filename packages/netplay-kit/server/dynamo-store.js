@@ -9,10 +9,13 @@
  */
 
 const MAX_SCAN_PAGES = 10; // 公開の部屋の一覧で読むページ（1ページ最大1MB）の上限
+// ゲームをまたいだ部屋の一覧の索引（GSI）。鍵は openList（'OPEN'）と openAt（作った時刻）で、載せる部屋にだけ付く（room-service.js の markOpenListing）
+// 索引に写す項目は code・expiresAt・lobbyEntry だけでよい（web-games の server/template.yaml）
+export const OPEN_ROOMS_INDEX = 'OpenRooms';
 
 import { DynamoDBClient, ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, ScanCommand } from '@aws-sdk/lib-dynamodb';
-import { ConflictError } from './room-service.js';
+import { DynamoDBDocumentClient, GetCommand, PutCommand, DeleteCommand, ScanCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
+import { ConflictError, OPEN_LIST, openRoomOf } from './room-service.js';
 
 export class DynamoStore {
     constructor(tableName, client = DynamoDBDocumentClient.from(new DynamoDBClient({}), {
@@ -79,6 +82,22 @@ export class DynamoStore {
             startKey = LastEvaluatedKey;
         }
         return rooms;
+    }
+
+    // 全ゲームの、ロビーで人を待っている部屋（新しい順）。索引 OpenRooms を1回 Query するだけで、テーブルを Scan しない
+    // TTL で消える前の期限切れは除く。索引は結果整合性なので、直前の変更が少し遅れて映ることがある
+    async listOpenRooms(nowSeconds = Math.floor(Date.now() / 1000), { limit = 50 } = {}) {
+        const { Items = [] } = await this.client.send(new QueryCommand({
+            TableName: this.tableName,
+            IndexName: OPEN_ROOMS_INDEX,
+            KeyConditionExpression: '#openList = :open',
+            FilterExpression: '#expiresAt > :now',
+            ExpressionAttributeNames: { '#openList': 'openList', '#expiresAt': 'expiresAt' },
+            ExpressionAttributeValues: { ':open': OPEN_LIST, ':now': nowSeconds },
+            ScanIndexForward: false,
+            Limit: limit
+        }));
+        return Items.map(openRoomOf).filter(Boolean);
     }
 
     async getConnection(connectionId) {

@@ -38,9 +38,28 @@ Resources:
       AttributeDefinitions:
         - AttributeName: pk
           AttributeType: S
+        - AttributeName: openList
+          AttributeType: S
+        - AttributeName: openAt
+          AttributeType: N
       KeySchema:
         - AttributeName: pk
           KeyType: HASH
+      # 全ゲームの、ロビーで人を待っている部屋の一覧（入口のページの GET /rooms）。Scan せずに1回の Query で引く
+      # openList・openAt は一覧に載せる部屋にだけ付く（netplay-kit の room-service.js の markOpenListing）ので、索引は小さい
+      GlobalSecondaryIndexes:
+        - IndexName: OpenRooms
+          KeySchema:
+            - AttributeName: openList
+              KeyType: HASH
+            - AttributeName: openAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: INCLUDE
+            NonKeyAttributes:
+              - code
+              - expiresAt
+              - lobbyEntry
       TimeToLiveSpecification:
         AttributeName: expiresAt
         Enabled: true
@@ -165,9 +184,13 @@ Resources:
       Environment:
         Variables:
           STATS_TABLE_NAME: !Ref StatsTable
+          # GET /rooms で、部屋のテーブルの索引 OpenRooms を読む（読むだけ）
+          TABLE_NAME: !Ref Table
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref StatsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref Table
 
   StatsFunctionLogGroup:
     Type: AWS::Logs::LogGroup
@@ -205,6 +228,13 @@ Resources:
     Properties:
       ApiId: !Ref StatsApi
       RouteKey: GET /stats
+      Target: !Sub integrations/${StatsIntegration}
+
+  StatsRoomsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref StatsApi
+      RouteKey: GET /rooms
       Target: !Sub integrations/${StatsIntegration}
 
   StatsPostRoute:
