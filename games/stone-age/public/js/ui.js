@@ -17,12 +17,21 @@ import { finalBonus, multiplierCounts, multiplierBase } from './scoring.js';
 import { symbolsSvg, sym, civCardHtml, buildingFaceHtml, buildingText, cardText, dieHtml, amountHtml } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff, flyIn } from './anim.js';
 
 const SETTINGS_KEY = 'stone-age.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
 export const COLORS = ['#d9473b', '#3d7dd8', '#3c9f4b', '#e2b72a'];
 const RESULT_DELAY_MS = 900;
 const AUTO_DELAY_MS = 600;
+
+// 動きの目印：置いた人は「場所:席」、場所はカード・建物の表、数は欄ごとの何番目か
+const TOKENS = { key: el => `${el.closest('[data-place]')?.dataset.place}:${el.dataset.seat}` };
+const PLACES = { key: el => el.dataset.place, value: el => el.querySelector('.civ, .bld-face')?.innerHTML ?? '' };
+const AMOUNTS = '#players .pl-score, #players .pl-stats > .amt, #me .me-row > .pl-score, #me .me-row > .amt, #me .tools, #me .cards-btn';
+const amountKey = el => `${el.closest('.pl')?.dataset.seat ?? 'me'}:${[...el.closest('.pl, #me').querySelectorAll(AMOUNT_ITEM)].indexOf(el)}`;
+const AMOUNT_ITEM = '.pl-score, .pl-stats > .amt, .me-row > .pl-score, .me-row > .amt, .tools, .cards-btn';
 const PHASE_NAME = { place: '人を置く', action: '行動', feed: '食べさせる', end: '終わり' };
 
 const $ = (selector) => document.querySelector(selector);
@@ -110,6 +119,7 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     }
 
     // ---- 画面の切り替え ----
@@ -179,7 +189,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         clearTimeout(this.autoTimer);
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
@@ -372,6 +382,9 @@ export default class UI {
         const v = this.controller.getView();
         this.recordLocalResult(v);
         const prev = this.view;
+        // 手が進んだときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+        const moved = Boolean(prev) && v.commandCount !== prev.commandCount;
+        const before = moved ? this.captureMotion() : null;
         this.view = v;
         // 始めた時点までの出来事は鳴らさない
         const lastSeq = this.lastSeq;
@@ -392,12 +405,43 @@ export default class UI {
         this.markHint();
         if ($('#log').open) this.renderLog();
         this.scheduleAuto(v);
+        if (moved) this.animateMotion(v, before);
+        // 結果の画面は、最後の手の動きが終わってから出す
         if (v.phase === 'end' && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // ---- 動き（描き直しの前後の差） ----
+
+    // 描き直す前：置いた人・場所のカードと建物・各プレイヤーの数
+    captureMotion() {
+        return {
+            tokens: snapshot($('#board'), '.tok', TOKENS),
+            places: snapshot($('#board'), '[data-place]', PLACES),
+            amounts: snapshot(document, AMOUNTS, { key: amountKey })
+        };
+    }
+
+    // 描いたあと：置いた人はその人の欄から飛ばし（人数が増えたら目立たせ）、入れ替わったカード・建物ははねて出し、数の変化を目立たせる
+    animateMotion(v, before) {
+        animateDiff(before.tokens, $('#board'), '.tok', {
+            ...TOKENS,
+            enter: el => flyIn(el, this.playerPanel(v, Number(el.dataset.seat)))
+        });
+        animateDiff(before.places, $('#board'), '[data-place]', {
+            ...PLACES,
+            enter: null,
+            change: el => Motion.popIn(el.querySelector('.civ, .bld-face') ?? el, { duration: 320 })
+        });
+        animateDiff(before.amounts, document, AMOUNTS, { key: amountKey });
+    }
+
+    playerPanel(v, seat) {
+        return seat === v.you ? $('#me .me-row') : $(`#players .pl[data-seat="${seat}"]`);
     }
 
     // 使える場所が1つだけなら、少し間を置いて自動で使う
@@ -444,7 +488,7 @@ export default class UI {
 
     tokensHtml(v, place) {
         return v.placed.map((m, seat) => (m[place]
-            ? `<span class="tok" style="--c:${COLORS[seat]}">${sym('person')}${m[place] > 1 ? `<b>${m[place]}</b>` : ''}</span>`
+            ? `<span class="tok" data-seat="${seat}" style="--c:${COLORS[seat]}">${sym('person')}${m[place] > 1 ? `<b>${m[place]}</b>` : ''}</span>`
             : '')).join('');
     }
 
