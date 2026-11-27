@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#f4efe4">
+    <title>四角に切れ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="四角に切れ">
+    <link rel="stylesheet" href="./css/style.css">
+    <link rel="stylesheet" href="./css/theme.css">
+</head>
+<body>
+    <main>
+        <!-- タイトル -->
+        <section id="screen-title" class="screen title-screen">
+            <header class="title-head">
+                <svg id="title-art" class="title-art" viewBox="0 0 220 64" aria-hidden="true"><line x1="74" y1="8" x2="146" y2="8" stroke="var(--line)" stroke-width="1"/><line x1="74" y1="20" x2="146" y2="20" stroke="var(--line)" stroke-width="1"/><line x1="74" y1="32" x2="146" y2="32" stroke="var(--line)" stroke-width="1"/><line x1="74" y1="44" x2="146" y2="44" stroke="var(--line)" stroke-width="1"/><line x1="74" y1="56" x2="146" y2="56" stroke="var(--line)" stroke-width="1"/><line x1="74" y1="8" x2="74" y2="56" stroke="var(--line)" stroke-width="1"/><line x1="86" y1="8" x2="86" y2="56" stroke="var(--line)" stroke-width="1"/><line x1="98" y1="8" x2="98" y2="56" stroke="var(--line)" stroke-width="1"/><line x1="110" y1="8" x2="110" y2="56" stroke="var(--line)" stroke-width="1"/><line x1="122" y1="8" x2="122" y2="56" stroke="var(--line)" stroke-width="1"/><line x1="134" y1="8" x2="134" y2="56" stroke="var(--line)" stroke-width="1"/><line x1="146" y1="8" x2="146" y2="56" stroke="var(--line)" stroke-width="1"/><rect x="75.5" y="9.5" width="21" height="21" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/><text x="86" y="23.6" font-size="10" font-weight="800" fill="var(--ink)" text-anchor="middle">4</text><rect x="99.5" y="9.5" width="33" height="21" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/><text x="116" y="23.6" font-size="10" font-weight="800" fill="var(--ink)" text-anchor="middle">6</text><rect x="135.5" y="9.5" width="9" height="45" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/><text x="140" y="35.6" font-size="10" font-weight="800" fill="var(--ink)" text-anchor="middle">4</text><rect x="75.5" y="33.5" width="21" height="21" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/><text x="86" y="47.6" font-size="10" font-weight="800" fill="var(--ink)" text-anchor="middle">4</text><rect x="99.5" y="33.5" width="33" height="21" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/><text x="116" y="47.6" font-size="10" font-weight="800" fill="var(--ink)" text-anchor="middle">6</text></svg>
+                <h1 class="logo">四角に切れ</h1>
+            </header>
+            <div class="panel">
+                <div id="mode-tabs" class="segmented mode-tabs" role="radiogroup" aria-label="遊び方の種類">
+                    <button type="button" role="radio" data-mode="free">フリー</button>
+                    <button type="button" role="radio" data-mode="daily">今日のパズル</button>
+                    <button type="button" role="radio" data-mode="attack">タイムアタック</button>
+                </div>
+                <div class="options">
+                    <div class="row" data-modes="free attack">
+                        <span class="row-label">難しさ</span>
+                        <div id="difficulty" class="segmented" role="radiogroup" aria-label="難しさ"></div>
+                    </div>
+                    <div class="row" data-modes="attack">
+                        <span class="row-label">問題の数</span>
+                        <div id="count" class="segmented" role="radiogroup" aria-label="問題の数"></div>
+                    </div>
+                    <div class="row" data-modes="attack">
+                        <span class="row-label">ライバル</span>
+                        <div id="rival" class="segmented" role="radiogroup" aria-label="CPU のライバルの強さ"></div>
+                    </div>
+                    <div id="daily-info" class="daily-info" data-modes="daily"></div>
+                    <p id="mode-note" class="mode-note"></p>
+                </div>
+                <div class="buttons">
+                    <button id="start" type="button" class="primary">はじめる</button>
+                    <button id="resume" type="button" class="secondary" hidden>続きから</button>
+                </div>
+                <!-- オンライン対戦の接続先がないとき（デプロイ前の公開ページ）は隠す -->
+                <div class="buttons" id="online-row" hidden>
+                    <button id="online" type="button" class="secondary">オンラインで遊ぶ</button>
+                </div>
+                <div class="title-links">
+                    <button id="open-help-title" type="button" class="link">遊び方</button>
+                    <button id="open-stats" type="button" class="link">記録</button>
+                    <button type="button" class="link sound-toggle" aria-pressed="true">サウンド</button>
+                    <a class="link portal-link" href="../">← ゲーム一覧</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- 遊ぶ画面 -->
+        <section id="screen-game" class="screen game-screen" hidden>
+            <header class="topbar">
+                <button id="home" type="button" class="icon-button" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div class="game-info">
+                    <div id="game-title" class="game-title"></div>
+                    <div class="game-sub"><span id="game-progress"></span><span id="timer" class="timer">0:00</span></div>
+                </div>
+                <button id="undo" type="button" class="icon-button" aria-label="待った" title="待った（1手戻す）">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+                </button>
+                <button id="hint" type="button" class="icon-button" aria-label="ヒント" title="ヒント">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/></svg>
+                </button>
+                <button type="button" class="icon-button sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg>
+                </button>
+                <button id="open-help-game" type="button" class="icon-button" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 3.8"/><path d="M12 17.2v.1"/></svg>
+                </button>
+            </header>
+            <div id="racers" class="racers" hidden></div>
+            <div class="status">
+                <p id="status" class="status-text" aria-live="polite"></p>
+                <button id="reset" type="button" class="link small">最初から</button>
+            </div>
+            <div id="board" class="board"></div>
+            <div id="overlay" class="overlay" hidden>
+                <div class="overlay-card"><div id="overlay-text" class="overlay-text"></div><div id="overlay-sub" class="overlay-sub"></div></div>
+            </div>
+        </section>
+    </main>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2>遊び方</h2><button type="button" class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <div id="help" class="help"></div>
+        </div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="stats-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2>記録</h2><button type="button" class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <div id="stats" class="stats"></div>
+        </div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2 id="result-title">クリア</h2><button type="button" class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <p id="result-summary" class="result-summary"></p>
+            <ol id="log" class="result-log" aria-label="記録"></ol>
+            <div class="buttons">
+                <button id="again" type="button" class="primary">もう一度</button>
+                <button id="result-home" type="button" class="secondary">ホーム</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

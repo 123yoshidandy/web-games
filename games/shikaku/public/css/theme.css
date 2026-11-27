@@ -1,0 +1,6 @@
+/* 四角に切れの色（共通の css/style.css の変数を上書きする）：紙の地に、朱の差し色 */
+:root {
+    --accent: #b5502a;
+    --accent-strong: #8c3b1d;
+    --accent-soft: rgba(181, 80, 42, .12);
+}

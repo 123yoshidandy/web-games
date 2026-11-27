@@ -1,0 +1,19 @@
+{
+    "name": "四角に切れ",
+    "short_name": "四角に切れ",
+    "description": "盤面を長方形に切り分け、どの長方形にも数字が1つ入り、その数字がマスの数になるようにする論理パズル。毎回新しい問題で、答えは1つ。今日のパズル・タイムアタック・オンラインの早解き",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "orientation": "portrait",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#f4efe4",
+    "theme_color": "#f4efe4",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
