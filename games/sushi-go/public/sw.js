@@ -9,7 +9,7 @@ const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const PRECACHE = [
     './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'css/style.css',
     'js/main.js', 'js/ui.js', 'js/art.js', 'js/game-controller.js', 'js/game.js', 'js/cards.js', 'js/scoring.js',
-    'js/game-view.js', 'js/cpu-player.js', 'js/random.js',
+    'js/game-view.js', 'js/motion/motion.js', 'js/animator.js', 'js/cpu-player.js', 'js/random.js',
     'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js',
     'js/online-config.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/netplay-lobby.js', 'js/netplay/user-stats.js'
 ];

@@ -13,6 +13,8 @@ import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, cardHtml, miniHtml, icon } from './art.js';
 import { makiIcons } from './scoring.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate } from './animator.js';
 
 const SETTINGS_KEY = 'sushi-go.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
@@ -77,6 +79,8 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '' });
         this.renderTitleArt();
         this.renderHelp();
     }
@@ -153,8 +157,10 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
+        this.roundCancel?.();
+        this.roundCancel = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -303,6 +309,8 @@ export default class UI {
         if (!this.controller) return;
         const view = this.controller.getView();
         this.recordLocalResult(view);
+        const prev = this.view;
+        const before = measure(prev);
         this.view = view;
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
@@ -327,9 +335,11 @@ export default class UI {
         this.renderHand(view);
         this.renderActions(view);
         if ($('#log').open) this.renderLog();
+        animate(before, prev, view, fresh);
         this.showRoundResult(view);
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            // 札の動きが終わってから結果を出す
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
@@ -416,9 +426,15 @@ export default class UI {
         if (!r || r.round <= this.shownRound) return;
         this.shownRound = r.round;
         if (view.phase === 'end') return; // 最後のラウンドは、終わりの画面にまとめる
-        $('#round-title').textContent = `ラウンド${r.round}の得点`;
-        $('#round-table').innerHTML = this.roundTable(view, r);
-        if (!$('#round-result').open) $('#round-result').showModal();
+        // 札の動きが終わってから出す
+        this.roundCancel?.();
+        this.roundCancel = Motion.afterIdle(() => {
+            this.roundCancel = null;
+            if (!this.controller) return;
+            $('#round-title').textContent = `ラウンド${r.round}の得点`;
+            $('#round-table').innerHTML = this.roundTable(view, r);
+            if (!$('#round-result').open) $('#round-result').showModal();
+        }, 500);
     }
 
     roundTable(view, r) {
