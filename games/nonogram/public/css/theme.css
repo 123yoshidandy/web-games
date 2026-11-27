@@ -1,0 +1,6 @@
+/* お絵かきロジックの色（共通の css/style.css の変数を上書きする）：紙の地に、藍の差し色 */
+:root {
+    --accent: #34508c;
+    --accent-strong: #263c6c;
+    --accent-soft: rgba(52, 80, 140, .12);
+}

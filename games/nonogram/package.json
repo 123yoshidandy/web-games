@@ -1,0 +1,27 @@
+{
+  "name": "nonogram",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs",
+    "sw": "node ../../packages/puzzle-kit/tools/precache.mjs ."
+  },
+  "portal": {
+    "original": "Nonogram",
+    "aliases": [
+      "おえかきろじっく",
+      "ノノグラム",
+      "イラストロジック"
+    ],
+    "genres": [
+      "パズル"
+    ],
+    "players": [1, 2, 3, 4]
+  },
+  "dependencies": {
+    "netplay-kit": "*",
+    "puzzle-kit": "*"
+  }
+}
