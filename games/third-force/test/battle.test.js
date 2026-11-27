@@ -14,8 +14,8 @@ const only = (rules, extra = {}) => normalizeTactic({ name: 't', rules, arms: de
 describe('決定性', () => {
     it('同じシードと戦術からは、同じ勝者・同じ出来事の並び・同じ最後の状態になる', () => {
         for (const seed of [1, 42, 2 ** 31 + 5]) {
-            const a = runBattle({ seed, tactics: [BUILTIN.kazuki, BUILTIN.sample] });
-            const b = runBattle({ seed, tactics: [structuredClone(BUILTIN.kazuki), structuredClone(BUILTIN.sample)] });
+            const a = runBattle({ seed, tactics: [BUILTIN.offense, BUILTIN.sample] });
+            const b = runBattle({ seed, tactics: [structuredClone(BUILTIN.offense), structuredClone(BUILTIN.sample)] });
             expect(a.winner).toBe(b.winner);
             expect(a.events).toEqual(b.events);
             expect(hashBattle(a)).toBe(hashBattle(b));
@@ -53,7 +53,7 @@ describe('決定性', () => {
 describe('記録からの再現', () => {
     it('提出と開始の記録を replay すると、同じ対戦になる', () => {
         const match = createMatch();
-        expect(applyCommand(match, { type: 'submit', side: 0, tactic: BUILTIN.kazuki })).toBe(true);
+        expect(applyCommand(match, { type: 'submit', side: 0, tactic: BUILTIN.offense })).toBe(true);
         expect(applyCommand(match, { type: 'start', seed: 77 })).toBe(false); // 両方そろうまで始められない
         expect(applyCommand(match, { type: 'submit', side: 1, tactic: BUILTIN.random })).toBe(true);
         expect(applyCommand(match, { type: 'start', seed: 77 })).toBe(true);
@@ -143,7 +143,7 @@ describe('対戦のルール', () => {
     });
 
     it('終わったあとは進まない（終局後に出撃しない）', () => {
-        const battle = runBattle({ seed: 2, tactics: [BUILTIN.kazuki, BUILTIN.random] });
+        const battle = runBattle({ seed: 2, tactics: [BUILTIN.offense, BUILTIN.random] });
         const events = battle.events.length;
         step(battle);
         expect(battle.events.length).toBe(events);
@@ -180,7 +180,7 @@ describe('原作の JS の戦術との比べ', () => {
         return w / SEEDS;
     };
 
-    it.each([['sample', 'random'], ['kazuki', 'random'], ['kazuki', 'sample']])('%s 対 %s の勝率が、元の版とルールの版で近い', (a, b) => {
+    it.each([['sample', 'random'], ['offense', 'random'], ['offense', 'sample']])('%s 対 %s の勝率が、元の版とルールの版で近い', (a, b) => {
         const reference = rate(REFERENCE[a], REFERENCE[b]);
         const rules = rate(BUILTIN[a], BUILTIN[b]);
         expect(reference).toBeGreaterThanOrEqual(0.75);

@@ -1,5 +1,5 @@
 /**
- * 原作の JS の戦術3本（js/tactics/random.js・sample.js・kazuki.main.js）を、関数の戦術に移した参考の版
+ * 原作の JS の戦術3本（js/tactics の random.js・sample.js と、つよい戦術の main.js）を、関数の戦術に移した参考の版
  * ルールで書いた組み込みの戦術（cpu-tactics.js）と勝率を比べるために使う（テストだけで使う）
  * 原作との違い：Math.random のかわりに、側ごとのシード付きの乱数（random）を使う。兵器への指示は戻り値の orders で返す
  */
@@ -41,7 +41,7 @@ export function sampleTactic({ own, enemy, random }) {
     return { orders, spawns };
 }
 
-export function kazukiTactic({ own, enemy, random }) {
+export function offenseTactic({ own, enemy, random }) {
     const orders = own.arms.map((self) => {
         let dest = ['infantry', 'bomber'].includes(self.type) ? WIDTH : WIDTH - self.range;
         for (const e of enemy.arms) {
@@ -85,4 +85,4 @@ export function kazukiTactic({ own, enemy, random }) {
     return { orders, spawns };
 }
 
-export const REFERENCE = { random: randomTactic, sample: sampleTactic, kazuki: kazukiTactic };
+export const REFERENCE = { random: randomTactic, sample: sampleTactic, offense: offenseTactic };

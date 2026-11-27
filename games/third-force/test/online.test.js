@@ -18,14 +18,14 @@ describe('オンライン対戦（3rd Force）', () => {
         const server = createTestServer(definition);
         const [a, b] = await server.createRoom(['あお', 'あか']);
         await a.send('start');
-        await submit(a, BUILTIN.kazuki);
+        await submit(a, BUILTIN.offense);
         const before = [...a.all('state'), ...b.all('state')].map((m) => m.view);
         for (const view of before) {
             expect(view.battle).toBeNull();
             expect(randomKeysIn(view)).toEqual([]);
         }
         expect(b.last('state').view.players[0].submitted).toBe(true);
-        expect(JSON.stringify(b.last('state').view)).not.toContain(encodeTactic(BUILTIN.kazuki));
+        expect(JSON.stringify(b.last('state').view)).not.toContain(encodeTactic(BUILTIN.offense));
         await submit(b, BUILTIN.random);
         const view = a.last('state').view;
         expect(view.phase).toBe('over');
@@ -33,7 +33,7 @@ describe('オンライン対戦（3rd Force）', () => {
         const local = runBattle({ seed: view.battle.seed, tactics: view.battle.tactics.map(decodeTactic) });
         expect(local.winner).toBe(view.result.winner);
         expect(local.sides.map((s) => s.life)).toEqual(view.result.life);
-        expect(hashBattle(local)).toBe(hashBattle(runBattle({ seed: view.battle.seed, tactics: [BUILTIN.kazuki, BUILTIN.random] })));
+        expect(hashBattle(local)).toBe(hashBattle(runBattle({ seed: view.battle.seed, tactics: [BUILTIN.offense, BUILTIN.random] })));
     });
 
     it('壊れた戦術・二度目の提出は断る', async () => {
@@ -44,23 +44,33 @@ describe('オンライン対戦（3rd Force）', () => {
         expect(a.last('error')).toBeTruthy();
         await submit(a, BUILTIN.sample);
         const errors = a.all('error').length;
-        await submit(a, BUILTIN.kazuki);
+        await submit(a, BUILTIN.offense);
         expect(a.all('error').length).toBe(errors + 1);
     });
 
     it('CPU の席は、ロビーで選んだ組み込みの戦術を出す。再戦では勝ち数を引き継ぐ', async () => {
         const server = createTestServer(definition);
         const [a] = await server.createRoom(['あお']);
-        await a.send('setSettings', { settings: { cpu: 'kazuki' } });
+        await a.send('setSettings', { settings: { cpu: 'offense' } });
         await a.send('addCpu');
         await a.send('start');
         expect(a.last('state').view.players[1].submitted).toBe(true);
         await submit(a, BUILTIN.random);
         const view = a.last('state').view;
-        expect(view.battle.tactics[1]).toBe(encodeTactic(BUILTIN.kazuki));
+        expect(view.battle.tactics[1]).toBe(encodeTactic(BUILTIN.offense));
         expect(view.wins[1]).toBe(1);
         await a.send('ready', { ready: true });
         expect(a.last('state').view.phase).toBe('submit');
         expect(a.last('state').view.wins).toEqual([0, 1]);
+    });
+
+    it('名前を変える前の CPU の id を選んでも、今の戦術に読み替える', async () => {
+        const server = createTestServer(definition);
+        const [a] = await server.createRoom(['あお']);
+        await a.send('setSettings', { settings: { cpu: 'kazuki' } });
+        await a.send('addCpu');
+        await a.send('start');
+        await submit(a, BUILTIN.random);
+        expect(a.last('state').view.battle.tactics[1]).toBe(encodeTactic(BUILTIN.offense));
     });
 });

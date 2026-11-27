@@ -3,7 +3,7 @@
   "cases": [
     {
       "seed": 1,
-      "a": "kazuki",
+      "a": "offense",
       "b": "sample",
       "hash": "d51732d5",
       "winner": 0
@@ -18,7 +18,7 @@
     {
       "seed": 3,
       "a": "defense",
-      "b": "kazuki",
+      "b": "offense",
       "hash": "a5cb0dad",
       "winner": null
     },

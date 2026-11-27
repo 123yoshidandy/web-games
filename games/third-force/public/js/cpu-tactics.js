@@ -1,6 +1,6 @@
 /**
  * 組み込みの戦術（CPU）。どれもエディタで作れる形のルールで書いてある（写して直せる）
- * やさしい＝random、ふつう＝sample、つよい＝kazuki.main は、原作の JS の戦術3本をルールに書き直したもの
+ * やさしい＝random、ふつう＝sample、つよい＝offense は、原作の JS の戦術3本をルールに書き直したもの
  * 守りは、ルールで足した型（ロケット砲とミサイルで中央を守り、お金がたまったら戦車で守った歩兵を送る）
  */
 
@@ -43,8 +43,8 @@ const RAW = {
         ],
         arms: arms()
     },
-    kazuki: {
-        name: 'カズキ',
+    offense: {
+        name: '攻め',
         rules: [
             line([money('lt', 2000)], save),
             line([threat('air', 50, ['missile'])], spawn('missile', 'target')),
@@ -90,10 +90,14 @@ const RAW = {
 export const CPU_LEVELS = [
     { id: 'random', label: 'やさしい' },
     { id: 'sample', label: 'ふつう' },
-    { id: 'kazuki', label: 'つよい' },
+    { id: 'offense', label: 'つよい' },
     { id: 'defense', label: '守り' }
 ];
 
 export const BUILTIN = Object.fromEntries(Object.entries(RAW).map(([id, raw]) => [id, normalizeTactic(raw)]));
 
-export const builtinTactic = (id) => structuredClone(BUILTIN[id] ?? BUILTIN.sample);
+// 名前を変えた戦術の前の id（保存した設定や、遊びかけの部屋の設定に残っている）を、今の id に読み替える
+const RENAMED = { kazuki: 'offense' };
+export const cpuId = (id) => RENAMED[id] ?? id;
+
+export const builtinTactic = (id) => structuredClone(BUILTIN[cpuId(id)] ?? BUILTIN.sample);

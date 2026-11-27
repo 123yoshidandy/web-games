@@ -9,7 +9,7 @@ import { battleFromRecord } from './match.js';
 import { TICKS_PER_SECOND, MAX_TICKS } from './arms.js';
 import { emptyTactic, normalizeTactic } from './rules.js';
 import { lineText, actText } from './rules-text.js';
-import { BUILTIN, CPU_LEVELS, builtinTactic } from './cpu-tactics.js';
+import { BUILTIN, CPU_LEVELS, builtinTactic, cpuId } from './cpu-tactics.js';
 import { encodeTactic, decodeTactic, encodeRecord, decodeRecord } from './codec.js';
 import { createSeed } from './random.js';
 import { createBoard } from './board.js';
@@ -25,11 +25,13 @@ import { getServerUrl, GAME } from './online-config.js';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-const levelLabel = (id) => CPU_LEVELS.find((l) => l.id === id)?.label ?? id;
+const levelLabel = (id) => CPU_LEVELS.find((l) => l.id === cpuId(id))?.label ?? id;
 const SAVE_EVERY_TICKS = 120;
 
 let rulesets = loadRulesets();
 let settings = { tactic: 'b:sample', level: 'sample', ...store.load(KEYS.settings) };
+settings.level = cpuId(settings.level);
+if (settings.tactic?.startsWith('b:')) settings.tactic = `b:${cpuId(settings.tactic.slice(2))}`;
 let editing = null;   // エディタで開いている { id（保存前は null） }
 let run = null;       // 再生中の対戦
 let onlineController = null;
@@ -59,7 +61,7 @@ function showScene(name) {
 }
 
 const tacticRef = (ref) => {
-    if (ref?.startsWith('b:')) return BUILTIN[ref.slice(2)] ? builtinTactic(ref.slice(2)) : null;
+    if (ref?.startsWith('b:')) return BUILTIN[cpuId(ref.slice(2))] ? builtinTactic(ref.slice(2)) : null;
     return rulesets.find((r) => r.id === ref)?.tactic ?? null;
 };
 const myTactic = () => tacticRef(settings.tactic) ?? builtinTactic('sample');

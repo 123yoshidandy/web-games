@@ -3,7 +3,7 @@
 import { runBattle, hashBattle, ENGINE_VERSION } from '../public/js/battle.js';
 import { BUILTIN } from '../public/js/cpu-tactics.js';
 
-const PAIRS = [['kazuki', 'sample', 1], ['sample', 'random', 2], ['defense', 'kazuki', 3], ['random', 'random', 123456789]];
+const PAIRS = [['offense', 'sample', 1], ['sample', 'random', 2], ['defense', 'offense', 3], ['random', 'random', 123456789]];
 const cases = PAIRS.map(([a, b, seed]) => {
     const battle = runBattle({ seed, tactics: [BUILTIN[a], BUILTIN[b]] });
     return { seed, a, b, hash: hashBattle(battle), winner: battle.winner };

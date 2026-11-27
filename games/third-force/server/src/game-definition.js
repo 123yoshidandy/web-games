@@ -10,7 +10,7 @@
 
 import { runBattle, ENGINE_VERSION } from '../../public/js/battle.js';
 import { encodeTactic, decodeTactic } from '../../public/js/codec.js';
-import { BUILTIN, CPU_LEVELS } from '../../public/js/cpu-tactics.js';
+import { BUILTIN, CPU_LEVELS, cpuId } from '../../public/js/cpu-tactics.js';
 
 const CPU_IDS = CPU_LEVELS.map((level) => level.id);
 
@@ -68,6 +68,7 @@ export default {
         defaults: () => ({ cpu: 'sample' }),
         validate: (patch, current) => {
             const next = { ...current, ...patch };
+            next.cpu = cpuId(next.cpu);
             if (!CPU_IDS.includes(next.cpu)) throw new Error('CPU の戦術が正しくありません');
             return { cpu: next.cpu };
         }
@@ -108,7 +109,7 @@ export default {
         step: (game, { random }) => {
             const seat = cpuSeatToSubmit(game);
             if (game.phase !== 'submit' || seat < 0) return false;
-            return submit(game, seat, { type: 'submit', tactic: encodeTactic(BUILTIN[game.cpu] ?? BUILTIN.sample) }, random) === null;
+            return submit(game, seat, { type: 'submit', tactic: encodeTactic(BUILTIN[cpuId(game.cpu)] ?? BUILTIN.sample) }, random) === null;
         },
         progress: (game) => game.commands.length
     },

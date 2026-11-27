@@ -29,7 +29,7 @@ describe('ヒント', () => {
 
     it('ヒントの計算は数秒に収まる', () => {
         const started = performance.now();
-        suggest(BUILTIN.sample, BUILTIN.kazuki);
+        suggest(BUILTIN.sample, BUILTIN.offense);
         expect(performance.now() - started).toBeLessThan(10000);
     });
 });

@@ -14,7 +14,7 @@ describe('共有コード', () => {
     });
 
     it('12 行の戦術でも 300 字ほどに収まる', () => {
-        const tactic = structuredClone(BUILTIN.kazuki);
+        const tactic = structuredClone(BUILTIN.offense);
         while (tactic.rules.length < MAX_RULES) tactic.rules.push(structuredClone(tactic.rules[2]));
         tactic.name = '十二行の戦術';
         const code = encodeTactic(tactic);
