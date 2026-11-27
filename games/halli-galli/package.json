@@ -1,0 +1,29 @@
+{
+  "name": "halli-galli",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "portal": {
+    "original": "Halli Galli",
+    "aliases": [
+      "ハリガリ"
+    ],
+    "genres": [
+      "カードゲーム"
+    ],
+    "minutes": 15,
+    "weight": 1
+  },
+  "standards": {
+    "skip": {
+      "undo": "早押しのリアルタイムのゲームで、めくったカードやベルを戻すと時間を巻き戻せてしまう"
+    }
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  }
+}
