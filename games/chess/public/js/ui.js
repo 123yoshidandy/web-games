@@ -17,6 +17,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'chess';
 const SETTINGS_KEY = 'chess.settings';
@@ -30,7 +31,7 @@ const CLOCK_OPTIONS = Object.entries(CLOCK_PRESETS).map(([value, preset]) => ({ 
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reduceMotion = () => !Motion.enabled(); // 速さが「なし」（動きを減らす設定を含む）
 // 升の名前（e4）と、ビューの盤の添え字（0 が a8、63 が h1）
 const indexOf = (name) => (8 - Number(name[1])) * 8 + FILES.indexOf(name[0]);
 const nameOf = (index) => FILES[index % 8] + (8 - Math.floor(index / 8));
@@ -122,6 +123,11 @@ export default class UI {
         this.lastFlagPing = 0;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'チェス',
@@ -214,7 +220,7 @@ export default class UI {
         this.controller = null;
         clearInterval(this.clockTimer);
         this.clockTimer = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -367,7 +373,7 @@ export default class UI {
         if (!this.controller?.undo()) return;
         music.play('cancel');
         this.selected = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -455,7 +461,7 @@ export default class UI {
         }
         if (!view.over) this.resultShown = false;
         if (view.over && !$('#result').open && !this.resultTimer && !this.resultShown) {
-            this.resultTimer = setTimeout(() => {
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
@@ -643,7 +649,10 @@ export default class UI {
         if (!prev || !fresh.length) return;
         this.playSounds(view, fresh);
         const move = [...fresh].reverse().find(e => e.type === 'move');
-        if (move && !reduceMotion()) this.anim = { from: move.from, to: move.to, rookFrom: move.rookFrom, rookTo: move.rookTo };
+        if (move && !reduceMotion()) {
+            this.anim = { from: move.from, to: move.to, rookFrom: move.rookFrom, rookTo: move.rookTo };
+            Motion.hold(200); // 駒の滑る動き（CSS）が終わるまで CPU を待たせる
+        }
         const declined = fresh.filter(e => e.type === 'drawDeclined').at(-1);
         if (declined && !view.over) this.toast(`${this.seatLabel(view, declined.seat)}は引き分けを断りました`);
         else if (move?.check && !view.over) this.toast('チェック');

@@ -60,7 +60,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .btn {
     display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex: none;
     min-width: 116px; height: 44px; padding: 0 16px; border: none; border-radius: 12px;
-    font-size: 16px; font-weight: 700; cursor: pointer; transition: transform .08s, box-shadow .08s;
+    font-size: 16px; font-weight: 700; cursor: pointer; transition: transform calc(.08s * var(--motion-scale, 1)), box-shadow calc(.08s * var(--motion-scale, 1));
 }
 .btn.primary { color: #2a1d05; background: linear-gradient(var(--gold-light), var(--gold)); box-shadow: 0 4px 0 var(--gold-deep); }
 .btn.secondary { color: #fff; background: linear-gradient(#a57b52, var(--wood)); box-shadow: 0 4px 0 var(--wood-deep); }
@@ -90,7 +90,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 
 #screen-title { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 16px; }
 .title-art {
-    --c: min(44px, 6.5dvh);
+    --c: min(44px, 5.5dvh);
     display: grid; grid-template-columns: repeat(4, var(--c)); grid-template-rows: repeat(4, var(--c)); padding: 5px;
     border-radius: 8px; background: var(--frame); box-shadow: 0 6px 18px rgba(0, 0, 0, .5), inset 0 0 0 2px var(--frame2);
 }
@@ -134,7 +134,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .side .clock.low { color: #fff; background: #c0392b; }
 .side .clock.paused { opacity: .55; }
 .side.active .name { color: var(--gold-light); }
-.side.thinking { animation: think 1.2s ease-in-out infinite; }
+.side.thinking { animation: think calc(1.2s * var(--motion-scale, 1)) ease-in-out infinite; }
 .side.won { box-shadow: inset 0 0 0 2px var(--gold-light); background: rgba(217, 180, 90, .24); }
 @keyframes think { 50% { background: rgba(217, 180, 90, .05); } }
 
@@ -158,7 +158,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 
 .pc { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .pc .piece { width: 92%; height: 92%; filter: drop-shadow(0 1.5px 1px rgba(0, 0, 0, .35)); }
-.pc.slide { z-index: 2; animation: slide .2s ease-out backwards; }
+.pc.slide { z-index: 2; animation: slide calc(.2s * var(--motion-scale, 1)) ease-out backwards; }
 @keyframes slide { from { transform: translate(calc(var(--dx) * 100%), calc(var(--dy) * 100%)); } }
 
 .dot, .ring { position: absolute; pointer-events: none; z-index: 1; border-radius: 50%; }
@@ -219,7 +219,7 @@ dialog h2:focus-visible { outline: none; }
 .toast {
     position: fixed; left: 50%; top: 42%; z-index: 80; max-width: calc(100% - 32px); padding: 8px 16px; border-radius: 10px;
     background: rgba(12, 9, 6, .94); box-shadow: inset 0 0 0 1px var(--gold-deep); color: #fff; font-size: 15px; font-weight: 700; line-height: 1.5;
-    transform: translateX(-50%); opacity: 0; pointer-events: none; transition: opacity .2s;
+    transform: translateX(-50%); opacity: 0; pointer-events: none; transition: opacity calc(.2s * var(--motion-scale, 1));
 }
 .toast.show { opacity: 1; }
 
@@ -252,3 +252,8 @@ dialog h2:focus-visible { outline: none; }
 
 /* 背の低い画面（スマホを横にしたとき）は、タイトルの絵を出さずに設定とボタンを収める */
 @media (max-height: 460px) { .title-art { display: none; } }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択肢と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .35); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 30px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #2a1d05; background: var(--gold); }

@@ -15,6 +15,7 @@
 import Game from './game.js';
 import { createGameView, clockView } from './game-view.js';
 import { decide, isCpuTurn, applyDecision, clockBudget } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_MOVE_MS = 450;    // 前の手で駒が動くのが見えるように待ってから考え始める（持ち時間が少ないときは縮める）
 const FLAG_SLACK_MS = 5;    // 時間切れのタイマーを、ちょうどの時刻より少しあとにする
@@ -52,7 +53,7 @@ export default class LocalGameController {
             : new Game(setup.players, setup.options ?? {});
         // 人が1人なら CPU 戦。2人なら、操作を待っている人の席から見る
         this.humanSeats = this.game.players.filter(p => !p.isCPU).map(p => p.id);
-        this.cpuTimer = null;
+        this.cpuWait = null;
         this.token = 0;
         this.thinking = false;
         this.stalls = 0;
@@ -186,8 +187,8 @@ export default class LocalGameController {
     }
 
     cancelCpu() {
-        clearTimeout(this.cpuTimer);
-        this.cpuTimer = null;
+        this.cpuWait?.();
+        this.cpuWait = null;
         this.token++;
         this.thinking = false;
     }
@@ -200,7 +201,7 @@ export default class LocalGameController {
         // 持ち時間が少ないときは、手を見せる間も縮める
         const budget = clockBudget({ clock: clockView(this.game) });
         const delay = budget === null ? CPU_MOVE_MS : Math.min(CPU_MOVE_MS, Math.floor(budget * 0.2));
-        this.cpuTimer = setTimeout(() => this.runCpu(token), delay);
+        this.cpuWait = Motion.afterIdle(() => this.runCpu(token), delay); // 駒が動き終わってから
     }
 
     async runCpu(token) {
