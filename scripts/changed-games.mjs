@@ -2,7 +2,7 @@
 // - games/<名前>/ が変わった → そのゲーム
 // - packages/<部品>/ が変わった → その部品と、それを package.json の依存に書いているか、テスト（test/・tests/）で import しているゲーム
 //   （test-kit は、依存に書かずに import しているゲームが多いので、import も見る）
-//   （clock は、写しを持つゲーム（clock.lock.json がある）も流す。写しを通してゲームのテストが本体を使うため）
+//   （clock・random は、写しを持つゲーム（<部品>.lock.json がある）も流す。写しを通してゲームのテストが本体を使うため）
 // - ゲームの BGM の曲（sound/bgm.js）が変わった → そのゲームと、曲を検査する packages/sound
 // - 直下の package.json・package-lock.json・scripts/ が変わった → 全部
 // - それ以外（README・docs など）だけなら → なし
@@ -17,7 +17,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // 写しを持つゲームも流す部品（<部品>.lock.json で見分ける）
 // sound は、ほぼすべてのゲームが写しを持ち、写しの確認（sync.mjs check --all）で足りるので入れない
-const COPIED_PACKAGES = ['clock'];
+const COPIED_PACKAGES = ['clock', 'random'];
 
 const workspaces = (dir) => readdirSync(join(root, dir))
     .filter((name) => existsSync(join(root, dir, name, 'package.json')))

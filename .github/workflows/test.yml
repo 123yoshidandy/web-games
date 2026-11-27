@@ -44,6 +44,9 @@ jobs:
       # 動きの部品の写しが、元とそろっているか
       - name: Check motion copies
         run: node packages/motion/scripts/sync.mjs check --all
+      # シード付きの乱数の写し（random.js）が、元とそろっているか
+      - name: Check random copies
+        run: node packages/random/scripts/sync.mjs check --all
       # 変わったゲームと共通の部品のテスト
       # push の比べる元は、同じブランチで最後に流れきった（成功か失敗の）テストのコミット
       # github.event.before だと、取りやめになった push の変更を、次の実行が見落とす（取りやめたコミットが比べる元になるため）
