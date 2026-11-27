@@ -7,6 +7,7 @@ const CACHE = 'cascadia-v1';
 const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const PRECACHE = [
+    'js/motion/motion.js',
     './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'css/style.css',
     'js/art.js', 'js/cards.js', 'js/cpu-player.js', 'js/game-controller.js', 'js/game-view.js', 'js/game.js', 'js/habitat.js', 'js/hex.js', 'js/main.js', 'js/random.js', 'js/score-tools.js', 'js/scoring.js', 'js/tiles.js', 'js/ui.js',
     'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js',

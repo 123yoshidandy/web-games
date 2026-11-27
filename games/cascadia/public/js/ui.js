@@ -18,6 +18,7 @@ import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { key, parseKey, toPixel, fromPixel, neighbors } from './hex.js';
 import { symbolsSvg, tileSvg, tokenSvg, tileOnlySvg, habitatSwatch, natureSvg, hexPoints, ANIMALS, HABITATS, HABITAT_ORDER, ANIMAL_ORDER } from './art.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'cascadia';
 const SETTINGS_KEY = 'cascadia.settings';
@@ -68,9 +69,14 @@ export default class UI {
         this.cam = { s: 2, tx: 0, ty: 0 };
         this.userCam = false;  // 指で動かしたら、自動で合わせない
         this.fresh = new Set(); // 今描くときに落とすタイル
-        this.resultTimer = null;
+        this.resultTimer = () => {}; // 結果を出す予約を取り消す関数
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'カスカディア',
@@ -154,8 +160,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
-        this.resultTimer = null;
+        this.resultTimer();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -312,6 +317,7 @@ export default class UI {
             if (e.type === 'place') this.fresh.add(`${e.seat}:${key(e.q, e.r)}`);
         });
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
+        if (this.fresh.size) Motion.hold(350); // 置いたタイルの現れる動き（CSS）が終わるまで CPU を待たせる
         const myTurn = this.isMyTurn();
         if (!myTurn) this.clearSelection();
         // 場が変わったら（流し直し）、選びを確かめ直す
@@ -324,8 +330,8 @@ export default class UI {
         this.renderAct();
         this.renderNote();
         if (view.phase === 'end' && prev && prev.phase !== 'end') {
-            clearTimeout(this.resultTimer);
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.resultTimer();
+            this.resultTimer = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
     }
 

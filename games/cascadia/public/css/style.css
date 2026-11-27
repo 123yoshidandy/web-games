@@ -80,7 +80,7 @@ button {
     font-size: 16px;
     font-weight: 800;
     cursor: pointer;
-    transition: transform .08s, box-shadow .08s;
+    transition: transform calc(.08s * var(--motion-scale, 1)), box-shadow calc(.08s * var(--motion-scale, 1));
 }
 .btn.small { min-width: 0; height: 40px; padding: 0 12px; font-size: 15px; }
 .btn.primary { color: #fff; background: linear-gradient(#86b075, var(--moss)); box-shadow: 0 4px 0 var(--moss-deep); }
@@ -129,14 +129,14 @@ button {
 .slot { fill: rgba(255, 255, 255, .7); }
 .keystone-ring { fill: none; stroke: rgba(255, 255, 255, .85); stroke-width: 1; stroke-dasharray: 1.6 1.2; }
 .spot { fill: rgba(255, 255, 255, .28); stroke: rgba(84, 104, 72, .35); stroke-width: 1.2; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; cursor: pointer; }
-.spot.on { fill: rgba(255, 240, 210, .45); stroke: var(--glow); stroke-width: 2; stroke-dasharray: none; animation: hint 1.4s ease-in-out infinite; }
+.spot.on { fill: rgba(255, 240, 210, .45); stroke: var(--glow); stroke-width: 2; stroke-dasharray: none; animation: hint calc(1.4s * var(--motion-scale, 1)) ease-in-out infinite; }
 @keyframes hint { 50% { fill: rgba(255, 226, 170, .6); } }
 .tile.last > .tile-edge { stroke: var(--glow); stroke-width: 3; vector-effect: non-scaling-stroke; }
 .tile.draft { pointer-events: none; }
 .tile.draft > .tile-edge { stroke: var(--glow); stroke-width: 3; stroke-dasharray: 8 5; vector-effect: non-scaling-stroke; }
-.tile.drop { animation: drop .35s ease-out backwards; }
+.tile.drop { animation: drop calc(.35s * var(--motion-scale, 1)) ease-out backwards; }
 @keyframes drop { from { opacity: 0; transform: translateY(-5px); } }
-.target { fill: rgba(255, 236, 196, .2); stroke: var(--glow); stroke-width: 3; vector-effect: non-scaling-stroke; animation: pulse 1.3s ease-in-out infinite; pointer-events: all; cursor: pointer; }
+.target { fill: rgba(255, 236, 196, .2); stroke: var(--glow); stroke-width: 3; vector-effect: non-scaling-stroke; animation: pulse calc(1.3s * var(--motion-scale, 1)) ease-in-out infinite; pointer-events: all; cursor: pointer; }
 @keyframes pulse { 50% { stroke-opacity: .35; } }
 .token-draft { pointer-events: none; }
 
@@ -307,7 +307,7 @@ dialog h2:focus-visible { outline: none; }
     transform: translateX(-50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s;
+    transition: opacity calc(.2s * var(--motion-scale, 1));
 }
 .toast.show { opacity: 1; }
 
@@ -345,3 +345,8 @@ dialog h2:focus-visible { outline: none; }
     .bar > .icon-btn { width: 32px; }
     .status { gap: 5px; }
 }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択肢と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(84, 104, 72, .14); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #fff; background: var(--moss); }
