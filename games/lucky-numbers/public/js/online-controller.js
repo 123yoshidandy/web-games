@@ -52,11 +52,10 @@ export default class OnlineGameController {
 
     // ===== 部屋の操作 =====
 
-    // { public: true } で公開の部屋にする（公開の部屋の一覧に出て、部屋番号を知らない人も入れる）
-    createRoom(name, options) { return this.net.createRoom(name, options); }
-    joinRoom(roomCode, name) { return this.net.joinRoom(roomCode, name); }
+    // 部屋はすべて公開（一覧に載る）。前の版のサーバーでも公開になるように public: true を付ける
+    createRoom(name) { return this.net.createRoom(name, { public: true }); }
     enterRoom(roomCode, name) { return this.net.enterRoom(roomCode, name); } // 参加できたら resolve、断られたら reject
-    listRooms() { return this.net.listRooms(); }                              // 入れる公開の部屋の一覧
+    listRooms() { return this.net.listRooms(); }                              // 入れる部屋の一覧
     joinFromInvite(name) { return this.net.joinFromInvite(name); } // 参加できたら resolve、断られたら reject
     resume() { return this.net.resume(); }
     addCpu() { this.net.addCpu(); }

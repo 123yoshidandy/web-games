@@ -128,4 +128,19 @@ describe('オンライン対戦（ゲームの定義）', () => {
         expect(lobby.players.map(p => p.name)).toEqual(['はる']);
         expect(lobby.hostSeat).toBe(lobby.seat);
     });
+
+    it('部屋はすべて公開で、作った人の名前と人数つきで一覧に出て、始まると消える', async () => {
+        const server = createTestServer(game);
+        const [host] = await server.createRoom(['あき']); // public を付けなくても公開になる
+        const finder = server.connect();
+        await finder.send('listRooms');
+        expect(finder.last('rooms').rooms).toEqual([expect.objectContaining({
+            roomCode: host.last('joined').roomCode, hostName: 'あき', players: 1, maxPlayers: 4
+        })]);
+        expect(JSON.stringify(finder.last('rooms'))).not.toContain(host.last('joined').token);
+        await host.send('addCpu');
+        await host.send('start');
+        await finder.send('listRooms');
+        expect(finder.last('rooms').rooms).toEqual([]);
+    });
 });

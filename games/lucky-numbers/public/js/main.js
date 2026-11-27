@@ -14,9 +14,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.__app = ui; // ヘッドレス Chrome での確認用（状態を見る口）
 
     // 招待のURL（?room=部屋番号）で開いたら、その部屋に参加する
-    const roomCode = NetplayClient.inviteRoomCode();
-    if (roomCode) {
-        await ui.openInvite(roomCode);
+    if (NetplayClient.inviteRoomCode()) {
+        await ui.openInvite();
         return;
     }
     // 前回入っていた部屋があれば戻る。なければ開始画面

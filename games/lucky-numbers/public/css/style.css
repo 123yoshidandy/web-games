@@ -196,8 +196,9 @@ input:focus, select:focus {
     flex: 1;
 }
 
-/* 招待URLで開いたときは、名前と「参加する」だけにする */
-#screen-online.invited .not-invited {
+/* 招待URLで開いたときは、名前と「参加する」だけにする（いつもの入口では「参加する」を出さない） */
+#screen-online.invited .not-invited,
+#screen-online:not(.invited) .invited-only {
     display: none;
 }
 
@@ -208,31 +209,34 @@ input:focus, select:focus {
     margin: 14px 0;
 }
 
-/* 部屋を作るボタンの横の、公開の切り替え */
-.public-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 0 14px;
-    border-radius: 999px;
-    background: #e8efe3;
-    color: var(--green-dark);
-    font-weight: 800;
-    cursor: pointer;
-}
-
-/* 公開の部屋の一覧。押すとその部屋に入る */
+/* 参加できる部屋の一覧（部屋はすべて公開）。押すとその部屋に入る */
 .public-rooms {
     padding-top: 12px;
     border-top: 1px dashed #dfe6d9;
 }
 
+.public-rooms-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.public-rooms-head h3 {
+    margin: 0;
+    font-size: 15px;
+    color: var(--green-dark);
+}
+
+/* 部屋が多いときは、一覧の中だけをスクロールする */
 #public-rooms {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    max-height: 40vh;
+    overflow-y: auto;
     margin: 10px 0 0;
-    padding: 0;
+    padding: 0 0 4px;
     list-style: none;
 }
 
@@ -281,14 +285,6 @@ input[type=checkbox] {
     accent-color: var(--green);
     width: 18px;
     height: 18px;
-}
-
-#lobby-code {
-    font-family: ui-monospace, Menlo, monospace;
-    letter-spacing: 3px;
-    padding: 2px 10px;
-    border-radius: 8px;
-    background: var(--green-light);
 }
 
 #lobby-players {
