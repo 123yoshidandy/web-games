@@ -1,16 +1,17 @@
 /**
  * 何が起きたかを動きで見せる
  * 描く前に目印の要素の位置を測り（captureAnchors）、描いたあとで、出来事ごとに複製を元の位置から行き先へ飛ばす（playEvents）
- * 動きを減らす設定のときは動かさない
+ * 動きの速さが「なし」のとき（動きを減らす設定のときも）は動かさない
  */
 
 import { cardHtml, cardBackHtml } from './art.js';
+import * as Motion from './motion/motion.js';
 
 const DURATION_MS = 480;
 const STAGGER_MS = 80;
 const MAX_EVENTS = 6; // これより多く溜まっていたら（裏のタブから戻ったときなど）、動かさない
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = () => !Motion.enabled();
 const rectOf = (el) => {
     const rect = el?.getBoundingClientRect();
     return rect && rect.width > 0 && rect.height > 0 ? rect : null;
@@ -46,8 +47,9 @@ function fly(html, from, to, { delay = 0 } = {}) {
         { transform: 'translate(0, 0) scale(1)' },
         { transform: `translate(${dx / 2}px, ${dy / 2 + lift}px) scale(${(1 + scale) / 2})`, offset: 0.5 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.85 }
-    ], { duration: DURATION_MS, delay, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+    ], { duration: Motion.ms(DURATION_MS), delay: Motion.ms(delay), easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
     const remove = () => el.remove();
+    Motion.track(animation, Motion.ms(DURATION_MS + delay));
     animation.finished.then(remove, remove);
     setTimeout(remove, DURATION_MS + delay + 400);
 }

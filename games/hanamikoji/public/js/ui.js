@@ -15,6 +15,7 @@ import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { symbolsSvg, cardHtml, cardBackHtml, geishaHtml, chipHtml, actionTokenHtml, markerHtml } from './art.js';
+import * as Motion from './motion/motion.js';
 import { captureAnchors, playEvents } from './animator.js';
 
 const CPU_NAME = '千代';
@@ -44,7 +45,7 @@ export default class UI {
         this.pickSel = null;    // 差し出されたものから選んだもの
         this.frozen = null;     // 結果を見ている間の、ラウンドの終わりのイベント
         this.lastSeq = 0;
-        this.dialogTimer = null;
+        this.cancelDialog = null;
         this.level = loadLevel();
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
@@ -134,7 +135,7 @@ export default class UI {
         this.controller?.stop();
         this.controller = null;
         this.frozen = null;
-        clearTimeout(this.dialogTimer);
+        this.cancelDialog?.();
         ['#round-result', '#result'].forEach(id => { if ($(id).open) $(id).close(); });
     }
 
@@ -296,8 +297,8 @@ export default class UI {
             this.frozen = { ...roundEnd, gameOver: fresh.some(e => e.type === 'end') };
             if (this.frozen.gameOver) this.recordLocalResult(this.frozen);
             this.controller.pause();
-            clearTimeout(this.dialogTimer);
-            this.dialogTimer = setTimeout(() => this.showRoundResult(), ROUND_DIALOG_DELAY_MS);
+            this.cancelDialog?.();
+            this.cancelDialog = Motion.afterIdle(() => this.showRoundResult(), Motion.ms(ROUND_DIALOG_DELAY_MS));
         }
         if (!this.myTurn()) this.sel = [];
         this.sel = this.sel.filter(i => i < this.me().hand.length);
