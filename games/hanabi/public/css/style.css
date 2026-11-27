@@ -175,14 +175,14 @@ button { font: inherit; color: inherit; touch-action: manipulation; }
 }
 .card.empty .sym { left: 50%; top: 50%; transform: translate(-50%, -50%); opacity: 0.6; }
 .card.clued { box-shadow: inset 0 0 0 0.035em var(--gold), 0 0 0 0.03em var(--gold); }
-.card.touched { animation: touched 1.2s ease-in-out 3; }
+.card.touched { animation: touched calc(1.2s * var(--motion-scale, 1)) ease-in-out 3; }
 @keyframes touched {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-0.08em); box-shadow: 0 0 0 0.05em #fff, 0 0 0.2em rgba(255, 255, 255, 0.8); }
 }
 .card.selected { transform: translateY(-0.05em); box-shadow: 0 0 0 0.06em #fff, 0 0 0.2em rgba(255, 255, 255, 0.7), 0 0.1em 0.2em rgba(0, 0, 0, 0.5); }
 .card.related { box-shadow: 0 0 0 0.04em rgba(255, 255, 255, 0.85); }
-.card.dealt { animation: dealt 0.4s ease-out; }
+.card.dealt { animation: dealt calc(0.4s * var(--motion-scale, 1)) ease-out; }
 @keyframes dealt { from { transform: translateY(-0.3em); opacity: 0; } }
 .card.flying { position: fixed; z-index: 50; pointer-events: none; margin: 0; }
 
@@ -504,3 +504,12 @@ body.landscape #right { margin-top: 0; }
 /* ヒント（おすすめの手） */
 #hint:disabled { opacity: .35; cursor: default; }
 .recommended { outline: 3px solid #fff; outline-offset: 1px; box-shadow: 0 0 0 6px rgba(255, 210, 87, .7), 0 0 18px rgba(255, 210, 87, .8); }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数などと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; background: rgba(0, 0, 0, 0.3); border-radius: 12px; padding: 3px; gap: 3px; }
+#motion-setting .motion-speed button { border: none; background: transparent; padding: 8px 14px; border-radius: 9px; font-size: 15px; font-weight: 800; color: var(--ink-soft); cursor: pointer; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: var(--bg); background: var(--ink); }
+
+/* 動きの速さが「なし」のとき（動きを減らす設定のときも）は、CSS の動きも止める。速さの倍率は --motion-scale（js/motion/motion.js） */
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }

@@ -11,12 +11,22 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
 const FLY_MS = 450;
 
 const $ = selector => document.querySelector(selector);
+
+// 動きの速さを、CSS（--motion-scale・data-motion）に伝え、タイトルの切り替えを作る
+const paintMotion = () => {
+    document.documentElement.style.setProperty('--motion-scale', Motion.speedScale());
+    document.documentElement.dataset.motion = Motion.getSpeed();
+};
+paintMotion();
+Motion.onSpeedChange(paintMotion);
+Motion.mountSpeedSetting(document.getElementById('motion-setting'), { label: '' });
 
 const app = {
     scene: 'title',
@@ -28,7 +38,8 @@ const app = {
 };
 
 const escapeHtml = text => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reduced = () => !Motion.enabled();
+const CLUE_MS = 1200;   // ヒントで光る札（CSS の touched の1回分）
 
 // ===== 部品 =====
 
@@ -155,10 +166,11 @@ function update() {
     app.view = view;
     playSound(view, previous, moved);
     render(view);
+    if (moved?.type === 'clue') Motion.hold(CLUE_MS);
     if (moved && from) flyCard(moved, from);
     if (view.phase === 'end' && previous && previous.phase !== 'end') {
         recordLocalResult(view);
-        setTimeout(showResult, 1300);
+        Motion.afterIdle(showResult, Motion.ms(1300));
     }
 }
 
@@ -340,7 +352,8 @@ function flyCard(move, from) {
         { transform: 'translate(0, 0) scale(1)' },
         { transform: `translate(${dx / 2}px, ${dy / 2 - 40}px) scale(${(1 + scale) / 2 + 0.1})`, offset: 0.5 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: move.success ? 1 : 0.3 }
-    ], { duration: FLY_MS, easing: 'cubic-bezier(.4,.1,.3,1)' });
+    ], { duration: Motion.ms(FLY_MS), easing: 'cubic-bezier(.4,.1,.3,1)' });
+    Motion.track(animation, Motion.ms(FLY_MS));
     const done = () => el.remove();
     animation.onfinish = done;
     animation.oncancel = done;
