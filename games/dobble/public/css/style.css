@@ -67,9 +67,9 @@ main { height: 100%; }
 @keyframes hint { 50% { fill: rgba(126, 230, 201, .1); } }
 .sym.wrong .hit { fill: rgba(230, 80, 60, .3); stroke: #e5604a; stroke-width: 3; }
 .sym.got .hit { fill: rgba(255, 165, 60, .35); stroke: var(--accent); stroke-width: 4; }
-.card.shake { animation: shake .4s; }
+.card.shake { animation: shake calc(.4s * var(--motion-scale, 1)); }
 @keyframes shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
-.card.enter { animation: enter .3s ease-out; }
+.card.enter { animation: enter calc(.3s * var(--motion-scale, 1)) ease-out; }
 @keyframes enter { from { transform: scale(.92); opacity: .4; } }
 .flyer { position: fixed; z-index: 30; pointer-events: none; margin: 0; }
 
@@ -110,8 +110,8 @@ main { height: 100%; }
 .player.me { border-color: var(--accent); background: rgba(255, 165, 60, .12); }
 .pname { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pscore { font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
-.player.scored, #taken-count.scored { animation: scored .6s ease-out; }
-.player.missed { animation: missed .5s ease-out; }
+.player.scored, #taken-count.scored { animation: scored calc(.6s * var(--motion-scale, 1)) ease-out; }
+.player.missed { animation: missed calc(.5s * var(--motion-scale, 1)) ease-out; }
 @keyframes scored { 0% { box-shadow: 0 0 0 0 rgba(255, 165, 60, .9); } 100% { box-shadow: 0 0 0 10px rgba(255, 165, 60, 0); } }
 @keyframes missed { 0%, 100% { background: var(--panel); } 30% { background: rgba(230, 80, 60, .45); } }
 
@@ -134,7 +134,7 @@ main { height: 100%; }
     background: rgba(8, 24, 30, .9); border: 2px solid #e5604a; font-weight: 800; font-size: 18px; pointer-events: none; white-space: nowrap;
     font-variant-numeric: tabular-nums;
 }
-.lock.pulse { animation: pulse .3s; }
+.lock.pulse { animation: pulse calc(.3s * var(--motion-scale, 1)); }
 @keyframes pulse { 50% { transform: translate(-50%, -50%) scale(1.12); } }
 
 .infobar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: none; min-height: 36px; padding: 0 6px; color: var(--muted); font-size: 14px; }
@@ -200,3 +200,14 @@ main { height: 100%; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数などと同じ見た目にする */
+#motion-setting { flex: 1; display: flex; }
+#motion-setting .motion-speed { flex: 1; display: flex; }
+#motion-setting .motion-speed-options { flex: 1; display: flex; background: rgba(0, 0, 0, .25); border-radius: 10px; padding: 3px; gap: 3px; }
+#motion-setting .motion-speed button { flex: 1; min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 14px; padding: 0 4px; cursor: pointer; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { background: var(--secondary); color: #fff; font-weight: 800; }
+
+/* 動きの速さが「なし」のとき（動きを減らす設定のときも）は、CSS の動きも止める。速さの倍率は --motion-scale（js/motion/motion.js） */
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }

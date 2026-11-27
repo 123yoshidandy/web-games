@@ -12,6 +12,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'dobble';
 const CPU_NAMES = ['ミナ', 'ソウタ', 'リオ'];
@@ -27,7 +28,16 @@ const MARK_MS = 600;        // 当たった・まちがえたマークの印を�
 const SPEEDS = [1, 2, 4, 8];
 
 const $ = selector => document.querySelector(selector);
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = () => !Motion.enabled();
+
+// 動きの速さを、CSS（--motion-scale・data-motion）に伝え、タイトルの切り替えを作る
+const paintMotion = () => {
+    document.documentElement.style.setProperty('--motion-scale', Motion.speedScale());
+    document.documentElement.dataset.motion = Motion.getSpeed();
+};
+paintMotion();
+Motion.onSpeedChange(paintMotion);
+Motion.mountSpeedSetting(document.getElementById('motion-setting'), { label: '' });
 
 const app = {
     scene: 'title',
@@ -216,7 +226,7 @@ function update() {
         app.resultShown = true;
         recordLocalResult(view);
         onFinished(view);
-        setTimeout(() => showResult(), previous ? RESULT_DELAY_MS : 0);
+        Motion.afterIdle(() => showResult(), previous ? RESULT_DELAY_MS : 0);
     }
 }
 
@@ -340,8 +350,9 @@ function fly(from, target, land) {
     const animation = flyer.animate([
         { transform: 'translate(0, 0) scale(1)', opacity: 1 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: land ? 1 : 0.2 }
-    ], { duration: FLY_MS, easing: 'cubic-bezier(.4,0,.6,1)' });
+    ], { duration: Motion.ms(FLY_MS), easing: 'cubic-bezier(.4,0,.6,1)' });
     const done = () => flyer.remove();
+    Motion.track(animation, Motion.ms(FLY_MS));
     animation.onfinish = done;
     setTimeout(done, FLY_MS + 300);
 }

@@ -7,6 +7,7 @@ const CACHE = 'dobble-v1';
 const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 const PRECACHE = [
+    'js/motion/motion.js',
     './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
     'css/style.css', 'js/main.js', 'js/game.js', 'js/deck.js', 'js/game-view.js', 'js/cpu-player.js', 'js/symbol-art.js',
     'js/game-controller.js', 'js/random.js', 'js/storage.js',
