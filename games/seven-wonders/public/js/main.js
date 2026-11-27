@@ -12,7 +12,8 @@ import { helpMarkup } from './help.js';
 import { music } from './music.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'sevenwonders.settings.v1', save: 'sevenwonders.save.v1' };
@@ -141,8 +142,22 @@ function beginGame(next) {
 
 function saveProgress() {
     if (!controller || controller.isOnline) return; // オンライン対戦はサーバーが持つ
-    if (controller.game.isOver()) store.remove(KEYS.save);
-    else store.save(KEYS.save, controller.saveData());
+    if (controller.game.isOver()) {
+        recordLocalResult();
+        store.remove(KEYS.save);
+    } else store.save(KEYS.save, controller.saveData());
+}
+
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// 終わったあとの更新でも呼ばれるが、id がシードから決まるので、同じ対戦は1回しか数えない
+function recordLocalResult() {
+    const { game, humanSeat } = controller;
+    if (humanSeat < 0) return;
+    recordResult({
+        game: GAME,
+        id: `${GAME}-${game.options.seed}`,
+        outcome: outcomeFromWinners(game.winners(), humanSeat, game.players.length)
+    });
 }
 
 function goHome() {

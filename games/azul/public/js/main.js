@@ -9,7 +9,8 @@ import { measureBefore, playMove } from './motion.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const CPU_NAMES = ['ルシア', 'マテウス', 'イネス'];
 const HUMAN_NAME = 'あなた';
@@ -142,8 +143,21 @@ function update() {
     if (moved) playMove(view.lastMove, before, view.viewer);
     if (previous) playSounds(previous, view, moved);
     if (view.phase === 'end' && previous && previous.phase !== 'end') {
+        recordLocalResult(view);
         setTimeout(() => showResult(), 1400);
     }
+}
+
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline || !view.result) return;
+    recordResult({
+        game: GAME,
+        id: `${GAME}-${controller.setup.seed}`,
+        outcome: outcomeFromWinners(view.result.winners, view.viewer, view.players.length)
+    });
 }
 
 // 効果音：1回の更新に1つだけ鳴らす。終局は勝ち・負け、ラウンドの得点は得た音か知らせ、
