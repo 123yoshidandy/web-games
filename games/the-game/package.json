@@ -1,0 +1,27 @@
+{
+  "name": "the-game",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "portal": {
+    "original": "The Game",
+    "genres": [
+      "カードゲーム",
+      "協力"
+    ],
+    "players": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  }
+}

@@ -1,0 +1,19 @@
+{
+    "name": "ザ・ゲーム",
+    "short_name": "ザ・ゲーム",
+    "description": "2〜99 の98枚を、仲間と協力して4つの山に出し切るカードゲーム「ザ・ゲーム」",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "orientation": "portrait",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#141a33",
+    "theme_color": "#141a33",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

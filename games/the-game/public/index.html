@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#141a33">
+    <title>ザ・ゲーム</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ザ・ゲーム">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&family=Oswald:wght@600&display=swap">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- 合図の図柄（自作）：手のひら＝出さないで、星＝大事なカードがある -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+            <symbol id="sym-stop" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11m0-6.5a1.5 1.5 0 0 1 3 0V11m0-5a1.5 1.5 0 0 1 3 0V12m0-3.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.9-2.6L4.4 14.6a1.6 1.6 0 0 1 2.5-2L8 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+            <symbol id="sym-good" viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6-4.5-4.2 6.1-.7z" fill="currentColor"/></symbol>
+            <symbol id="sym-up" viewBox="0 0 24 24"><path d="M12 5l7 9H5z" fill="currentColor"/></symbol>
+            <symbol id="sym-down" viewBox="0 0 24 24"><path d="M12 19l7-9H5z" fill="currentColor"/></symbol>
+        </defs>
+    </svg>
+
+    <!-- タイトル -->
+    <section id="screen-title" class="screen">
+        <a class="portal-link" href="../">← ゲーム一覧</a>
+        <button type="button" id="open-help-title" class="icon-btn title-help" data-action="help" aria-label="遊び方" title="遊び方">
+            <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+        </button>
+        <div class="title-inner">
+            <h1 class="logo">THE GAME</h1>
+            <p class="logo-sub">ザ・ゲーム　98枚を出し切れ</p>
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <div class="settings">
+                <div class="setting">
+                    <span class="setting-label">人数</span>
+                    <div class="segment" id="count-select">
+                        <button type="button" data-value="1">1人</button>
+                        <button type="button" data-value="2">2人</button>
+                        <button type="button" data-value="3">3人</button>
+                        <button type="button" data-value="4">4人</button>
+                        <button type="button" data-value="5">5人</button>
+                    </div>
+                </div>
+                <div class="setting" id="level-setting">
+                    <span class="setting-label">仲間</span>
+                    <div class="segment" id="level-select">
+                        <button type="button" data-level="easy">やさしい</button>
+                        <button type="button" data-level="normal">ふつう</button>
+                        <button type="button" data-level="strong">つよい</button>
+                    </div>
+                </div>
+            </div>
+            <div class="title-buttons">
+                <button type="button" id="start" class="btn btn-primary">はじめる</button>
+                <button type="button" id="resume" class="btn btn-secondary" hidden>続きから</button>
+                <!-- オンライン対戦の接続先がないとき（デプロイ前の公開ページ）は隠す -->
+                <button type="button" id="online" class="btn btn-secondary" hidden>オンラインで遊ぶ</button>
+            </div>
+            <button type="button" class="btn btn-plain small sound-toggle" aria-pressed="true">サウンド</button>
+        </div>
+    </section>
+
+    <!-- プレイ中 -->
+    <section id="screen-game" class="screen" hidden>
+        <header id="topbar">
+            <button type="button" id="home" class="icon-btn" data-action="home" aria-label="ホーム" title="ホーム">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+            </button>
+            <span id="deck-info" class="deck-info"></span>
+            <span class="spacer"></span>
+            <button type="button" id="undo" class="icon-btn" data-action="undo" aria-label="待った" title="待った" hidden>
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M9 7 4.5 11.5 9 16"/><path d="M5 11.5h9.5a5 5 0 0 1 0 10H11"/></svg>
+            </button>
+            <button type="button" id="hint" class="icon-btn" data-action="hint" aria-label="ヒント" title="ヒント">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/></svg>
+            </button>
+            <button type="button" id="log" class="icon-btn" data-action="log" aria-label="記録" title="記録">
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M6 4h12v16H6z"/><path d="M9 8.5h6M9 12h6M9 15.5h4"/></svg>
+            </button>
+            <button type="button" id="result-open" class="icon-btn" data-action="result" aria-label="結果" title="結果" hidden>
+                <svg class="line-icon" viewBox="0 0 24 24"><path d="M7.5 4h9v5a4.5 4.5 0 0 1-9 0z"/><path d="M7.5 6H4.5a3 3 0 0 0 3 4M16.5 6h3a3 3 0 0 1-3 4M12 13.5V17M8.5 20h7M9.5 17h5"/></svg>
+            </button>
+            <button type="button" class="icon-btn sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg></button>
+            <button type="button" id="open-help-game" class="icon-btn" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </header>
+        <main id="play">
+            <div id="team" class="team"></div>
+            <div id="piles" class="piles"></div>
+            <div id="status" class="status"></div>
+            <div id="hand" class="hand"></div>
+            <div class="actions">
+                <button type="button" id="end-turn" class="btn btn-primary" data-action="end">番を終える</button>
+            </div>
+        </main>
+    </section>
+
+    <!-- 合図を選ぶ -->
+    <dialog id="signal-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="signal-title" class="sheet-title">合図</h2>
+            <div class="signal-choices">
+                <button type="button" class="signal-choice" data-mark="stop"><svg><use href="#sym-stop"/></svg>この山には出さないで</button>
+                <button type="button" class="signal-choice" data-mark="good"><svg><use href="#sym-good"/></svg>この山に大事なカードがある</button>
+                <button type="button" class="signal-choice" data-mark="">合図を外す</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 記録 -->
+    <dialog id="log-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">記録</h2>
+            <ol id="log-body" class="log-list"></ol>
+        </div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="result-title" class="sheet-title"></h2>
+            <div id="result-body"></div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-plain" data-action="close-result">盤面を見る</button>
+                <button type="button" id="result-home" class="btn btn-secondary" data-action="home">タイトルへ</button>
+                <button type="button" id="result-again" class="btn btn-primary" data-action="again">もう一度</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="sheet help">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">遊び方</h2>
+            <section>
+                <h3>目的</h3>
+                <p>全員で協力して、2〜99 の98枚を4つの山に出し切ります。出し切れなくても、残りが少ないほど良い結果です（10枚以下ならすばらしい）。</p>
+            </section>
+            <section>
+                <h3>山</h3>
+                <ul>
+                    <li><b>上り</b>（▲ 1から）の2つには、一番上より<b>大きい</b>カードを出します</li>
+                    <li><b>下り</b>（▼ 100から）の2つには、一番上より<b>小さい</b>カードを出します</li>
+                    <li><b>10戻し</b>：ちょうど10違うカードは、逆向きにも出せます（上りの 47 に 37、下りの 52 に 62）。山が戻るので、とても助かります</li>
+                </ul>
+            </section>
+            <section>
+                <h3>自分の番</h3>
+                <ul>
+                    <li>手札を選んで、出したい山を押します。山には、どれだけ進むかが出ます</li>
+                    <li><b>2枚以上</b>出したら「番を終える」で、手札が元の枚数になるまで引きます。山札がなくなったら、1枚以上でかまいません</li>
+                    <li>手札の枚数：1人 8枚・2人 7枚・3〜5人 6枚</li>
+                    <li>番の人が決まった枚数を出せなくなったら、そこで終わりです</li>
+                </ul>
+            </section>
+            <section>
+                <h3>合図</h3>
+                <p>数字は伝えられません。代わりに、山の下の「合図」で、<b>この山には出さないで</b>（手のひら）か、<b>この山に大事なカードがある</b>（星）を置けます。番でなくても置けます。仲間の CPU も、手札に近いカードがあると合図を置き、合図のある山に大きく飛ばして出すのを避けます。</p>
+            </section>
+            <section>
+                <h3>結果</h3>
+                <p>残ったカード（山札と全員の手札）の枚数で決まります。0枚なら出し切り、10枚以下ならすばらしい結果です。</p>
+            </section>
+            <section>
+                <h3>コツ</h3>
+                <ul>
+                    <li>飛ばす数はできるだけ小さく。大きく飛ばすと、仲間の出せるカードが減ります</li>
+                    <li>手札の中で10違う2枚があれば、大きい方を出してから10戻せます</li>
+                </ul>
+            </section>
+            <section>
+                <h3>CPU の考え</h3>
+                <ul id="cpu-help"></ul>
+            </section>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-help">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
