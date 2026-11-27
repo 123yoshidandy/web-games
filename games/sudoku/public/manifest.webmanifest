@@ -1,0 +1,19 @@
+{
+    "name": "数独",
+    "short_name": "数独",
+    "description": "どの行・列・ブロックにも同じ数字が1つずつ入るように、マスを数字で埋める論理パズル。毎回新しい問題で、答えは1つ。メモも書ける。今日のパズル・タイムアタック・オンラインの早解き",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "orientation": "portrait",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#f4efe4",
+    "theme_color": "#f4efe4",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
