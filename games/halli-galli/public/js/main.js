@@ -12,6 +12,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_NAMES = ['ミナ', 'ソウタ', 'リオ', 'ハル', 'ユイ'];
 const HUMAN_NAME = 'あなた';
@@ -30,7 +31,16 @@ const PING_MAX_MS = 1000;
 const PING_FIVE_MS = 250;   // 5つが見えている間（CPU のベルを早く映す）
 
 const $ = selector => document.querySelector(selector);
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = () => !Motion.enabled();
+
+// 動きの速さを、CSS（--motion-scale・data-motion）に伝え、タイトルの切り替えを作る
+const paintMotion = () => {
+    document.documentElement.style.setProperty('--motion-scale', Motion.speedScale());
+    document.documentElement.dataset.motion = Motion.getSpeed();
+};
+paintMotion();
+Motion.onSpeedChange(paintMotion);
+Motion.mountSpeedSetting(document.getElementById('motion-setting'), { label: '' });
 
 const app = {
     scene: 'title',
@@ -209,7 +219,7 @@ function update() {
     if (view.phase === 'end' && !app.resultShown) {
         app.resultShown = true;
         onFinished(view);
-        setTimeout(() => showResult(), previous ? RESULT_DELAY_MS : 0);
+        Motion.afterIdle(() => showResult(), previous ? RESULT_DELAY_MS : 0);
     }
 }
 
@@ -348,8 +358,9 @@ function fly(from, target, index) {
     const animation = flyer.animate([
         { transform: 'translate(0, 0) scale(1)', opacity: 1 },
         { transform: `translate(${dx}px, ${dy}px) scale(0.2)`, opacity: 0.2 }
-    ], { duration: FLY_MS, delay: index * 40, easing: 'cubic-bezier(.5,0,.6,1)', fill: 'backwards' });
+    ], { duration: Motion.ms(FLY_MS), delay: Motion.ms(index * 40), easing: 'cubic-bezier(.5,0,.6,1)', fill: 'backwards' });
     const done = () => flyer.remove();
+    Motion.track(animation, Motion.ms(FLY_MS + index * 40));
     animation.onfinish = done;
     setTimeout(done, FLY_MS + 600);
 }

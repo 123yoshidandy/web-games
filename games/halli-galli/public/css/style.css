@@ -63,7 +63,7 @@ main { height: 100%; }
 .card-back { fill: #b5372f; stroke: #7c1f1a; stroke-width: 2; }
 .card-back-inner { fill: #d4483d; stroke: #f6d9a8; stroke-width: 2; stroke-dasharray: 5 4; }
 .card { position: relative; width: var(--cw); height: var(--cw); border-radius: calc(var(--cw) * .11); filter: drop-shadow(0 3px 0 rgba(0, 0, 0, .3)); }
-.card.enter { animation: flip-in .28s ease-out; }
+.card.enter { animation: flip-in calc(.28s * var(--motion-scale, 1)) ease-out; }
 @keyframes flip-in { from { transform: rotateY(85deg) translateY(-6px); } to { transform: none; } }
 .flyer { position: fixed; z-index: 30; pointer-events: none; margin: 0; }
 
@@ -117,8 +117,8 @@ main { height: 100%; }
 .slot { position: relative; width: var(--cw); height: var(--cw); border-radius: calc(var(--cw) * .11); border: 2px dashed rgba(255, 255, 255, .18); }
 .slot .card { position: absolute; inset: -2px; }
 .slot .under { position: absolute; inset: -2px; transform: translate(3px, 3px); opacity: .55; }
-.seat.gained .seat-head { animation: gained .7s ease-out; }
-.seat.missed .seat-head { animation: missed .6s ease-out; }
+.seat.gained .seat-head { animation: gained calc(.7s * var(--motion-scale, 1)) ease-out; }
+.seat.missed .seat-head { animation: missed calc(.6s * var(--motion-scale, 1)) ease-out; }
 @keyframes gained { 0% { box-shadow: 0 0 0 0 rgba(242, 193, 78, .95); } 100% { box-shadow: 0 0 0 12px rgba(242, 193, 78, 0); } }
 @keyframes missed { 0%, 100% { background: var(--panel); } 30% { background: rgba(230, 80, 60, .6); } }
 
@@ -128,7 +128,7 @@ main { height: 100%; }
     font-weight: 800; font-size: 17px; white-space: nowrap; box-shadow: 0 8px 24px rgba(0, 0, 0, .45);
 }
 .banner.ng { border-color: #e5604a; }
-.banner.show { animation: banner .25s ease-out; }
+.banner.show { animation: banner calc(.25s * var(--motion-scale, 1)) ease-out; }
 @keyframes banner { from { transform: translate(-50%, -50%) scale(.8); opacity: 0; } }
 
 /* 操作：左に山札（めくる）、真ん中に大きなベル、右に自動 */
@@ -155,7 +155,7 @@ main { height: 100%; }
 .bell:disabled { filter: grayscale(.7) brightness(.8); }
 .bell-svg { display: block; width: 100%; height: 100%; pointer-events: none; }
 .bell-base { fill: #3b3b3b; }
-.bell.ringing .bell-svg { animation: ring .35s ease-out; }
+.bell.ringing .bell-svg { animation: ring calc(.35s * var(--motion-scale, 1)) ease-out; }
 @keyframes ring { 20% { transform: rotate(-9deg); } 45% { transform: rotate(8deg); } 70% { transform: rotate(-4deg); } }
 .bell.recommended { border-color: rgba(155, 232, 181, .75); }
 .five-flash {
@@ -227,3 +227,14 @@ main { height: 100%; }
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、時間などと同じ見た目にする */
+#motion-setting { flex: 1; display: flex; min-width: 0; }
+#motion-setting .motion-speed { flex: 1; display: flex; }
+#motion-setting .motion-speed-options { flex: 1; display: flex; background: rgba(0, 0, 0, .25); border-radius: 10px; padding: 3px; gap: 3px; }
+#motion-setting .motion-speed button { flex: 1; min-height: 34px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 14px; padding: 0 2px; white-space: nowrap; cursor: pointer; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { background: var(--secondary); color: #fff; font-weight: 800; }
+
+/* 動きの速さが「なし」のとき（動きを減らす設定のときも）は、CSS の動きも止める。速さの倍率は --motion-scale（js/motion/motion.js） */
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }
