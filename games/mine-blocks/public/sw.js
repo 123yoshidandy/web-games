@@ -9,7 +9,7 @@ const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 // 画面のファイルは、初めて開いたときに全部入れておく（オフラインで開いても、すべての画面がそろう）
 const PRECACHE = [
-    './', 'index.html', 'style.css', 'manifest.webmanifest', 'favicon.svg', 'favicon.png',
+    './', 'index.html', 'css/style.css', 'manifest.webmanifest', 'favicon.svg', 'favicon.png',
     'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'js/block.js',
     'js/assist.js', 'js/board.js', 'js/challenge.js', 'js/effects.js', 'js/feedback.js', 'js/game-state.js', 'js/hint.js',
     'js/interaction.js', 'js/main.js', 'js/online-config.js', 'js/online.js', 'js/piece-shape.js',

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 // アシストのモジュールは <script> で読む作りなので、関数だけを取り出して確かめる（画面の部分は呼ばない）
-const code = readFileSync(new URL('../js/assist.js', import.meta.url), 'utf8');
+const code = readFileSync(new URL('../public/js/assist.js', import.meta.url), 'utf8');
 const { suggestPiece, pieceCells } = new Function(`${code}\nreturn { suggestPiece, pieceCells };`)();
 
 const blocks = [

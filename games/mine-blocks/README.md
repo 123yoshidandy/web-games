@@ -6,7 +6,7 @@
 
 - コマンドは web-games の直下で実行する：`npm install`（直下で1回）、`npm test -w games/mine-blocks`、`npm run dev:server -w games/mine-blocks`、`npm run build:server -w games/mine-blocks`、`npm run deploy:server -w games/mine-blocks`
 - 部屋の仕組みのサーバー側は、web-games の `packages/netplay-kit/server/` を `netplay-kit/server/*.js` として import する（写しは持たない。esbuild で Lambda 用に1つにまとめる）
-- 画面側の `js/netplay/` は netplay-kit の写し（ビルドの仕組みがないため）。直すときは netplay-kit で直し、直下で `node packages/netplay-kit/scripts/sync.mjs games/mine-blocks` を実行する（`check` を付けると、手で直されていないかを確かめる）。版は `netplay-kit.lock.json`
+- 画面側の `public/js/netplay/` は netplay-kit の写し（ビルドの仕組みがないため）。直すときは netplay-kit で直し、直下で `node packages/netplay-kit/scripts/sync.mjs games/mine-blocks` を実行する（`check` を付けると、手で直されていないかを確かめる）。版は `netplay-kit.lock.json`
 - 公開先は https://123yoshidandy.github.io/web-games/mine-blocks/ になる予定。サーバーの自動デプロイ（GitHub Actions）は、web-games の直下にまとめる予定で、今はない。サーバーを1つにまとめる計画は `docs/server-merge.md`
 - 下の説明のうち、リポジトリ単体のときの手順（`.github/workflows/`・GitHub Pages への公開など）は、もとのリポジトリでの話
 
@@ -86,25 +86,25 @@ MINE BLOCKSは、盤面の数字と赤いマス（マイン）をヒントに、
 - 想定解が収まる最小の長方形を盤面とし、想定解で使わないマスは斜線（置けないマス）になる
 
 ### ファイル構成
-- `index.html` / `style.css`: 画面とデザイン
-- `js/random.js`: シード付き乱数（ランダムな問題番号の作成）
-- `js/game-state.js`: ゲームの状態、画面要素、タイマー
-- `js/block.js`: ピースの生成と描画
-- `js/solution.js`: 想定解と盤面の生成
-- `js/board.js`: 盤面の描画、ピースの配置判定・配置・取り外し、クリア判定
-- `js/effects.js`: クリアの演出（盤面の波と紙吹雪）
-- `js/music.js`: BGM と効果音のプレイヤーと、サウンドのボタン（`js/sound/` の共通の音のエンジンの写しを使う）
-- `js/sound/bgm.js`: BGM の曲（`js/sound/` のほかのファイルは packages/sound から同期した写しなので、直接直さない）
-- `js/top.js`: トップ画面（遊び方を選ぶ。ロゴを押すと戻る）
-- `js/interaction.js`: ドラッグ＆ドロップ、タッチ操作
-- `js/ui.js`: ボタン、共有、配置プレビュー
-- `js/challenge.js`: チャレンジモード
-- `js/hint.js`: 遊び方（アニメーションでの説明）
-- `js/surrender.js`: 降参と想定解の表示
-- `js/resume.js`: 続きから（エンドレスの解きかけの問題の保存と復元）
-- `js/online-config.js`: オンライン対戦のサーバーの URL
-- `js/online.js`: オンライン対戦の画面（参加画面、ロビー、カウントダウン、対戦中のバー、結果画面）
-- `js/netplay/`: netplay-kit からコピーした、オンライン対戦の通信の共通部品（接続・再接続・参加情報の保存・ping・時計のずれの補正・招待URL）
+- `public/index.html` / `public/css/style.css`: 画面とデザイン（公開するファイルは `public/` にまとめる。URL は `/mine-blocks/` のまま）
+- `public/js/random.js`: シード付き乱数（ランダムな問題番号の作成）
+- `public/js/game-state.js`: ゲームの状態、画面要素、タイマー
+- `public/js/block.js`: ピースの生成と描画
+- `public/js/solution.js`: 想定解と盤面の生成
+- `public/js/board.js`: 盤面の描画、ピースの配置判定・配置・取り外し、クリア判定
+- `public/js/effects.js`: クリアの演出（盤面の波と紙吹雪）
+- `public/js/music.js`: BGM と効果音のプレイヤーと、サウンドのボタン（`public/js/sound/` の共通の音のエンジンの写しを使う）
+- `public/js/sound/bgm.js`: BGM の曲（`public/js/sound/` のほかのファイルは packages/sound から同期した写しなので、直接直さない）
+- `public/js/top.js`: トップ画面（遊び方を選ぶ。ロゴを押すと戻る）
+- `public/js/interaction.js`: ドラッグ＆ドロップ、タッチ操作
+- `public/js/ui.js`: ボタン、共有、配置プレビュー
+- `public/js/challenge.js`: チャレンジモード
+- `public/js/hint.js`: 遊び方（アニメーションでの説明）
+- `public/js/surrender.js`: 降参と想定解の表示
+- `public/js/resume.js`: 続きから（エンドレスの解きかけの問題の保存と復元）
+- `public/js/online-config.js`: オンライン対戦のサーバーの URL
+- `public/js/online.js`: オンライン対戦の画面（参加画面、ロビー、カウントダウン、対戦中のバー、結果画面）
+- `public/js/netplay/`: netplay-kit からコピーした、オンライン対戦の通信の共通部品（接続・再接続・参加情報の保存・ping・時計のずれの補正・招待URL）
 - `server/`: オンライン対戦のサーバー（部屋の仕組みは web-games の `packages/netplay-kit` を import する）
   - `src/game-definition.js`: 対戦の中身（問題番号と開始時刻の配布、解けた／降参の受け付け、勝敗、勝ち数の設定）
   - `src/handler.js`: Lambda の入口
@@ -112,11 +112,11 @@ MINE BLOCKSは、盤面の数字と赤いマス（マイン）をヒントに、
   - `template.yaml`: AWS SAM のテンプレート
 - `netplay-kit.lock.json`: コピーした netplay-kit（画面側）の版と、各ファイルのハッシュ
 - `test/`: 対戦の中身のテスト（Vitest）
-- `js/main.js`: 初期化と問題の生成
-- `sw.js` / `manifest.webmanifest`: ホーム画面に追加したときの設定と、オフラインで開くためのキャッシュ（自分のファイルはネットワークを先に使う）
+- `public/js/main.js`: 初期化と問題の生成
+- `public/sw.js` / `public/manifest.webmanifest`: ホーム画面に追加したときの設定と、オフラインで開くためのキャッシュ（自分のファイルはネットワークを先に使う）
 
 ### オンライン対戦のしくみ
-- 部屋の仕組み（作成・参加・再接続・保存・送信）は、ほかのゲームと共通の netplay-kit を使う。サーバー側は web-games の `packages/netplay-kit` を import する。画面側の `js/netplay/` は手で直さず、netplay-kit で直してから直下の `node packages/netplay-kit/scripts/sync.mjs games/mine-blocks` で同期する（`sync.mjs check games/mine-blocks` で、手で直されていないか確かめられる）
+- 部屋の仕組み（作成・参加・再接続・保存・送信）は、ほかのゲームと共通の netplay-kit を使う。サーバー側は web-games の `packages/netplay-kit` を import する。画面側の `public/js/netplay/` は手で直さず、netplay-kit で直してから直下の `node packages/netplay-kit/scripts/sync.mjs games/mine-blocks` で同期する（`sync.mjs check games/mine-blocks` で、手で直されていないか確かめられる）
 - 問題は問題番号から各端末で作るので、サーバーは問題番号・開始時刻・結果（解けた／降参とタイム）だけを扱う
 - 開始時刻とタイムはサーバーの時計で決める。端末にはサーバーの時刻も送り、カウントダウンの終わりを端末の時計に合わせる
 - 解けたかどうかは端末からの通知を信用する（友人どうしの対戦を想定）
@@ -129,7 +129,7 @@ MINE BLOCKSは、盤面の数字と赤いマス（マイン）をヒントに、
 npm install
 
 # 画面を手元で配信して http://localhost:8089 を開く
-python3 -m http.server 8089
+python3 -m http.server 8089 -d public
 
 # テスト
 npm test
@@ -178,9 +178,9 @@ AWS SAM CLI と AWS CLI が必要です。プロフィールは環境変数で�
 AWS_PROFILE=<プロフィール名> npm run deploy:server
 ```
 
-初めてデプロイしたときは、出力される `WebSocketUrl` を `js/online-config.js` の `ONLINE_DEPLOYED_SERVER_URL` に書きます。画面は main ブランチに push すると GitHub Pages に反映されます。
+初めてデプロイしたときは、出力される `WebSocketUrl` を `public/js/online-config.js` の `ONLINE_DEPLOYED_SERVER_URL` に書きます。画面は main ブランチに push すると GitHub Pages に反映されます。
 
 ## 利用方法
 
-1. https://123yoshidandy.github.io/mine-blocks/ を開く（手元では `index.html` をブラウザで開く）
+1. https://123yoshidandy.github.io/mine-blocks/ を開く（手元では `public/index.html` をブラウザで開く）
 2. トップ画面でエンドレス・チャレンジ・オンライン対戦を選び、ピースを置いて盤面を埋める
