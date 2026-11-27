@@ -240,7 +240,10 @@ class UIEventHandler {
     handleEndTurn() {
         const view = this.gameController.getView();
         // 自動のターン終了とボタン操作が重なっても、二重にターンを進めない
-        if (this.isEndingTurn || !view || !view.isMyTurn || view.prompt) return;
+        // 返事待ちの操作（「購入へ」で財宝を場へ出している間・購入のアニメーション中など）があるうちも終えない
+        // （財宝が場に着く前に終えると、購入フェーズに入らないまま何もせずにターンが終わってしまう）
+        if (this.isEndingTurn || this.isActionPending || this.pendingPurchases?.count > 0 ||
+            !view || !view.isMyTurn || view.prompt) return;
         
         this.isEndingTurn = true;
         const finishTurn = () => {
