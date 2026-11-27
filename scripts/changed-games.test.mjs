@@ -30,6 +30,12 @@ test('部品が変わったら、依存に書いたゲームと、テストで i
     assert.deepEqual(select(['packages/netplay-kit/server/room.js']), ['packages/netplay-kit', 'games/c']);
 });
 
+test('写しを配る部品が変わったら、写しを持つゲームも流す', () => {
+    const clock = { path: 'packages/clock', pkg: { name: 'clock', scripts: withTest }, imports: [] };
+    const withCopy = [...games, { path: 'games/d', pkg: { scripts: withTest }, imports: [], copies: ['clock'] }];
+    assert.deepEqual(selectWorkspaces(['packages/clock/src/clock.js'], { games: withCopy, packages: [...packages, clock] }), ['packages/clock', 'games/d']);
+});
+
 test('曲が変わったら、packages/sound も流す', () => {
     assert.deepEqual(select(['games/c/public/js/sound/bgm.js']), ['packages/sound', 'games/c']);
 });
