@@ -8,17 +8,26 @@
  *   export const handler = createHandler(game);
  * web-games の1つのスタックにまとめるときは、ゲームの名前を keyPrefix に渡す（部屋のキーがゲームどうしでぶつからない。router.js）
  *   export const handler = createHandler(game, { keyPrefix: 'azul' });
+ * 環境変数 STATS_TABLE_NAME（利用者ごとの記録のテーブル）があり、keyPrefix（ゲームの名前）を渡したときは、
+ * 対戦が終わるたびに、人の席の結果を記録する（stats.js。ゲームの定義の result があればそれを使う）
  */
 
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
 import { RoomService, RateLimiter } from './room-service.js';
 import { DynamoStore } from './dynamo-store.js';
+import { DynamoStatsStore } from './dynamo-stats-store.js';
+import { createMatchRecorder } from './stats.js';
 
 const SEND_RETRY_DELAYS_MS = [100, 300, 900]; // 送信が 429 で断られたときに、送り直すまで待つ時間
 
-export function createHandler(game, { tableName = process.env.TABLE_NAME, keyPrefix = '' } = {}) {
+export function createHandler(game, {
+    tableName = process.env.TABLE_NAME, keyPrefix = '',
+    statsTableName = process.env.STATS_TABLE_NAME, statsStore = null
+} = {}) {
     // 以下は Lambda の呼び出しをまたいで使い回す
     const store = new DynamoStore(tableName, undefined, { keyPrefix });
+    const stats = statsStore ?? (statsTableName && keyPrefix ? new DynamoStatsStore(statsTableName) : null);
+    const onMatchEnd = stats && keyPrefix ? createMatchRecorder({ gameName: keyPrefix, definition: game, store: stats }) : null;
     const clients = new Map();          // 送信用のクライアント
     const connectionCache = new Map();  // 接続→部屋番号
     const limiter = new RateLimiter({ perSecond: game.messagesPerSecond ?? 10, burst: game.messagesBurst ?? 20 });
@@ -53,7 +62,7 @@ export function createHandler(game, { tableName = process.env.TABLE_NAME, keyPre
                 }
             }
         };
-        return new RoomService({ game, store, send, connectionCache, limiter });
+        return new RoomService({ game, store, send, connectionCache, limiter, onMatchEnd });
     };
 
     return async (event) => {

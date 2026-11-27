@@ -89,8 +89,9 @@ export class RoomService {
     // store: getRoom(code) / putRoom(room, previousVersion) / listPublicRooms(nowSeconds, { status }) / getConnection(id) / putConnection(connection) / deleteConnection(id)
     // send: (connectionId, message) => Promise（接続が切れていれば失敗してよい）
     // connectionCache / limiter: Lambda の呼び出しをまたいで使い回すもの（省略するとこのインスタンスだけで持つ）
+    // onMatchEnd: ({ room, game }) => Promise。対戦が終わったことを保存できたときに、対戦ごとに1回だけ呼ぶ（利用者ごとの記録。stats.js）
     constructor({ game, store, send, createToken = () => crypto.randomUUID(), now = () => Date.now(), random = Math.random,
-        connectionCache = new Map(), limiter = null }) {
+        connectionCache = new Map(), limiter = null, onMatchEnd = null }) {
         this.game = { ...DEFAULTS, ...game };
         if (!historyKinds.has(game)) historyKinds.set(game, { player: {}, spectator: {} });
         this.historyKinds = historyKinds.get(game);
@@ -100,7 +101,8 @@ export class RoomService {
         this.now = now;
         this.random = random;
         this.connectionCache = connectionCache;
-        this.limiter = limiter ?? new RateLimiter({ perSecond: this.game.messagesPerSecond, burst: this.game.messagesBurst, now });
+        this.onMatchEnd = onMatchEnd;
+        this.limiter = limiter ??new RateLimiter({ perSecond: this.game.messagesPerSecond, burst: this.game.messagesBurst, now });
 
         const reserved = Object.keys(this.game.actions ?? {}).filter(name => RESERVED_ACTIONS.includes(name));
         if (reserved.length > 0) throw new Error(`ゲームの定義の actions に共通の操作名は使えません: ${reserved.join(', ')}`);
@@ -572,15 +574,31 @@ export class RoomService {
     // ===== 保存と送信 =====
 
     // 部屋を保存する（読み込んだときと版が違えば ConflictError）
+    // 対戦が終わったことを初めて保存できたら、onMatchEnd を呼ぶ。どの対戦まで知らせたかを部屋に残すので、
+    // 保存がぶつかってやり直しても、終わったあとに退出などで保存し直しても、2回は呼ばない
     async saveRoom(room) {
         const previousVersion = room.version;
+        const previousReported = room.reportedMatchId;
+        const justEnded = Boolean(this.onMatchEnd) && room.status === 'ended' && room.reportedMatchId !== room.matchId;
         room.version = previousVersion + 1;
         room.expiresAt = this.expiresAt();
+        if (justEnded) room.reportedMatchId = room.matchId;
         try {
             await this.store.putRoom(room, previousVersion, Math.floor(this.now() / 1000));
         } catch (error) {
             room.version = previousVersion;
+            room.reportedMatchId = previousReported;
             throw error;
+        }
+        if (justEnded) await this.reportMatchEnd(room);
+    }
+
+    // 知らせる側（記録）の失敗で、対戦の処理を止めない
+    async reportMatchEnd(room) {
+        try {
+            await this.onMatchEnd({ room, game: room.game ? this.restoreGame(room) : null });
+        } catch (error) {
+            console.log(JSON.stringify({ event: 'match_end_failed', room: room.code, matchId: room.matchId, error: error.name, message: error.message }));
         }
     }
 

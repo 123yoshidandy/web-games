@@ -1,7 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 # web-games の全ゲームのオンライン対戦をまとめたスタック（web-games-online。docs/server-merge.md）
-# netplay-kit の template/template.yaml の写し。違いは、Lambda のメモリ（256 → 512）と、パラメーターの既定値だけ
+# netplay-kit の template/template.yaml の写し。違いは、Lambda のメモリ（256 → 512）と、パラメーターの既定値と、
+# 利用者ごとの記録（StatsTable・StatsFunction・HTTP API の StatsApi。docs/user-stats.md）
 # リソースの名前は CloudFormation が web-games-online-<論理ID>-<乱数> で付ける（web-games-cfn-deploy のロールが作れるのは、この形だけ）
 # 名前と受け付け上限は samconfig.toml の parameter_overrides で変えられる
 Description: web-games online play (API Gateway WebSocket + Lambda + DynamoDB)
@@ -19,6 +20,14 @@ Parameters:
     Type: Number
     Default: 200
     Description: Burst requests accepted by the stage (shared by all games)
+  StatsThrottlingRateLimit:
+    Type: Number
+    Default: 10
+    Description: Requests per second accepted by the stats HTTP API
+  StatsThrottlingBurstLimit:
+    Type: Number
+    Default: 20
+    Description: Burst requests accepted by the stats HTTP API
 
 Resources:
   # 部屋（ROOM#ゲーム#部屋番号）・接続（CONN#接続ID）・接続のゲーム（GAME#接続ID）を入れるテーブル。使った分だけの課金で、expiresAt を過ぎると消える
@@ -50,9 +59,13 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref Table
+          # 対戦が終わったら、人の席の結果を記録する（docs/user-stats.md）
+          STATS_TABLE_NAME: !Ref StatsTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref Table
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StatsTable
         - Statement:
             - Effect: Allow
               Action: execute-api:ManageConnections
@@ -118,7 +131,112 @@ Resources:
       Principal: apigateway.amazonaws.com
       SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
 
+  # ===== 利用者ごとの記録（docs/user-stats.md） =====
+
+  # 利用者ごとの数（USER#名前）と、数えた記録の印（RESULT#id。expiresAt で消える）。部屋のテーブルと違い、数は消えない
+  # 消すと記録がなくなるので、スタックから外しても残す
+  StatsTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  # GET /stats・POST /results を受け持つ（server/src/stats-handler.js を束ねた stats-handler.mjs）
+  StatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: stats-handler.handler
+      Runtime: nodejs22.x
+      Architectures:
+        - arm64
+      MemorySize: 256
+      Timeout: 10
+      Environment:
+        Variables:
+          STATS_TABLE_NAME: !Ref StatsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref StatsTable
+
+  StatsFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${StatsFunction}
+      RetentionInDays: 7
+
+  # 画面（GitHub Pages）から呼ぶ HTTP API。ログインは名前だけなので、どこからでも呼べる（CORS は *）
+  StatsApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub ${AppName}-stats
+      ProtocolType: HTTP
+      CorsConfiguration:
+        AllowOrigins:
+          - '*'
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+        MaxAge: 86400
+
+  StatsIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref StatsApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt StatsFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  StatsGetRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref StatsApi
+      RouteKey: GET /stats
+      Target: !Sub integrations/${StatsIntegration}
+
+  StatsPostRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref StatsApi
+      RouteKey: POST /results
+      Target: !Sub integrations/${StatsIntegration}
+
+  # 想定外のアクセスで料金が増えないよう、受け付ける数に上限を設ける
+  StatsStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref StatsApi
+      StageName: $default
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: !Ref StatsThrottlingBurstLimit
+        ThrottlingRateLimit: !Ref StatsThrottlingRateLimit
+
+  StatsInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref StatsFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${StatsApi}/*
+
 Outputs:
   WebSocketUrl:
     Description: URL for the browser to connect to
     Value: !Sub wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod
+  StatsApiUrl:
+    Description: URL of the per-user stats API (write it to DEPLOYED_STATS_URL in netplay-kit/client/user-stats.js)
+    Value: !Sub https://${StatsApi}.execute-api.${AWS::Region}.amazonaws.com

@@ -1,11 +1,13 @@
 // オンライン対戦の通し試験：ヘッドレス Chrome で2人分のページを開き、共通のロビーから部屋を作って数手打つ（AWS は使わない）
-// 使い方: node scripts/online-e2e.mjs <ゲーム> [--moves 6] [--shots <フォルダ>]
+// 使い方: node scripts/online-e2e.mjs <ゲーム> [--moves 6] [--finish] [--shots <フォルダ>]
 // - 全ゲーム用のテスト用サーバー（dev-online.mjs と同じ）と画面の配信を、このプロセスの中で空いているポートに立て、終わったら止める（8080 は使わない）
 // - A は localhost、B は 127.0.0.1 で開く（参加情報の保存が混ざらない）。A が部屋を作り、B が参加できる部屋の一覧から入り、A が始める
 //   部屋はすべて公開で、部屋番号は画面に出ない（入口・一覧・待合室の文字に部屋番号がないことも確かめる）
 // - 手は、サーバーの部屋の状態から選び（定義の CPU、だめならゲームの suggest）、その席のページの
 //   window.__app.online.controller.send() で送る。両方のページに届いたかを、部屋の版で確かめる
 // - 最後に、B の再読み込みで同じ席に戻ること、A が部屋を出ると B に届くこと、ページにエラーがないことを確かめる
+// - --finish を付けると、決まった手数で止めずに対戦の終わりまで打ち、利用者ごとの記録（docs/user-stats.md）に
+//   A・B の両方の結果と、互いの勝ち負けが入ったかを確かめる
 // - 結果は「OK／NG 項目」で出し、NG があれば終了コード1。画面の PNG は --shots のフォルダ（省くと一時フォルダ）に置く
 // - ページの大きさは、ゲームの向きに合わせて layout-check と同じスマホの大きさにする（横のゲームは 844×390）
 import http from 'node:http';
@@ -29,11 +31,12 @@ const TYPES = {
 };
 
 export function parseArgs(argv) {
-    const args = { game: null, moves: 6, shots: null };
+    const args = { game: null, moves: 6, shots: null, finish: false };
     const rest = [...argv];
     while (rest.length > 0) {
         const arg = rest.shift();
         if (arg === '--moves') args.moves = Number(rest.shift());
+        else if (arg === '--finish') args.finish = true;
         else if (arg === '--shots') args.shots = rest.shift();
         else if (!arg.startsWith('--')) args.game = arg;
     }
@@ -122,7 +125,10 @@ const BOARD_DRAWN = `(() => {
 })()`;
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function runE2E({ game, moves = 6, shots = null }) {
+const FINISH_MAX_MOVES = 2000; // --finish で打つ手の上限（止まらないゲームの安全装置）
+
+export async function runE2E({ game, moves: requestedMoves = 6, shots = null, finish = false }) {
+    const moves = finish ? FINISH_MAX_MOVES : requestedMoves;
     const definition = await loadDefinition(game);
     if (!definition) throw new Error(`${game} にゲームの定義（server/src/game-definition.js）がありません`);
     const publicDir = publicDirOf(game);
@@ -233,7 +239,21 @@ export async function runE2E({ game, moves = 6, shots = null }) {
             await b.waitFor(`window.__app.online.controller.net.lastVersion >= ${version}`);
             played++;
         }
-        check.ok(`${moves} 手を打ち、両方の画面に届く`, played >= moves || (played > 0 && dev.store.rooms.get(roomKey).status !== 'playing'), `${played} 手`);
+        check.ok(`${finish ? '終わりまで' : `${moves} 手を`}打ち、両方の画面に届く`, finish
+            ? dev.store.rooms.get(roomKey).status === 'ended'
+            : played >= moves || (played > 0 && dev.store.rooms.get(roomKey).status !== 'playing'), `${played} 手`);
+        if (finish) {
+            // 対戦の終わりに、サーバーが A・B の両方の記録を書く（相手ごとの勝ち負けは、互いに逆になる）
+            const [mineA, mineB] = await Promise.all(['あお', 'みどり'].map(async (name) => (await dev.stats.get(name)).games[game]));
+            const vsB = mineA?.vs.find((o) => o.name === 'みどり' && !o.cpu);
+            const vsA = mineB?.vs.find((o) => o.name === 'あお' && !o.cpu);
+            check.ok('終わると A・B の両方の記録が1回ずつ増える（オンライン）', mineA?.plays === 1 && mineA.online === 1 && mineB?.plays === 1 && mineB.online === 1,
+                JSON.stringify({ A: mineA, B: mineB }));
+            check.ok('A・B の相手ごとの勝ち負けが互いに逆になる', Boolean(vsA && vsB) && vsB.wins === vsA.losses && vsB.losses === vsA.wins && vsB.draws === vsA.draws,
+                JSON.stringify({ vsB, vsA }));
+            const outcomes = [mineA, mineB].map((s) => (s.wins ? 'win' : s.losses ? 'loss' : s.draws ? 'draw' : '?'));
+            console.log(`記録：あお ${outcomes[0]}・みどり ${outcomes[1]}`);
+        }
         check.ok('A・B: 盤面に何か描かれている', await a.eval(BOARD_DRAWN) && await b.eval(BOARD_DRAWN));
         await a.shot(join(shotDir, `${game}-game-A.png`));
         await b.shot(join(shotDir, `${game}-game-B.png`));
@@ -266,7 +286,7 @@ export async function runE2E({ game, moves = 6, shots = null }) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const args = parseArgs(process.argv.slice(2));
     if (!args.game || !Number.isFinite(args.moves)) {
-        console.error('使い方: node scripts/online-e2e.mjs <ゲーム> [--moves 6] [--shots <フォルダ>]');
+        console.error('使い方: node scripts/online-e2e.mjs <ゲーム> [--moves 6] [--finish] [--shots <フォルダ>]');
         process.exit(2);
     }
     runE2E(args).catch((error) => {

@@ -10,12 +10,36 @@
  * 複数のゲームを1つのサーバーで動かすとき（web-games の npm run dev:online）:
  *   startMultiDevServer({ load: (name) => そのゲームの定義（なければ null） });
  *   画面は ws://localhost:8787?game=<ゲームの名前> につなぐ。AWS の router.js と同じく、ゲームは接続の URL で選ぶ
+ *   同じポートの HTTP で、利用者ごとの記録の API（stats-handler.js の GET /stats・POST /results）も受け持つ（保存先はメモリ）
+ *   対戦が終わると、AWS と同じく人の席の結果を記録する（stats.js）
  */
 
+import http from 'node:http';
 import { WebSocketServer } from 'ws';
 import { RoomService } from './room-service.js';
 import { MemoryStore } from './memory-store.js';
 import { isGameName, unwrapModule } from './game-name.js';
+import { MemoryStatsStore, createMatchRecorder } from './stats.js';
+import { createStatsHandler } from './stats-handler.js';
+
+// HTTP の要求を、API Gateway の HTTP API（ペイロード 2.0）と同じ形の event にして、記録の API に渡す
+function serveStats(statsHandler) {
+    return (request, response) => {
+        const url = new URL(request.url ?? '/', 'http://localhost');
+        let body = '';
+        request.on('data', (chunk) => { body += chunk; });
+        request.on('end', async () => {
+            const result = await statsHandler({
+                rawPath: url.pathname,
+                queryStringParameters: Object.fromEntries(url.searchParams),
+                requestContext: { http: { method: request.method } },
+                body,
+                isBase64Encoded: false
+            });
+            response.writeHead(result.statusCode, result.headers).end(result.body);
+        });
+    };
+}
 
 export function startDevServer(game, { port = Number(process.env.PORT ?? 8787), log = console.log } = {}) {
     const sockets = new Map();
@@ -56,11 +80,12 @@ export function startDevServer(game, { port = Number(process.env.PORT ?? 8787), 
 
 // 複数のゲームを受け持つ（?game= で選ぶ）。ゲームの部屋の処理は、最初につながったときに作る
 // 保存先は1つの場所を共有し、ゲームごとに keyPrefix を付ける（AWS で1つのテーブルにまとめた形と同じ）
-export function startMultiDevServer({ load, port = Number(process.env.PORT ?? 8787), log = console.log } = {}) {
+export function startMultiDevServer({ load, port = Number(process.env.PORT ?? 8787), log = console.log, stats = new MemoryStatsStore() } = {}) {
     const sockets = new Map();
     const shared = new MemoryStore();
     const services = new Map(); // ゲームの名前 → RoomService（なければ null）の Promise
     let connectionCount = 0;
+    const recorderOf = (name, game) => createMatchRecorder({ gameName: name, definition: game, store: stats, log: (entry) => log(JSON.stringify(entry)) });
 
     const send = async (connectionId, message) => {
         const socket = sockets.get(connectionId);
@@ -73,7 +98,9 @@ export function startMultiDevServer({ load, port = Number(process.env.PORT ?? 87
             services.set(name, Promise.resolve()
                 .then(() => load(name))
                 .then(unwrapModule)
-                .then(game => (game ? new RoomService({ game, store: new MemoryStore({ keyPrefix: name, from: shared }), send }) : null))
+                .then(game => (game ? new RoomService({
+                    game, store: new MemoryStore({ keyPrefix: name, from: shared }), send, onMatchEnd: recorderOf(name, game)
+                }) : null))
                 .catch(error => {
                     log(`ゲーム ${name} を読み込めません: ${error.message}`);
                     return null;
@@ -82,7 +109,9 @@ export function startMultiDevServer({ load, port = Number(process.env.PORT ?? 87
         return services.get(name);
     };
 
-    const server = new WebSocketServer({ port });
+    const web = http.createServer(serveStats(createStatsHandler({ store: stats, log: (entry) => log(JSON.stringify(entry)) })));
+    const server = new WebSocketServer({ server: web });
+    web.listen(port);
     server.on('connection', (socket, request) => {
         const name = new URL(request.url ?? '/', 'http://localhost').searchParams.get('game');
         const connectionId = `local-${++connectionCount}`;
@@ -105,9 +134,11 @@ export function startMultiDevServer({ load, port = Number(process.env.PORT ?? 87
     });
 
     log(`オンライン対戦のテスト用サーバー（全ゲーム）: ws://localhost:${port}?game=<ゲームの名前>`);
+    log(`利用者ごとの記録の API: http://localhost:${port}/stats?name=<名前>（保存先はメモリ）`);
     const close = () => new Promise(resolve => {
         server.clients.forEach(socket => socket.terminate());
-        server.close(resolve);
+        server.close(() => web.close(() => resolve()));
+        web.closeAllConnections?.();
     });
-    return { server, services, store: shared, close };
+    return { server, web, services, store: shared, stats, close };
 }

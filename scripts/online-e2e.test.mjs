@@ -6,9 +6,10 @@ import { createTestServer } from 'netplay-kit/server/testing.js';
 import { parseArgs, freePorts, createE2EPicker, publicDirOf, viewportOf } from './online-e2e.mjs';
 import { loadDefinition } from './dev-online.mjs';
 
-test('引数：ゲーム・手数・画面の置き場所', () => {
-    assert.deepEqual(parseArgs(['azul']), { game: 'azul', moves: 6, shots: null });
-    assert.deepEqual(parseArgs(['--moves', '3', 'go', '--shots', '/x']), { game: 'go', moves: 3, shots: '/x' });
+test('引数：ゲーム・手数・画面の置き場所・終わりまで打つか', () => {
+    assert.deepEqual(parseArgs(['azul']), { game: 'azul', moves: 6, shots: null, finish: false });
+    assert.deepEqual(parseArgs(['--moves', '3', 'go', '--shots', '/x']), { game: 'go', moves: 3, shots: '/x', finish: false });
+    assert.deepEqual(parseArgs(['azul', '--finish']), { game: 'azul', moves: 6, shots: null, finish: true });
 });
 
 test('空いているポートを重ならずに選び、8080 は使わない', async () => {

@@ -95,6 +95,9 @@ export default {
 
     isOver: (game) => game.phase === 'end',      // true になったら status を 'ended' にする
     carryOver: (game, carry) => ({ wins }),      // 対戦が終わったとき、次の対戦に残すもの（通算の勝ち数など）
+    // 省略可（1.13.0）：利用者ごとの記録に使う結果。{ winners: [席] } / { ranks: [席ごとの順位] } / { draw: true } /
+    // { coop: true, won } / null（回数だけ）。省くと game.result.standings・ranking・winners・winner から取り出す（下の「利用者ごとの記録」）
+    result: (game, room) => ({ winners: game.winners }),
 
     // CPU（共通側が、手数の上限まで、または人間の操作が必要になるまで進める）
     cpu: {
@@ -323,6 +326,15 @@ web-games では、全ゲームを1つの WebSocket の API・Lambda・テーブ
 - `createRouter({ load })`（`router.js`）：`$connect` で `?game=` を確かめ（`game-name.js` の形で、`load(name)` が handler を返すときだけ。ほかは 400）、`GAME#接続ID` に記録する。以降のメッセージと切断は、そのゲームの handler に渡す。`load` は使うゲームだけを読み込む関数（`(name) => import('../../games/' + name + '/server/src/handler.js')` なら esbuild がゲームごとに分けてまとめる）
 - `startMultiDevServer({ load })`（`dev-server.js`）：手元のテスト用サーバーを1つのポートで全ゲーム分動かす。`load(name)` はゲームの定義（かそのモジュール）を返す。保存先は1つの MemoryStore を共有し、ゲームごとに `keyPrefix` を付ける（AWS と同じ形）。知らないゲームの接続は 4004 で閉じる。web-games の `npm run dev:online` がこれを使う
 - MemoryStore も `new MemoryStore({ keyPrefix, from })` で同じ形を試せる（`from` に渡した MemoryStore と保存場所を共有する）
+
+## 利用者ごとの記録（1.13.0）
+
+ログインは名前だけ（ロビーと同じ `netplay.name`）。ゲームごとに回数・勝ち・負け・引き分けと、オンラインの相手ごとの勝ち負けを残す。
+
+- サーバー：`RoomService` の `onMatchEnd` が、対戦の終わりを保存できたときに対戦ごとに1回だけ呼ばれる。`createHandler` は、環境変数 `STATS_TABLE_NAME` と `keyPrefix` があれば `stats.js` の `createMatchRecorder` をつなぎ、人の席の結果を `DynamoStatsStore` に書く（同じ対戦は二重に数えない）
+- 結果は定義の `result` があればそれ、なければ `stats.js` の `resultOf` が決まった形の項目から取り出す。取れなければ回数だけを数える
+- HTTP API：`stats-handler.js`（`GET /stats?name=`・`POST /results`）。`startMultiDevServer` は同じポートの HTTP で、メモリの保存先で受け持つ
+- 画面：`client/user-stats.js`（ログイン・ローカル対戦の結果の待ち行列と送り直し・記録の読み込み）。デプロイしたら `DEPLOYED_STATS_URL` に API の URL を書いて同期する
 
 ## 入口とロビーの画面（netplay-lobby.js、1.10.0）
 

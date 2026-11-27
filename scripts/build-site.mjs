@@ -3,6 +3,7 @@
 //   サーバー・テスト・設定などのファイルを除いたもの）
 // - ゲームの一覧の入口のページ _site/index.html を、各ゲームの manifest と portal の情報（scripts/portal/metadata.mjs）から作る。
 //   検索・絞り込みの JS は scripts/portal/ から _site/portal/ に写す
+//   ログイン（名前だけ）と「自分の記録」の JS（scripts/portal/stats.js）も写し、netplay-kit の user-stats.js を横に置く（docs/user-stats.md）
 // - service worker が先に読むファイルが、写した先にすべてあるかを確かめる
 // 使い方: node scripts/build-site.mjs
 import { readdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, cpSync } from 'node:fs';
@@ -64,16 +65,19 @@ if (errors.length > 0) {
 }
 
 mkdirSync(join(site, PORTAL_DIR));
-for (const file of ['filter.js', 'page.js']) cpSync(join(root, 'scripts', 'portal', file), join(site, PORTAL_DIR, file));
+for (const file of ['filter.js', 'page.js', 'stats.js', 'stats-view.js']) cpSync(join(root, 'scripts', 'portal', file), join(site, PORTAL_DIR, file));
+// ログインと「自分の記録」は、ゲームと同じ netplay-kit の画面側の部品を使う（docs/user-stats.md）
+cpSync(join(root, 'packages', 'netplay-kit', 'client', 'user-stats.js'), join(site, PORTAL_DIR, 'user-stats.js'));
 
 const cards = entries.map(({ game, name, shortName, icon, color, players, online, original, aliases, genres }) => {
     // 名前・短い名前・原題・読み・フォルダ名を、区切り文字でつないで1つにする（語をまたいで当たらないように）
     const search = [name, shortName, original, ...aliases, game].map(normalize).join('/');
     const tags = [playersLabel(players), online ? 'オンライン' : ''].filter(Boolean);
-    return `            <li data-search="${escapeHtml(search)}" data-players="${players.join(' ')}" data-online="${online ? 1 : 0}" data-genres="${escapeHtml(genres.join('|'))}"><a href="${game}/" style="--color: ${escapeHtml(color)}">
+    return `            <li data-game="${escapeHtml(game)}" data-search="${escapeHtml(search)}" data-players="${players.join(' ')}" data-online="${online ? 1 : 0}" data-genres="${escapeHtml(genres.join('|'))}"><a href="${game}/" style="--color: ${escapeHtml(color)}">
                 ${icon ? `<img src="${escapeHtml(icon)}" alt="" width="72" height="72" loading="lazy">` : ''}
                 <span class="name">${escapeHtml(name)}</span>
                 ${tags.length > 0 ? `<span class="tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}
+                <span class="mine" hidden></span>
             </a></li>`;
 }).join('\n');
 
@@ -142,6 +146,33 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         .name { font-size: 0.85rem; text-align: center; line-height: 1.35; overflow-wrap: anywhere; }
         .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: auto; }
         .tags span { font-size: 0.7rem; line-height: 1.4; padding: 1px 7px; border-radius: 999px; background: var(--bg); color: var(--muted); white-space: nowrap; }
+        .mine { font-size: 0.7rem; font-weight: 600; color: var(--accent); white-space: nowrap; }
+        .mine[hidden] { display: none; }
+        .account { margin-top: 12px; display: grid; gap: 6px; }
+        .account[hidden], .account [hidden] { display: none; }
+        .account form, #account-user { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+        .account input { flex: 1 1 140px; min-width: 0; max-width: 220px; font: inherit; font-size: 1rem; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: inherit; }
+        .account button, #stats-dialog button { font: inherit; font-size: 0.85rem; padding: 6px 12px; min-height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: inherit; cursor: pointer; }
+        .account button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+        #account-name { font-weight: 600; margin-right: 4px; }
+        #account-note { margin: 0; font-size: 0.8rem; color: var(--muted); }
+        #stats-dialog { width: min(560px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); padding: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--card); color: var(--fg); }
+        #stats-dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+        .stats-head { position: sticky; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 16px; background: var(--card); border-bottom: 1px solid var(--line); }
+        .stats-head h2 { margin: 0; font-size: 1.1rem; }
+        #stats-body { padding: 8px 16px 16px; }
+        .stats-total, .stats-empty { margin: 4px 0 10px; font-size: 0.9rem; color: var(--muted); }
+        .stats-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .stats-table th, .stats-table td { padding: 6px 4px; border-bottom: 1px solid var(--line); vertical-align: top; }
+        .stats-table thead th { font-size: 0.75rem; color: var(--muted); font-weight: 600; text-align: right; }
+        .stats-table thead th:first-child, .stats-table tbody th { text-align: left; }
+        .stats-table td { text-align: right; font-variant-numeric: tabular-nums; width: 3em; }
+        .stats-table tbody th a { color: inherit; font-weight: 600; }
+        .stats-table small { display: block; font-weight: 400; font-size: 0.7rem; color: var(--muted); }
+        .vs { list-style: none; margin: 4px 0 0; padding: 0; font-weight: 400; font-size: 0.75rem; color: var(--muted); display: grid; gap: 2px; }
+        .vs li { display: flex; gap: 6px; align-items: baseline; }
+        .vs .cpu { font-size: 0.65rem; padding: 0 5px; border-radius: 999px; border: 1px solid var(--line); }
+        .vs-record { margin-left: auto; white-space: nowrap; }
         @media (max-width: 480px) {
             #filters, #filter-groups { gap: 8px; }
             .group { flex-wrap: nowrap; align-items: flex-start; gap: 8px; }
@@ -157,7 +188,23 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
     <header>
         <h1>web-games</h1>
         <p>ブラウザで遊べるゲーム ${entries.length} 本</p>
+        <div id="account" class="account" hidden>
+            <form id="login-form">
+                <input type="text" id="login-name" maxlength="12" placeholder="名前" aria-label="ログインの名前" autocomplete="nickname" enterkeyhint="done">
+                <button type="submit" class="primary">ログイン</button>
+            </form>
+            <div id="account-user" hidden>
+                <span id="account-name"></span>
+                <button type="button" id="stats-open" class="primary">自分の記録</button>
+                <button type="button" id="logout">ログアウト</button>
+            </div>
+            <p id="account-note" hidden></p>
+        </div>
     </header>
+    <dialog id="stats-dialog" aria-labelledby="stats-title">
+        <div class="stats-head"><h2 id="stats-title">自分の記録</h2><button type="button" id="stats-close">閉じる</button></div>
+        <div id="stats-body"></div>
+    </dialog>
     <section id="filters" aria-label="検索と絞り込み" hidden>
         <form role="search">
             <input type="search" id="q" placeholder="名前で探す（例：かたん、Azul）" aria-label="ゲームの名前で探す" autocomplete="off" enterkeyhint="search">
@@ -183,6 +230,7 @@ ${cards}
         </div>
     </main>
     <script type="module" src="${PORTAL_DIR}/page.js"></script>
+    <script type="module" src="${PORTAL_DIR}/stats.js"></script>
 </body>
 </html>
 `);

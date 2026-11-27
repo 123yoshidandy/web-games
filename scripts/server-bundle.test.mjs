@@ -26,8 +26,29 @@ export class GetCommand extends Command {}
 export class PutCommand extends Command {}
 export class DeleteCommand extends Command {}
 export class ScanCommand extends Command {}
+export class TransactWriteCommand extends Command {}
 const copy = (item) => item && structuredClone(item);
+// 利用者ごとの記録（dynamo-stats-store.js）：印の Put（なければだけ）と、SET・ADD の Update を、まとめて行う
+const transact = ({ TransactItems }) => {
+    const [first] = TransactItems;
+    if (first.Put && fake.items.has(first.Put.Item.pk)) {
+        throw Object.assign(new Error('canceled'), { name: 'TransactionCanceledException', CancellationReasons: [{ Code: 'ConditionalCheckFailed' }] });
+    }
+    for (const { Put, Update } of TransactItems) {
+        if (Put) fake.items.set(Put.Item.pk, copy(Put.Item));
+        if (!Update) continue;
+        const item = fake.items.get(Update.Key.pk) ?? { ...Update.Key };
+        const names = Update.ExpressionAttributeNames;
+        const values = Update.ExpressionAttributeValues;
+        const [, sets, adds] = Update.UpdateExpression.match(/^SET (.*) ADD (.*)$/);
+        for (const part of sets.split(', ')) { const [n, v] = part.split(' = '); item[names[n]] = values[v]; }
+        for (const part of adds.split(', ')) { const [n, v] = part.split(' '); item[names[n]] = (item[names[n]] ?? 0) + values[v]; }
+        fake.items.set(Update.Key.pk, item);
+    }
+    return {};
+};
 const send = async (command) => {
+    if (command instanceof TransactWriteCommand) return transact(command.input);
     const { Key, Item, ConditionExpression, ExpressionAttributeValues: values = {} } = command.input;
     if (command instanceof GetCommand) return { Item: copy(fake.items.get(Key.pk)) };
     if (command instanceof DeleteCommand) { fake.items.delete(Key.pk); return {}; }
@@ -64,6 +85,7 @@ export class ApiGatewayManagementApiClient {
 let dir;
 let built;
 let handler;
+let statsHandler;
 let fake;
 
 const event = (routeKey, connectionId, { game, body } = {}) => ({
@@ -82,7 +104,9 @@ before(async () => {
         writeFileSync(join(pkgDir, 'index.js'), source);
     }
     process.env.TABLE_NAME = 'web-games-online-test';
+    process.env.STATS_TABLE_NAME = 'web-games-online-stats-test';
     ({ handler } = await import(pathToFileURL(join(dir, 'dist', 'handler.mjs')).href));
+    ({ handler: statsHandler } = await import(pathToFileURL(join(dir, 'dist', 'stats-handler.mjs')).href));
     fake = globalThis.__fakeAws;
 });
 
@@ -136,6 +160,19 @@ test('前からの7本も、部屋のキーにゲームの名前が付く（keyP
         assert.ok(fake.items.has(`ROOM#${game}#${roomCode}`), game);
         assert.equal(fake.items.has(`ROOM#${roomCode}`), false, game);
     }
+});
+
+test('記録の API（stats-handler.mjs）：ローカルの結果を受け取り、同じ id は1回だけ数え、名前で読める', async () => {
+    const http = (method, rawPath, { query, body } = {}) => statsHandler({
+        rawPath, queryStringParameters: query, requestContext: { http: { method } }, body: body && JSON.stringify(body)
+    });
+    const body = { id: 'azul-bundle-1', name: 'バンドル', game: 'azul', outcome: 'win' };
+    assert.deepEqual(JSON.parse((await http('POST', '/results', { body })).body), { ok: true, duplicate: false });
+    assert.deepEqual(JSON.parse((await http('POST', '/results', { body })).body), { ok: true, duplicate: true });
+    const response = await http('GET', '/stats', { query: { name: 'バンドル' } });
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body).games.azul, { plays: 1, wins: 1, losses: 0, draws: 0, online: 0, vs: [] });
+    assert.ok(fake.items.has('RESULT#local:azul:バンドル:azul-bundle-1'));
 });
 
 test('全ゲームの chunk が読み込めて、つなげる', async () => {
