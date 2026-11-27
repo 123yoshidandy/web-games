@@ -21,6 +21,14 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff } from './anim.js';
+
+// 動きの目印：タイルは場所、線は「線:何本目」、数は欄ごとの何番目か
+const TILES = { key: el => el.getAttribute('data-slot'), value: el => el.innerHTML };
+const LINKS = { key: el => el.getAttribute('data-link'), value: () => '' };
+const AMOUNTS = '#players .pstats, #market-info .mk, #era-info span';
+const amountKey = el => `${el.closest('[data-seat]')?.dataset.seat ?? el.parentElement.id}:${[...el.parentElement.children].indexOf(el)}`;
 
 const SETTINGS_KEY = 'brass-birmingham.settings';
 const CPU_NAMES = ['ワット', 'ボールトン', 'ダーウィン'];
@@ -77,6 +85,7 @@ export default class UI {
         this.lastEra = null;
         this.map = new MapView($('#map'), { onPick: (kind, id) => this.onMapPick(kind, id) });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'ブラス：バーミンガム',
@@ -166,6 +175,9 @@ export default class UI {
         // オンライン対戦のビューは新しい記録だけを運ぶので、記録の一覧のためにためておく
         const known = this.logHistory.at(-1)?.seq ?? 0;
         this.logHistory.push(...this.view.logs.filter(l => l.seq > known));
+        // 記録が増えた（手が進んだ）ときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+        const moved = (this.logHistory.at(-1)?.seq ?? 0) !== known;
+        const before = moved ? this.captureMotion() : null;
         this.playSounds(this.view, state.era !== this.lastEra);
         if (state.era !== this.lastEra) {
             this.lastEra = state.era;
@@ -174,8 +186,32 @@ export default class UI {
         }
         if (this.view.current !== this.view.seat) this.mode = null;
         this.render();
+        if (moved) this.animateMotion(before);
         this.recordLocalResult(this.view);
-        if (this.view.over) setTimeout(() => this.showResult(), 700);
+        // 結果の画面は、最後の手の動きが終わってから出す
+        if (this.view.over) Motion.afterIdle(() => this.showResult(), 700);
+    }
+
+    // ---- 動き（描き直しの前後の差） ----
+
+    // 描き直す前：地図のタイルと線・各プレイヤーと市場の数
+    captureMotion() {
+        return {
+            tiles: snapshot($('#map'), '.tile[data-slot]', TILES),
+            links: snapshot($('#map'), '.built-link[data-link]', LINKS),
+            amounts: snapshot(document, AMOUNTS, { key: amountKey })
+        };
+    }
+
+    // 描いたあと：建てたタイルははねて出し、裏返った・石炭や鉄が減ったタイルは目立たせ、
+    // 引いた運河・鉄道は現れ、点・お金・収入・市場の値の変化を目立たせる
+    animateMotion(before) {
+        animateDiff(before.tiles, $('#map'), '.tile[data-slot]', {
+            ...TILES,
+            change: el => Motion.pulse(el, { duration: 380, scale: 1.15 })
+        });
+        animateDiff(before.links, $('#map'), '.built-link[data-link]', { ...LINKS, enter: el => Motion.fadeIn(el, { duration: 360 }) });
+        animateDiff(before.amounts, document, AMOUNTS, { key: amountKey });
     }
 
     // 効果音：前の更新からの記録を見て、1回の更新に1つだけ鳴らす

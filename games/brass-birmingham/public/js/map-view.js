@@ -124,14 +124,16 @@ export default class MapView {
         built.replaceChildren();
         for (const [id, owner] of Object.entries(state.links)) {
             const { segs } = linkSegments(LINK_BY_ID[id]);
-            segs.forEach(([a, b]) => {
-                built.append(el('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: `built-link ${state.era}`, stroke: PLAYER_COLORS[owner] }));
+            segs.forEach(([a, b], i) => {
+                built.append(el('line', { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: `built-link ${state.era}`, stroke: PLAYER_COLORS[owner], 'data-link': `${id}:${i}` }));
             });
         }
         tiles.replaceChildren();
         for (const [slot, tile] of Object.entries(state.board)) {
             const [loc, idx] = slot.split(':');
-            tiles.append(this.tileNode(slotRect(loc, Number(idx)), tile));
+            const node = this.tileNode(slotRect(loc, Number(idx)), tile);
+            node.setAttribute('data-slot', slot); // 動き（ui.js）が、前に描いたタイルと比べる目印
+            tiles.append(node);
         }
         merchants.replaceChildren();
         for (const [m, def] of Object.entries(MERCHANTS)) {

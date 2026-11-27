@@ -82,6 +82,14 @@ button:disabled { cursor: default; }
 .segment button { flex: 1; padding: 10px 0; background: transparent; border: 0; font-size: 15px; }
 .segment button + button { border-left: 1px solid var(--panel-line); }
 .segment button.on { background: var(--brass); color: #1f1712; font-weight: 700; }
+/* 動きの速さ（共通の部品 motion の切り替え）を、人数・CPU の切り替えと同じ見た目にする */
+#motion-setting, #motion-setting .motion-speed { flex: 1; display: flex; }
+#motion-setting .motion-speed-options { flex: 1; display: flex; gap: 0; padding: 0; background: none; border: 1px solid var(--panel-line); border-radius: 10px; overflow: hidden; }
+#motion-setting .motion-speed button { flex: 1; padding: 10px 0; border: 0; border-radius: 0; background: transparent; font-size: 15px; color: inherit; }
+#motion-setting .motion-speed button + button { border-left: 1px solid var(--panel-line); }
+#motion-setting .motion-speed button[aria-pressed="true"] { background: var(--brass); color: #1f1712; font-weight: 700; }
+/* 地図のタイルが弾む・目立つ動きは、タイルの中心を基準にする */
+#map .tile { transform-box: fill-box; transform-origin: center; }
 
 .buttons { display: flex; gap: 10px; justify-content: center; }
 .setup .buttons { flex-direction: column; }
