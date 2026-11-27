@@ -249,8 +249,16 @@ export async function runE2E({ game, moves: requestedMoves = 6, shots = null, fi
             const vsA = mineB?.vs.find((o) => o.name === 'あお' && !o.cpu);
             check.ok('終わると A・B の両方の記録が1回ずつ増える（オンライン）', mineA?.plays === 1 && mineA.online === 1 && mineB?.plays === 1 && mineB.online === 1,
                 JSON.stringify({ A: mineA, B: mineB }));
-            check.ok('A・B の相手ごとの勝ち負けが互いに逆になる', Boolean(vsA && vsB) && vsB.wins === vsA.losses && vsB.losses === vsA.wins && vsB.draws === vsA.draws,
-                JSON.stringify({ vsB, vsA }));
+            // 協力のゲーム（定義の result が { coop: true }）は全員が同じ結果で、相手ごとの記録は残さない（docs/user-stats.md）
+            const ended = dev.store.rooms.get(roomKey);
+            const coop = definition.result?.(definition.restore ? definition.restore(structuredClone(ended.game), ended) : ended.game, ended)?.coop === true;
+            if (coop) {
+                check.ok('協力：A・B が同じ結果で、相手ごとの記録はない', mineA?.wins === mineB?.wins && mineA?.losses === mineB?.losses && !vsA && !vsB,
+                    JSON.stringify({ A: mineA, B: mineB }));
+            } else {
+                check.ok('A・B の相手ごとの勝ち負けが互いに逆になる', Boolean(vsA && vsB) && vsB.wins === vsA.losses && vsB.losses === vsA.wins && vsB.draws === vsA.draws,
+                    JSON.stringify({ vsB, vsA }));
+            }
             const outcomes = [mineA, mineB].map((s) => (s.wins ? 'win' : s.losses ? 'loss' : s.draws ? 'draw' : '?'));
             console.log(`記録：あお ${outcomes[0]}・みどり ${outcomes[1]}`);
         }
