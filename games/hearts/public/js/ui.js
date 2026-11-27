@@ -16,6 +16,7 @@ import { getServerUrl } from './online-config.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, suitIcon, cardHtml } from './art.js';
 import { fly, rectOf, reducedMotion } from './animator.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'hearts';
 const SETTINGS_KEY = 'hearts.settings';
@@ -308,8 +309,10 @@ export default class UI {
         const event = this.queue.shift();
         const delay = this.step(event);
         if (delay === null) return;
-        if (delay === 0) return this.pump();
-        this.timer = setTimeout(() => this.pump(), delay);
+        const wait = Motion.ms(delay);
+        if (wait === 0) return this.pump();
+        Motion.hold(delay);
+        this.timer = setTimeout(() => this.pump(), wait);
     }
 
     fromView(view) {
@@ -455,13 +458,13 @@ export default class UI {
         if (reducedMotion()) return;
         document.querySelectorAll('#hand .card').forEach((el, i) => {
             el.animate([{ transform: 'translateY(-30px)', opacity: 0 }, { transform: 'none', opacity: 1 }],
-                { duration: 260, delay: i * 25, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
+                { duration: Motion.ms(260), delay: Motion.ms(i * 25), easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
         });
     }
 
     bump(el) {
         if (!el || reducedMotion()) return;
-        el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)', offset: 0.4 }, { transform: 'scale(1)' }], { duration: 320, delay: 380 });
+        el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06)', offset: 0.4 }, { transform: 'scale(1)' }], { duration: Motion.ms(320), delay: Motion.ms(380) });
     }
 
     // 再生が終わったあと：選んでいた札を、今できることに合わせる。終わっていれば結果を出す

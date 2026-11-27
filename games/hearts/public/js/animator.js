@@ -1,11 +1,13 @@
 /**
  * 要素の複製を、元の位置から行き先へ飛ばす
- * 動きを減らす設定のときは動かさない
+ * 動きの速さが「なし」のとき（動きを減らす設定のときも）は動かさない
  */
+
+import * as Motion from './motion/motion.js';
 
 const DURATION_MS = 480;
 
-export const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+export const reducedMotion = () => !Motion.enabled();
 
 export const rectOf = (el) => {
     const rect = el?.getBoundingClientRect();
@@ -35,11 +37,12 @@ export function fly(html, from, to, { delay = 0, hide = null, size = null } = {}
         { transform: 'translate(0, 0) scale(1)' },
         { transform: `translate(${dx / 2}px, ${dy / 2 + lift}px) scale(${(1 + scale) / 2})`, offset: 0.5 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})` }
-    ], { duration: DURATION_MS, delay, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+    ], { duration: Motion.ms(DURATION_MS), delay: Motion.ms(delay), easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
     const done = () => {
         el.remove();
         if (hide) hide.style.visibility = '';
     };
+    Motion.track(animation, Motion.ms(DURATION_MS + delay));
     animation.finished.then(done, done);
     // 裏のタブなどで終わりが来なくても、必ず消す
     setTimeout(done, DURATION_MS + delay + 400);
