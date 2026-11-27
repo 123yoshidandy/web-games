@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1b2130">
+    <title>リコシェロボット</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="リコシェロボット">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- タイトル -->
+    <section id="screen-title" class="screen">
+        <div class="title-inner">
+            <h1 class="logo">RICOCHET<span>ROBOTS</span></h1>
+            <p class="logo-sub">リコシェロボット</p>
+            <div id="title-art" class="title-art" aria-hidden="true"></div>
+            <div class="settings">
+                <div class="setting">
+                    <span class="setting-label">遊び方</span>
+                    <div class="segment" id="mode-select">
+                        <button type="button" data-value="race">CPU と早解き</button>
+                        <button type="button" data-value="solo">ひとりで練習</button>
+                    </div>
+                </div>
+                <div class="setting race-only">
+                    <span class="setting-label">相手</span>
+                    <div class="segment" id="count-select">
+                        <button type="button" data-value="2">1人</button>
+                        <button type="button" data-value="3">2人</button>
+                        <button type="button" data-value="4">3人</button>
+                    </div>
+                </div>
+                <div class="setting race-only">
+                    <span class="setting-label">CPU</span>
+                    <div class="segment" id="level-select">
+                        <button type="button" data-level="easy" data-value="easy">やさしい</button>
+                        <button type="button" data-level="normal" data-value="normal">ふつう</button>
+                        <button type="button" data-level="hard" data-value="hard">つよい</button>
+                    </div>
+                </div>
+                <div class="setting">
+                    <span class="setting-label">目標</span>
+                    <div class="segment" id="targets-select">
+                        <button type="button" data-value="5">5枚</button>
+                        <button type="button" data-value="9">9枚</button>
+                        <button type="button" data-value="17">17枚</button>
+                    </div>
+                </div>
+                <div class="setting">
+                    <span class="setting-label">銀</span>
+                    <div class="segment" id="silver-select">
+                        <button type="button" data-value="off">なし</button>
+                        <button type="button" data-value="on">あり（じゃま役）</button>
+                    </div>
+                </div>
+            </div>
+            <p id="best-record" class="best-record" hidden></p>
+            <div class="title-buttons">
+                <button type="button" id="start-button" class="btn btn-primary">はじめる</button>
+                <button type="button" id="resume-button" class="btn btn-secondary" hidden>続きから</button>
+                <!-- オンライン対戦の接続先がないとき（デプロイ前の公開ページ）は隠す -->
+                <button type="button" id="online-button" class="btn btn-secondary" hidden>オンラインで遊ぶ</button>
+            </div>
+            <div class="title-links">
+                <a class="portal-link" href="../">← ゲーム一覧</a>
+                <button type="button" id="open-help-title" class="link-btn" data-action="help">遊び方</button>
+                <button type="button" id="replay-title" class="link-btn" data-action="replay" hidden>前回のリプレイ</button>
+                <button type="button" class="link-btn sound-toggle" aria-pressed="true">サウンド</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- プレイ中 -->
+    <section id="screen-game" class="screen" hidden>
+        <header id="topbar">
+            <button type="button" id="home" class="icon-btn" data-action="home" aria-label="ホーム" title="ホーム">
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+            </button>
+            <div id="round-label" class="round-label"></div>
+            <button type="button" class="icon-btn sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg></button>
+            <button type="button" id="hint" class="icon-btn" data-action="hint" aria-label="ヒント" title="ヒント"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>
+            <button type="button" id="open-log" class="icon-btn" data-action="log" aria-label="記録" title="記録"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/></svg></button>
+            <button type="button" id="open-help-game" class="icon-btn" data-action="help" aria-label="遊び方" title="遊び方">
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.3a2.8 2.8 0 1 1 3.9 2.6c-.8.4-1.2 1-1.2 1.9v.6"/><circle cx="12" cy="17.3" r=".6" fill="currentColor"/></svg>
+            </button>
+        </header>
+        <main id="play">
+            <div id="status" class="status">
+                <span id="status-target" class="status-target" aria-hidden="true"></span>
+                <span id="status-text" class="status-text"></span>
+                <span id="timer" class="timer"></span>
+            </div>
+            <div id="board-wrap" class="board-wrap">
+                <svg id="board" class="board" viewBox="-1 -1 162 162" role="img" aria-label="盤面"></svg>
+            </div>
+            <div id="side">
+                <div id="players" class="players"></div>
+                <div id="controls" class="controls"></div>
+            </div>
+        </main>
+        <div id="toast" class="toast" hidden></div>
+    </section>
+
+    <!-- 記録 -->
+    <dialog id="log" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">記録</h2>
+            <ol id="log-list" class="log-list"></ol>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-log">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- ヒント -->
+    <dialog id="hint-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 class="sheet-title">ヒント</h2>
+            <p class="sheet-note">どちらも、使うと1点引かれます（1つの目標で、種類ごとに1回）。</p>
+            <div class="hint-choices">
+                <button type="button" class="btn btn-secondary" data-action="hint-first">最初の1手を見る</button>
+                <button type="button" class="btn btn-secondary" data-action="hint-count">最短の手数を見る</button>
+            </div>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-hint">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="sheet">
+        <div class="sheet-body" tabindex="-1" autofocus>
+            <h2 id="result-title" class="sheet-title"></h2>
+            <div id="result-body"></div>
+            <div class="sheet-buttons wrap">
+                <button type="button" class="btn btn-secondary" data-action="close-result">盤面を見る</button>
+                <button type="button" id="result-replay" class="btn btn-secondary" data-action="replay">リプレイ</button>
+                <button type="button" id="result-home" class="btn btn-secondary" data-action="home">タイトルへ</button>
+                <button type="button" class="btn btn-primary" data-action="rematch">もう一度</button>
+            </div>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="sheet help">
+        <div class="sheet-body" id="help" tabindex="-1" autofocus>
+            <h2 class="sheet-title">遊び方</h2>
+            <section>
+                <h3>目的</h3>
+                <p>めくられた目標のマスに、<b>同じ色のロボット</b>を止める手順を、だれよりも早く、少ない手数で見つけます。</p>
+            </section>
+            <section>
+                <h3>ロボットの動き</h3>
+                <p>ロボットは上下左右のどれかに、<b>壁かほかのロボットに当たるまで</b>滑ります。途中では止まれません。1回動かすと1手です。ほかの色のロボットを先に動かして、止まるための壁代わりにしてもかまいません。</p>
+                <div id="help-art" class="help-art" aria-hidden="true"></div>
+                <p>渦の目標は、どのロボットで止めてもよい目標です。銀のロボットは目標を持たない、じゃま役です。</p>
+            </section>
+            <section>
+                <h3>早解き</h3>
+                <ul>
+                    <li>目標がめくられたら、全員が同時に考えます。手順を見つけたら、手数の数字を押して<b>宣言</b>します</li>
+                    <li>最初の宣言で、<b>60秒の砂時計</b>が動き出します。その間は、だれでも（自分も）もっと少ない手数を宣言できます</li>
+                    <li>時間切れになると、少ない手数を宣言した人から<b>実演</b>します（同じ手数なら先に宣言した人）。宣言した手数以内で止められたら、目標のチップを1枚もらいます。ロボットはそのまま残ります</li>
+                    <li>実演に失敗したら、ロボットを戻して次の人が実演します</li>
+                    <li>もう宣言しないときは「パス」。全員がパスすると、砂時計を待たずに先へ進みます</li>
+                    <li>目標をすべてめくったら終わり。チップの多い人の勝ちです</li>
+                </ul>
+            </section>
+            <section>
+                <h3>操作</h3>
+                <p>ロボットを押すと、動ける向きに矢印が出ます。矢印を押すか、ロボットをその向きへ払います。考えている間は<b>試しに動かせます</b>（本当の盤面は変わりません。うすい影が元の位置です）。試しで着いたら、その手数のボタンが光ります。</p>
+            </section>
+            <section>
+                <h3>ひとりで練習</h3>
+                <p>自分でロボットを動かして目標に止めます。最短の手数と同じなら3点、1手多いごとに1点減ります。かかった時間も記録し、ベストを残します。</p>
+            </section>
+            <section>
+                <h3>ヒント</h3>
+                <p>電球のボタンで、最短の手順の<b>最初の1手</b>か、<b>最短の手数</b>を見られます。使うと1点引かれます（オンライン対戦では使えません）。</p>
+            </section>
+            <div class="sheet-buttons">
+                <button type="button" class="btn btn-primary" data-action="close-help">閉じる</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

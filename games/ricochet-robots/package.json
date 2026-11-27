@@ -1,0 +1,24 @@
+{
+  "name": "ricochet-robots",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "portal": {
+    "original": "Ricochet Robots",
+    "aliases": [
+      "ハイパーロボット",
+      "Rasende Roboter"
+    ],
+    "genres": [
+      "パズル",
+      "ボードゲーム"
+    ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  }
+}

@@ -1,0 +1,19 @@
+{
+    "name": "リコシェロボット",
+    "short_name": "リコシェロボット",
+    "description": "ロボットを跳ね返らせて目標に止める手順を、だれより早く見つける早解きパズル「リコシェロボット」",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "orientation": "portrait",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#1b2130",
+    "theme_color": "#1b2130",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}
