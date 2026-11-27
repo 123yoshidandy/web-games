@@ -1,0 +1,20 @@
+{
+  "name": "flash-point",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs 40 4 all"
+  },
+  "portal": {
+    "original": "Flash Point: Fire Rescue",
+    "genres": [
+      "ボードゲーム",
+      "協力"
+    ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  }
+}
