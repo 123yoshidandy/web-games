@@ -112,7 +112,7 @@ export default class MapView {
                 const a = (-90 + i * 120) * Math.PI / 180;
                 const x = p.x + Math.cos(a) * 5.2;
                 const y = p.y + Math.sin(a) * 5.2;
-                layer.append(el('path', { d: `M${(x - 4.6).toFixed(1)} ${(y + 4).toFixed(1)}v-4.4l4.6-4 4.6 4v4.4z`, fill: PLAYER_COLORS[seat], class: 'house' }));
+                layer.append(el('path', { d: `M${(x - 4.6).toFixed(1)} ${(y + 4).toFixed(1)}v-4.4l4.6-4 4.6 4v4.4z`, fill: PLAYER_COLORS[seat], class: 'house', 'data-house': `${city}:${seat}` }));
             });
         });
         marks.replaceChildren();

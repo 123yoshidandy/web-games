@@ -13,6 +13,8 @@ import { symbolsSvg, plantHtml, resIcon, PLAYER_COLORS } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff, flyIn } from './anim.js';
 import { getServerUrl } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
@@ -25,6 +27,13 @@ const COMMAND_SOUND = { choose: 'place', bid: 'place', skip: 'select', pass: 'se
 const SETTINGS_KEY = 'power-grid.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン', 'ユイ'];
 const RESULT_DELAY_MS = 900;
+
+// 動きの目印：家は「都市:席」、発電所は番号、数は欄ごとの何番目か
+const HOUSE_MOTION = { key: el => el.dataset.house, value: () => '' };
+const PLANTS = { key: el => el.dataset.plant, value: () => '' };
+const OWNED = { key: el => `${el.closest('[data-seat]')?.dataset.seat}:${el.textContent}`, value: () => '' };
+const AMOUNTS = '#players .pl-money, #players .pl-cities, #phase .res-summary > span, #phase .res-left, #mine .mine-cap';
+const amountKey = el => `${el.closest('[data-seat]')?.dataset.seat ?? el.parentElement.className}:${el.className}:${[...el.parentElement.children].indexOf(el)}`;
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -84,6 +93,7 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     }
 
     // ---- 画面の切り替え ----
@@ -128,7 +138,7 @@ export default class UI {
     // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
     beginGame(controller) {
         if (this.controller !== controller) this.controller?.stop();
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         this.controller = controller;
@@ -155,7 +165,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -365,6 +375,10 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        // 手が進んだときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+        const prev = this.view;
+        const moved = Boolean(prev) && view.commandCount !== prev.commandCount;
+        const before = moved ? this.captureMotion() : null;
         this.view = view;
         this.trackEvents(view);
         const a = view.auction;
@@ -389,8 +403,10 @@ export default class UI {
         this.renderPhase(view);
         this.renderMine(view);
         if ($('#log').open) this.renderLog();
+        if (moved) this.animateMotion(before);
+        // 結果の画面は、最後の手の動きが終わってから出す
         if (view.phase === 'end' && !this.resultTimer && !$('#result').open) {
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.resultTimer = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
     }
 
@@ -418,12 +434,35 @@ export default class UI {
         $('#status').innerHTML = `<span class="round">${view.round}巡・段階${view.step}</span><span class="phase-name">${PHASE_NAMES[view.phase] ?? ''}</span>${who}`;
     }
 
+    // ---- 動き（描き直しの前後の差） ----
+
+    // 描き直す前：地図の家・発電所の市場と自分の発電所・各プレイヤーの発電所・数
+    captureMotion() {
+        return {
+            houses: snapshot(document, '#map .house[data-house]', HOUSE_MOTION),
+            market: snapshot($('#market'), '[data-plant]', PLANTS),
+            mine: snapshot($('#mine'), '[data-plant]', PLANTS),
+            owned: snapshot($('#players'), '.pl-plants > i', OWNED),
+            amounts: snapshot(document, AMOUNTS, { key: amountKey })
+        };
+    }
+
+    // 描いたあと：建てた家は地図に現れ（SVG なので大きさは変えない）、競り落とした発電所は市場から自分の欄へ飛ばし、
+    // 市場に出た発電所とほかの人が持った発電所ははねて出し、お金・都市・資源の残りの変化を目立たせる
+    animateMotion(before) {
+        animateDiff(before.houses, document, '#map .house[data-house]', { ...HOUSE_MOTION, enter: el => Motion.fadeIn(el, { duration: 360 }) });
+        animateDiff(before.market, $('#market'), '[data-plant]', PLANTS);
+        animateDiff(before.mine, $('#mine'), '[data-plant]', { ...PLANTS, enter: (el, num) => flyIn(el, before.market.get(num)?.rect ?? null) });
+        animateDiff(before.owned, $('#players'), '.pl-plants > i', OWNED);
+        animateDiff(before.amounts, document, AMOUNTS, { key: amountKey });
+    }
+
     renderPlayers(view) {
         $('#players').style.setProperty('--n', view.players.length);
         $('#players').innerHTML = view.order.map(seat => {
             const p = view.players[seat];
             const acting = view.actors.includes(seat);
-            return `<div class="pl${acting ? ' acting' : ''}" style="--c:${PLAYER_COLORS[seat]}">
+            return `<div class="pl${acting ? ' acting' : ''}" data-seat="${seat}" style="--c:${PLAYER_COLORS[seat]}">
                 <div class="pl-top"><span class="pl-name">${escapeHtml(p.name)}</span><b class="pl-money">${p.money}</b></div>
                 <div class="pl-bottom"><span class="pl-cities" title="都市">⌂${p.cities}</span><span class="pl-plants">${p.plants.map(n => `<i>${n}</i>`).join('')}</span></div>
             </div>`;

@@ -8,6 +8,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_DELAY_MS = 450;       // CPU は1手ずつ、間を置いて打つ
 const SAVE_KEY = 'power-grid.save';
@@ -36,7 +37,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.hold = false;
         this.save();
@@ -86,10 +87,11 @@ export default class LocalGameController {
 
     // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (this.hold || !isCpuTurn(this.game)) return;
         const delay = CPU_DELAY_MS;
-        this.cpuTimer = setTimeout(() => {
+        // 画面の動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 const before = this.game.commands.length;
                 runCpuStep(this.game);
@@ -121,6 +123,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

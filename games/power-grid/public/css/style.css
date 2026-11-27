@@ -50,6 +50,10 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .3); flex: none; }
 .segmented button { min-width: 40px; height: 36px; padding: 0 10px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
 .segmented button[aria-checked="true"] { color: #2a1f02; background: var(--gold); }
+/* 動きの速さ（共通の部品 motion の切り替え）を、人数・CPU の切り替えと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; gap: 0; border: none; border-radius: 10px; background: rgba(0, 0, 0, .3); }
+#motion-setting .motion-speed button { min-width: 40px; height: 36px; padding: 0 10px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #2a1f02; background: var(--gold); }
 
 /* ---- 発電所カード ---- */
 .plant { position: relative; flex: none; display: grid; grid-template-rows: 1fr 14px; width: 42px; height: 52px; padding: 2px 3px; border-radius: 6px; background: linear-gradient(#f4f1e8, #d9d4c6); color: #20242c; box-shadow: 0 2px 3px rgba(0, 0, 0, .45); overflow: hidden; }
