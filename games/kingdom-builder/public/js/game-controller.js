@@ -5,6 +5,7 @@
  * 自分の番の中なら、undo() で1手戻せる（記録の最後の操作を除いて作り直す）
  */
 
+import * as Motion from './motion/motion.js';
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
@@ -36,7 +37,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.save();
     }
@@ -106,9 +107,10 @@ export default class LocalGameController {
 
     // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (!isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        // 盤の動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 const before = this.game.commands.length;
                 runCpuStep(this.game);
@@ -140,6 +142,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

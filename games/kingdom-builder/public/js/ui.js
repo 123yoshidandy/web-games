@@ -9,6 +9,8 @@ import { buildTargets, tileTargets, moveSources, usableTiles } from './rules.js'
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import * as PieceMotion from './piece-motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
@@ -47,8 +49,8 @@ export default class UI {
         this.mode = null;            // 場所タイルを使う途中 { tile, from }
         this.recent = new Set();     // 自分の前の番のあとに、ほかの人が建てた家
         this.seenCommands = 0;
-        this.resultTimer = null;
-        this.endTimer = null;
+        this.cancelResult = null;
+        this.cancelEnd = null;
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'キングダムビルダー',
@@ -77,6 +79,7 @@ export default class UI {
             onInfo: (cell) => this.info(cell)
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     }
 
     // ---- 画面の切り替え ----
@@ -119,6 +122,7 @@ export default class UI {
         this.mode = null;
         this.recent = new Set();
         this.seenCommands = this.controller.getView().commandCount;
+        this.animateNext = false; // 前の対戦の盤との差も動かさない
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
@@ -143,15 +147,15 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
-        clearTimeout(this.endTimer);
-        this.resultTimer = null;
+        this.cancelResult?.();
+        this.cancelEnd?.();
+        this.cancelResult = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
     send(command) {
         if (!this.controller) return false;
-        clearTimeout(this.endTimer);
+        this.cancelEnd?.();
         return this.controller.send(command);
     }
 
@@ -197,7 +201,7 @@ export default class UI {
             if (event.target.closest('#end-turn')) return this.send({ type: 'end' });
             if (event.target.closest('#hint')) return this.showHint();
             if (event.target.closest('#undo')) {
-                clearTimeout(this.endTimer);
+                this.cancelEnd?.();
                 this.mode = null;
                 if (this.controller?.undo()) music.play('cancel');
             }
@@ -325,6 +329,9 @@ export default class UI {
         this.trackRecent(view);
         if (this.mode && (!this.myTurn(view) || !usableTiles(view, view.you).includes(this.mode.tile))) this.mode = null;
         const { pick, kind } = this.picking(view);
+        // 描き直す前に家・点の位置を測り、描いたあとで前との差を動かす
+        const before = this.animateNext ? PieceMotion.measure($('#screen-game')) : null;
+        this.animateNext = true;
         this.board.setMap(view.terrain, view.locations);
         this.board.render({
             owner: view.owner,
@@ -339,9 +346,11 @@ export default class UI {
         this.renderPlayers(view);
         this.renderCards(view);
         this.renderMine(view);
+        PieceMotion.animate(before, $('#screen-game'));
         this.scheduleAutoEnd(view);
-        if (view.phase === 'end' && !this.resultTimer && !$('#result').open) {
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+        if (view.phase === 'end' && !this.cancelResult && !$('#result').open) {
+            // 盤の動きが終わってから出す
+            this.cancelResult = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
         if ($('#log').open) this.renderLog();
     }
@@ -430,8 +439,8 @@ export default class UI {
         $('#players').innerHTML = view.players.map((p, i) => {
             const tiles = p.tiles.map(t => `<span class="${t.fresh || t.used ? 'dim' : ''}">${locationHex(t.type, 15)}</span>`).join('');
             return `<div class="pl${i === view.active && view.phase === 'play' ? ' active' : ''}" style="--c:${PLAYER_COLORS[i]}">
-                <div class="pl-top">${houseSvg(i, 13)}<span class="pl-name">${escapeHtml(p.name)}</span><b class="pl-score">${view.scores[i].total}</b></div>
-                <div class="pl-bottom"><span class="pl-supply">${houseSvg(i, 11)}${p.supply}</span><span class="pl-tiles">${tiles}</span></div>
+                <div class="pl-top">${houseSvg(i, 13)}<span class="pl-name">${escapeHtml(p.name)}</span><b class="pl-score" data-mk="score-${i}" data-mv="${view.scores[i].total}">${view.scores[i].total}</b></div>
+                <div class="pl-bottom"><span class="pl-supply">${houseSvg(i, 11)}<span data-mk="supply-${i}" data-mv="${p.supply}">${p.supply}</span></span><span class="pl-tiles">${tiles}</span></div>
             </div>`;
         }).join('');
     }
@@ -477,10 +486,11 @@ export default class UI {
 
     // 3軒建て終えて、使える場所タイルもなければ、少し待って番を終える
     scheduleAutoEnd(view) {
-        clearTimeout(this.endTimer);
+        this.cancelEnd?.();
         if (!this.myTurn(view) || !view.mandatoryDone || this.mode || usableTiles(view, view.you).length) return;
         const count = view.commandCount;
-        this.endTimer = setTimeout(() => {
+        // 盤の動きが終わってから番を終える
+        this.cancelEnd = Motion.afterIdle(() => {
             const now = this.controller?.getView();
             if (now && this.myTurn(now) && now.commandCount === count && now.mandatoryDone && !usableTiles(now, now.you).length) this.send({ type: 'end' });
         }, AUTO_END_MS);

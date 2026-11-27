@@ -115,7 +115,10 @@ export default class BoardView {
             const { x, y } = CENTERS[cell];
             const g = el('g', { transform: `translate(${x} ${y + .4})`, class: 'house' });
             g.append(el('use', { href: '#house', fill: PLAYER_COLORS[seat], stroke: PLAYER_LINES[seat], 'stroke-width': .9 }));
-            houses.append(g);
+            // 描き直しの前後で見分けられるように包む（piece-motion.js）。動かした家は前のマスから飛ぶ
+            const wrap = el('g', { 'data-mk': `h-${cell}`, 'data-mg': `h-${seat}`, 'data-mv': 1 });
+            wrap.append(g);
+            houses.append(wrap);
         });
         marks.replaceChildren();
         (state.recent ?? []).forEach(cell => {

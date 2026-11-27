@@ -10,7 +10,8 @@ const PRECACHE = [
     './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'css/style.css',
     'js/art.js', 'js/board-view.js', 'js/boards.js', 'js/cpu-player.js', 'js/game-controller.js', 'js/game-view.js', 'js/game.js', 'js/help.js', 'js/hex.js', 'js/main.js', 'js/random.js', 'js/rules.js', 'js/ui.js',
     'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js',
-    'js/online-config.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/user-stats.js', 'js/netplay/netplay-lobby.js'
+    'js/online-config.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/user-stats.js', 'js/netplay/netplay-lobby.js',
+    'js/motion/motion.js', 'js/piece-motion.js'
 ];
 
 self.addEventListener('install', event => {
