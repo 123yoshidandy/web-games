@@ -793,11 +793,6 @@ body.in-room .solo-only {
     border-color: var(--tile-filled);
 }
 
-.online-join {
-    display: flex;
-    gap: 8px;
-}
-
 .primary-button, .secondary-button {
     padding: 10px 16px;
     border-radius: 10px;
@@ -824,21 +819,52 @@ body.in-room .solo-only {
     box-shadow: 0 1px 0 var(--raised-edge);
 }
 
-.online-code-row {
+/* 参加できる部屋の一覧（部屋番号は出さない） */
+.online-rooms-head, .online-invite-row {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-#online-room-code {
-    font-size: 24px;
-    letter-spacing: 2px;
-}
-
-.online-code-row .secondary-button {
+.online-rooms-head .secondary-button, .online-invite-row .secondary-button {
     margin-left: auto;
     padding: 6px 10px;
     font-size: 13px;
+}
+
+#online-rooms {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 40vh;
+    overflow-y: auto;
+}
+
+#online-rooms .room-empty {
+    padding: 8px 2px;
+    color: var(--muted);
+}
+
+#online-rooms button {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    width: 100%;
+    padding: 9px 12px;
+    border-radius: 10px;
+    background: var(--raised);
+    box-shadow: 0 3px 0 var(--raised-edge);
+    font-size: 15px;
+    font-weight: 700;
+    text-align: left;
+}
+
+#online-rooms .room-meta {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
 }
 
 .online-result {

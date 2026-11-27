@@ -9,6 +9,7 @@ import { ONLINE_DEPLOYED_SERVER_URL } from './online-config.js';
 
 const NAME_STORAGE_KEY = 'wordle.name';
 const RESULT_PANEL_DELAY_MS = 3500; // 最後の行をめくって結果を見せてから、部屋の画面を開くまで
+const MODE_LABELS = { word: 'ことば', pokemon: 'ポケモン' }; // 一覧に出す、部屋の答えの種類
 
 // 対戦の結果の文
 export function resultMessage(view, seat) {
@@ -28,6 +29,7 @@ export function setupOnline({ onView, onExit, showMessage }) {
     let lobby = null;
     let view = null;
     let panelTimer = null;
+    let invitedCode = null; // 招待URLの部屋（画面には出さない）
 
     function client() {
         if (net) return net;
@@ -39,6 +41,7 @@ export function setupOnline({ onView, onExit, showMessage }) {
         net.on('lobby', (message) => {
             const previous = lobby?.status;
             lobby = message;
+            invitedCode = null;
             net.setRoomUrl(message.roomCode);
             document.body.classList.add('in-room');
             // 対戦が始まったら部屋の画面を閉じる。ロビーに戻ったら開く
@@ -79,6 +82,59 @@ export function setupOnline({ onView, onExit, showMessage }) {
     function open() {
         render();
         modal.classList.remove('hidden');
+        if (!lobby) findRooms();
+    }
+
+    // 参加できる部屋の一覧（部屋はすべて公開。部屋番号は出さない）
+    async function findRooms() {
+        const list = el('online-rooms');
+        const note = (text) => {
+            const item = document.createElement('li');
+            item.className = 'room-empty';
+            item.textContent = text;
+            return item;
+        };
+        list.replaceChildren(note('探しています…'));
+        try {
+            const rooms = await client().listRooms();
+            if (lobby) return; // 返事を待つ間に部屋に入った
+            if (rooms.length === 0) {
+                list.replaceChildren(note('待っている部屋はありません'));
+                return;
+            }
+            list.replaceChildren(...rooms.map(room => {
+                const item = document.createElement('li');
+                const button = document.createElement('button');
+                button.type = 'button';
+                const host = document.createElement('span');
+                host.textContent = `${room.hostName} の部屋`;
+                const meta = document.createElement('span');
+                meta.className = 'room-meta';
+                meta.textContent = [`${room.players}/${room.maxPlayers}人`, MODE_LABELS[room.settings?.mode]].filter(Boolean).join('・');
+                button.append(host, meta);
+                button.addEventListener('click', () => join(room.roomCode));
+                item.appendChild(button);
+                return item;
+            }));
+        } catch (e) {
+            if (!lobby) list.replaceChildren(note(e.message));
+        }
+    }
+
+    // 一覧の部屋か、招待URLの部屋に入る。断られたら一覧を取り直す（サーバーの断りは error の知らせで出る）
+    async function join(roomCode) {
+        try {
+            await client().enterRoom(roomCode, playerName());
+        } catch (e) {
+            if (e.fromServer) {
+                invitedCode = null;
+                net.setRoomUrl(null);
+            } else {
+                showMessage(e.message);
+            }
+            render();
+            findRooms();
+        }
     }
 
     function close() {
@@ -99,11 +155,11 @@ export function setupOnline({ onView, onExit, showMessage }) {
     function render() {
         el('online-entry').classList.toggle('hidden', Boolean(lobby));
         el('online-room').classList.toggle('hidden', !lobby);
+        el('online-invited').classList.toggle('hidden', !invitedCode);
         if (!lobby) return;
 
         const isHost = net.isHost();
         const status = lobby.status;
-        el('online-room-code').textContent = lobby.roomCode;
 
         const ended = status === 'ended' && view?.phase === 'end';
         el('online-result').classList.toggle('hidden', !ended);
@@ -163,26 +219,19 @@ export function setupOnline({ onView, onExit, showMessage }) {
             }
         });
 
-        el('online-join').addEventListener('click', async () => {
-            const code = el('online-code').value.trim();
-            if (!NetplayClient.isRoomCode(code)) {
-                showMessage(`部屋番号は${NetplayClient.ROOM_CODE_LENGTH}桁の数字です`);
-                return;
-            }
-            try {
-                await client().joinRoom(code, playerName());
-            } catch (e) {
-                showMessage(e.message);
-            }
-        });
+        el('online-invited').addEventListener('click', () => join(invitedCode));
+        el('online-refresh').addEventListener('click', findRooms);
 
+        // 招待URLを送る。URL には部屋番号が入るが、文字では出さない
         el('online-invite').addEventListener('click', async () => {
             const url = net.inviteUrl();
             try {
                 await navigator.clipboard.writeText(url);
                 showMessage('招待URLをコピーしました');
             } catch (e) {
-                showMessage(url);
+                // コピーできなければ、このページの URL を招待URLにする（アドレスバーから送ってもらう）
+                net.setRoomUrl(lobby?.roomCode);
+                showMessage('コピーできませんでした。このページのURLを送ると、この部屋に招待できます');
             }
         });
 
@@ -210,21 +259,20 @@ export function setupOnline({ onView, onExit, showMessage }) {
                 return;
             }
             setupButtons();
-            el('online-code').maxLength = NetplayClient.ROOM_CODE_LENGTH;
             try {
                 el('online-name').value = localStorage.getItem(NAME_STORAGE_KEY) || '';
             } catch (e) {
                 // 読めなくても遊べる
             }
 
-            // 招待URLから開いたら、部屋番号を入れて部屋の画面を開く。前の部屋に入っていれば戻る
-            const code = NetplayClient.roomCodeFromUrl();
-            if (code) {
-                el('online-code').value = code;
-                open();
-            }
-            if (client().session) {
+            // 前の部屋に入っていれば戻る。招待URLから開いたら、「招待された部屋に参加」を出して部屋の画面を開く
+            const code = NetplayClient.inviteRoomCode();
+            const session = client().session;
+            if (session && (!code || code === session.roomCode)) {
                 client().resume().catch(() => showMessage('サーバーに接続できませんでした'));
+            } else if (code) {
+                invitedCode = code;
+                open();
             }
         },
 

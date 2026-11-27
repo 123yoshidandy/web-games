@@ -159,16 +159,17 @@
                     <span>名前</span>
                     <input id="online-name" maxlength="12" autocomplete="nickname">
                 </label>
+                <button id="online-invited" type="button" class="primary-button hidden">招待された部屋に参加</button>
                 <button id="online-create" type="button" class="primary-button">部屋を作る</button>
-                <div class="online-join">
-                    <input id="online-code" inputmode="numeric" autocomplete="off" placeholder="部屋番号">
-                    <button id="online-join" type="button" class="primary-button">参加</button>
+                <div class="online-rooms-head">
+                    <span>参加できる部屋</span>
+                    <button id="online-refresh" type="button" class="secondary-button">一覧を更新</button>
                 </div>
+                <ul id="online-rooms"></ul>
             </div>
             <div id="online-room" class="hidden">
-                <div class="online-code-row">
-                    <span>部屋番号</span>
-                    <strong id="online-room-code"></strong>
+                <div class="online-invite-row">
+                    <span>参加者</span>
                     <button id="online-invite" type="button" class="secondary-button">招待URLをコピー</button>
                 </div>
                 <p id="online-result" class="online-result hidden"></p>
