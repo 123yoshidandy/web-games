@@ -1,4 +1,4 @@
-// netplay-kit 1.12.0（517db5f-dirty）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.14.0（daaac58）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * 利用者ごとの記録（画面側）：ログインの名前、ローカル対戦（CPU・ひとり）の結果の送信、記録の読み込み
  * オンライン対戦の結果は、サーバー（netplay-kit の stats.js）が対戦の終わりに記録するので、ここからは送らない
@@ -22,7 +22,7 @@ const OUTCOMES = ['win', 'loss', 'draw'];
 
 // web-games のサーバー（web-games-online）をデプロイしたら、出力された StatsApiUrl を書く
 // 空のあいだは、公開したページでは記録を送らない（手元では npm run dev:online のサーバーに送る）
-export const DEPLOYED_STATS_URL = '';
+export const DEPLOYED_STATS_URL = 'https://2nbyr1nm21.execute-api.ap-northeast-1.amazonaws.com';
 
 const storage = () => {
     try {
@@ -169,6 +169,20 @@ export async function fetchStats(name = currentUser(), { fetchImpl = globalThis.
         const response = await fetchImpl(`${url}/stats?name=${encodeURIComponent(user)}`);
         if (!response.ok) return null;
         return await response.json();
+    } catch {
+        return null;
+    }
+}
+
+// 全ゲームの、ロビーで人を待っている部屋（入口のページの「いま立っている部屋」）。読めなければ null
+// [{ game, roomCode, hostName, players, maxPlayers, createdAt }]（新しい順）。入るときは <ゲーム>/?room=<部屋番号>（招待URLと同じ）
+export async function fetchOpenRooms({ fetchImpl = globalThis.fetch, url = resolveStatsUrl() } = {}) {
+    if (!url || typeof fetchImpl !== 'function') return null;
+    try {
+        const response = await fetchImpl(`${url}/rooms`);
+        if (!response.ok) return null;
+        const { rooms } = await response.json();
+        return Array.isArray(rooms) ? rooms : null;
     } catch {
         return null;
     }

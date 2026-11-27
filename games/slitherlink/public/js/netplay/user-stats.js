@@ -1,4 +1,4 @@
-// netplay-kit 1.14.0（0d5a750）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.14.0（daaac58）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * 利用者ごとの記録（画面側）：ログインの名前、ローカル対戦（CPU・ひとり）の結果の送信、記録の読み込み
  * オンライン対戦の結果は、サーバー（netplay-kit の stats.js）が対戦の終わりに記録するので、ここからは送らない
@@ -22,7 +22,7 @@ const OUTCOMES = ['win', 'loss', 'draw'];
 
 // web-games のサーバー（web-games-online）をデプロイしたら、出力された StatsApiUrl を書く
 // 空のあいだは、公開したページでは記録を送らない（手元では npm run dev:online のサーバーに送る）
-export const DEPLOYED_STATS_URL = '';
+export const DEPLOYED_STATS_URL = 'https://2nbyr1nm21.execute-api.ap-northeast-1.amazonaws.com';
 
 const storage = () => {
     try {

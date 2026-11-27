@@ -1,4 +1,4 @@
-// netplay-kit 1.14.0（75b2878）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.14.0（daaac58）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * ES モジュールから NetplayClient を使うための入口（中身は netplay-client.js）
  *   import NetplayClient from './netplay/netplay-client.mjs';
