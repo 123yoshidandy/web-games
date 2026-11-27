@@ -20,7 +20,9 @@
     ],
     "players": [
       2
-    ]
+    ],
+    "minutes": 5,
+    "weight": 2
   },
   "standards": {
     "skip": {

@@ -11,7 +11,9 @@
     "original": "Abalone",
     "genres": [
       "アブストラクト"
-    ]
+    ],
+    "minutes": 20,
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

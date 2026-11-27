@@ -21,6 +21,8 @@
     ],
     "players": [
       2
-    ]
+    ],
+    "minutes": 15,
+    "weight": 2
   }
 }

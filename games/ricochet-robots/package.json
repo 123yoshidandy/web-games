@@ -16,7 +16,9 @@
     "genres": [
       "パズル",
       "ボードゲーム"
-    ]
+    ],
+    "minutes": 5,
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

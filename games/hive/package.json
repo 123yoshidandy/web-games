@@ -11,7 +11,9 @@
     "original": "Hive",
     "genres": [
       "アブストラクト"
-    ]
+    ],
+    "minutes": 20,
+    "weight": 3
   },
   "dependencies": {
     "netplay-kit": "*"

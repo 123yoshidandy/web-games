@@ -15,7 +15,9 @@
     ],
     "players": [
       2
-    ]
+    ],
+    "minutes": 15,
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

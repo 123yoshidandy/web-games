@@ -17,7 +17,9 @@
     ],
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": 10,
+    "weight": 1
   },
   "dependencies": {
     "netplay-kit": "*"

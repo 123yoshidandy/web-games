@@ -11,7 +11,9 @@
     "original": "Ticket to Ride",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [20, 30],
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

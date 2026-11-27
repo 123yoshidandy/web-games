@@ -17,6 +17,8 @@
     "original": "Small World",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [40, 60],
+    "weight": 3
   }
 }

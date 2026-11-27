@@ -14,7 +14,9 @@
     "original": "Great Western Trail",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [60, 120],
+    "weight": 5
   },
   "dependencies": {
     "netplay-kit": "*"

@@ -15,7 +15,9 @@
     "genres": [
       "カードゲーム",
       "正体隠し・ブラフ"
-    ]
+    ],
+    "minutes": 20,
+    "weight": 1
   },
   "dependencies": {
     "netplay-kit": "*"

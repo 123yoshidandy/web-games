@@ -11,7 +11,9 @@
     "original": "Welcome To...",
     "genres": [
       "カードゲーム"
-    ]
+    ],
+    "minutes": 20,
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

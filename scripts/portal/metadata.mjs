@@ -5,7 +5,13 @@
 //   server/src/game-definition.js（ゲームの定義）だけのゲームは、まだ画面から対戦できないので含めない
 // - 原題とジャンル：package.json の portal.original と portal.genres に書く（コードからは分からないため）。
 //   portal.aliases（読みや別名）は任意
-// 例: "portal": { "original": "Azul", "genres": ["タイル配置"] }
+// - 遊ぶ時間と難しさ：package.json の portal.minutes と portal.weight に書く（docs/standards.md の portal-meta）
+//   minutes：このブラウザ版で1ゲーム（パズルは1問）を遊ぶ分数。20 か、幅があれば [20, 30]。
+//     原作の箱の時間をもとに、CPU の手番がすぐ終わる分を短くする
+//   weight：難しさ 1〜5（1・2 かんたん、3 ふつう、4・5 むずかしい）。BoardGameGeek の重さ（Weight）を
+//     1.5・2.2・2.9・3.6 で区切って丸める。伝統ゲームのように、ルールがよく知られているものは下げてよい
+//   書き方の誤りは errors、書いていないだけのときは warnings に入れる（作りかけのゲームを止めないため。いずれ errors にする）
+// 例: "portal": { "original": "Azul", "genres": ["タイル配置"], "minutes": [15, 30], "weight": 2 }
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -69,6 +75,15 @@ export const hasDeployedServer = (publicDir) => {
 // ポータルで「オンライン」と出すのは、配備したサーバーにつながるゲームだけ（デプロイ前は、画面でもオンラインのボタンを隠す）
 export const hasDeployedOnline = (gameDir, publicDir) => hasOnlinePlay(gameDir, publicDir) && hasDeployedServer(publicDir);
 
+const isMinutes = (n) => Number.isInteger(n) && n >= 1 && n <= 600;
+// portal.minutes を [短い, 長い] にそろえる。書き方が違えば null
+export const parseMinutes = (value) => {
+    if (isMinutes(value)) return [value, value];
+    if (Array.isArray(value) && value.length === 2 && value.every(isMinutes) && value[0] < value[1]) return [...value];
+    return null;
+};
+export const isWeight = (value) => Number.isInteger(value) && value >= 1 && value <= 5;
+
 const isPlayerList = (value) => Array.isArray(value) && value.length > 0
     && value.every((n, i) => Number.isInteger(n) && n >= 1 && (i === 0 || n > value[i - 1]));
 
@@ -78,6 +93,7 @@ export const gameMetadata = (gamesDir, game) => {
     const publicDir = existsSync(join(gameDir, 'public')) ? join(gameDir, 'public') : gameDir;
     const portal = JSON.parse(readFileSync(join(gameDir, 'package.json'), 'utf8')).portal;
     const errors = [];
+    const warnings = [];
 
     if (!portal) errors.push('package.json に portal がない（原題とジャンルを書く）');
     const original = typeof portal?.original === 'string' ? portal.original.trim() : '';
@@ -107,12 +123,22 @@ export const gameMetadata = (gamesDir, game) => {
         errors.push(`portal.players（${declared.join(',')}）が、コードの人数（${fromCode.players.join(',')}）と違う`);
     }
 
+    const minutes = parseMinutes(portal?.minutes);
+    if (portal?.minutes === undefined) warnings.push('portal.minutes（遊ぶ時間の分数）がない');
+    else if (!minutes) errors.push('portal.minutes は、1〜600 の分数（例：20）か、小さい順の2つ（例：[20, 30]）で書く');
+    const weight = isWeight(portal?.weight) ? portal.weight : null;
+    if (portal?.weight === undefined) warnings.push('portal.weight（難しさ 1〜5）がない');
+    else if (!weight) errors.push('portal.weight は、1〜5 の整数で書く');
+
     return {
         players,
         online: hasDeployedOnline(gameDir, publicDir),
         original,
         aliases: Array.isArray(aliases) ? aliases.filter((a) => typeof a === 'string') : [],
         genres: genres.filter((genre) => GENRES.includes(genre)),
-        errors
+        minutes,
+        weight,
+        errors,
+        warnings
     };
 };

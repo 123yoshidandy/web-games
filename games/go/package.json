@@ -19,7 +19,9 @@
     "genres": [
       "アブストラクト",
       "伝統ゲーム"
-    ]
+    ],
+    "minutes": [10, 60],
+    "weight": 3
   },
   "dependencies": {
     "netplay-kit": "*"

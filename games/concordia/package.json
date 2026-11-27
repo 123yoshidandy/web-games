@@ -14,7 +14,9 @@
     "original": "Concordia",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [60, 90],
+    "weight": 4
   },
   "dependencies": {
     "netplay-kit": "*"

@@ -11,7 +11,9 @@
     "original": "6 nimmt!",
     "genres": [
       "カードゲーム"
-    ]
+    ],
+    "minutes": 15,
+    "weight": 1
   },
   "dependencies": {
     "netplay-kit": "*"

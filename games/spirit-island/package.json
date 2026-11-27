@@ -18,7 +18,9 @@
     "genres": [
       "ボードゲーム",
       "協力"
-    ]
+    ],
+    "minutes": [90, 120],
+    "weight": 5
   },
   "standards": {
     "skip": {

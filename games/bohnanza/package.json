@@ -14,7 +14,9 @@
     "original": "Bohnanza",
     "genres": [
       "カードゲーム"
-    ]
+    ],
+    "minutes": 30,
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url';
 import { GENRES, PRIVATE, gameMetadata } from './portal/metadata.mjs';
 import {
     PLAYER_CHOICES, MANY_PLAYERS, TIME_CHOICES, TIME_LABELS, WEIGHT_CHOICES, WEIGHT_LABELS,
-    normalize, playersLabel, minutesLabel, weightLabel
+    normalize, playersLabel, minutesLabel
 } from './portal/filter.js';
 import { newIssueUrl } from './portal/links.js';
 
@@ -77,7 +77,8 @@ cpSync(join(root, 'packages', 'netplay-kit', 'client', 'user-stats.js'), join(si
 const cards = entries.map(({ game, name, shortName, icon, color, players, online, original, aliases, genres, minutes, weight }) => {
     // 名前・短い名前・原題・読み・フォルダ名を、区切り文字でつないで1つにする（語をまたいで当たらないように）
     const search = [name, shortName, original, ...aliases, game].map(normalize).join('/');
-    const tags = [playersLabel(players), minutesLabel(minutes), weightLabel(weight), online ? 'オンライン' : ''].filter(Boolean);
+    // 難しさは札に出さない（スマホで札が3行以上になるため。絞り込みと並べ替えで使う）
+    const tags = [playersLabel(players), minutesLabel(minutes), online ? 'オンライン' : ''].filter(Boolean);
     return `            <li data-game="${escapeHtml(game)}" data-search="${escapeHtml(search)}" data-players="${players.join(' ')}" data-online="${online ? 1 : 0}" data-genres="${escapeHtml(genres.join('|'))}" data-minutes="${minutes ? minutes.join(' ') : ''}" data-weight="${weight ?? ''}"><a href="${game}/" style="--color: ${escapeHtml(color)}">
                 ${icon ? `<img src="${escapeHtml(icon)}" alt="" width="72" height="72" loading="lazy">` : ''}
                 <span class="name">${escapeHtml(name)}</span>

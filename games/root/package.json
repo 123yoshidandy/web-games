@@ -17,6 +17,8 @@
     "original": "Root",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [60, 90],
+    "weight": 5
   }
 }

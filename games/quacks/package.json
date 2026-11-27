@@ -17,6 +17,8 @@
     "original": "The Quacks of Quedlinburg",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [30, 45],
+    "weight": 2
   }
 }

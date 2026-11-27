@@ -12,7 +12,9 @@
     "genres": [
       "伝統ゲーム",
       "ダイス"
-    ]
+    ],
+    "minutes": 15,
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

@@ -11,7 +11,9 @@
     "original": "Race for the Galaxy",
     "genres": [
       "カードゲーム"
-    ]
+    ],
+    "minutes": [20, 30],
+    "weight": 4
   },
   "dependencies": {
     "netplay-kit": "*"

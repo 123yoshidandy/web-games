@@ -12,7 +12,9 @@
     "genres": [
       "ボードゲーム",
       "協力"
-    ]
+    ],
+    "minutes": [30, 45],
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

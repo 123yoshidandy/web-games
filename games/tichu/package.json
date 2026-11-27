@@ -11,7 +11,9 @@
     "original": "Tichu",
     "genres": [
       "カードゲーム"
-    ]
+    ],
+    "minutes": [45, 60],
+    "weight": 3
   },
   "dependencies": {
     "netplay-kit": "*"

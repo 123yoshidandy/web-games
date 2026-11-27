@@ -19,7 +19,9 @@
       2,
       3,
       4
-    ]
+    ],
+    "minutes": [45, 60],
+    "weight": 4
   },
   "dependencies": {
     "netplay-kit": "*"

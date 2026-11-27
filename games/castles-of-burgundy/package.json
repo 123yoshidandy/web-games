@@ -18,7 +18,9 @@
     "genres": [
       "ボードゲーム",
       "ダイス"
-    ]
+    ],
+    "minutes": [45, 75],
+    "weight": 4
   },
   "dependencies": {
     "netplay-kit": "*"

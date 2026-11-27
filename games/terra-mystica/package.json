@@ -17,6 +17,8 @@
     "original": "Terra Mystica",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [90, 120],
+    "weight": 5
   }
 }

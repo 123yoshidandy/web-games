@@ -1,5 +1,5 @@
 // 入口のページの検索・絞り込みの画面。カードとボタンは build-site.mjs が HTML に書き出し、ここでは表示を切り替える
-import { EMPTY_STATE, parseState, stateToSearch, isEmptyState, activeFilterCount, clearFilters, toggleGenre, matches } from './filter.js';
+import { EMPTY_STATE, parseState, stateToSearch, isEmptyState, activeFilterCount, clearFilters, toggleGenre, matches, sortGames } from './filter.js';
 
 const panel = document.getElementById('filters');
 const input = document.getElementById('q');
@@ -12,17 +12,27 @@ const clear = document.getElementById('filter-clear');
 const chips = [...panel.querySelectorAll('button[data-key]')];
 const genres = chips.filter((b) => b.dataset.key === 'genre' && b.dataset.value).map((b) => b.dataset.value);
 
-const cards = [...document.querySelectorAll('#games > li')].map((li) => ({
+const list = document.getElementById('games');
+const cards = [...list.querySelectorAll(':scope > li')].map((li) => ({
     li,
     search: li.dataset.search,
     players: li.dataset.players.split(' ').filter(Boolean).map(Number),
     online: li.dataset.online === '1',
-    genres: li.dataset.genres.split('|').filter(Boolean)
+    genres: li.dataset.genres.split('|').filter(Boolean),
+    // 時間は「短い 長い」、難しさは 1〜5。書いていないゲームは空
+    minutes: li.dataset.minutes ? li.dataset.minutes.split(' ').map(Number) : null,
+    weight: li.dataset.weight ? Number(li.dataset.weight) : null
 }));
 
 let state = parseState(location.search, genres);
 
+let sorted = null;
 const render = () => {
+    // 並べる順が変わったときだけ、カードを並べ直す
+    if (sorted !== state.sort) {
+        sorted = state.sort;
+        list.append(...sortGames(cards, state.sort).map((card) => card.li));
+    }
     let shown = 0;
     for (const card of cards) {
         const hit = matches(card, state);

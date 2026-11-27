@@ -12,7 +12,9 @@
     "genres": [
       "ダイス",
       "正体隠し・ブラフ"
-    ]
+    ],
+    "minutes": 15,
+    "weight": 1
   },
   "dependencies": {
     "netplay-kit": "*"

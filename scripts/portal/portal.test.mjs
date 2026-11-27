@@ -5,11 +5,16 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { normalize, parseState, stateToSearch, matches, playersLabel, toggleGenre, activeFilterCount, clearFilters, isEmptyState, EMPTY_STATE } from './filter.js';
-import { gameMetadata, playersFromCode } from './metadata.mjs';
+import {
+    normalize, parseState, stateToSearch, matches, playersLabel, toggleGenre, activeFilterCount, clearFilters, isEmptyState, EMPTY_STATE,
+    sortGames, minutesLabel
+} from './filter.js';
+import { gameMetadata, playersFromCode, parseMinutes } from './metadata.mjs';
 
 const GENRES = ['ボードゲーム', '協力', 'パズル'];
-const game = (overrides) => ({ search: normalize('カタン/catan'), players: [2, 3, 4], online: true, genres: ['ボードゲーム'], ...overrides });
+const game = (overrides) => ({
+    search: normalize('カタン/catan'), players: [2, 3, 4], online: true, genres: ['ボードゲーム'], minutes: [45, 60], weight: 3, ...overrides
+});
 const state = (overrides) => ({ ...EMPTY_STATE, ...overrides });
 
 test('正規化で、カタカナとひらがな・大文字と小文字・全角と半角・区切りとアクセントをそろえる', () => {
@@ -77,7 +82,7 @@ test('ジャンルのボタンで、選んでいなければ足し、選んで�
 });
 
 test('URL の状態を読み書きでき、おかしな値は無視する', () => {
-    const s = { q: 'かたん', players: 6, online: 'yes', genres: ['ボードゲーム', 'パズル'], open: false };
+    const s = state({ q: 'かたん', players: 6, online: 'yes', genres: ['ボードゲーム', 'パズル'] });
     assert.deepEqual(parseState(stateToSearch(s), GENRES), s);
     assert.equal(stateToSearch(s), `?q=${encodeURIComponent('かたん')}&players=6&online=yes&genre=${encodeURIComponent('ボードゲーム')}&genre=${encodeURIComponent('パズル')}`);
     assert.equal(stateToSearch(EMPTY_STATE), '');
@@ -101,6 +106,89 @@ test('欄の中で選んでいる条件の数を数え、「解除」は欄の�
     assert.equal(activeFilterCount(state({ players: 6, online: 'no', genres: ['協力', 'パズル'] })), 4);
     const cleared = clearFilters(state({ q: 'かたん', players: 6, online: 'no', genres: ['協力'], open: true }));
     assert.deepEqual(cleared, state({ q: 'かたん', open: true }));
+});
+
+test('遊ぶ時間は短いほうの時間で「〜N分」に入れ、「60分〜」は長いほうが60分を超えるもの', () => {
+    const quick = game({ minutes: [10, 10] });
+    const range = game({ minutes: [20, 60] });
+    const long = game({ minutes: [60, 90] });
+    assert.ok(matches(quick, state({ time: '15' })));
+    assert.ok(matches(quick, state({ time: '60' })), '短いものは、長い時間の条件にも入る');
+    assert.ok(!matches(range, state({ time: '15' })));
+    assert.ok(matches(range, state({ time: '30' })), '幅があれば、短いほうで比べる');
+    assert.ok(!matches(range, state({ time: 'long' })), 'ちょうど60分までなら、60分〜には入らない');
+    assert.ok(!matches(long, state({ time: '30' })));
+    assert.ok(matches(long, state({ time: '60' })));
+    assert.ok(matches(long, state({ time: 'long' })));
+    assert.ok(!matches(game({ minutes: null }), state({ time: '60' })), '時間を書いていないものは、時間で絞ると出さない');
+    assert.ok(matches(game({ minutes: null }), state()));
+});
+
+test('難しさは 1・2 をかんたん、3 をふつう、4・5 をむずかしいとし、ほかの条件とはすべてを満たすものだけ残す', () => {
+    assert.ok(matches(game({ weight: 1 }), state({ weight: 'easy' })));
+    assert.ok(matches(game({ weight: 2 }), state({ weight: 'easy' })));
+    assert.ok(!matches(game({ weight: 3 }), state({ weight: 'easy' })));
+    assert.ok(matches(game({ weight: 3 }), state({ weight: 'normal' })));
+    assert.ok(matches(game({ weight: 5 }), state({ weight: 'hard' })));
+    assert.ok(!matches(game({ weight: null }), state({ weight: 'hard' })));
+    assert.ok(matches(game(), state({ weight: 'normal', time: '60', players: 4, genres: ['ボードゲーム'] })));
+    assert.ok(!matches(game(), state({ weight: 'normal', time: '30' })));
+    assert.ok(!matches(game(), state({ weight: 'easy', time: '60' })));
+});
+
+test('時間・難しさ・並べる順を URL に残し、時間と難しさは条件に数え、並べる順は数えない', () => {
+    const s = state({ time: 'long', weight: 'hard', sort: 'weight' });
+    assert.equal(stateToSearch(s), '?time=long&weight=hard&sort=weight');
+    assert.deepEqual(parseState(stateToSearch(s), GENRES), s);
+    assert.deepEqual(parseState('?time=45&weight=7&sort=name', GENRES), EMPTY_STATE);
+    assert.equal(activeFilterCount(s), 2);
+    assert.ok(isEmptyState(state({ sort: 'time' })), '並べ替えただけなら、絞っていない');
+    assert.deepEqual(clearFilters(s), state({ sort: 'weight' }), '「解除」は並べる順を残す');
+});
+
+test('短い順・かんたん順に並べ、同じなら一覧の順のまま、時間や難しさのないものは後ろにする', () => {
+    const list = [
+        { id: 'a', minutes: [30, 45], weight: 2 },
+        { id: 'b', minutes: null, weight: null },
+        { id: 'c', minutes: [10, 10], weight: 3 },
+        { id: 'd', minutes: [30, 30], weight: 2 },
+        { id: 'e', minutes: [30, 45], weight: 1 }
+    ];
+    const ids = (games) => games.map((g) => g.id).join('');
+    assert.equal(ids(sortGames(list, null)), 'abcde');
+    assert.equal(ids(sortGames(list, 'time')), 'cdeab');
+    assert.equal(ids(sortGames(list, 'weight')), 'edacb');
+    assert.equal(ids(list), 'abcde', 'もとの一覧は変えない');
+});
+
+test('時間の表記', () => {
+    assert.equal(minutesLabel([15, 15]), '15分');
+    assert.equal(minutesLabel([20, 30]), '20〜30分');
+    assert.equal(minutesLabel(null), '');
+});
+
+test('portal.minutes は分数か小さい順の2つ、portal.weight は 1〜5。誤りは errors、書いていなければ warnings に入れる', () => {
+    assert.deepEqual(parseMinutes(20), [20, 20]);
+    assert.deepEqual(parseMinutes([20, 30]), [20, 30]);
+    for (const bad of [0, 1.5, 601, '20', [30, 20], [20, 20], [20], [20, 30, 40]]) assert.equal(parseMinutes(bad), null, JSON.stringify(bad));
+    const dir = mkdtempSync(join(tmpdir(), 'portal-'));
+    try {
+        const make = (name, portal) => {
+            mkdirSync(join(dir, name, 'public'), { recursive: true });
+            writeFileSync(join(dir, name, 'package.json'), JSON.stringify({ portal: { original: 'X', genres: ['協力'], players: [2], ...portal } }));
+        };
+        make('ok', { minutes: [20, 30], weight: 2 });
+        make('none', {});
+        make('bad', { minutes: '20分', weight: 2.5 });
+        const ok = gameMetadata(dir, 'ok');
+        assert.deepEqual([ok.minutes, ok.weight, ok.errors, ok.warnings], [[20, 30], 2, [], []]);
+        const none = gameMetadata(dir, 'none');
+        assert.deepEqual([none.minutes, none.weight, none.errors.length, none.warnings.length], [null, null, 0, 2]);
+        const bad = gameMetadata(dir, 'bad');
+        assert.deepEqual([bad.minutes, bad.weight, bad.errors.length, bad.warnings.length], [null, null, 2, 0]);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
 });
 
 test('人数の表記', () => {

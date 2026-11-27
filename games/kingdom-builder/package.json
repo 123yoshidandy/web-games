@@ -14,7 +14,9 @@
     "original": "Kingdom Builder",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [20, 30],
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

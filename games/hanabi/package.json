@@ -15,7 +15,9 @@
     "genres": [
       "カードゲーム",
       "協力"
-    ]
+    ],
+    "minutes": 25,
+    "weight": 2
   },
   "standards": {
     "skip": {

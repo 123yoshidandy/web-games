@@ -81,7 +81,7 @@ web-games のゲームは、作った時期と作りがまちまちで、同じ�
 | 33 | tests | テスト | 品質 | 必須 | `npm test` が `vitest run` で、テストがある | package.json の `scripts.test` と `test/`・`tests/` のファイル |
 | 34 | cpu-match | CPU 同士の対戦 | 品質 | 推奨 | CPU の強さを勝率で測るスクリプトがある | `scripts/cpu-match.mjs`・`scripts/cpu-sim.mjs`・`tools/cpu-bench.mjs` のどれか。`cpu` が n/a なら n/a。**要統一** |
 | 35 | readme | README の節 | 品質 | 推奨 | README に、遊び方（ルール）・CPU・開発の節がある | `## ` の見出しに「遊び方」「ルール」、「CPU」（`cpu` を宣言したゲームはいらない）、「開発」「テスト」「構成」のどれか。**要統一** |
-| 36 | portal-meta | 入口のページの情報 | 情報 | 必須 | package.json の `portal`（原題・ジャンル・人数）がそろっている | `scripts/portal/metadata.mjs` の errors がない（check-games.mjs でも落とす） |
+| 36 | portal-meta | 入口のページの情報 | 情報 | 必須 | package.json の `portal`（原題・ジャンル・人数・遊ぶ時間・難しさ）がそろっている。遊ぶ時間 `minutes` は、このブラウザ版で1ゲーム（パズルは1問）を遊ぶ分数（`20` か `[20, 30]`。原作の箱の時間から、CPU の手番が速い分を短くする）。難しさ `weight` は 1〜5 の整数（BoardGameGeek の重さを 1.5・2.2・2.9・3.6 で区切って丸める。1・2 がかんたん、3 がふつう、4・5 がむずかしいとして絞り込む） | `scripts/portal/metadata.mjs` の errors がない（check-games.mjs でも落とす）。`minutes`・`weight` は、書き方の誤りは落とし、書いていないものは今は警告だけ（作りかけのゲームがそろったら落とす） |
 | 37 | storage-prefix | 保存の名前 | 情報 | 必須 | localStorage のキーが「<頭>.<種類>」の形で、頭が1つ | `'<頭>.save'` などの文字列と `PREFIX = '<頭>.'` から頭を集め、1つか。localStorage を使わなければ n/a。ほかのゲームとの重なりは check-games.mjs が見る |
 | 38 | names-match | 名前と色の一致 | 情報 | 推奨 | index.html の title・apple-mobile-web-app-title・theme-color が、manifest の name・short_name・theme_color とそろう | index.html と manifest を比べる（title は name と同じか short_name を含む） |
 | 39 | effects | 効果音 | 音 | 推奨 | ゲームのできごとで、共通の効果音を鳴らす（`packages/sound/README.md` の「共通の効果音」の表と当て方の決まり） | JS に `.play('<共通の効果音の名前>')` がある。独自の音（`js/sound.js`）のゲームは、自前の効果音を認める |

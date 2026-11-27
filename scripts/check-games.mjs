@@ -2,7 +2,8 @@
 // - service worker のキャッシュの名前が、ゲームどうしで重ならない
 // - service worker が、ほかのゲームのキャッシュを消さない（自分の名前の頭のものだけ消す）
 // - 保存の名前（localStorage）の頭が、ゲームどうしで重ならない
-// - 入口のページの検索・絞り込みに使う情報（人数・原題・ジャンル）がそろっている（scripts/portal/metadata.mjs）
+// - 入口のページの検索・絞り込みに使う情報（人数・原題・ジャンル）がそろっている（scripts/portal/metadata.mjs）。
+//   遊ぶ時間・難しさは、書き方の誤りだけを落とし、書いていないものは警告として出す
 // - BGM の再生エンジンの写し（sound/engine.js・engine.mjs）が、packages/sound の今の本体と同じ（packages/sound/scripts/sync.mjs）
 // - ゲームの標準（docs/standards.md）の必須の項目を満たし、宣言に誤りがない（scripts/standards.mjs の checkRequired）
 //   公開（pages.yml）では --skip-standards を付けて、この確認だけを省く（標準の欠けで公開を止めない）
@@ -70,10 +71,16 @@ export function checkGames(gamesDir, games = listGames(gamesDir), { standards = 
     return errors;
 }
 
+// 落とすまではしないが、知らせること（入口のページの情報の、まだ書いていない項目）
+export const metadataWarnings = (gamesDir, games = listGames(gamesDir)) => games
+    .flatMap((game) => gameMetadata(gamesDir, game).warnings.map((warning) => `${game}: ${warning}`));
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const gamesDir = join(root, 'games');
     const games = listGames(gamesDir);
     const standards = !process.argv.includes('--skip-standards');
+    const warnings = metadataWarnings(gamesDir, games);
+    if (warnings.length > 0) console.warn(`警告（落とさない）:\n${warnings.join('\n')}`);
     const errors = checkGames(gamesDir, games, { standards });
     if (errors.length > 0) {
         console.error(errors.join('\n'));

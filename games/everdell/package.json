@@ -14,7 +14,9 @@
     "original": "Everdell",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [40, 60],
+    "weight": 3
   },
   "dependencies": {
     "netplay-kit": "*"

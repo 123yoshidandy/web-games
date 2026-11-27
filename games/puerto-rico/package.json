@@ -11,7 +11,9 @@
     "original": "Puerto Rico",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [60, 90],
+    "weight": 4
   },
   "dependencies": {
     "netplay-kit": "*"

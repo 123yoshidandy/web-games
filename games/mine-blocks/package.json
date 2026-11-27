@@ -24,7 +24,9 @@
       2,
       3,
       4
-    ]
+    ],
+    "minutes": 10,
+    "weight": 2
   },
   "standards": {
     "skip": {

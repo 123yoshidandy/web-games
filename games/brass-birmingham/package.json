@@ -14,7 +14,9 @@
     "original": "Brass: Birmingham",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [60, 120],
+    "weight": 5
   },
   "dependencies": {
     "netplay-kit": "*"

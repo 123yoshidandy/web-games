@@ -11,7 +11,9 @@
     "original": "Azul",
     "genres": [
       "タイル配置"
-    ]
+    ],
+    "minutes": [15, 30],
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

@@ -11,7 +11,9 @@
     "original": "Santorini",
     "genres": [
       "アブストラクト"
-    ]
+    ],
+    "minutes": 15,
+    "weight": 2
   },
   "dependencies": {
     "netplay-kit": "*"

@@ -15,7 +15,9 @@
     "genres": [
       "ボードゲーム",
       "カードゲーム"
-    ]
+    ],
+    "minutes": [60, 90],
+    "weight": 4
   },
   "standards": {
     "skip": {

@@ -14,7 +14,9 @@
     "original": "Blokus",
     "genres": [
       "アブストラクト"
-    ]
+    ],
+    "minutes": 15,
+    "weight": 1
   },
   "dependencies": {
     "netplay-kit": "*"

@@ -14,7 +14,9 @@
     "original": "Agricola",
     "genres": [
       "ボードゲーム"
-    ]
+    ],
+    "minutes": [45, 90],
+    "weight": 5
   },
   "dependencies": {
     "netplay-kit": "*"

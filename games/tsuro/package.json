@@ -14,7 +14,9 @@
     "original": "Tsuro",
     "genres": [
       "タイル配置"
-    ]
+    ],
+    "minutes": 10,
+    "weight": 1
   },
   "dependencies": {
     "netplay-kit": "*"
