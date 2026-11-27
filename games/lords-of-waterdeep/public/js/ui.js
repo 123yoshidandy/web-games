@@ -14,6 +14,8 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff, flyIn } from './anim.js';
 
 // 自分の操作の効果音（依頼を果たしたら gain）
 const COMMAND_SOUNDS = { place: 'place', pick: 'gain', quest: 'draw', buy: 'pay', intrigue: 'place', opponent: 'select', option: 'select', target: 'select' };
@@ -23,6 +25,13 @@ const SETTINGS_KEY = 'lords-of-waterdeep.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
 export const COLORS = ['#d9473b', '#4a86e8', '#3c9f4b', '#e2b72a', '#2bb3b3'];
 const RESULT_DELAY_MS = 900;
+
+// 動きの目印：場所は置いた人の席、クエストはカードの id、数は欄ごとの何番目か
+const SPACES = { key: el => el.dataset.space, value: el => el.querySelector('.who')?.dataset.seat ?? '' };
+const QUESTS = { key: el => el.dataset.quest, value: () => '' };
+const AMOUNT_ITEM = '.pl-vp, .pl-bottom > *, .me-row > .vp, .me-row > .amt, .me-row > .chip';
+const AMOUNTS = AMOUNT_ITEM.split(', ').map(s => `#players ${s}, #me ${s}`).join(', ');
+const amountKey = el => `${el.closest('.pl')?.dataset.seat ?? 'me'}:${[...el.closest('.pl, #me').querySelectorAll(AMOUNT_ITEM)].indexOf(el)}`;
 // 盤面に並べる順（4列）。会館の売り物は会館の後ろ、建てた建物は最後に並べる
 const BOARD_ORDER = ['castle', 'shop', 'tower', 'field', 'tavern', 'plinth', 'inn0', 'inn1', 'inn2', 'harbor0', 'harbor1', 'harbor2', 'builders'];
 const SPACE_GAIN = {
@@ -155,6 +164,7 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     }
 
     // ---- 画面の切り替え ----
@@ -221,7 +231,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         this.decideKey = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
@@ -432,6 +442,9 @@ export default class UI {
         if (!this.controller) return;
         const prev = this.view;
         const v = this.controller.getView();
+        // 手が進んだときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+        const moved = Boolean(prev) && v.commandCount !== prev.commandCount;
+        const before = moved ? this.captureMotion() : null;
         this.view = v;
         this.playSound(prev, v);
         if (this.sel && !v.legal.includes(this.sel)) this.sel = null;
@@ -446,9 +459,46 @@ export default class UI {
             this.decideKey = null;
             $('#decide').close();
         }
+        if (moved) this.animateMotion(v, before);
+        // 結果の画面は、最後の手の動きが終わってから出す
         if (v.phase === 'over' && !this.resultTimer && !$('#result').open) {
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.resultTimer = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
+    }
+
+    // ---- 動き（描き直しの前後の差） ----
+
+    // 描き直す前：場所に置いた人・酒場と手元のクエスト・各プレイヤーの数
+    captureMotion() {
+        return {
+            spaces: snapshot($('#board'), '[data-space]', SPACES),
+            inn: snapshot($('#inn'), '[data-quest]', QUESTS),
+            mine: snapshot($('#me'), '[data-quest]', QUESTS),
+            amounts: snapshot(document, AMOUNTS, { key: amountKey })
+        };
+    }
+
+    // 描いたあと：置いたエージェントはその人の欄から飛ばし、酒場から取ったクエストは手元へ飛ばし、
+    // 酒場に新しく出たクエストははねて出し、数の変化を目立たせる
+    animateMotion(v, before) {
+        animateDiff(before.spaces, $('#board'), '[data-space]', {
+            ...SPACES,
+            enter: null,
+            change: (el) => {
+                const who = el.querySelector('.who');
+                if (who) flyIn(who, this.playerPanel(v, Number(who.dataset.seat)));
+            }
+        });
+        animateDiff(before.inn, $('#inn'), '[data-quest]', QUESTS);
+        animateDiff(before.mine, $('#me'), '[data-quest]', {
+            ...QUESTS,
+            enter: (el, id) => flyIn(el, before.inn.get(id)?.rect ?? null)
+        });
+        animateDiff(before.amounts, document, AMOUNTS, { key: amountKey });
+    }
+
+    playerPanel(v, seat) {
+        return seat === v.you ? $('#me .me-row') : $(`#players .pl[data-seat="${seat}"]`);
     }
 
     // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
@@ -516,7 +566,7 @@ export default class UI {
                 this.sel === space ? 'sel' : placing && v.legal.includes(space) ? 'can' : '',
                 this.info === `s:${space}` ? 'info' : ''].filter(Boolean).join(' ');
             const style = owner !== null ? ` style="--c:${COLORS[owner]}"` : '';
-            const who = occ ? `<span class="who" style="--c:${COLORS[occ.seat]}">${occ.ambassador ? '大' : ''}</span>` : '';
+            const who = occ ? `<span class="who" data-seat="${occ.seat}" style="--c:${COLORS[occ.seat]}">${occ.ambassador ? '大' : ''}</span>` : '';
             return `<button class="${cls}" data-space="${space}"${style}><span class="tile-name">${name}</span><span class="tile-gain gain">${gain}</span>${who}</button>`;
         };
         const sale = (h, i) => {
