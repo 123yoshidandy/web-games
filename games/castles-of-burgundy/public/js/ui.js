@@ -15,6 +15,7 @@ import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { symbolsSvg, icon, resIcon, artKey, tileTag, hexHtml, dieSvg, goodsHtml } from './art.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'castles-of-burgundy';
 const SETTINGS_KEY = 'burgundy.settings';
@@ -33,7 +34,7 @@ const PICK_TEXT = { building: '大工作業場：建物を1枚取る', mine: '�
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reduceMotion = () => !Motion.enabled(); // 速さが「なし」（動きを減らす設定を含む）
 
 function loadSettings() {
     try {
@@ -109,6 +110,11 @@ export default class UI {
         this.choose = null;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'ブルゴーニュの城',
@@ -183,8 +189,8 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
-        clearTimeout(this.autoTimer);
+        this.resultTimer?.();
+        this.autoTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('#fx').innerHTML = '';
@@ -531,7 +537,7 @@ export default class UI {
         this.scheduleAutoEnd(view);
         if ($('#log').open) this.renderLog();
         if (view.over && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
@@ -657,9 +663,9 @@ export default class UI {
 
     // ダイスを使い切り、買い物もできなければ、少し待って自動で終える
     scheduleAutoEnd(view) {
-        clearTimeout(this.autoTimer);
+        this.autoTimer?.();
         if (!this.myTurn() || this.top() || !this.me().used.every(Boolean) || this.canBuy()) return;
-        this.autoTimer = setTimeout(() => {
+        this.autoTimer = Motion.afterIdle(() => {
             const now = this.controller?.getView();
             if (now && now.answering.includes(now.you) && !now.pending.length && now.players[now.you].used.every(Boolean)) this.send({ type: 'end' });
         }, AUTO_END_MS);
@@ -762,7 +768,8 @@ export default class UI {
         el.style.left = `${rect.left + rect.width / 2}px`;
         el.style.top = `${rect.top + rect.height}px`;
         $('#fx').appendChild(el);
-        setTimeout(() => el.remove(), reduceMotion() ? 600 : FLOAT_MS);
+        setTimeout(() => el.remove(), reduceMotion() ? 600 : Motion.ms(FLOAT_MS));
+        Motion.hold(500); // 浮かぶ数字の動き（CSS）の間は CPU と自動の進行を待たせる
     }
 
     toast(message) {
