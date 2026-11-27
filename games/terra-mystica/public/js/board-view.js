@@ -3,6 +3,7 @@
  * 拡大と移動（2本指・ホイール・ボタン）を受け、タップした土地を onTap(hex) で知らせる
  */
 
+import * as Motion from './motion/motion.js';
 import { TERRAIN_INFO, FACTIONS } from './data.js';
 import { HEXES, BRIDGE_PAIRS } from './map.js';
 
@@ -45,6 +46,13 @@ export function buildingSvg(type, color, { size = 22, ink = '#1b1208' } = {}) {
         + `<path d="${BUILDING_PATHS[type]}" fill="${color}" stroke="#fff8e6" stroke-width="2" stroke-linejoin="round"/>`
         + `<path d="${BUILDING_PATHS[type]}" fill="${color}" stroke="${ink}" stroke-width=".9" stroke-linejoin="round"/></svg>`;
 }
+
+// 動く部品を、描き直しの前後で見分けられる名前を付けた g に包む（piece-motion.js）。建物は動かず、新しく出るとはねて現れる
+const mk = (node, key) => {
+    const wrap = el('g', { 'data-mk': key });
+    wrap.append(node);
+    return wrap;
+};
 
 export default class BoardView {
     constructor(root) {
@@ -100,13 +108,20 @@ export default class BoardView {
         bridges.replaceChildren();
         state.hexes.forEach((h, id) => {
             const info = TERRAIN_INFO[h.terrain];
+            // 地形が変わった土地は、色が移り変わるように見せる（描き直しのあとなので、前の色と比べる）
+            if (this.hexEls[id].getAttribute('fill') && this.hexEls[id].getAttribute('fill') !== info.color && this.animateTerrain) {
+                const length = Motion.ms(420);
+                if (Motion.enabled()) Motion.track(this.hexEls[id].animate([{ opacity: 0.25 }, { opacity: 1 }], { duration: length, easing: 'ease-out' }), length);
+            }
             this.hexEls[id].setAttribute('fill', info.color);
         });
         // 橋（架けられる場所の候補は点線）
         (marks.bridges ?? []).forEach(([a, b]) => bridges.append(this.bridgeLine(a, b, null)));
         state.bridges.forEach(b => {
             const f = FACTIONS[state.players[b.owner].faction];
-            bridges.append(this.bridgeLine(b.a, b.b, TERRAIN_INFO[f.terrain].color));
+            const line = this.bridgeLine(b.a, b.b, TERRAIN_INFO[f.terrain].color);
+            line.setAttribute('data-mk', `br-${b.a}-${b.b}`);
+            bridges.append(line);
         });
         // 最近変わった土地
         (marks.recent ?? new Set()).forEach(id => {
@@ -136,14 +151,15 @@ export default class BoardView {
             const g = el('g', { transform: `translate(${p.x.toFixed(2)},${(p.y + 0.4).toFixed(2)}) scale(1.1)`, class: 'bld' });
             g.append(el('path', { d: BUILDING_PATHS[h.building], fill: color, stroke: '#fff8e6', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
             g.append(el('path', { d: BUILDING_PATHS[h.building], fill: color, stroke: '#1b1208', 'stroke-width': 0.9, 'stroke-linejoin': 'round' }));
-            items.append(g);
+            items.append(mk(g, `b-${id}-${h.building}`));
             if (h.town) {
                 const t = el('g', { transform: `translate(${(p.x + 5.2).toFixed(2)},${(p.y - 5.4).toFixed(2)})`, class: 'town-mark' });
                 t.append(el('circle', { r: 2.2, fill: '#f4cf5d', stroke: '#5a3e00', 'stroke-width': 0.5 }));
                 t.append(el('path', { d: 'M-.9-.3a.9.9 0 1 1 1.8 0a.9.9 0 1 1-1.8 0M0 .5V1.6', stroke: '#5a3e00', 'stroke-width': 0.45, fill: 'none' }));
-                items.append(t);
+                items.append(mk(t, `town-${id}`));
             }
         });
+        this.animateTerrain = true;
     }
 
     bridgeLine(a, b, color) {

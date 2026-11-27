@@ -18,6 +18,8 @@ import {
 } from './data.js';
 import { HEXES, LAND, BRIDGE_PAIRS } from './map.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import * as PieceMotion from './piece-motion.js';
 
 const SETTINGS_KEY = 'terra-mystica.settings';
 const RESULT_DELAY_MS = 900;
@@ -85,7 +87,7 @@ export default class UI {
         this.mode = null;
         this.seenSeq = 0;
         this.openedPrompt = null;
-        this.resultTimer = null;
+        this.cancelResult = null;
         this.resultShown = false;
         this.sheetActs = [];
         this.pendingActs = [];
@@ -113,6 +115,7 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         this.renderTitleArt();
         this.renderHelpWheel();
     }
@@ -159,6 +162,8 @@ export default class UI {
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.mode = null;
+        this.animateNext = false; // 前の対戦の盤との差も動かさない
+        this.board.animateTerrain = false;
         this.resultShown = false;
         this.openedPrompt = null;
         this.view = this.controller.getView();
@@ -186,7 +191,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
         ['#result', '#sheet'].forEach(id => { if ($(id).open) $(id).close(); });
     }
 
@@ -392,7 +397,9 @@ export default class UI {
             if (!this.resultShown) {
                 this.resultShown = true;
                 if ($('#sheet').open) $('#sheet').close();
-                this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+                // 盤の動きが終わってから出す
+                this.cancelResult?.();
+                this.cancelResult = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
             }
             return;
         }
@@ -483,6 +490,9 @@ export default class UI {
 
     render() {
         const s = this.view.state;
+        // 描き直す前に建物・点・資源の位置を測り、描いたあとで前との差を動かす
+        const before = this.animateNext ? PieceMotion.measure($('#screen-game')) : null;
+        this.animateNext = true;
         // 上の欄
         if (s.round === 0) {
             $('#round-info').innerHTML = '<b>準備</b><span class="tile-text">最初の住居とボーナスカード</span>';
@@ -497,13 +507,14 @@ export default class UI {
         $('#players').innerHTML = order.map(seat => {
             const p = s.players[seat];
             const cls = ['pchip', seat === actor ? 'active' : '', p.passed && s.phase === 'actions' ? 'passed' : '', seat === this.you ? 'mine' : ''].join(' ');
-            const sub = p.passed && s.phase === 'actions' ? 'パス' : `${ICONS.VP}<b>${p.res.VP}</b>`;
+            const sub = p.passed && s.phase === 'actions' ? 'パス' : `${ICONS.VP}<b data-mk="pc-vp-${seat}" data-mv="${p.res.VP}">${p.res.VP}</b>`;
             return `<button class="${cls}" data-seat="${seat}">${swatch(p.faction)}<span class="pc-text"><span class="pc-name">${seat === this.you ? 'あなた' : FACTIONS[p.faction].short ?? FACTIONS[p.faction].name}</span><span class="pc-sub">${sub}</span></span></button>`;
         }).join('');
         // 地図
         this.board.render(s, this.marks());
         this.renderStatus();
         this.renderMe();
+        PieceMotion.animate(before, $('#screen-game'));
         // 下のボタン
         const action = this.myAction();
         const mine = !!this.myWaiting();
@@ -602,9 +613,9 @@ export default class UI {
             ? `${f.teleport.type === 'tunnel' ? 'トンネル' : 'じゅうたん'} ${this.sim.teleportRange(this.you)}`
             : `航海 ${p.ship}${p.bonus === 'BON4' ? '+1' : ''}`;
         const spade = p.faction === 'darklings' ? '鋤＝司祭1' : `鋤＝職人${[3, 2, 1][p.dig]}`;
-        $('#me').innerHTML = `<div class="me-row">${swatch(p.faction)}<span class="res">${ICONS.C}<b>${p.res.C}</b></span><span class="res">${ICONS.W}<b>${p.res.W}</b></span><span class="res">${ICONS.P}<b>${p.res.P}</b></span>`
+        $('#me').innerHTML = `<div class="me-row">${swatch(p.faction)}<span class="res">${ICONS.C}<b data-mk="me-C" data-mv="${p.res.C}">${p.res.C}</b></span><span class="res">${ICONS.W}<b data-mk="me-W" data-mv="${p.res.W}">${p.res.W}</b></span><span class="res">${ICONS.P}<b data-mk="me-P" data-mv="${p.res.P}">${p.res.P}</b></span>`
             + `<span class="bowls">${ICONS.PW}<span>${p.power[0]}</span><span>${p.power[1]}</span><span class="b3">${p.power[2]}</span></span>`
-            + `<span class="res vp">${ICONS.VP}<b>${p.res.VP}</b></span></div>`
+            + `<span class="res vp">${ICONS.VP}<b data-mk="me-VP" data-mv="${p.res.VP}">${p.res.VP}</b></span></div>`
             + `<div class="me-row sub"><span>${f.name}</span><span>${reach}</span><span>${spade}</span>${p.keys ? `<span>鍵 ${p.keys}</span>` : ''}<span>${p.bonus ? BONUS_CARDS[p.bonus].text.split('。')[0] : ''}</span></div>`;
     }
 
