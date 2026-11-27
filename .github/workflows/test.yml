@@ -1,4 +1,4 @@
-name: テスト
+name: Test
 
 # ゲームをまたいだ確認と直下のスクリプトのテストは毎回流し、ゲームと共通の部品のテストは変わったものだけ流す（scripts/changed-games.mjs）
 # 公開（pages.yml）とは別に流れ、公開は止めない
@@ -6,6 +6,11 @@ on:
   pull_request:
   push:
     branches: [main]
+
+# 同じブランチに新しい push が来たら、古いテストは取りやめて最新だけを流す
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -19,13 +24,17 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: ゲームをまたいだ確認と、標準の必須の項目
+      # ゲームをまたいだ確認と、標準の必須の項目
+      - name: Check games
         run: node scripts/check-games.mjs
-      - name: 直下のスクリプトのテスト（一覧のページの検索・決まりの表・画面の検査の判定・テストを流すゲームの選び方）
+      # 直下のスクリプトのテスト（一覧のページの検索・決まりの表・画面の検査の判定・テストを流すゲームの選び方）
+      - name: Test scripts
         run: node --test "scripts/**/*.test.mjs"
-      - name: BGM のエンジンの写し
+      # BGM のエンジンの写しが、元とそろっているか
+      - name: Check BGM engine copies
         run: node packages/sound/scripts/sync.mjs check --all
-      - name: 変わったゲームのテスト
+      # 変わったゲームと共通の部品のテスト
+      - name: Test changed games
         env:
           BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
         run: |

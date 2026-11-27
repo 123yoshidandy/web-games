@@ -1,4 +1,4 @@
-name: 画面の検査
+name: Layout Check
 
 # 全ゲームを、スマホ縦・スマホ横・PC の大きさでヘッドレス Chrome で開き、はみ出し・主要なボタン・開始・BGM・エラーを確かめる（scripts/layout-check.mjs）
 # 知らせるだけで、公開（pages.yml）は止めない。公開とは別に流れ、互いに待たない
@@ -27,20 +27,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: 日本語の字体
+      # 日本語の字体
+      - name: Install Japanese fonts
         run: |
           sudo apt-get update -q
           sudo apt-get install -y -q fonts-noto-cjk
-      - name: Chrome（ランナーにあるものを、サンドボックスなしで起動する）
+      # Chrome（ランナーにあるものを、サンドボックスなしで起動する）
+      - name: Set up Chrome
         run: |
           # Ubuntu 24.04 は、権限のないユーザー名前空間を制限していて、Chrome のサンドボックスが使えない
           printf '#!/bin/sh\nexec /usr/bin/google-chrome --no-sandbox "$@"\n' > "$RUNNER_TEMP/chrome"
           chmod +x "$RUNNER_TEMP/chrome"
           echo "CHROME_PATH=$RUNNER_TEMP/chrome" >> "$GITHUB_ENV"
           google-chrome --version
-      - name: 公開するファイルを集める
+      # 公開するファイルを _site/ に集める
+      - name: Build site
         run: node scripts/build-site.mjs
-      - name: 画面の検査
+      # 画面の検査
+      - name: Check layout
         run: node scripts/layout-check.mjs --site _site --sizes all --shard ${{ matrix.shard }}/4 --jobs 3 --out layout-check/shard-${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
         if: always()
@@ -62,7 +66,8 @@ jobs:
         with:
           pattern: layout-check-*
           path: layout-check
-      - name: 結果の表
+      # 結果の表
+      - name: Report results
         run: |
           set +e
           node scripts/layout-check.mjs --report layout-check > layout-check/results.md

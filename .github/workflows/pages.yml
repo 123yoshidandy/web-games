@@ -1,4 +1,4 @@
-name: 公開
+name: Pages
 
 # 各ゲームの公開するファイルと、ゲームの一覧のページを _site/ に集めて GitHub Pages に載せる
 on:
@@ -23,9 +23,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: ゲームをまたいだ確認（標準の必須の項目は test.yml で見て、公開は止めない）
+      # ゲームをまたいだ確認（標準の必須の項目は test.yml で見て、公開は止めない）
+      - name: Check games
         run: node scripts/check-games.mjs --skip-standards
-      - name: 公開するファイルを集める
+      # 公開するファイルを _site/ に集める
+      - name: Build site
         run: node scripts/build-site.mjs
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

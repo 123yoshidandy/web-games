@@ -1,4 +1,4 @@
-name: 最強のデッキの探索
+name: Deck Search
 
 # ポケモンカードゲームの「最強のデッキ」を、CPU 同士の対戦でさがして、結果（best-decks.json）を main にコミットする
 # （games/pokemon-card-game/scripts/deck-search.mjs。前の結果から続けるので、走らせるたびに良くなる）
@@ -40,7 +40,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: 探索
+      # 探索
+      - name: Search decks
         env:
           MINUTES: ${{ inputs.minutes || '45' }}
           WITH_CARD: ${{ inputs.with-card || '' }}
@@ -61,7 +62,8 @@ jobs:
             sed -n '/分。/,$p' search.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-      - name: 結果が変わっていればコミットする
+      # 結果が変わっていればコミットする
+      - name: Commit results
         id: commit
         env:
           FILE: games/pokemon-card-game/public/data/best-decks.json
@@ -83,7 +85,8 @@ jobs:
             sleep 10
           done
           exit 1
-      - name: 公開する
+      # 公開する（pages.yml を workflow_dispatch で起こす）
+      - name: Trigger Pages
         if: steps.commit.outputs.pushed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}

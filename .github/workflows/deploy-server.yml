@@ -5,11 +5,11 @@
 #   画面を含むゲームの全部のテストは test.yml が流す。test.yml はデプロイを止めない（個人用のリポジトリなので、CI は知らせるだけ）
 # - Secret の AWS_DEPLOY_ROLE_ARN がないあいだは、デプロイを飛ばす（IAM のロールを作る前の push で失敗しないように）
 # AWS への認証は OIDC で行い、アクセスキーは使わない。リポジトリは公開なので、AWS のアカウント番号はログで伏せる
-name: deploy-server
+name: Deploy Server
 
 # サーバーは画面側の public/js・js のロジック（game.js・cpu-player.js・rules.js など）も読み込むので、ゲームの側はそこまで見る
 # ただし、画面だけのファイル（main.js・ui.js・art.js・netplay/・sound/ など）は、どのゲームでもサーバーに入らないので外す
-# （esbuild の metafile で、束ねた入力にこれらの名前がないことを確かめた。入り込んだら「束ねた入力の確認」の手順で警告が出る）
+# （esbuild の metafile で、束ねた入力にこれらの名前がないことを確かめた。入り込んだら「Check bundle inputs」の手順で警告が出る）
 # サーバーに変わりがなければ、sam deploy は「No changes to deploy」で終わる
 on:
   push:
@@ -20,7 +20,7 @@ on:
       - 'games/*/server/**'
       - 'games/*/public/js/**'
       - 'games/*/js/**'
-      # paths は {a,b} の書き方を使えないので、1行ずつ並べる。下の「束ねた入力の確認」の正規表現と同じものにする
+      # paths は {a,b} の書き方を使えないので、1行ずつ並べる。下の「Check bundle inputs」の手順の正規表現と同じものにする
       - '!games/*/public/js/netplay/**'
       - '!games/*/public/js/sound/**'
       - '!games/*/public/js/main.js'
@@ -63,7 +63,8 @@ jobs:
     outputs:
       enabled: ${{ steps.secret.outputs.enabled }}
     steps:
-      - name: デプロイ用のロールの Secret があるかを調べる
+      # デプロイ用のロールの Secret があるかを調べる
+      - name: Check deploy role secret
         id: secret
         env:
           ROLE_ARN: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
@@ -81,32 +82,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # github.sha（イベントのコミット）ではなく、動き出した時点のブランチの先端を取り出す
-      - name: リポジトリを取り出す
+      - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.ref }}
           fetch-depth: 0
 
-      - name: Node.js 22 を用意する
+      # Node.js 22 を用意する
+      - name: Set up Node.js 22
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
           cache: npm
 
-      - name: 依存を入れる
+      # 依存を入れる
+      - name: Install dependencies
         run: npm ci
 
       # 全ゲームの chunk を一時フォルダに束ね、偽の @aws-sdk の上で handler.mjs・stats-handler.mjs を読み込んで呼ぶ
-      - name: 束ねたサーバーのテスト
+      - name: Test server bundle
         run: node --test scripts/server-bundle.test.mjs
 
       # chrome.test.js はヘッドレス Chrome で画面側の部品を見るもので、サーバーには関わらないので外す
-      - name: netplay-kit のテスト
+      - name: Test netplay-kit
         run: npm test -w packages/netplay-kit -- --exclude test/chrome.test.js
 
       # 比べる元は、最後に成功したデプロイのコミット（github.event.before だと、置き換わって流れなかった push の変更を見落とす）
       # 見つからないとき（初めてのデプロイ・手で動かしたときの履歴の欠けなど）は、全ゲームを流す。全部でも2分ほど
-      - name: 変わったゲームの game-definition のテスト
+      - name: Test game definitions of changed games
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -134,31 +137,34 @@ jobs:
             exit 1
           fi
 
-      - name: AWS に OIDC で認証する
+      # AWS に OIDC で認証する
+      - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-northeast-1
           mask-aws-account-id: true
 
-      - name: アカウント番号をログで伏せる
+      # アカウント番号をログで伏せる
+      - name: Mask AWS account ID
         run: |
           account_id=$(aws sts get-caller-identity --query Account --output text)
           echo "::add-mask::${account_id}"
 
-      - name: AWS SAM CLI を用意する
+      # AWS SAM CLI を用意する
+      - name: Set up AWS SAM CLI
         uses: aws-actions/setup-sam@341eee193f458fa5aae5d52c94b0c5cf3a1c5a52 # v3
         with:
           use-installer: true
 
       # ゲームごとの chunk ができなかったら、ここで失敗する（scripts/build-server.mjs）
-      - name: サーバーをビルドする
+      - name: Build server
         run: npm run build:server
 
       # 束ねた出力には、元のファイルを示す「// games/<名前>/public/js/<ファイル>」の注記が残る
       # on.push.paths で外した画面だけのファイルが入り込んでいたら、そのファイルの変更ではデプロイが動かないので、警告する
       # （デプロイは止めない。直すのは on.push.paths のほう）
-      - name: 束ねた入力の確認（外したファイルが入っていないか）
+      - name: Check bundle inputs
         run: |
           leaked=$(grep -rhoE '^// games/[^/]+/(public/js/((netplay|sound)/.*|(main|online-config|music|game-controller|ui|art|help|animator|storage|board-view|sound)\.js)|js/(netplay|sound)/.*)$' server/dist | sort -u || true)
           if [ -n "$leaked" ]; then
@@ -169,7 +175,7 @@ jobs:
       # GitHub 用のロールにできるのは、CloudFormation 用のロール（web-games-cfn-deploy）を渡して変更セットを作ることと、
       # 成果物を共有のバケットの web-games-online/ の下に置くことだけ
       # ロールの ARN にはアカウント番号が入るので、リポジトリには書かず、ここで組み立てる（番号は前の手順でログから伏せてある）
-      - name: デプロイする
+      - name: Deploy
         working-directory: server
         run: |
           account_id=$(aws sts get-caller-identity --query Account --output text)
