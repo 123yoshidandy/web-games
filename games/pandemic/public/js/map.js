@@ -84,11 +84,26 @@ function cubesOf(c, cubes) {
     const pos = LABEL_POS[c.en] === 'up' ? 'down' : 'up';
     const y = pos === 'up' ? c.y - 21 : c.y + 12;
     const w = list.length * size + (list.length - 1) * gap;
-    return list.map((color, i) => `<rect class="m-cube c${color}" x="${c.x - w / 2 + i * (size + gap)}" y="${y}" width="${size}" height="${size}" rx="1.5" />`).join('');
+    return '<g class="m-cubes">' + list.map((color, i) => `<rect class="m-cube c${color}" x="${c.x - w / 2 + i * (size + gap)}" y="${y}" width="${size}" height="${size}" rx="1.5" />`).join('') + '</g>';
 }
 
 function pawnShape(x, y, role, extra = '') {
     return `<g class="m-pawn ${extra}" transform="translate(${x} ${y})"><path d="M-5 6 Q-5 -1 0 -1 Q5 -1 5 6Z" fill="${ROLE_COLOR[role]}" /><circle cx="0" cy="-4" r="3.4" fill="${ROLE_COLOR[role]}" /></g>`;
+}
+
+// 駒の位置（地図の座標）：席 → [x, y]。同じ都市の駒は横に並べる
+export function pawnPositions(view) {
+    const pos = new Map();
+    const pawnsAt = new Map();
+    view.players.forEach(p => {
+        if (!pawnsAt.has(p.city)) pawnsAt.set(p.city, []);
+        pawnsAt.get(p.city).push(p);
+    });
+    pawnsAt.forEach((list, city) => {
+        const c = CITIES[city];
+        list.forEach((p, i) => pos.set(p.id, [c.x + 13 + i * 7 - (list.length > 2 ? 4 : 0), c.y + 3]));
+    });
+    return pos;
 }
 
 // view：ゲームのビュー。opts：{ reach: 行ける都市の集合, picks: 選べる都市の集合, mover: 動かす駒の席, focus: 選んだ都市 }
@@ -97,11 +112,7 @@ export function mapSvg(view, opts = {}) {
     const reach = opts.reach ?? new Set();
     const picks = opts.picks ?? null;
     const infected = new Set(view.infected);
-    const pawnsAt = new Map();
-    view.players.forEach(p => {
-        if (!pawnsAt.has(p.city)) pawnsAt.set(p.city, []);
-        pawnsAt.get(p.city).push(p);
-    });
+    const pos = pawnPositions(view);
     const cities = CITIES.map(c => {
         const cls = ['m-city'];
         if (picks ? picks.has(c.id) : reach.has(c.id)) cls.push('target');
@@ -109,8 +120,8 @@ export function mapSvg(view, opts = {}) {
         if (opts.focus === c.id) cls.push('focus');
         const total = view.cubes[c.id].reduce((a, b) => a + b, 0);
         if (view.cubes[c.id].some(n => n >= 3)) cls.push('danger');
-        const pawns = (pawnsAt.get(c.id) ?? []).map((p, i, arr) => pawnShape(c.x + 13 + i * 7 - (arr.length > 2 ? 4 : 0), c.y + 3, p.role,
-            [p.id === view.current ? 'current' : '', p.id === opts.mover ? 'mover' : ''].join(' ')));
+        const pawns = view.players.filter(p => p.city === c.id).map(p => `<g class="pslot" data-pawn="${p.id}">${pawnShape(pos.get(p.id)[0], pos.get(p.id)[1], p.role,
+            [p.id === view.current ? 'current' : '', p.id === opts.mover ? 'mover' : ''].join(' '))}</g>`);
         return `<g class="${cls.join(' ')}" data-city="${c.id}">`
             + `<circle class="m-ring" cx="${c.x}" cy="${c.y}" r="14" />`
             + `<circle class="m-dot c${c.color}" cx="${c.x}" cy="${c.y}" r="8" />`

@@ -9,9 +9,10 @@ import {
     CITIES, NEIGHBORS, COLOR_NAMES, ROLES, EVENTS, LEVELS, INFECTION_RATES, MAX_OUTBREAKS, MAX_STATIONS, HAND_LIMIT,
     isCityCard, isEventCard, eventOf, cardColor, cardName
 } from './cities.js';
-import { mapSvg, miniMapSvg, shortestPath, DISEASE_COLORS } from './map.js';
+import { mapSvg, miniMapSvg, shortestPath, pawnPositions, DISEASE_COLORS } from './map.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -85,6 +86,7 @@ function saveSettings(settings) {
     } catch { /* 保存できない環境でも遊べるようにする */ }
 }
 
+const SLIDE_MS = 420; // 駒が都市から都市へ進む長さ（普通の速さ）
 const cardHtml = (card, extra = '') => {
     if (isEventCard(card)) return `<span class="card ev ${extra}" data-card="${card}"><b>${eventOf(card).name}</b></span>`;
     return `<span class="card c${cardColor(card)} ${CITIES[card].name.length >= 6 ? 'long' : ''} ${extra}" data-card="${card}"><b>${CITIES[card].name}</b></span>`;
@@ -168,6 +170,7 @@ export default class UI {
         seg('count', 'count', Number);
         seg('level', 'level');
         seg('mode', 'mode');
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         $('start').addEventListener('click', () => this.start());
         $('resume').addEventListener('click', () => {
             const saved = loadSavedGame();
@@ -240,6 +243,7 @@ export default class UI {
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.view = null;
+        this.cancelResult?.();
         this.update();
     }
 
@@ -360,7 +364,10 @@ export default class UI {
             this.mover = null;
         }
         if (this.pick && !this.isMyActions() && this.pick.needsActions) this.setPick(null);
+        // 手札のカードが飛び立つ山札の位置は、描き直す前に測る
+        const deckFrom = prev ? Motion.rectOf($('player-deck')) : null;
         this.render();
+        if (prev) this.animateChanges(prev, v, deckFrom);
         this.playUpdateSound(prev);
         // 割り込み（捨てる・予測）はシートで聞く
         const discarder = v.phase === 'discard' ? v.actors.find(s => this.can(s)) : undefined;
@@ -370,8 +377,53 @@ export default class UI {
         this.recordLocalResult(v);
         if (v.result && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.openResult(), 600);
+            this.cancelResult = Motion.afterIdle(() => this.openResult(), 600);
         }
+    }
+
+    // 描き直したあと：前のビューとの差を動かす（駒は滑り、増えた病原体・新しい研究所は弾み、数が変わった欄は目立ち、引いたカードは山札から手札へ飛ぶ）
+    animateChanges(prev, v, deckFrom) {
+        if (!Motion.enabled() || prev.turnNo === undefined) return;
+        const before = pawnPositions(prev);
+        const after = pawnPositions(v);
+        for (const p of v.players) {
+            const [ox, oy] = before.get(p.id) ?? [];
+            const [nx, ny] = after.get(p.id);
+            if (ox === undefined || (Math.abs(ox - nx) < 0.5 && Math.abs(oy - ny) < 0.5)) continue;
+            const slot = $('map').querySelector(`.pslot[data-pawn="${p.id}"]`);
+            const length = Motion.ms(SLIDE_MS);
+            const animation = slot?.animate([
+                { transform: `translate(${ox - nx}px, ${oy - ny}px)` },
+                { transform: `translate(${(ox - nx) / 2}px, ${(oy - ny) / 2 - 12}px)`, offset: 0.5 },
+                { transform: 'translate(0, 0)' }
+            ], { duration: length, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+            if (animation) Motion.track(animation, length);
+        }
+        const sum = (row) => row.reduce((a, b) => a + b, 0);
+        CITIES.forEach(c => {
+            const city = $('map').querySelector(`.m-city[data-city="${c.id}"]`);
+            if (sum(v.cubes[c.id]) > sum(prev.cubes[c.id])) Motion.popIn(city?.querySelector('.m-cubes'), { duration: 360, delay: 120 });
+            if (v.stations.includes(c.id) && !prev.stations.includes(c.id)) Motion.popIn(city?.querySelector('.m-station'), { duration: 360 });
+        });
+        const change = (id, a, b) => { if (a !== b) Motion.pulse($(id), { duration: 380, scale: 1.25 }); };
+        change('outbreaks', prev.outbreaks, v.outbreaks);
+        change('rate', prev.rate, v.rate);
+        change('player-deck', prev.playerDeckCount, v.playerDeckCount);
+        change('infection-deck', prev.infectionDeckCount, v.infectionDeckCount);
+        $('cures').querySelectorAll('.vial').forEach((el, color) => {
+            if (v.cures[color] !== prev.cures[color] || v.supply[color] !== prev.supply[color]) Motion.pulse(el, { duration: 380, scale: 1.3 });
+        });
+        // 手札：見ている人の手札に増えたカードは、プレイヤーの山札から飛ばす（山札が減っていないときは弾ませる）
+        const focus = this.focus ?? (v.phase === 'discard' ? v.actors[0] : v.current);
+        const old = prev.players[focus]?.hand ?? [];
+        const drawn = v.players[focus].hand.filter(card => !old.includes(card));
+        const fromDeck = v.playerDeckCount < prev.playerDeckCount;
+        drawn.forEach((card, i) => {
+            const el = $('hand').querySelector(`[data-card="${card}"]`);
+            if (!el) return;
+            if (fromDeck && deckFrom) Motion.fly(deckFrom, el, { content: el, hide: el, size: Motion.rectOf(el), delay: i * 120, duration: 420 });
+            else Motion.popIn(el, { duration: 320, delay: i * 80 });
+        });
     }
 
     // ローカル対戦（人1人と CPU の「CPU に任せる」）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
