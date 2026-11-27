@@ -14,10 +14,16 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'railroad-ink';
 
 const SETTINGS_KEY = 'railroad-ink.settings';
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 400;      // タイルがダイスの欄から盤のマスへ
+const DICE_MS = 380;     // ダイスが転がる
+const STAGGER_MS = 80;   // 何個も動くときの間
+const RESULT_DELAY_MS = 600;   // 動きが終わってから数える
 const CPU_NAMES = ['ジョー', 'ハンク', 'ケイト', 'ビリー', 'モリー'];
 
 const $ = (id) => document.getElementById(id);
@@ -56,6 +62,7 @@ export default class UI {
         this.sel = { source: null, o: 0, cell: null };   // 選んだダイス・向き・マス
         this.round = 0;
         this.resultShown = false;
+        this.flying = new Set();   // 飛んでいる最中のタイルのマス（描き直しても隠し続ける）
         $('home').innerHTML = LINE_ICONS.home;
         $('open-help-game').innerHTML = LINE_ICONS.help;
         $('hint').innerHTML = LINE_ICONS.hint;
@@ -81,6 +88,8 @@ export default class UI {
         });
         this.bindTitle();
         this.bindGame();
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('motion-setting-help'), { label: '動き' });
         document.addEventListener('contextmenu', event => event.preventDefault());
     }
 
@@ -139,6 +148,8 @@ export default class UI {
     showTitle() {
         this.controller?.stop();
         this.controller = null;
+        this.cancelResult?.();
+        this.cancelResult = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('screen-game').hidden = true;
         this.renderTitle();
@@ -175,9 +186,12 @@ export default class UI {
     beginGame(controller) {
         if (this.controller !== controller) this.controller?.stop();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
+        this.cancelResult?.();
+        this.cancelResult = null;
         this.sel = { source: null, o: 0, cell: null };
         this.round = 0;
         this.resultShown = false;
+        this.flying.clear();
         this.controller = controller;
         this.view = null;
         $('screen-title').hidden = true;
@@ -377,6 +391,9 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
+        // 描き直す前に、動きの出発点（ダイスと特別なタイルの欄）を測る
+        const before = prev && Motion.enabled() ? this.measure() : null;
         this.view = view;
         $('hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         if (view.round !== this.round) {
@@ -399,11 +416,76 @@ export default class UI {
         const s = me.score;
         $('score').innerHTML = `${scoreParts(s)}<span class="sp total">見込み<b>${s.total}</b>点</span>`;
         this.renderActions(view, me, mine);
+        if (before) this.animateUpdate(prev, view, before);
 
         if (view.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.showResult(), 600);
+            const controller = this.controller;
+            this.cancelResult = Motion.afterIdle(() => {
+                this.cancelResult = null;
+                if (this.controller === controller) this.showResult();
+            }, RESULT_DELAY_MS);
         }
+    }
+
+    // ---- 動き ----
+
+    measure() {
+        const sources = new Map();
+        document.querySelectorAll('#tray [data-source], #specials [data-source]').forEach(el => sources.set(el.dataset.source, { rect: Motion.rectOf(el), el }));
+        return { sources };
+    }
+
+    // ダイスが転がって現れる
+    tumble(el, delay) {
+        if (!Motion.enabled() || !el) return;
+        const length = Motion.ms(DICE_MS);
+        const animation = el.animate([
+            { transform: 'rotate(-220deg) scale(.4)', opacity: 0 },
+            { transform: 'rotate(18deg) scale(1.12)', opacity: 1, offset: 0.7 },
+            { transform: 'rotate(0) scale(1)', opacity: 1 }
+        ], { duration: length, delay: Motion.ms(delay), easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' });
+        Motion.track(animation, length + Motion.ms(delay));
+    }
+
+    // 描いたタイルを、ダイス（特別なタイル）の欄から盤のマスへ飛ばす。飛んでいる間、マスのタイルは隠す（描き直しても隠し続ける）
+    flyTile(from, content, cell, delay) {
+        const to = Motion.rectOf($('board').querySelector(`[data-cell="${cell}"]`));
+        if (!from || !to) return;
+        this.flying.add(cell);
+        this.hideFlying();
+        Motion.fly(from, to, { content, delay, duration: FLY_MS }).then(() => {
+            this.flying.delete(cell);
+            const tile = $('board').querySelector(`[data-cell="${cell}"] .b-tile`);
+            if (tile) tile.style.visibility = '';
+        });
+    }
+
+    hideFlying() {
+        this.flying.forEach(cell => {
+            const tile = $('board').querySelector(`[data-cell="${cell}"] .b-tile`);
+            if (tile) tile.style.visibility = 'hidden';
+        });
+    }
+
+    // 前のビューから増えた出来事（events の seq で見る）を動かす
+    // 自分が描いたタイルは欄から盤へ飛び、新しいラウンドではダイスが転がる。見込みの点が変わったら弾ませる
+    animateUpdate(prev, v, before) {
+        const lastSeq = Math.max(0, ...(prev.events ?? []).map(e => e.seq));
+        const fresh = (v.events ?? []).filter(e => e.seq > lastSeq);
+        let n = 0;
+        fresh.forEach(e => {
+            if (e.type !== 'place' || e.seat !== v.you) return;
+            const src = before.sources.get(e.source);
+            if (!src) return;
+            this.flyTile(src.rect, src.el, index(e.x, e.y), n++ * STAGGER_MS);
+        });
+        if (v.round !== prev.round) {
+            document.querySelectorAll('#tray .die').forEach((el, i) => this.tumble(el, i * 60));
+        }
+        const old = prev.players[prev.you]?.score?.total;
+        const now = v.players[v.you]?.score?.total;
+        if (old !== undefined && now !== undefined && old !== now) Motion.pulse(document.querySelector('#score .total b'), { delay: n ? FLY_MS : 0, scale: 1.5, duration: 400 });
     }
 
     sourceUsable(source) {
@@ -456,6 +538,7 @@ export default class UI {
         }
         const fresh = new Set(me.placed.map(p => p.cell));
         $('board').innerHTML = boardSvg(me.cells, { legal, preview, fresh });
+        this.hideFlying();
         this.legalCount = legal?.size ?? 0;
     }
 
