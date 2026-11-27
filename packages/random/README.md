@@ -33,6 +33,8 @@ games/<ゲーム>/
 
 ## 写しを持たないゲーム
 
+（chess・dominion は前は関数の一部だけを持ち、panel-de-pon は書き方だけが違う同じ計算だったので、写しに置き換えた。使っている関数の結果は変わらない）
+
 - puzzle-kit を使う10本：puzzle-kit が自分の `random.js` を配っている（中身は同じ）。puzzle-kit の写しのまま
 - everdell（状態を数値1つで持つ `nextRandom` を足している）・ricochet-robots（`mixSeed` を足している）：ゲームの中で足した関数があるので、自前のまま
 - mine-blocks：普通の `<script>` で読み、グローバルの関数で持つ作りなので、自前のまま

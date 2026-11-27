@@ -1,8 +1,11 @@
+// packages/random 1.0.0 からコピーしたファイル。ここでは直さず、packages/random で直してから同期する
 /**
  * シード付きの乱数
- * チェスのルールに乱数はない。CPU の迷い（弱い CPU が、ほどほどに良い手から選ぶ）にだけ使う
- * 同じシードからは同じ順で同じ値が出るので、同じ局面なら CPU は同じ手を指す
+ * 同じシードからは同じ順で同じ値が出るので、操作の記録からゲームを再現できる
  */
+
+// 0以上2^32未満のランダムなシード
+export const createSeed = () => Math.floor(Math.random() * 2 ** 32);
 
 // [0, 1) の乱数を返す関数を作る（mulberry32）
 export function createRandom(seed) {
@@ -14,4 +17,13 @@ export function createRandom(seed) {
         t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
         return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
+}
+
+// 配列をその場でシャッフルする（Fisher-Yates）
+export function shuffle(array, random) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
 }

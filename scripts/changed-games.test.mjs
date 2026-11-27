@@ -55,3 +55,11 @@ test('このリポジトリで test-kit を変えたら、全ゲームと test-k
 test('このリポジトリで packages/clock を変えたら、時計の写しを持つ4本も流す', () => {
     assert.deepEqual(selectWorkspaces(['packages/clock/src/clock.js']), ['packages/clock', 'games/chess', 'games/go', 'games/gomoku', 'games/shogi']);
 });
+
+test('このリポジトリで packages/random を変えたら、乱数の写しを持つゲームも流す', () => {
+    const withCopy = readdirSync(join(root, 'games')).filter((name) => existsSync(join(root, 'games', name, 'random.lock.json')));
+    assert.ok(withCopy.length > 100);
+    const selected = selectWorkspaces(['packages/random/src/random.js']);
+    assert.deepEqual(selected.filter((path) => path.startsWith('games/')).sort(), withCopy.map((name) => `games/${name}`).sort());
+    assert.ok(selected.includes('packages/random'));
+});
