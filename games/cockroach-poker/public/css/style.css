@@ -83,7 +83,7 @@ button {
     font-size: 16px;
     font-weight: 800;
     cursor: pointer;
-    transition: transform .08s, box-shadow .08s;
+    transition: transform calc(.08s * var(--motion-scale, 1)), box-shadow calc(.08s * var(--motion-scale, 1));
 }
 .btn.primary { color: #3a1b02; background: linear-gradient(#f8b56f, var(--accent)); box-shadow: 0 4px 0 var(--accent-deep); }
 .btn.secondary { color: #fff; background: linear-gradient(#a8785a, var(--brown)); box-shadow: 0 4px 0 var(--brown-deep); }
@@ -157,7 +157,7 @@ button {
 .chip .critter { background: #fbf4e6; border-radius: 5px; }
 .chip b { min-width: .7em; text-align: center; text-shadow: 0 1px 1px rgba(0, 0, 0, .4); }
 .chip.warn { box-shadow: 0 0 0 2px #f6d06a; }
-.chip.danger { box-shadow: 0 0 0 2px #ff5a4d; animation: danger 1.4s ease-in-out infinite; }
+.chip.danger { box-shadow: 0 0 0 2px #ff5a4d; animation: danger calc(1.4s * var(--motion-scale, 1)) ease-in-out infinite; }
 .chip.zero { opacity: .28; filter: grayscale(.6); }
 @keyframes danger { 50% { box-shadow: 0 0 0 2px rgba(255, 90, 77, .35); } }
 
@@ -272,7 +272,7 @@ button {
 }
 .opponent.current { box-shadow: inset 0 0 0 2px var(--accent); }
 .opponent.holding { background: rgba(240, 145, 58, .16); }
-.opponent.targetable { cursor: pointer; box-shadow: inset 0 0 0 2px #f6d06a; animation: target 1.2s ease-in-out infinite; }
+.opponent.targetable { cursor: pointer; box-shadow: inset 0 0 0 2px #f6d06a; animation: target calc(1.2s * var(--motion-scale, 1)) ease-in-out infinite; }
 .opponent.chosen { animation: none; background: rgba(246, 208, 106, .3); box-shadow: inset 0 0 0 3px #f6d06a; }
 @keyframes target { 50% { background: rgba(246, 208, 106, .16); } }
 .opponent.lost { box-shadow: inset 0 0 0 2px var(--danger); background: rgba(212, 72, 63, .18); }
@@ -283,7 +283,7 @@ button {
     right: 6px;
     color: var(--accent);
     font-weight: 800;
-    animation: blink 1s steps(2) infinite;
+    animation: blink calc(1s * var(--motion-scale, 1)) steps(2) infinite;
 }
 @keyframes blink { 50% { opacity: .3; } }
 .op-head { display: flex; align-items: center; gap: 5px; min-width: 0; padding-right: 12px; }
@@ -423,7 +423,7 @@ dialog h2:focus-visible { outline: none; }
     transform: translateX(-50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s;
+    transition: opacity calc(.2s * var(--motion-scale, 1));
 }
 .toast.show { opacity: 1; }
 
@@ -452,3 +452,8 @@ dialog h2:focus-visible { outline: none; }
 
 /* ヒント：おすすめの印 */
 .recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択肢と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .3); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3a1b02; background: var(--accent); }

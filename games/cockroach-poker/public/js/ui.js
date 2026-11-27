@@ -12,6 +12,7 @@ import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { symbolsSvg, cardHtml, backHtml, kindTag, critter, icon } from './art.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'cockroach-poker';
 const SETTINGS_KEY = 'cockroach-poker.settings';
@@ -21,7 +22,7 @@ const FLY_MS = 520;
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reduceMotion = () => !Motion.enabled(); // 速さが「なし」（動きを減らす設定を含む）
 const countOf = (list, item) => list.filter(x => x === item).length;
 
 function loadSettings() {
@@ -53,6 +54,11 @@ export default class UI {
         this.resultTimer = null;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'おばけポーカー',
@@ -128,7 +134,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('#fx').innerHTML = '';
@@ -283,7 +289,7 @@ export default class UI {
         this.playEvents(view, prev);
         if ($('#log').open) this.renderLog();
         if (view.loser !== null && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
@@ -515,11 +521,13 @@ export default class UI {
         holder.style.top = `${y0}px`;
         $('#fx').appendChild(holder);
         const lift = Math.min(60, Math.hypot(x1 - x0, y1 - y0) * 0.25);
-        holder.animate([
+        const flight = holder.animate([
             { transform: 'translate(-50%, -50%) scale(1)' },
             { transform: `translate(calc(-50% + ${(x1 - x0) / 2}px), calc(-50% + ${(y1 - y0) / 2 - lift}px)) scale(1.08)`, offset: 0.5 },
             { transform: `translate(calc(-50% + ${x1 - x0}px), calc(-50% + ${y1 - y0}px)) scale(.8)` }
-        ], { duration: FLY_MS, easing: 'ease-in-out' }).finished.finally(() => holder.remove());
+        ], { duration: Motion.ms(FLY_MS), easing: 'ease-in-out' });
+        Motion.track(flight, Motion.ms(FLY_MS)); // CPU は飛び終わってから動く
+        flight.finished.catch(() => {}).finally(() => holder.remove());
     }
 
     toast(message) {
