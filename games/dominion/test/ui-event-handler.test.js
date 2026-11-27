@@ -15,7 +15,7 @@ vi.mock('../public/js/card-animations.js', () => {
 vi.mock('../public/js/ui-view.js', () => ({ hasNightCard: () => false }));
 vi.mock('../public/js/music.js', () => ({ music: { play: () => {} } }));
 
-const { default: UIEventHandler } = await import('../public/js/ui-event-handler.js');
+const { default: UIEventHandler, unplayableReason } = await import('../public/js/ui-event-handler.js');
 
 // 財宝はタイマーで少しずつずらして動かし始めるので、タイマーを進めてから終える
 const finishAnimations = () => {
@@ -35,7 +35,7 @@ function createHandler(controller) {
         playedCards: { querySelectorAll: () => [], getBoundingClientRect: () => rect },
         discardCards: { getBoundingClientRect: () => rect }
     };
-    const handler = new UIEventHandler({ elements, gameController: controller });
+    const handler = new UIEventHandler({ elements, gameController: controller, showToast: vi.fn() });
     // 状態が変わって描き直されたときと同じく、返事待ちの操作をなくす
     controller.setUIController({ updateGameView: () => handler.clearPendingActions() });
     return handler;
@@ -89,5 +89,47 @@ describe('ターン終了の操作（#12）', () => {
         finishAnimations();
         expect(controller.game.commands.at(-1).type).toBe('endTurn');
         expect(controller.getView().isMyTurn).toBe(false);
+    });
+});
+
+describe('フェーズの流れの知らせ（#11）', () => {
+    let controller;
+    let handler;
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        pendingAnimations.length = 0;
+        controller = new GameController();
+        controller.initGame([{ name: 'あなた' }, { name: 'CPU', isCPU: true }], { seed: 1 });
+        for (let step = 0; step < 100 && !controller.getView().isMyTurn; step++) controller.runCpuStep();
+        handler = createHandler(controller);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('アクションフェーズに財宝をタップすると、購入へ進めば自動で出ることを知らせる', () => {
+        const hand = controller.getView().me.hand;
+        const index = hand.findIndex(card => card.isType(CARD_TYPES.TREASURE));
+        handler.handleCardPlay(index);
+        expect(handler.uiController.showToast).toHaveBeenCalledWith(expect.stringContaining('「購入へ」'));
+        expect(controller.getView().phase).toBe('action');
+    });
+
+    it('購入へ進むと、自動で出した財宝の枚数を知らせる', () => {
+        const treasures = controller.getView().me.hand.filter(card => card.isType(CARD_TYPES.TREASURE)).length;
+        handler.handleEnterBuyPhase();
+        finishAnimations();
+        expect(handler.uiController.showToast).toHaveBeenCalledWith(`手札の財宝${treasures}枚を自動で出しました`);
+    });
+
+    it('プレイできない理由を、フェーズとカードの種類に合わせて返す', () => {
+        const view = controller.getView();
+        const of = (type) => ({ isType: (t) => t === type });
+        expect(unplayableReason({ ...view, isMyTurn: false }, of(CARD_TYPES.ACTION))).toContain('自分の番');
+        expect(unplayableReason({ ...view, phase: 'action' }, of(CARD_TYPES.ACTION))).toContain('アクションが残っていません');
+        expect(unplayableReason({ ...view, phase: 'action' }, of(CARD_TYPES.VICTORY))).toContain('長押し');
+        expect(unplayableReason({ ...view, phase: 'buy' }, of(CARD_TYPES.TREASURE))).toContain('サプライ');
     });
 });

@@ -13,6 +13,20 @@ const MINI_CARD_WIDTH = 76;
 const MINI_CARD_HEIGHT = 30;
 const PLAYED_CARDS_GAP = 6;
 
+// 手札のカードを今プレイできない理由（タップしたときに短く知らせる）。知らせることがなければ null
+export function unplayableReason(view, card) {
+    if (!view.isMyTurn) return '自分の番になるとプレイできます';
+    if (view.phase === 'action') {
+        if (card.isType(CARD_TYPES.TREASURE)) return '財宝は「購入へ」を押すと、まとめて自動で出ます';
+        if (card.isType(CARD_TYPES.ACTION)) return 'アクションが残っていません。「購入へ」で購入に進みます';
+        if (card.isType(CARD_TYPES.NIGHT)) return '夜のカードは、購入の後の夜フェーズにプレイします';
+        return 'このカードはプレイしません（長押しで説明）';
+    }
+    if (view.phase === 'buy') return 'サプライのカードをタップして購入します';
+    if (view.phase === 'night') return '夜フェーズには、夜のカードだけプレイできます';
+    return null;
+}
+
 class UIEventHandler {
     // 購入回数を使い切ってから自動でターンを終えるまでの待ち時間（ミリ秒）
     static AUTO_END_TURN_DELAY_MS = 200;
@@ -39,9 +53,17 @@ class UIEventHandler {
         const canPlayNight = view.phase === 'night' && card?.isType(CARD_TYPES.NIGHT);
         const canPlay = view.isMyTurn && (canPlayAction || canPlayNight) && !view.prompt;
 
-        // 今プレイできないカードはタップしても何もしない（説明は長押しで表示する）
         // アニメーション中や返事を待つ間の連打で、別のカードまでプレイしないようにする
-        if (!canPlay || this.isActionPending) return;
+        if (this.isActionPending) return;
+        // 今プレイできないカードは、なぜかを短く知らせる（説明は長押しで表示する）
+        if (!canPlay) {
+            const reason = card && !view.prompt ? unplayableReason(view, card) : null;
+            if (reason) {
+                music.play('error');
+                this.uiController.showToast?.(reason);
+            }
+            return;
+        }
         this.isActionPending = true;
 
         // カード要素を取得（手札は並び替えて表示しているので、画面上の位置ではなく手札の番号で探す）
@@ -70,7 +92,12 @@ class UIEventHandler {
         this.isActionPending = true;
         const hand = view.me.hand;
         const enterBuyPhase = () => {
-            if (!this.gameController.send({ type: 'buyPhase' })) this.clearPendingActions();
+            if (!this.gameController.send({ type: 'buyPhase' })) {
+                this.clearPendingActions();
+            } else if (treasureCards.length > 0) {
+                // 財宝は1枚ずつタップしなくても、購入へ進むときにまとめて出すことを知らせる
+                this.uiController.showToast?.(`手札の財宝${treasureCards.length}枚を自動で出しました`);
+            }
         };
         
         // 財宝カードをアニメーションするためのカード要素を取得（要素の data-card-index で手札と対応させる）

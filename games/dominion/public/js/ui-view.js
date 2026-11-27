@@ -65,7 +65,7 @@ class UIView {
             <span class="status-player">${currentPlayer.name}${cpuLabel}</span>
             ${controller ? `<span class="status-waiting">${controller.name}が支配中</span>` : ''}
             ${view.missionTurn ? '<span class="status-waiting">伝道のターン（カードは購入できない）</span>' : ''}
-            <span class="status-phase phase-${view.phase}">${this.getPhaseText(view.phase)}</span>
+            ${this.getPhaseStepsHtml(view)}
             ${view.prompt?.waiting ? `<span class="status-waiting">${view.prompt.playerName}が選択中</span>` : ''}
             ${view.realtime?.waiting ? `<span class="status-waiting">あと${Object.values(view.realtime.status).filter(status => status === 'playing').length}人</span>` : ''}
         `;
@@ -86,6 +86,20 @@ class UIView {
             (currentPlayer.coffers > 0 ? stat('財源', currentPlayer.coffers, view.phase !== 'buy') : '') +
             (currentPlayer.villagers > 0 ? stat('村人', currentPlayer.villagers, view.phase !== 'action') : '') +
             (currentPlayer.favors > 0 ? stat('恩恵', currentPlayer.favors, false) : '');
+    }
+
+    // ターンの流れ（アクション › 購入、夜のカードがあれば › 夜）を並べ、今のフェーズを強調する
+    // クリーンアップ・待機などは、今のフェーズだけを出す
+    getPhaseStepsHtml(view) {
+        const steps = ['action', 'buy'];
+        if (view.phase === 'night' || (view.isMyTurn && hasNightCard(view.me))) steps.push('night');
+        if (!steps.includes(view.phase)) {
+            return `<span class="status-phase phase-${view.phase}">${this.getPhaseText(view.phase)}</span>`;
+        }
+        const items = steps.map(phase => phase === view.phase
+            ? `<span class="status-phase phase-${phase}" aria-current="step">${this.getPhaseText(phase)}</span>`
+            : `<span class="status-phase phase-${phase} other-step">${this.getPhaseText(phase)}</span>`);
+        return `<span class="phase-steps" aria-label="フェーズ">${items.join('<span class="phase-arrow" aria-hidden="true">›</span>')}</span>`;
     }
 
     // フェーズの日本語テキストを取得
@@ -576,7 +590,7 @@ class UIView {
 
         if (view.phase === 'action' && view.isMyTurn) {
             actionButtonsHtml += `
-                <button id="buy-phase-btn" ${view.me.actions <= 0 ? 'class="highlight"' : ''}>購入へ</button>
+                <button id="buy-phase-btn" ${view.me.actions <= 0 ? 'class="highlight"' : ''} title="手札の財宝をまとめて自動で出して、購入に進みます">購入へ<small class="btn-sub">財宝は自動で出す</small></button>
             `;
         }
         
