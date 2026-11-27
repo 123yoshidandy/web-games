@@ -7,8 +7,9 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
-export const CPU_PLAY_DELAY_MS = 900;   // カードを取る前は、前の出来事が見えるように長めに待つ
+export const CPU_PLAY_DELAY_MS = 900;   // カードを取る前は、前の出来事が見えるように長めに待つ（動きが終わってから数える）
 const CPU_QUICK_DELAY_MS = 700;  // 七不思議のドラフトと、効果の選択
 const SAVE_KEY = 'seven-wonders-duel.save';
 
@@ -36,7 +37,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.save();
     }
@@ -79,10 +80,13 @@ export default class LocalGameController {
 
     // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
         if (!isCpuTurn(this.game)) return;
         const delay = this.game.phase === 'play' ? CPU_PLAY_DELAY_MS : CPU_QUICK_DELAY_MS;
-        this.cpuTimer = setTimeout(() => {
+        this.cancelCpu = Motion.afterIdle(() => {
+            // 待っている間に新しい動きが始まっていたら、また動き終わるのを待つ
+            if (!Motion.isIdle()) return this.scheduleCpu();
             try {
                 const before = this.game.commands.length;
                 runCpuStep(this.game);
@@ -116,6 +120,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
     }
 }

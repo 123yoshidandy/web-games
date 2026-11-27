@@ -12,6 +12,7 @@ import { recordResult } from './netplay/user-stats.js';
 import { PLAYERS } from './game.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import {
     symbolsSvg, icon, resourceIcon, scienceIcon, coinHtml, vpHtml, cardHtml, cardBackHtml, wonderHtml,
     tokenHtml, cardText, wonderText, costHtml
@@ -21,6 +22,12 @@ const SETTINGS_KEY = 'seven-wonders-duel.settings';
 const CPU_NAME = 'クレオ';
 const RESULT_DELAY_MS = 900;
 const FLOAT_MS = 1100;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 取ったカード・トークンが行き先へ
+const FLIP_MS = 360;     // 伏せ札が表になる
+const DEAL_MS = 260;     // 時代の初めに並びが出る
+const STAGGER_MS = 90;   // 続けて動くときの間
+const DEAL_STAGGER_MS = 28;
 const CARD_RATIO = 1.25;   // カードの高さ ÷ 幅
 const ROW_STEP = 0.5;      // 行の間隔（カードの高さに対して）。下の行が上のカードの下半分を覆う
 const GAP = 4;
@@ -28,7 +35,6 @@ const ROMAN = ['', 'I', 'II', 'III'];
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function loadSettings() {
     try {
@@ -72,7 +78,7 @@ export default class UI {
         this.lastSeq = 0;
         this.openedPrompt = null;   // 自動で開いた選択。閉じても同じ選択では開き直さない
         this.detailSlot = null;
-        this.resultTimer = null;
+        this.cancelResult = null;
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: '七不思議デュエル',
@@ -97,6 +103,7 @@ export default class UI {
         this.bindStatic();
         this.renderTitleArt();
         this.renderHelp();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         window.addEventListener('resize', () => {
             if (this.controller) this.renderStructure();
         });
@@ -166,7 +173,9 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
+        this.cancelResult = null;
+        Motion.cancelAll();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         document.querySelectorAll('.float').forEach(el => el.remove());
     }
@@ -274,6 +283,8 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const previous = this.view;
+        // 描き直す前に、動きの出発点（並びのカード・トークン・軍事の駒）を測る
+        const before = previous && Motion.enabled() ? this.measure() : null;
         this.view = this.controller.getView();
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         const v = this.view;
@@ -287,7 +298,7 @@ export default class UI {
         this.renderStructure();
         this.markHint();
         this.renderStatus();
-        this.playEvents(previous);
+        this.playEvents(previous, before);
         this.recordLocalResult(previous);
         this.refreshOpenDialogs();
         this.maybePrompt();
@@ -335,7 +346,7 @@ export default class UI {
             const token = v.militaryTokens.find(t => !t.taken && ((t.loser !== me && i === t.at) || (t.loser === me && i === -t.at)));
             const zone = Math.abs(i) >= 6 ? 'z3' : Math.abs(i) >= 3 ? 'z2' : Math.abs(i) >= 1 ? 'z1' : 'z0';
             const side = i < 0 ? 'mine' : i > 0 ? 'theirs' : '';
-            cells.push(`<span class="mcell ${zone} ${side} ${Math.abs(i) === 9 ? 'capital' : ''}">${token ? `<span class="mtoken">${token.coins}</span>` : ''}${i === pos ? '<span class="pawn"></span>' : ''}</span>`);
+            cells.push(`<span class="mcell ${zone} ${side} ${Math.abs(i) === 9 ? 'capital' : ''}">${token ? `<span class="mtoken">${token.coins}</span>` : ''}${i === pos ? '<span class="pawn" data-key="pawn"></span>' : ''}</span>`);
         }
         const points = militaryPoints(Math.abs(pos));
         $('#military').innerHTML = `<div class="track">${cells.join('')}</div>`;
@@ -430,12 +441,12 @@ export default class UI {
     }
 
     // コインの増減を、都市の上に浮かべる
-    playEvents(previous) {
+    playEvents(previous, before = null) {
         const v = this.view;
         const fresh = v.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = v.events.at(-1)?.seq ?? this.lastSeq;
         if (previous) this.playSound(fresh, previous);
-        if (!previous || reduceMotion()) return;
+        if (!previous || !Motion.enabled()) return;
         const sums = [0, 0];
         fresh.filter(e => e.type === 'coins').forEach(e => { sums[e.seat] += e.delta; });
         sums.forEach((delta, seat) => {
@@ -451,6 +462,107 @@ export default class UI {
             document.body.appendChild(el);
             setTimeout(() => el.remove(), FLOAT_MS);
         });
+        if (before) this.animate(fresh, before);
+    }
+
+    // ---- 動き ----
+
+    // 描き直す前の、動きの出発点
+    measure() {
+        const copy = (el) => {
+            const rect = Motion.rectOf(el);
+            if (!rect) return null;
+            const node = el.cloneNode(true);
+            // 飛んでいる間は body の下に置かれるので、カードの大きさを決める変数を持たせる
+            ['--cw', '--ch'].forEach(name => node.style.setProperty(name, $('#structure').style.getPropertyValue(name)));
+            return { rect, node };
+        };
+        const collect = (selector, key) => {
+            const map = new Map();
+            document.querySelectorAll(selector).forEach(el => {
+                const item = copy(el);
+                if (item) map.set(el.dataset[key], item);
+            });
+            return map;
+        };
+        const counts = new Map();
+        ['#city-0', '#city-1'].forEach(id => document.querySelectorAll(`${id} .cc`).forEach(el => {
+            const rect = Motion.rectOf(el);
+            if (rect) counts.set(`${$(id).dataset.seat}:${[...el.classList].find(c => c.startsWith('c-')).slice(2)}`, rect);
+        }));
+        return {
+            slots: collect('#structure .slot[data-slot]', 'slot'),
+            tokens: collect('#board-info [data-token]', 'token'),
+            wonders: collect('#structure [data-pick-wonder]', 'pickWonder'),
+            counts,
+            pawn: Motion.captureRects($('#military'), '.pawn[data-key]', 'key')
+        };
+    }
+
+    // 新しい出来事を動かす：取ったカードは行き先（都市・捨て札・七不思議）へ飛び、伏せ札は裏返り、軍事の駒は滑る
+    animate(fresh, before) {
+        const v = this.view;
+        const cityOf = (seat) => $(seat === v.you ? '#city-0' : '#city-1');
+        const lastOf = (el, selector) => [...(el?.querySelectorAll(selector) ?? [])].at(-1) ?? null;
+        const discardBtn = $('#open-discard');
+        const flyCard = (key, from, to, i) => {
+            if (!from || !to) return;
+            Motion.fly(from, to, { content: cardHtml(key), size: { width: 44, height: 55 }, duration: FLY_MS, delay: i * STAGGER_MS });
+        };
+        let settle = 0;
+        let i = 0;
+        const land = (to) => {
+            Motion.pulse(to, { delay: i * STAGGER_MS + FLY_MS, scale: 1.25, duration: 320 });
+            settle = Math.max(settle, i * STAGGER_MS + FLY_MS);
+            i++;
+        };
+        fresh.forEach(e => {
+            if (e.type === 'take') {
+                const from = before.slots.get(String(e.slot));
+                const city = cityOf(e.seat);
+                const to = e.action === 'discard' ? discardBtn
+                    : e.action === 'build' ? (city.querySelector(`.cc.c-${CARDS[e.card].color}`) ?? city.querySelector('.color-counts'))
+                        : lastOf(city, '.mini-wonder.built');
+                if (!from || !to) return;
+                Motion.fly(from.rect, to, { content: from.node, duration: FLY_MS, delay: i * STAGGER_MS });
+                land(to);
+            } else if (e.type === 'token') {
+                const from = before.tokens.get(e.token);
+                const to = cityOf(e.seat).querySelector(`.tok-list [data-token="${e.token}"]`);
+                if (!from || !to) return;
+                Motion.fly(from.rect, to, { content: from.node, duration: FLY_MS, delay: i * STAGGER_MS });
+                land(to);
+            } else if (e.type === 'pickWonder') {
+                const from = before.wonders.get(e.wonder);
+                const to = lastOf(cityOf(e.seat), '.mini-wonder');
+                if (!from || !to) return;
+                Motion.fly(from.rect, to, { content: from.node, duration: FLY_MS, delay: i * STAGGER_MS });
+                land(to);
+            } else if (e.type === 'destroy') {
+                const from = before.counts.get(`${e.seat}:${CARDS[e.card].color}`);
+                flyCard(e.card, from, discardBtn, i);
+                if (from) land(discardBtn);
+            } else if (e.type === 'revive') {
+                const to = cityOf(e.seat).querySelector(`.cc.c-${CARDS[e.card].color}`) ?? cityOf(e.seat).querySelector('.color-counts');
+                flyCard(e.card, discardBtn, to, i);
+                if (to) land(to);
+            }
+        });
+        const slotEl = (slot) => $('#structure').querySelector(`.slot[data-slot="${slot}"]`);
+        // 伏せ札が表になる：取ったカードが着くころに、裏から表へ回す
+        fresh.filter(e => e.type === 'reveal').forEach(e => e.slots.forEach((slot, k) => {
+            const el = slotEl(slot);
+            const s = v.structure[slot];
+            if (!el || !s?.faceUp) return;
+            const face = el.innerHTML;
+            el.innerHTML = cardBackHtml(v.age, s.back);
+            Motion.flipCard(el, { duration: FLIP_MS, delay: settle + k * 60, onHalf: () => { el.innerHTML = face; } });
+        }));
+        // 時代の初めは、並びが順に出る
+        if (fresh.some(e => e.type === 'age')) {
+            Motion.flipFrom(new Map(), $('#structure'), '.slot[data-slot]', 'slot', { duration: DEAL_MS, stagger: DEAL_STAGGER_MS, enter: 'pop' });
+        }
+        Motion.flipFrom(before.pawn, $('#military'), '.pawn[data-key]', 'key', { duration: 360 });
     }
 
     // ---- 選ぶ ----
@@ -631,9 +743,10 @@ export default class UI {
 
     maybeResult() {
         const v = this.view;
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
+        this.cancelResult = null;
         if (v.phase !== 'end') return;
-        this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+        this.cancelResult = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
     }
 
     showResult() {

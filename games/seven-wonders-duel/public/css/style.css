@@ -128,6 +128,13 @@ button {
     cursor: pointer;
 }
 .segmented button[aria-checked="true"] { color: #2d1f04; background: var(--gold); }
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; border-radius: 10px; background: rgba(0, 0, 0, .25); padding: 3px; }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 36px; padding: 0 10px; border-radius: 8px; color: var(--muted); font-size: 15px; font-weight: 800; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #2d1f04; background: var(--gold); }
+/* 飛んでいるカード */
+.motion-flyer { filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); }
 
 /* ---- 小さな部品 ---- */
 
