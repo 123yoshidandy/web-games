@@ -1,0 +1,22 @@
+{
+    "name": "ポケモン6対6タクティクス",
+    "short_name": "ポケモン6対6",
+    "description": "マス目のフィールドで6体ずつのポケモンを動かして戦うタクティクス。編成と戦術ルールを決めて、手動でも自動でも戦えます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": [
+        "fullscreen",
+        "standalone"
+    ],
+    "orientation": "portrait",
+    "background_color": "#16233a",
+    "theme_color": "#16233a",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

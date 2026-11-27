@@ -1,0 +1,38 @@
+{
+  "name": "pokemon-battle",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "portal": {
+    "original": "Pokémon（6対6タクティクス）",
+    "aliases": [
+      "ポケモン",
+      "ポケモンバトル",
+      "タクティクス",
+      "ガンビット"
+    ],
+    "genres": [
+      "ボードゲーム"
+    ],
+    "minutes": [
+      10,
+      20
+    ],
+    "weight": 2
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  },
+  "devDependencies": {
+    "test-kit": "*"
+  },
+  "standards": {
+    "skip": {
+      "undo": "技の命中とダメージの乱数を見たあとに戻すと有利になる"
+    }
+  }
+}
