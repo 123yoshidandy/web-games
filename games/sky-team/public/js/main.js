@@ -12,6 +12,7 @@ import { PLAYERS } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'skyteam.settings', save: 'skyteam.save' };
@@ -19,6 +20,11 @@ const CPU_NAMES = ['ソラ', 'ハヤテ'];
 // 確かめるときだけ、URL の ?cpuDelay=ミリ秒 で CPU の間隔を縮められる
 const CPU_DELAY = Number(new URLSearchParams(location.search).get('cpuDelay')) || undefined;
 const REDUCED_MOTION = matchMedia('(prefers-reduced-motion: reduce)');
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // ダイスがダイスの欄から置き場へ
+const PLANE_MS = 650;    // 飛行機が進む
+const DICE_MS = 380;     // ダイスが転がる
+const STAGGER_MS = 70;   // 何個も動くときの間
 
 const store = {
     load(key) {
@@ -42,6 +48,8 @@ let view = null;
 let seenSeq = 0;
 let ui = { die: null, delta: 0, hint: null };
 let resultShown = false;
+let cancelResult = null;
+let lastReroll = [];   // 自分が振り直したダイスの添え字（転がして見せる）
 
 const SLOT_LABEL = {
     axis: '軸', engine: 'エンジン', radio: '無線', gear: '着陸装置', flap: 'フラップ', brake: 'ブレーキ', coffee: 'コーヒー'
@@ -138,6 +146,8 @@ function startGame(setup) {
 // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
 function beginGame(next) {
     if (controller !== next) controller?.stop();
+    cancelResult?.();
+    cancelResult = null;
     document.querySelectorAll('dialog[open]').forEach(d => d.close());
     controller = next;
     view = controller.getView();
@@ -162,6 +172,8 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
+    cancelResult?.();
+    cancelResult = null;
     showScene('title');
 }
 
@@ -182,6 +194,8 @@ function recordLocalResult() {
 function onUpdate() {
     if (!controller) return;
     const prev = view;
+    // 描き直す前に、動きの出発点（選んだダイス・相棒のダイス・飛行機）を測る
+    const before = prev && Motion.enabled() ? measure() : null;
     view = controller.getView();
     const fresh = view.events.filter(e => e.seq > seenSeq);
     seenSeq = view.eventSeq;
@@ -193,8 +207,14 @@ function onUpdate() {
     recordLocalResult();
     render();
     renderLog();
-    flash(fresh);
-    if (view.phase === 'end' && !resultShown) setTimeout(showResult, REDUCED_MOTION.matches ? 0 : 900);
+    if (before) animateUpdate(prev, fresh, before);
+    if (view.phase === 'end' && !resultShown && !cancelResult) {
+        const current = controller;
+        cancelResult = Motion.afterIdle(() => {
+            cancelResult = null;
+            if (controller === current) showResult();
+        }, REDUCED_MOTION.matches ? 0 : 900);
+    }
 }
 
 // 新しい出来事から効果音を1つ鳴らす（1つの操作に1つ。終わりは勝ち負けを2人とも）
@@ -266,7 +286,8 @@ function reroll() {
     if (!isMyTurn() || view.board.rerolls <= 0) return;
     const dice = view.dice.map((d, i) => (d.used ? null : i)).filter(i => i !== null);
     // 選んでいるダイスがあればそれだけ、なければ残り全部を振り直す
-    controller.send({ type: 'reroll', dice: ui.die !== null ? [ui.die] : dice });
+    lastReroll = ui.die !== null ? [ui.die] : dice;
+    controller.send({ type: 'reroll', dice: lastReroll });
     ui = { die: null, delta: 0, hint: null };
 }
 
@@ -449,10 +470,69 @@ function renderTray() {
         <div class="tray-partner"><span class="tray-label ${partner === 0 ? 'p' : 'c'}">${escapeHtml(view.players[partner].name)}</span><div class="dice">${hidden || '<span class="muted">置き終えた</span>'}</div></div>`;
 }
 
-// 置かれた置き場を少し光らせる（動きを減らす設定では光らせない）
-function flash(fresh) {
-    if (REDUCED_MOTION.matches) return;
-    fresh.filter(e => e.type === 'place').forEach(e => document.querySelector(`[data-slot="${e.slot}"]`)?.classList.add('just'));
+// ---------- 動き ----------
+
+function measure() {
+    const picked = document.querySelector('#tray .die-button.selected svg');
+    const plane = document.querySelector('#track .me-plane');
+    return {
+        die: picked ? { rect: Motion.rectOf(picked), el: picked } : null,
+        partner: Motion.rectOf(document.querySelector('#tray .hidden-die')),
+        plane: plane ? { rect: Motion.rectOf(plane), el: plane } : null,
+        lamps: document.querySelectorAll('#cockpit .slot.done').length,
+        cups: document.querySelectorAll('#cockpit .cup.full').length,
+        rerolls: document.querySelector('#cockpit .rerolls b')?.textContent
+    };
+}
+
+// ダイスが転がって現れる
+function tumble(el, delay) {
+    if (!Motion.enabled() || !el) return;
+    const length = Motion.ms(DICE_MS);
+    const animation = el.animate([
+        { transform: 'rotate(-220deg) scale(.4)', opacity: 0 },
+        { transform: 'rotate(18deg) scale(1.12)', opacity: 1, offset: 0.7 },
+        { transform: 'rotate(0) scale(1)', opacity: 1 }
+    ], { duration: length, delay: Motion.ms(delay), easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' });
+    Motion.track(animation, length + Motion.ms(delay));
+}
+
+// 前のビューから増えた出来事（events の seq で見る）を動かす
+// 置いたダイスは欄から置き場へ飛び、新しい回や振り直しのダイスは転がり、飛行機は進んだマスへ飛ぶ
+function animateUpdate(prev, fresh, before) {
+    let settle = 0;
+    fresh.forEach(e => {
+        if (e.type === 'place') {
+            const slot = document.querySelector(`[data-slot="${e.slot}"]`);
+            const to = slot?.querySelector('svg.placed');
+            if (!to) return;
+            const mine = e.seat === view.seat;
+            const from = mine ? before.die?.rect : before.partner;
+            const content = mine && before.die ? before.die.el : dieSvg(e.value, e.seat, '');
+            if (from) Motion.fly(from, to, { content, hide: to, size: { width: 36, height: 36 }, duration: FLY_MS });
+            Motion.pulse(slot, { delay: from ? FLY_MS : 0, scale: 1.14, duration: 380 });
+            settle = Math.max(settle, FLY_MS);
+        } else if (e.type === 'reroll') {
+            if (e.seat === view.seat) lastReroll.forEach((i, n) => tumble(document.querySelector(`#tray [data-die="${i}"] svg`), n * STAGGER_MS));
+            else document.querySelectorAll('#tray .hidden-die').forEach((el, n) => Motion.popIn(el, { delay: n * STAGGER_MS }));
+        } else if (e.type === 'roll') {
+            document.querySelectorAll('#tray [data-die] svg').forEach((el, n) => tumble(el, n * STAGGER_MS));
+            document.querySelectorAll('#tray .hidden-die').forEach((el, n) => Motion.popIn(el, { delay: n * STAGGER_MS }));
+        }
+    });
+    // 飛行機：進んだマスへ飛ぶ（置いたダイスが着いてから）
+    const plane = document.querySelector('#track .me-plane');
+    const now = Motion.rectOf(plane);
+    if (before.plane?.rect && now && Math.abs(before.plane.rect.left - now.left) > 2) {
+        Motion.fly(before.plane.rect, plane, { content: before.plane.el, hide: plane, delay: settle, duration: PLANE_MS, lift: false });
+    }
+    // 出した装置のランプ・コーヒー・振り直しの数
+    document.querySelectorAll('#cockpit .slot.done .lamp').forEach((el, i, all) => {
+        if (all.length > before.lamps && i >= before.lamps) Motion.popIn(el, { delay: settle });
+    });
+    if (document.querySelectorAll('#cockpit .cup.full').length !== before.cups) Motion.pulse(document.querySelector('#cockpit .cups'), { delay: settle, scale: 1.3, duration: 380 });
+    const rerolls = document.querySelector('#cockpit .rerolls b');
+    if (rerolls && before.rerolls !== undefined && rerolls.textContent !== before.rerolls) Motion.pulse(rerolls, { delay: settle, scale: 1.5, duration: 380 });
 }
 
 // ---------- 履歴 ----------
@@ -501,6 +581,8 @@ function setupDialogs() {
         });
     });
     $('help').innerHTML = helpMarkup();
+    Motion.mountSpeedSetting($('motion-setting'), { label: '' });
+    Motion.mountSpeedSetting($('motion-setting-help'), { label: '動き' });
 }
 
 function showResult() {
