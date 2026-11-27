@@ -15,6 +15,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'draftosaurus';
 const $ = id => document.getElementById(id);
@@ -22,6 +23,10 @@ const KEYS = { settings: 'draftosaurus.settings.v1', save: 'draftosaurus.save.v1
 const CPU_NAMES = ['ミナ', 'ケン', 'ソラ', 'ハル'];
 const RESULT_DELAY_MS = 1100;
 const INPUT_LOCK_MS = 450;
+// 動き（普通の速さでの長さ。CSS の動きと合わせる）
+const ROLL_MS = 550;      // サイコロ
+const DROP_MS = 500;      // 置いた恐竜
+const DEAL_MS = 900;      // 手札のトークンが入ってくる
 // 確かめるときだけ、URL の ?cpuDelay=ミリ秒 で CPU の間隔を縮められる
 const CPU_DELAY = Number(new URLSearchParams(location.search).get('cpuDelay')) || undefined;
 
@@ -39,6 +44,15 @@ const store = {
 
 const escapeHtml = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+// 動きの速さを、CSS（--motion-scale・data-motion）に伝え、タイトルの切り替えを作る
+const paintMotion = () => {
+    document.documentElement.style.setProperty('--motion-scale', Motion.speedScale());
+    document.documentElement.dataset.motion = Motion.getSpeed();
+};
+paintMotion();
+Motion.onSpeedChange(paintMotion);
+Motion.mountSpeedSetting(document.getElementById('motion-setting'), { label: '' });
+
 let settings = { count: 4, level: 'normal', ...store.load(KEYS.settings) };
 let scene = 'title';
 let controller = null;
@@ -49,7 +63,7 @@ let ui = { dino: null, zone: null, key: null };
 let fx = { just: null, flash: false, handFrom: null, roll: false };
 let lastPlaced = {};
 let lockUntil = 0;
-let resultTimer = null;
+let cancelResult = null;
 
 const nameOf = seat => (seat === view.seat ? 'あなた' : view.players[seat].name);
 
@@ -110,12 +124,13 @@ function startGame(setup) {
 function beginGame(next) {
     if (controller !== next) controller?.stop();
     document.querySelectorAll('dialog[open]').forEach(d => d.close());
-    clearTimeout(resultTimer);
+    cancelResult?.();
     controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = { dino: null, zone: null, key: null };
     fx = { just: null, flash: false, handFrom: null, roll: true };
+    holdFx();
     lastPlaced = lastPlacementsOf(view.events);
     showScene('game');
     render();
@@ -141,7 +156,7 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
-    clearTimeout(resultTimer);
+    cancelResult?.();
     showScene('title');
 }
 
@@ -160,13 +175,20 @@ const online = new NetplayLobby({
     onError: (message) => onError(message),
     onExit: () => {
         controller = null;
-        clearTimeout(resultTimer);
+        cancelResult?.();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         showScene('title');
     }
 });
 
 // ---------- 更新 ----------
+
+// 描き直しで始まる CSS の動きが終わるまで、CPU を待たせる
+function holdFx() {
+    if (fx.just) Motion.hold(DROP_MS);
+    if (fx.roll) Motion.hold(ROLL_MS);
+    if (fx.handFrom) Motion.hold(DEAL_MS);
+}
 
 function onUpdate() {
     if (!controller) return;
@@ -179,7 +201,7 @@ function onUpdate() {
         lastPlaced = Object.fromEntries(reveal.placements.map(p => [p.seat, p]));
         fx.just = { zone: lastPlaced[view.seat].zone };
         fx.flash = true;
-        lockUntil = performance.now() + INPUT_LOCK_MS;
+        lockUntil = performance.now() + Motion.ms(INPUT_LOCK_MS);
     }
     const pass = fresh.find(e => e.type === 'pass');
     if (pass && view.phase !== 'end' && !fresh.some(e => e.type === 'round' && e.round > 1)) fx.handFrom = pass.direction === 'left' ? 'right' : 'left';
@@ -188,9 +210,10 @@ function onUpdate() {
         showToast(view.discardRule ? `第${view.round}ラウンド` : `第${view.round}ラウンド：${view.direction === 'left' ? '左' : '右'}へ渡す`);
     }
     if (fresh.some(e => e.type === 'roll')) fx.roll = true;
+    holdFx();
     if (fresh.some(e => e.type === 'end')) {
-        clearTimeout(resultTimer);
-        resultTimer = setTimeout(showResult, RESULT_DELAY_MS);
+        cancelResult?.();
+        cancelResult = Motion.afterIdle(showResult, Motion.ms(RESULT_DELAY_MS));
     }
     playSounds(fresh);
     saveProgress();

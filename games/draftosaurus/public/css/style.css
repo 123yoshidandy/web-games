@@ -92,7 +92,7 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .die-badge.exempt { border-color: var(--gold); }
 .die-badge.discard .die-face { opacity: .35; }
 .die-badge.exempt .die-text b { color: var(--gold); }
-.die-badge.rolling .die-face { animation: roll .55s ease-out backwards; }
+.die-badge.rolling .die-face { animation: roll calc(.55s * var(--motion-scale, 1)) ease-out backwards; }
 @keyframes roll { 0% { transform: rotate(-200deg) scale(.6); } 70% { transform: rotate(12deg) scale(1.08); } 100% { transform: none; } }
 
 /* 全員の欄 */
@@ -107,7 +107,7 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .rv-foot { display: flex; align-items: center; gap: 3px; min-width: 0; height: 17px; }
 .last { display: flex; align-items: center; gap: 2px; min-width: 0; font-size: 10px; white-space: nowrap; overflow: hidden; }
 .last span { overflow: hidden; text-overflow: ellipsis; }
-.last.flash { animation: flash 1.2s ease-out backwards; border-radius: 4px; }
+.last.flash { animation: flash calc(1.2s * var(--motion-scale, 1)) ease-out backwards; border-radius: 4px; }
 @keyframes flash { 0% { background: rgba(243, 198, 78, .9); color: #2b1d00; transform: scale(1.15); } 100% { background: transparent; } }
 .tag-die { margin-left: auto; flex: none; width: 16px; height: 16px; border-radius: 4px; background: #fbf6e6; color: #2a3a1c; display: grid; place-items: center; }
 .tag-icon { width: 12px; height: 12px; }
@@ -147,7 +147,7 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .slot.filled { background: none; }
 .slot .dino { max-width: 46px; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, .3)); }
 .slot.ghost { background: none; opacity: .55; }
-.slot.just .dino { animation: drop .5s cubic-bezier(.3, 1.4, .6, 1) backwards; }
+.slot.just .dino { animation: drop calc(.5s * var(--motion-scale, 1)) cubic-bezier(.3, 1.4, .6, 1) backwards; }
 @keyframes drop { 0% { transform: translateY(-28px) scale(1.2); opacity: 0; } 100% { transform: none; opacity: 1; } }
 .river-dinos { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 1px; overflow: hidden; }
 .river-dinos .slot { width: 100%; height: 20px; flex: none; background: none; }
@@ -182,9 +182,9 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .token.selected { transform: translateY(-6px); outline: 3px solid var(--gold); box-shadow: 0 3px 0 #b7a578, 0 0 14px rgba(243, 198, 78, .8); }
 .token.chosen { outline: 3px solid var(--gold); transform: translateY(-6px); }
 .token.idle:not(.chosen) { opacity: .55; }
-.token.in-left { animation: in-left .45s ease-out backwards; animation-delay: calc(.2s + var(--i) * 45ms); }
-.token.in-right { animation: in-right .45s ease-out backwards; animation-delay: calc(.2s + var(--i) * 45ms); }
-.token.in-top { animation: in-top .45s ease-out backwards; animation-delay: calc(.3s + var(--i) * 60ms); }
+.token.in-left { animation: in-left calc(.45s * var(--motion-scale, 1)) ease-out backwards; animation-delay: calc((.2s + var(--i) * 45ms) * var(--motion-scale, 1)); }
+.token.in-right { animation: in-right calc(.45s * var(--motion-scale, 1)) ease-out backwards; animation-delay: calc((.2s + var(--i) * 45ms) * var(--motion-scale, 1)); }
+.token.in-top { animation: in-top calc(.45s * var(--motion-scale, 1)) ease-out backwards; animation-delay: calc((.3s + var(--i) * 60ms) * var(--motion-scale, 1)); }
 @keyframes in-left { from { transform: translateX(-70vw); opacity: 0; } }
 @keyframes in-right { from { transform: translateX(70vw); opacity: 0; } }
 @keyframes in-top { from { transform: translateY(-40px) scale(.6); opacity: 0; } }
@@ -290,3 +290,12 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .action #hint { order: 1; }
 .action button.primary { order: 2; }
 .recommended { outline: 3px solid #fff8d6; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(243, 198, 78, .55), 0 0 14px 4px rgba(243, 198, 78, .75); }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数などと同じ見た目にする */
+#motion-setting .motion-speed-options { display: flex; border-radius: 10px; background: rgba(0, 0, 0, .25); padding: 3px; gap: 2px; }
+#motion-setting .motion-speed button { border: none; background: none; border-radius: 8px; padding: 6px 10px; font-size: 14px; color: var(--muted); min-width: 40px; cursor: pointer; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3b2a06; background: var(--gold); }
+
+/* 動きの速さが「なし」のとき（動きを減らす設定のときも）は、CSS の動きも止める。速さの倍率は --motion-scale（js/motion/motion.js） */
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }
