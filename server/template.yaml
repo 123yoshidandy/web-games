@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+# web-games の全ゲームのオンライン対戦をまとめたスタック（web-games-online。docs/server-merge.md）
+# netplay-kit の template/template.yaml の写し。違いは、Lambda のメモリ（256 → 512）と、パラメーターの既定値だけ
+# リソースの名前は CloudFormation が web-games-online-<論理ID>-<乱数> で付ける（web-games-cfn-deploy のロールが作れるのは、この形だけ）
+# 名前と受け付け上限は samconfig.toml の parameter_overrides で変えられる
+Description: web-games online play (API Gateway WebSocket + Lambda + DynamoDB)
+
+Parameters:
+  AppName:
+    Type: String
+    Default: web-games
+    Description: Name prefix of the WebSocket API
+  ThrottlingRateLimit:
+    Type: Number
+    Default: 100
+    Description: Requests per second accepted by the stage (shared by all games)
+  ThrottlingBurstLimit:
+    Type: Number
+    Default: 200
+    Description: Burst requests accepted by the stage (shared by all games)
+
+Resources:
+  # 部屋（ROOM#ゲーム#部屋番号）・接続（CONN#接続ID）・接続のゲーム（GAME#接続ID）を入れるテーブル。使った分だけの課金で、expiresAt を過ぎると消える
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+
+  GameFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: dist/
+      Handler: handler.handler
+      Runtime: nodejs22.x
+      Architectures:
+        - arm64
+      # dominion・pokemon-card-game のカードのデータが大きく、まとめると読み込みが重くなるので、見本より多くする
+      MemorySize: 512
+      Timeout: 15
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action: execute-api:ManageConnections
+              Resource: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+  GameFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${GameFunction}
+      RetentionInDays: 7
+
+  WebSocketApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub ${AppName}-online
+      ProtocolType: WEBSOCKET
+      RouteSelectionExpression: $request.body.action
+
+  GameIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref WebSocketApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !Sub arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${GameFunction.Arn}/invocations
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $connect
+      Target: !Sub integrations/${GameIntegration}
+
+  DisconnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $disconnect
+      Target: !Sub integrations/${GameIntegration}
+
+  DefaultRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref WebSocketApi
+      RouteKey: $default
+      Target: !Sub integrations/${GameIntegration}
+
+  # 想定外のアクセスで料金が増えないよう、受け付ける数に上限を設ける（ping も1回に数える）
+  Stage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref WebSocketApi
+      StageName: prod
+      AutoDeploy: true
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: !Ref ThrottlingBurstLimit
+        ThrottlingRateLimit: !Ref ThrottlingRateLimit
+
+  ApiInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !Ref GameFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*
+
+Outputs:
+  WebSocketUrl:
+    Description: URL for the browser to connect to
+    Value: !Sub wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod

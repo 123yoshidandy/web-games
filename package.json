@@ -9,7 +9,9 @@
   "scripts": {
     "test:game": "node scripts/test-games.mjs",
     "test:all": "node scripts/test-games.mjs --all",
-    "dev:online": "node scripts/dev-online.mjs"
+    "dev:online": "node scripts/dev-online.mjs",
+    "build:server": "node scripts/build-server.mjs",
+    "deploy:server": "npm run build:server && cd server && sam deploy"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",

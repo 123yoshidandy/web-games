@@ -1,0 +1,13 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "web-games-online"
+region = "ap-northeast-1"
+capabilities = "CAPABILITY_IAM"
+resolve_s3 = true
+# デプロイ用ロール（web-games-github-deploy・web-games-cfn-deploy）が読めるのは、共有のバケットのこの下だけ
+s3_prefix = "web-games-online"
+confirm_changeset = true
+# ステージの上限は全ゲームの合計。いちばん多い panel-de-pon（毎秒50・瞬間100）の倍にする
+# 1人あたりの上限は、各ゲームの定義（messagesPerSecond）と RateLimiter が受け持つ
+parameter_overrides = "AppName=web-games ThrottlingRateLimit=100 ThrottlingBurstLimit=200"

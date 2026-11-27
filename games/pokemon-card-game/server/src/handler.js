@@ -1,6 +1,7 @@
 /**
  * API Gateway（WebSocket）から呼ばれる Lambda の入口（部屋の仕組みは netplay-kit（packages/netplay-kit）の共通部品）
  * 共有デッキの操作（shared-decks.js）だけは、部屋の処理に渡す前にここで答える
+ * web-games の1つのスタック（router.js）から、接続の ?game=pokemon-card-game で呼ばれる。部屋のキーにゲームの名前を付ける
  */
 
 import { ApiGatewayManagementApiClient, PostToConnectionCommand } from '@aws-sdk/client-apigatewaymanagementapi';
@@ -9,7 +10,7 @@ import game from './game-definition.js';
 import { createSharedDecks, parseSharedDeckMessage } from './shared-decks.js';
 import { DynamoSharedDeckStore } from './shared-deck-store.js';
 
-const roomHandler = createHandler(game);
+const roomHandler = createHandler(game, { keyPrefix: 'pokemon-card-game' });
 const sharedDecks = createSharedDecks(new DynamoSharedDeckStore(process.env.TABLE_NAME));
 const clients = new Map(); // 送信用のクライアント（Lambda の呼び出しをまたいで使い回す）
 
