@@ -1,5 +1,5 @@
 import {
-    WIDTH, HEIGHT, BLOCK_SIZE, LAND_BOUNCE_FRAMES, PANEL_STYLES, CHAIN_COLOR, COMBO_COLOR, SHAKE_FRAMES
+    WIDTH, HEIGHT, VIEW_ROWS, BLOCK_SIZE, LAND_BOUNCE_FRAMES, PANEL_STYLES, CHAIN_COLOR, COMBO_COLOR, SHAKE_FRAMES
 } from './constants.js';
 import {
     getRaiseOffset, flattenMovePosition, panelOffset, garbageOffset, clearProgress, CLEAR
@@ -212,10 +212,11 @@ export function render(state, { countdown = 0 } = {}) {
         }
     }
 
-    // 次にせり上がってくる段（暗く）
+    // 次にせり上がってくる段（暗く）。盤面の下の帯に丸ごと見せ、盤面との境目に線を引く
     for (let x = 0; x < WIDTH; ++x) {
         drawPanel(state.next[x], x * size, HEIGHT * size - raiseY, { alpha: 0.4 });
     }
+    drawNextRowTray(g, size);
 
     for (const garbage of state.garbages) {
         const flash = garbage.clearing && (garbage.t & 4) !== 0;
@@ -237,7 +238,7 @@ export function render(state, { countdown = 0 } = {}) {
 
     if (countdown > 0) {
         g.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        g.fillRect(0, 0, WIDTH * size, HEIGHT * size);
+        g.fillRect(0, 0, WIDTH * size, VIEW_ROWS * size);
         g.font = `800 ${size * 3}px ${FONT}`;
         g.textAlign = 'center';
         g.textBaseline = 'middle';
@@ -249,6 +250,17 @@ export function render(state, { countdown = 0 } = {}) {
     }
 
     if (state.mode === 'versus') renderIncoming(state.incoming);
+}
+
+// 盤面の下の、次にせり上がる段を見せる帯（盤面より暗くし、境目に線を引く）
+function drawNextRowTray(context, size) {
+    const top = HEIGHT * size;
+    context.save();
+    context.fillStyle = 'rgba(8, 4, 40, 0.45)';
+    context.fillRect(0, top, WIDTH * size, (VIEW_ROWS - HEIGHT) * size);
+    context.fillStyle = 'rgba(236, 232, 255, 0.85)';
+    context.fillRect(0, top - Math.max(1, size / 20), WIDTH * size, Math.max(1, size / 20) * 2);
+    context.restore();
 }
 
 // 自分に送られてきて、まだ降っていないお邪魔ブロック（幅に比例した長さで並べ、2段以上は段数も出す）
@@ -284,7 +296,7 @@ export function renderOpponent(snapshot, info) {
     const ratio = pixelRatio();
     const size = opponentCanvas.width / ratio / WIDTH;
     og.setTransform(ratio, 0, 0, ratio, 0, 0);
-    og.clearRect(0, 0, WIDTH * size, HEIGHT * size);
+    og.clearRect(0, 0, WIDTH * size, VIEW_ROWS * size);
     if (snapshot) {
         const raiseY = Math.floor(size * snapshot.raise);
         for (let i = 0; i < WIDTH * HEIGHT; ++i) {
@@ -300,8 +312,31 @@ export function renderOpponent(snapshot, info) {
             drawMiniPanel(Number(snapshot.next[x]), x * size, HEIGHT * size - raiseY, size);
         }
         og.globalAlpha = 1;
+        drawNextRowTray(og, size);
+        // 小さい盤面でも何が起きているか分かるよう、連鎖の途中は連鎖数を大きく出す
+        if (snapshot.chain >= 2) drawOpponentChain(snapshot.chain, size);
     }
     opponentLabel.textContent = `${info.name}${info.connected ? '' : '（切断中）'}`;
+}
+
+function drawOpponentChain(chain, size) {
+    const w = WIDTH * size;
+    const h = size * 1.6;
+    const y = size * 1.5;
+    og.save();
+    og.fillStyle = CHAIN_COLOR;
+    og.strokeStyle = '#fff';
+    og.lineWidth = Math.max(1.5, size / 8);
+    og.beginPath();
+    og.roundRect(w * 0.1, y, w * 0.8, h, h / 2);
+    og.fill();
+    og.stroke();
+    og.fillStyle = '#fff';
+    og.font = `800 ${size * 0.95}px ${FONT}`;
+    og.textAlign = 'center';
+    og.textBaseline = 'middle';
+    og.fillText(`${chain}連鎖`, w / 2, y + h / 2 + size * 0.04);
+    og.restore();
 }
 
 // 相手のフィールドの小さなパネル（濃い板に、記号の色の四角）

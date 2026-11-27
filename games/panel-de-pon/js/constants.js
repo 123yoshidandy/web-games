@@ -1,6 +1,7 @@
 // ===== 盤面 =====
 export const WIDTH = 6;
 export const HEIGHT = 12;
+export const VIEW_ROWS = HEIGHT + 1; // 画面に出す段数（次にせり上がる段を、盤面の下に丸ごと見せる）
 export let BLOCK_SIZE = 30; // 1マスの大きさ（px）。画面サイズに応じて setBlockSize で変える
 export const MIN_BLOCK_SIZE = 20;
 export const MAX_BLOCK_SIZE = 60;

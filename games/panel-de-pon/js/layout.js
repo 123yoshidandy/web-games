@@ -1,11 +1,11 @@
-import { WIDTH, HEIGHT, BLOCK_SIZE, MIN_BLOCK_SIZE, MAX_BLOCK_SIZE, setBlockSize } from './constants.js';
+import { WIDTH, VIEW_ROWS, BLOCK_SIZE, MIN_BLOCK_SIZE, MAX_BLOCK_SIZE, setBlockSize } from './constants.js';
 import {
     canvas, opponentCanvas, opponentLabel, incomingElement, versusResultElement, playMenuElement
 } from './renderer.js';
 import { pixelRatio } from './panel-art.js';
 
 const INCOMING_GAP = 4; // 予告とフィールドの間隔（px）
-const OPPONENT_SCALE = 0.45; // 相手のフィールドの大きさ（自分のフィールドに対する比）
+const OPPONENT_SCALE = 0.55; // 相手のフィールドの大きさ（自分のフィールドに対する比）
 const OPPONENT_GAP = 12; // 自分と相手のフィールドの間隔（px）
 const MENU_SPACE = 48; // 画面の上に空ける、ホーム・遊び方のボタンの分の高さ（px）
 const MENU_TOP = 8; // ボタンの上の余白（px）
@@ -23,16 +23,16 @@ export function doLayout(nextMode = mode) {
     // 縦横それぞれの制約から収まる最大サイズを求める（対戦では相手のフィールドの分も横幅に入れる）
     const columns = versus ? WIDTH * (1 + OPPONENT_SCALE) : WIDTH;
     const maxBlockSizeX = Math.floor((w * 0.92 - (versus ? OPPONENT_GAP : 0)) / columns);
-    const maxBlockSizeY = Math.floor(((h - MENU_SPACE) * 0.88) / HEIGHT);
+    const maxBlockSizeY = Math.floor(((h - MENU_SPACE) * 0.88) / VIEW_ROWS);
     setBlockSize(Math.max(MIN_BLOCK_SIZE, Math.min(MAX_BLOCK_SIZE, maxBlockSizeX, maxBlockSizeY)));
 
     // キャンバスは画面の画素密度の分だけ細かく描き、表示の大きさは CSS で決める
     const ratio = pixelRatio();
     const canvasWidth = BLOCK_SIZE * WIDTH;
-    const canvasHeight = BLOCK_SIZE * HEIGHT;
+    const canvasHeight = BLOCK_SIZE * VIEW_ROWS;
     setCanvasSize(canvas, canvasWidth, canvasHeight, ratio);
     const opponentSize = Math.floor(BLOCK_SIZE * OPPONENT_SCALE);
-    setCanvasSize(opponentCanvas, opponentSize * WIDTH, opponentSize * HEIGHT, ratio);
+    setCanvasSize(opponentCanvas, opponentSize * WIDTH, opponentSize * VIEW_ROWS, ratio);
 
     Object.assign(versusResultElement.style, {
         width: `${canvasWidth}px`,
