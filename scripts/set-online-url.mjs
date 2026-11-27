@@ -1,7 +1,7 @@
 // まとめたサーバー（web-games-online）の接続先を、全ゲームの画面に書く（docs/server-merge.md の「切り替えの順番」の7）
 // - 新しい形のゲーム：public/js/online-config.js の DEPLOYED_SERVER_URL に、そのままの URL（wss://<API>/prod）を書く
 //   ?game=<名前> は、画面の resolveOnlineServerUrl が付ける
-// - 前からの7本：それぞれの定数（LEGACY_GAMES）に、URL と ?game=<名前> を書く
+// - 前からのもの（7本のうち、新しい形に移していない4本）：それぞれの定数（LEGACY_GAMES）に、URL と ?game=<名前> を書く
 //   ただし、サーバーの handler.js が keyPrefix: '<名前>' を渡していないうちは書かない（部屋のキーにゲームの名前が付かず、7本どうしでぶつかりうるため）
 //   書かなかったものは、ファイル・定数・書く値を一覧で出す
 // 使い方: node scripts/set-online-url.mjs <wss://...> [--dry-run]
@@ -12,12 +12,11 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// 前からの7本の接続先（docs/server-merge.md の表）。panel-de-pon・wordle は新しい形に移したので外した
+// 前からの7本の接続先（docs/server-merge.md の表）。mine-blocks・panel-de-pon・wordle は新しい形に移したので外した
 export const LEGACY_GAMES = {
     'dominion': { file: 'public/js/online-config.js', constant: 'DEPLOYED_SERVER_URL' },
     'katan': { file: 'public/js/online-config.js', constant: 'DEPLOYED_SERVER_URL' },
     'lucky-numbers': { file: 'public/js/online-config.js', constant: 'DEPLOYED_SERVER_URL' },
-    'mine-blocks': { file: 'js/online-config.js', constant: 'ONLINE_DEPLOYED_SERVER_URL' },
     'pokemon-card-game': { file: 'public/js/online-controller.js', constant: 'DEPLOYED_SERVER_URL' }
 };
 

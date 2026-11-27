@@ -25,13 +25,12 @@ const write = (path, text) => {
 
 beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'set-online-url-'));
-    // 新しい形
+    // 新しい形。mine-blocks は普通の <script> で読むので、export のない const に書く
     copy('games/azul/public/js/online-config.js');
-    // 前からのもの。mine-blocks だけ keyPrefix を渡している（切り替え済み）とする
+    copy('games/mine-blocks/public/js/online-config.js');
+    // 前からのもの。pokemon-card-game だけ keyPrefix を渡している（切り替え済み）とする
     copy('games/dominion/public/js/online-config.js');
     write('games/dominion/server/src/handler.js', "export const handler = createHandler(game);\n");
-    copy('games/mine-blocks/js/online-config.js');
-    write('games/mine-blocks/server/src/handler.js', "export const handler = createHandler(game, { keyPrefix: 'mine-blocks' });\n");
     copy('games/pokemon-card-game/public/js/online-controller.js');
     write('games/pokemon-card-game/server/src/handler.js', "export const handler = createHandler(game, { keyPrefix: 'pokemon-card-game' });\n");
     // オンライン対戦のないゲーム
@@ -45,7 +44,7 @@ test('新しい形はそのままの URL、切り替え済みの前からのも�
     assert.deepEqual(report.problems, []);
     assert.deepEqual(report.updated.map(({ game }) => game), ['azul', 'mine-blocks', 'pokemon-card-game']);
     assert.match(read('games/azul/public/js/online-config.js'), new RegExp(`^export const DEPLOYED_SERVER_URL = '${URL}';$`, 'm'));
-    assert.match(read('games/mine-blocks/js/online-config.js'), new RegExp(`^const ONLINE_DEPLOYED_SERVER_URL = '${URL}\\?game=mine-blocks';$`, 'm'));
+    assert.match(read('games/mine-blocks/public/js/online-config.js'), new RegExp(`^const DEPLOYED_SERVER_URL = '${URL}';$`, 'm'));
     // 行末のコメントは残す
     assert.match(read('games/pokemon-card-game/public/js/online-controller.js'),
         new RegExp(`^export const DEPLOYED_SERVER_URL = '${URL}\\?game=pokemon-card-game'; //`, 'm'));
@@ -98,7 +97,7 @@ test('URL の形を確かめる（末尾の / は取る。? や http は断る�
 test('リポジトリの全ゲームの接続先を見つけられる（--dry-run で読むだけ）', () => {
     const report = setOnlineUrl({ root: repoRoot, url: URL, dryRun: true });
     assert.deepEqual(report.problems, []);
-    // 前からの7本も keyPrefix を渡しているので、全部書ける
+    // 前からのものも keyPrefix を渡しているので、全部書ける
     assert.deepEqual(report.legacyPending, []);
     const legacy = [...report.updated, ...report.unchanged].filter(({ game }) => LEGACY_GAMES[game]);
     assert.deepEqual(legacy.map(({ game }) => game).sort(), Object.keys(LEGACY_GAMES).sort());

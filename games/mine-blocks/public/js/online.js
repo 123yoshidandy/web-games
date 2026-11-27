@@ -12,7 +12,7 @@
 const ONLINE_NAME_KEY = 'mineBlocks.name'; // 次回も同じ名前を使えるように保存する
 
 const net = new NetplayClient({
-    serverUrl: NetplayClient.resolveServerUrl({ deployed: ONLINE_DEPLOYED_SERVER_URL }),
+    serverUrl: getServerUrl(),
     storageKey: 'mineBlocks.online'
 });
 
