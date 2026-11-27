@@ -17,15 +17,17 @@ import {
 } from './rules.js';
 import { PROFILES, suggest } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
-import BoardView, { HAZARD_COLORS, TEEPEE_COLORS, posOf } from './board-view.js';
+import BoardView, { HAZARD_COLORS, TEEPEE_COLORS, posOf, pawnPositions } from './board-view.js';
 import RailView from './rail-view.js';
 
 const SETTINGS_KEY = 'great-western-trail.settings';
 const CPU_NAMES = ['テックス', 'ダコタ', 'ローハイド'];
+const SLIDE_MS = 520; // 牧場主が進む長さ（普通の速さ）
 const LEVELS = ['normal', 'strong'];
 
 const $ = (selector) => document.querySelector(selector);
@@ -218,6 +220,7 @@ export default class UI {
         if (this.controller !== controller) this.stopGame();
         else document.querySelectorAll('dialog[open]').forEach(d => d.close());
         this.controller = controller;
+        this.cancelResult?.();
         this.hint = null;
         this.view = this.controller.getView();
         this.lastLogSeq = this.view.logs.at(-1)?.seq ?? 0;
@@ -248,12 +251,15 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
+        this.cancelResult?.();
         ['#result', '#log'].forEach(id => { if ($(id).open) $(id).close(); });
     }
 
     onUpdate() {
         if (!this.controller) return;
         const before = { over: this.view?.over, myTurn: !!this.view && this.myTurn() };
+        const prevState = this.view?.state ?? null;
+        const prevHand = prevState?.players[this.view.seat]?.hand ?? [];
         this.view = this.controller.getView();
         const logs = this.view.logs.filter(l => l.seq > this.lastLogSeq);
         this.lastLogSeq = this.view.logs.at(-1)?.seq ?? this.lastLogSeq;
@@ -264,10 +270,42 @@ export default class UI {
         if (system) this.toast(system.text, 3000);
         this.playSound(before, others);
         this.render();
+        if (prevState && logs.length > 0) this.animateChanges(prevState, prevHand);
         if (this.view.over) {
             if (!before.over) this.recordLocalResult(this.view);
-            setTimeout(() => this.showResult(), 700);
+            this.cancelResult?.();
+            this.cancelResult = Motion.afterIdle(() => this.showResult(), 700);
         }
+    }
+
+    // 描き直したあと：前の状態との差を動かす（牧場主は場所から場所へ進み、建てた建物・置いたティーピーや災害は弾み、増えた手札は弾んで現れ、お金は変わると目立つ）
+    animateChanges(prev, prevHand) {
+        if (!Motion.enabled()) return;
+        const s = this.view.state;
+        const before = pawnPositions(prev);
+        const after = pawnPositions(s);
+        s.players.forEach(p => {
+            const [ox, oy] = before.get(p.seat) ?? [];
+            const [nx, ny] = after.get(p.seat) ?? [];
+            if (ox === undefined || nx === undefined || (Math.abs(ox - nx) < 0.5 && Math.abs(oy - ny) < 0.5)) return;
+            const length = Motion.ms(SLIDE_MS);
+            const animation = $('#trail').querySelector(`.pslot[data-seat="${p.seat}"]`)?.animate([
+                { transform: `translate(${ox - nx}px, ${oy - ny}px)` },
+                { transform: `translate(${(ox - nx) / 2}px, ${(oy - ny) / 2 - 24}px)`, offset: 0.5 },
+                { transform: 'translate(0, 0)' }
+            ], { duration: length, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+            if (animation) Motion.track(animation, length);
+        });
+        Object.keys(s.spots).forEach(id => {
+            if (JSON.stringify(s.spots[id]) !== JSON.stringify(prev.spots[id]) && s.spots[id]) {
+                Motion.popIn($('#trail').querySelector(`[data-id="${id}"]`), { duration: 360, delay: 160 });
+            }
+        });
+        const hand = s.players[this.view.seat]?.hand ?? [];
+        hand.filter(id => !prevHand.includes(id)).forEach((id, i) => Motion.popIn($('#hand').querySelector(`[data-card="${id}"]`), { duration: 320, delay: i * 60 }));
+        s.players.forEach((p, i) => {
+            if (p.money !== prev.players[i]?.money) Motion.pulse($('#players').children[i]?.querySelector('.pstats b'), { duration: 380, scale: 1.3 });
+        });
     }
 
     // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
@@ -281,6 +319,7 @@ export default class UI {
     // ---- 固定の部品 ----
 
     bindStatic() {
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         $('#count').addEventListener('click', (event) => {
             const button = event.target.closest('button[data-count]');
             if (button) this.changeSetting({ count: Number(button.dataset.count) });

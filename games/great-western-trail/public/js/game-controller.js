@@ -7,6 +7,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, cpuActors, PROFILES } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_DELAY_MS = [420, 700];   // CPU が次の手を打つまでの間（毎回少しずつ違う）
 const CPU_MOVE_EXTRA_MS = 250;     // 牧場主を進める手は、少し長めに見せる
@@ -37,7 +38,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.save();
     }
@@ -74,12 +75,13 @@ export default class LocalGameController {
 
     // 手番の CPU を、間を置いて動かす。例外が出ても必ず次を予約する。3回続けて進まなければ一番単純な手で抜ける
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (cpuActors(this.game).length === 0) return;
         const [min, max] = CPU_DELAY_MS;
         const moving = this.game.state.turn.stage === 'move' && this.game.state.turn.queue.length === 0;
         const delay = min + Math.random() * (max - min) + (moving ? CPU_MOVE_EXTRA_MS : 0);
-        this.cpuTimer = setTimeout(() => {
+        // 盤やカードの動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 const seat = cpuActors(this.game)[0];
                 const ok = seat !== undefined && runCpuStep(this.game, seat, PROFILES[this.level]);
@@ -106,6 +108,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

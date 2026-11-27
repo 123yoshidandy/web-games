@@ -83,6 +83,15 @@ button:disabled { cursor: default; }
 .segment button { flex: 1; padding: 10px 0; background: transparent; border: 0; font-size: 15px; }
 .segment button + button { border-left: 1px solid var(--panel-line); }
 .segment button.on { background: var(--accent); color: #1d1610; font-weight: 700; }
+/* 動きの速さ（共通の部品 motion の切り替え）を、ほかの切り替えと同じ見た目にする */
+.motion-setting { flex: 1; display: flex; }
+.motion-setting .motion-speed { flex: 1; display: flex; }
+.motion-setting .motion-speed-options { flex: 1; display: flex; border: 1px solid var(--panel-line); border-radius: 10px; overflow: hidden; }
+.motion-setting .motion-speed button { flex: 1; padding: 10px 0; background: transparent; border: 0; font-size: 15px; color: inherit; justify-content: center; }
+.motion-setting .motion-speed button + button { border-left: 1px solid var(--panel-line); }
+.motion-setting .motion-speed button[aria-pressed="true"] { background: var(--accent); color: #1d1610; font-weight: 700; }
+/* 建物・災害・ティーピーが弾む動きは、その形の中心を基準にする */
+.board-svg [data-id] { transform-box: fill-box; transform-origin: center; }
 
 .buttons { display: flex; gap: 10px; justify-content: center; }
 .setup .buttons { flex-direction: column; }

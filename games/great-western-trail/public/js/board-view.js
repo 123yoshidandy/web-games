@@ -24,6 +24,20 @@ export const posOf = (id) => {
 
 const BOUNDS = { x0: 0, x1: 1230, y0: 0, y1: 610 };
 
+// 牧場主の位置（画面の座標）：席 → [x, y]。同じ場所の牧場主は横に並べる
+export function pawnPositions(state) {
+    const pos = new Map();
+    const at = {};
+    state.players.forEach(pl => {
+        if (!pl.loc) return;
+        const list = (at[pl.loc] ??= []);
+        const p = posOf(pl.loc === 'start' ? 'start' : pl.loc);
+        pos.set(pl.seat, [p.x + (list.length - (state.n - 1) / 2) * 13, p.y - 30]);
+        list.push(pl.seat);
+    });
+    return pos;
+}
+
 function handMarks(hands, x, y) {
     return [...hands].map((h, i) => `<circle cx="${x + i * 9}" cy="${y}" r="4" class="toll ${h === 'g' ? 'toll-g' : 'toll-b'}"/>`).join('');
 }
@@ -78,15 +92,13 @@ export default class BoardView {
             if (!TRAIL[id]) parts.push(this.teepeeSvg(id, p, state.spots[id], targets.includes(id)));
         });
         // 牧場主
-        const at = {};
+        const spots = pawnPositions(state);
         state.players.forEach(pl => {
-            if (!pl.loc) return;
-            const list = (at[pl.loc] ??= []);
-            const p = posOf(pl.loc === 'start' ? 'start' : pl.loc);
-            const dx = (list.length - (state.n - 1) / 2) * 13;
-            list.push(pl.seat);
-            parts.push(`<g class="pawn${pl.seat === state.turn.seat && state.phase === 'play' ? ' active' : ''}" transform="translate(${p.x + dx} ${p.y - 30})">
-                <path d="M0 0 L-7 -14 A8 8 0 1 1 7 -14 Z" fill="${PLAYER_COLORS[pl.seat]}"/></g>`);
+            if (!spots.has(pl.seat)) return;
+            const [x, y] = spots.get(pl.seat);
+            // 動かすときは外側の g に CSS の transform をかける（内側の transform 属性はそのまま）
+            parts.push(`<g class="pslot" data-seat="${pl.seat}"><g class="pawn${pl.seat === state.turn.seat && state.phase === 'play' ? ' active' : ''}" transform="translate(${x} ${y})">
+                <path d="M0 0 L-7 -14 A8 8 0 1 1 7 -14 Z" fill="${PLAYER_COLORS[pl.seat]}"/></g></g>`);
         });
         this.dyn.innerHTML = parts.join('');
         this.targets = targets.map(id => ({ id, ...posOf(id), r: 26 }));
