@@ -14,6 +14,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'carcassonne.settings.v1', save: 'carcassonne.save.v1' };
@@ -101,7 +102,7 @@ function startGame(setup) {
 // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
 function beginGame(next) {
     if (controller !== next) controller?.stop();
-    clearTimeout(resultTimer);
+    resultTimer?.();
     $('result-dialog').close?.();
     boardView.clear();
     controller = next;
@@ -131,7 +132,7 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
-    clearTimeout(resultTimer);
+    resultTimer?.();
     showScene('title');
 }
 
@@ -150,7 +151,7 @@ const online = new NetplayLobby({
     onError: (message) => onError(message),
     onExit: () => {
         controller = null;
-        clearTimeout(resultTimer);
+        resultTimer?.();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         showScene('title');
     }
@@ -169,6 +170,7 @@ function onUpdate() {
     fresh.forEach(e => {
         if (e.type === 'place') {
             dropKey = `${e.x},${e.y}`;
+            Motion.hold(320); // 置いたタイルの現れる動き（CSS）が終わるまで CPU を待たせる
             if (e.seat !== view.seat) boardView.ensureVisible(e.x, e.y);
         } else if (e.type === 'score') {
             boardView.showScore(e, fxDelay(fxIndex));
@@ -470,8 +472,8 @@ function recordLocalResult() {
 }
 
 function showResultSoon(delay) {
-    clearTimeout(resultTimer);
-    resultTimer = setTimeout(showResult, delay);
+    resultTimer?.();
+    resultTimer = Motion.afterIdle(showResult, delay);
 }
 
 function showResult() {
@@ -497,6 +499,11 @@ function setup() {
     drawTitleArt();
     boardView = new BoardView($('board'), { onTap: onBoardTap });
     setupDialogs();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
 
     $('player-count').addEventListener('click', e => {
         const b = e.target.closest('button');

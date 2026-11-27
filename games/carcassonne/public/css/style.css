@@ -62,7 +62,7 @@ button.primary, button.secondary {
     color: #fff8ea;
     background: var(--primary);
     box-shadow: 0 4px 0 var(--primary-edge);
-    transition: transform .06s, box-shadow .06s;
+    transition: transform calc(.06s * var(--motion-scale, 1)), box-shadow calc(.06s * var(--motion-scale, 1));
 }
 button.secondary { background: var(--secondary); box-shadow: 0 4px 0 var(--secondary-edge); }
 button.primary:active:not(:disabled), button.secondary:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--primary-edge); }
@@ -264,7 +264,7 @@ button.link {
     text-overflow: ellipsis;
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s, transform .2s;
+    transition: opacity calc(.2s * var(--motion-scale, 1)), transform calc(.2s * var(--motion-scale, 1));
     z-index: 2;
 }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
@@ -275,32 +275,32 @@ button.link {
     stroke: #f4cd63;
     stroke-width: 4;
     stroke-dasharray: 10 7;
-    animation: glow 1.6s ease-in-out infinite;
+    animation: glow calc(1.6s * var(--motion-scale, 1)) ease-in-out infinite;
 }
 @keyframes glow { 50% { fill: rgba(255, 214, 110, .05); stroke-opacity: .45; } }
 
 .last-placed { fill: none; stroke: #fffaf0; stroke-width: 4; opacity: .9; }
 
-.tentative-frame { fill: none; stroke: #ffe08a; stroke-width: 4; animation: glow-frame 1.2s ease-in-out infinite; }
+.tentative-frame { fill: none; stroke: #ffe08a; stroke-width: 4; animation: glow-frame calc(1.2s * var(--motion-scale, 1)) ease-in-out infinite; }
 @keyframes glow-frame { 50% { stroke-opacity: .35; } }
 
 .spot {
     fill: rgba(255, 255, 255, .85);
     stroke: #3a2a17;
     stroke-width: 2.5;
-    animation: spot-pulse 1.2s ease-in-out infinite;
+    animation: spot-pulse calc(1.2s * var(--motion-scale, 1)) ease-in-out infinite;
     transform-box: fill-box;
     transform-origin: center;
 }
 @keyframes spot-pulse { 50% { transform: scale(.75); } }
 
-.tile.drop { animation: drop .32s cubic-bezier(.3, 1.4, .6, 1) backwards; }
+.tile.drop { animation: drop calc(.32s * var(--motion-scale, 1)) cubic-bezier(.3, 1.4, .6, 1) backwards; }
 @keyframes drop { from { transform: scale(1.18); opacity: .4; } }
-.drop-meeple, .meeple-new { animation: meeple-drop .3s ease-out backwards; }
-.drop-meeple { animation-delay: .25s; }
+.drop-meeple, .meeple-new { animation: meeple-drop calc(.3s * var(--motion-scale, 1)) ease-out backwards; }
+.drop-meeple { animation-delay: calc(.25s * var(--motion-scale, 1)); }
 @keyframes meeple-drop { from { transform: translateY(-14px); opacity: 0; } }
 
-.score-fx { animation: fx-fade 1.9s ease-out backwards; opacity: 0; }
+.score-fx { animation: fx-fade calc(1.9s * var(--motion-scale, 1)) ease-out backwards; opacity: 0; }
 @keyframes fx-fade { 0% { opacity: 0; } 10% { opacity: 1; } 75% { opacity: 1; } 100% { opacity: 0; } }
 .score-cell { fill: rgba(255, 240, 190, .16); stroke-width: 6; }
 .score-label {
@@ -334,7 +334,7 @@ button.link {
     overflow: hidden;
     box-shadow: 0 3px 8px rgba(0, 0, 0, .4);
 }
-.tile-preview svg { display: block; width: 100%; height: 100%; transition: transform .15s; }
+.tile-preview svg { display: block; width: 100%; height: 100%; transition: transform calc(.15s * var(--motion-scale, 1)); }
 .tile-preview:disabled { opacity: 1; cursor: default; }
 .tile-preview.waiting { border-color: var(--line); }
 
@@ -473,3 +473,8 @@ button.link {
 
 /* ヒント：おすすめの印 */
 .recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択肢と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3a2710; background: var(--gold); }

@@ -6,6 +6,7 @@
 
 import { tileUse, meepleUse, PLAYER_COLORS } from './tile-art.js';
 import { rotatedTile } from './tiles.js';
+import * as Motion from './motion/motion.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const TAP_SLOP = 9;        // これより動いたらタップではなく移動
@@ -213,7 +214,7 @@ export default class BoardView {
 
     moveTo(tx, ty, scale, animate) {
         this.cancelTween();
-        const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        const reduce = !Motion.enabled(); // 速さが「なし」（動きを減らす設定を含む）
         if (!animate || reduce) {
             Object.assign(this, { tx, ty, scale });
             this.applyTransform();
@@ -222,7 +223,7 @@ export default class BoardView {
         const from = { tx: this.tx, ty: this.ty, scale: this.scale };
         const start = performance.now();
         const step = now => {
-            const t = Math.min(1, (now - start) / 280);
+            const t = Math.min(1, (now - start) / Motion.ms(280));
             const e = 1 - (1 - t) ** 3;
             this.tx = from.tx + (tx - from.tx) * e;
             this.ty = from.ty + (ty - from.ty) * e;
@@ -301,7 +302,7 @@ export default class BoardView {
     showScore(event, delay = 0) {
         const color = event.winners.length === 1 ? PLAYER_COLORS[event.winners[0]] : '#fff7df';
         const g = svgEl('g', { class: 'score-fx' });
-        g.style.animationDelay = `${delay}ms`;
+        g.style.animationDelay = `${Motion.ms(delay)}ms`;
         const cells = event.cells;
         g.innerHTML = cells.map(([x, y]) => `<rect class="score-cell" x="${x * 100 + 3}" y="${y * 100 + 3}" width="94" height="94" rx="4" style="stroke:${color}"/>`).join('');
         // 得点は、コマのいたマスの真ん中に出す（いなければ数えたタイルの真ん中）
@@ -311,7 +312,7 @@ export default class BoardView {
         label.textContent = event.winners.length > 0 ? `+${event.points}` : '0';
         g.appendChild(label);
         this.layers.fx.appendChild(g);
-        setTimeout(() => g.remove(), 1900 + delay);
+        setTimeout(() => g.remove(), Motion.ms(1900 + delay));
     }
 
     clear() {

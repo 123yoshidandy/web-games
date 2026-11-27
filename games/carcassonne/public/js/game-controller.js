@@ -6,6 +6,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_STEP_DELAY_MS = 1000; // CPU の手は、引いたタイルが見える間を置いてから打つ
 const STALL_LIMIT = 3; // CPU の手が進まないことがこの回数続いたら、コマを置かずに最初の場所へ置く
@@ -21,7 +22,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.scheduleCpu();
     }
@@ -58,7 +59,8 @@ export default class LocalGameController {
     // 遊び方などを開いている間は、CPU を止める
     pause() {
         this.paused = true;
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
     }
 
     resume() {
@@ -67,9 +69,10 @@ export default class LocalGameController {
     }
 
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
         if (this.paused || !isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        this.cancelCpu = Motion.afterIdle(() => {
             // どこで例外が出ても、必ず次の手を予約する（対戦が止まらないように）
             try {
                 this.stepCpu();
@@ -100,6 +103,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
     }
 }
