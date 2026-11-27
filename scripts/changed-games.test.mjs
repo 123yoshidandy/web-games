@@ -51,3 +51,7 @@ test('このリポジトリで test-kit を変えたら、全ゲームと test-k
     assert.equal(selected.filter((path) => path.startsWith('games/')).length, all.length);
     assert.ok(selected.includes('packages/test-kit'));
 });
+
+test('このリポジトリで packages/clock を変えたら、時計の写しを持つ4本も流す', () => {
+    assert.deepEqual(selectWorkspaces(['packages/clock/src/clock.js']), ['packages/clock', 'games/chess', 'games/go', 'games/gomoku', 'games/shogi']);
+});

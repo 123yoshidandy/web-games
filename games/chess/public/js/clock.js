@@ -1,7 +1,9 @@
+// packages/clock 1.0.0 からコピーしたファイル。ここでは直さず、packages/clock で直してから同期する
 /**
  * 対局時計（持ち時間）の計算
  * DOM に依存せず、時刻も読まない（経過はミリ秒で受け取る）。ブラウザ・テスト・オンライン対戦のサーバーのどこでも同じ結果になる
- * chess・shogi・go で同じ中身を持つ（直すときは3つとも同じに直す）
+ * 元は packages/clock。chess・shogi・go・gomoku の public/js/clock.js へ写して使う（scripts/sync.mjs）
+ * ゲームごとの違い（切れ負け・秒読み・フィッシャー）は、すべて設定で表す
  *
  * 設定 { main, byoyomi, periods, increment }（時間はミリ秒、periods は秒読みの回数）
  * - 切れ負け：main だけ。使い切ったら負け

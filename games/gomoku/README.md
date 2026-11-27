@@ -89,7 +89,7 @@ npm run cpu-match                                   # CPU どうしの勝率
 |---|---|
 | `public/js/rules.js` | 盤・座標・五連の判定（DOM に依存しない） |
 | `public/js/game.js` | 進行（手番・五連・引き分け・投了・持ち時間）。操作は `applyCommand` だけで受け、記録から `Game.replay` で再現する。断る操作は状態を変えない |
-| `public/js/clock.js` | 持ち時間の計算（chess・shogi・go と同じ中身） |
+| `public/js/clock.js` | 持ち時間の計算。packages/clock の写し（clock.lock.json。手で直さず、packages/clock で直して同期する） |
 | `public/js/game-view.js` | 席ごとのビュー（盤・色・手順・時計。シードは入れない） |
 | `public/js/ai.js` | CPU の読み（形の表・VCF・αβ探索） |
 | `public/js/cpu-player.js` | CPU の強さと、ビューから手を決める処理・ヒント（`suggest`） |
@@ -108,7 +108,7 @@ npm run cpu-match                                   # CPU どうしの勝率
 - `ai.test.js`：形の表（活四・四・活三・飛び三・三・活二・盤の端）、四四・四三、枠の差分、五を打つ・四を止める・活三を止める・VCF、同じ局面で同じ手、10路、時間の打ち切り
 - `cpu-player.test.js`：どの強さも最後まで打ち切る、強いほど勝つ
 - `game-controller.test.js`：CPU が人の番で止まる、白を選ぶと CPU から、待った、2人で1台、続きから
-- `time-control.test.js`・`clock.test.js`：持ち時間（切れ負け・フィッシャー・時間切れ・再現・CPU の考える時間・オンライン）
+- `time-control.test.js`：持ち時間（切れ負け・フィッシャー・時間切れ・再現・CPU の考える時間・オンライン）
 - `hint.test.js`・`game-definition.test.js`・`online.test.js`・`pwa.test.js`・`offline.test.js`
 
 ### オンライン対戦
