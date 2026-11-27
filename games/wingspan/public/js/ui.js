@@ -18,6 +18,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const $ = (id) => document.getElementById(id);
 const SETTINGS_KEY = 'wingspan.settings';
@@ -27,6 +28,10 @@ const ACTION_VERB = { forest: '餌を取る', grassland: '卵を産む', wetland
 const BONUS_WORD = { forest: 'カード1枚 → 餌', grassland: '餌1つ → 卵', wetland: '卵1個 → カード' };
 const params = new URLSearchParams(location.search);
 const CPU_DELAY = params.has('cpuDelay') ? Number(params.get('cpuDelay')) : null;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 手札から場へ・場やトレイから手札へ
+const POP_MS = 280;      // トレイの補充
+const STAGGER_MS = 90;   // 何枚も動くときの間
 
 const store = {
     load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
@@ -50,6 +55,7 @@ export default class UI {
         this.lastSeq = 0;
         this.resultShown = false;
         this.bind();
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'ウイングスパン',
@@ -74,6 +80,7 @@ export default class UI {
     showTitle() {
         this.controller?.stop();
         this.controller = null;
+        Motion.cancelAll();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('screen-game').hidden = true;
         $('screen-title').hidden = false;
@@ -135,8 +142,76 @@ export default class UI {
     update() {
         if (!this.controller) return;
         this.prevSeat = this.view?.decision?.seat ?? null;
+        // 描き直す前に、動きの出発点（手札・トレイ・山札の位置と、餌・点の数）を測る
+        const before = this.view && Motion.enabled() ? this.measure() : null;
         this.view = this.controller.getView();
         this.render();
+        if (before) this.animate(before);
+    }
+
+    // ---- 動き ----
+
+    statsOf(v) {
+        const me = v.players[v.you];
+        return {
+            mine: String(me.score),
+            food: FOODS.map(f => me.food[f]),
+            others: new Map(v.players.filter(p => p.id !== v.you).map(p => [p.id, [p.score, p.handCount, p.foodTotal, HABITATS.reduce((s, h) => s + p.board[h].length, 0)].join()]))
+        };
+    }
+
+    measure() {
+        const nodes = new Map();
+        document.querySelectorAll('#hand .card[data-bird]').forEach(el => nodes.set(el.dataset.bird, el.cloneNode(true)));
+        return {
+            hand: Motion.captureRects($('hand'), '.card[data-bird]', 'bird'),
+            handNodes: nodes,
+            tray: Motion.captureRects($('tray'), '.card[data-bird]', 'bird'),
+            deck: Motion.rectOf($('deck')),
+            stats: this.statsOf(this.view)
+        };
+    }
+
+    // 手札から出した鳥は場へ飛び、引いたカードはトレイ・山札から手札へ飛ぶ。卵・餌・点の変わった所は弾む
+    animate(before) {
+        const v = this.view;
+        if (!v || $('screen-game').hidden) return;
+        const fresh = this.fresh ?? [];
+        let settle = 0;
+        let k = 0;
+        const pulseAt = (el, extra = {}) => Motion.pulse(el, { delay: settle, scale: 1.25, duration: 340, ...extra });
+        fresh.forEach(e => {
+            if (e.type !== 'play' || e.seat !== v.you) return;
+            const to = $('board').querySelector(`[data-ref="${refKey(e.ref)}"]`);
+            const from = before.hand.get(String(e.bird));
+            if (!to || !from) return;
+            Motion.fly(from, to, { content: before.handNodes.get(String(e.bird)), hide: to, duration: FLY_MS, delay: k * STAGGER_MS });
+            settle = Math.max(settle, k * STAGGER_MS + FLY_MS);
+            k++;
+        });
+        // 手札：残ったカードは詰め、増えたカードはトレイ（なければ山札）から飛んでくる
+        const entering = [];
+        document.querySelectorAll('#hand .card[data-bird]').forEach(el => {
+            if (!before.hand.has(el.dataset.bird)) entering.push(el);
+        });
+        Motion.flipFrom(before.hand, $('hand'), '.card[data-bird]', 'bird', { duration: POP_MS, enter: null });
+        entering.forEach((el, i) => {
+            const from = before.tray.get(el.dataset.bird) ?? before.deck;
+            Motion.fly(from, el, { content: el, hide: el, duration: FLY_MS, delay: i * STAGGER_MS });
+        });
+        Motion.flipFrom(before.tray, $('tray'), '.card[data-bird]', 'bird', { duration: POP_MS, enter: 'pop', stagger: 60 });
+        // 卵を産んだ鳥
+        fresh.forEach(e => {
+            if (e.type === 'lay' && e.seat === v.you) e.targets.forEach(r => pulseAt($('board').querySelector(`[data-ref="${refKey(r)}"]`)));
+        });
+        const now = this.statsOf(v);
+        if (now.mine !== before.stats.mine) pulseAt(document.querySelector('#mine .my-score b'), { scale: 1.4 });
+        now.food.forEach((n, i) => {
+            if (n !== before.stats.food[i]) pulseAt(document.querySelectorAll('#mine .token')[i]);
+        });
+        now.others.forEach((value, seat) => {
+            if (value !== before.stats.others.get(seat)) Motion.pulse($('opponents').querySelector(`.opp[data-peek="${seat}"] .opp-sub`), { scale: 1.2, duration: 360 });
+        });
     }
 
     send(command) {
@@ -261,6 +336,7 @@ export default class UI {
     // 新しく起きたことを、短い表示と光で見せる
     playEvents() {
         const fresh = this.view.events.filter(e => e.seq > this.lastSeq);
+        this.fresh = fresh;
         this.lastSeq = this.view.events.at(-1)?.seq ?? this.lastSeq;
         this.playSound(fresh);
         this.flash = new Set();
@@ -320,7 +396,7 @@ export default class UI {
         const full = draw && picked.length + (this.sel.deck ?? 0) >= d.n;
         $('tray').innerHTML = v.tray.map((id, i) => cardHtml(id, {
             cls: `${draw && !picked.includes(i) && !full ? 'glow' : ''} ${picked.includes(i) ? 'picked' : ''}`,
-            attrs: `data-tray="${i}"`
+            attrs: `data-tray="${i}" data-bird="${id}"`
         })).join('') + Array.from({ length: 3 - v.tray.length }, () => '<span class="card empty"></span>').join('');
         const deckN = this.sel.deck ?? 0;
         $('deck').className = `deck ${draw && !full && v.deckCount > deckN ? 'glow' : ''} ${deckN ? 'picked' : ''}`;
@@ -402,7 +478,7 @@ export default class UI {
             ? list.map((id, i) => {
                 const mode = this.handMode(id);
                 const picked = this.sel.card === i;
-                return cardHtml(id, { cls: `${mode && !picked ? 'glow' : ''} ${picked ? 'picked' : ''}`, attrs: `data-card="${i}"` });
+                return cardHtml(id, { cls: `${mode && !picked ? 'glow' : ''} ${picked ? 'picked' : ''}`, attrs: `data-card="${i}" data-bird="${id}"` });
             }).join('')
             : '<span class="hand-empty">手札なし</span>';
     }
@@ -477,7 +553,7 @@ export default class UI {
         const v = this.view;
         if (v.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.showResult(), 700);
+            Motion.afterIdle(() => this.showResult(), 700);
             return;
         }
         const d = this.myDecision();

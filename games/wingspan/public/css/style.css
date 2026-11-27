@@ -110,6 +110,15 @@ button:disabled { cursor: default; opacity: .45; }
 .segment { flex: 1; display: flex; background: #ece4d0; border-radius: 10px; padding: 3px; gap: 3px; }
 .segment button { flex: 1; min-height: 40px; border-radius: 8px; font-weight: 800; color: var(--muted); display: flex; align-items: center; justify-content: center; gap: 4px; }
 .segment button[aria-checked="true"] { background: var(--accent); color: #fff; }
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択と同じ見た目にする */
+#motion-setting { flex: 1; display: flex; }
+#motion-setting .motion-speed { flex: 1; }
+#motion-setting .motion-speed-options { flex: 1; border: none; border-radius: 10px; background: #ece4d0; padding: 3px; gap: 3px; }
+#motion-setting .motion-speed button { flex: 1; justify-content: center; min-height: 40px; border-radius: 8px; font-weight: 800; color: var(--muted); }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+/* 飛んでいるカード */
+.motion-flyer { filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); }
 
 /* ---- ゲーム ---- */
 .game-screen { display: flex; flex-direction: column; gap: 4px; padding: 2px 6px 6px; }
