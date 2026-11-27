@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1b2a2f">
+    <title>3rd Force</title>
+    <meta name="description" content="条件と行動を並べて戦術を組み、兵器どうしの自動の戦いで勝ちを目指す">
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="3rd Force">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main>
+        <!-- タイトル -->
+        <section id="screen-title" class="screen title-screen">
+            <div class="title-head">
+                <div class="title-art" aria-hidden="true"><svg id="title-art" viewBox="0 0 240 96"></svg></div>
+                <h1 class="logo">3rd Force</h1>
+                <p class="logo-sub">戦術を組んで、自動の戦いに勝つ</p>
+            </div>
+            <div class="panel">
+                <div class="row"><label class="row-label" for="my-tactic">戦術</label>
+                    <select id="my-tactic" class="select"></select>
+                </div>
+                <div class="row"><span class="row-label">相手</span>
+                    <div id="cpu-level" class="segmented" role="radiogroup" aria-label="CPU の強さ"></div>
+                </div>
+                <div class="buttons">
+                    <button id="start" type="button" class="primary">対戦開始</button>
+                    <button id="resume" type="button" class="secondary" hidden>続きから</button>
+                </div>
+                <div class="buttons">
+                    <button id="open-tactics" type="button" class="secondary">戦術を作る</button>
+                    <button id="watch" type="button" class="tertiary">観戦</button>
+                </div>
+                <!-- オンライン対戦の接続先がないとき（デプロイ前の公開ページ）は隠す -->
+                <div class="buttons" id="online-row" hidden>
+                    <button id="online" type="button" class="secondary">オンラインで遊ぶ</button>
+                </div>
+                <div class="title-links">
+                    <button id="open-help-title" type="button" class="link">遊び方</button>
+                    <button type="button" class="link sound-toggle" aria-pressed="true">サウンド</button>
+                    <a class="link portal-link" href="../">← ゲーム一覧</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- 戦術の一覧 -->
+        <section id="screen-tactics" class="screen" hidden>
+            <header class="topbar">
+                <button id="tactics-back" type="button" class="icon-button" aria-label="タイトルへ" title="タイトルへ">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <h2 class="bar-title">戦術</h2>
+                <button id="new-tactic" type="button" class="icon-button" aria-label="新しく作る" title="新しく作る">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                </button>
+            </header>
+            <div class="scroll">
+                <ul id="tactic-list" class="tactic-list"></ul>
+                <h3 class="list-head">組み込みの戦術</h3>
+                <ul id="builtin-list" class="tactic-list"></ul>
+            </div>
+        </section>
+
+        <!-- エディタ -->
+        <section id="screen-editor" class="screen" hidden>
+            <header class="topbar">
+                <button id="editor-back" type="button" class="icon-button" aria-label="戦術の一覧へ" title="戦術の一覧へ">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+                </button>
+                <button id="tactic-name" type="button" class="bar-title name-button"></button>
+                <button id="open-help-editor" type="button" class="icon-button" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg>
+                </button>
+            </header>
+            <div class="tabs" role="tablist">
+                <button type="button" role="tab" data-tab="rules" aria-selected="true">出撃ルール</button>
+                <button type="button" role="tab" data-tab="arms" aria-selected="false">兵器の動き</button>
+                <button type="button" role="tab" data-tab="formations" aria-selected="false">編成</button>
+            </div>
+            <div id="editor-body" class="scroll editor-body"></div>
+            <div id="trial-result" class="trial-result" hidden></div>
+            <footer class="editor-bar">
+                <button id="trial" type="button" class="secondary">試す</button>
+                <button id="hint" type="button" class="secondary">ヒント</button>
+                <button id="save-tactic" type="button" class="primary">保存</button>
+            </footer>
+        </section>
+
+        <!-- 対戦 -->
+        <section id="screen-game" class="screen game-screen" hidden>
+            <header class="topbar">
+                <button id="home" type="button" class="icon-button" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="match-title" class="match-title"></div>
+                <button id="open-help-game" type="button" class="icon-button" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg>
+                </button>
+                <button type="button" class="icon-button sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg></button>
+            </header>
+            <div class="game-main">
+                <div class="hud">
+                    <div class="hud-side own"><span class="hud-name" id="name-own"></span><div class="bar"><i id="life-own"></i></div><span class="hud-nums"><b id="life-own-n">1000</b><span id="money-own">1000</span></span></div>
+                    <div class="hud-time" id="clock">0秒</div>
+                    <div class="hud-side enemy"><span class="hud-name" id="name-enemy"></span><div class="bar"><i id="life-enemy"></i></div><span class="hud-nums"><b id="life-enemy-n">1000</b><span id="money-enemy">1000</span></span></div>
+                </div>
+                <div class="board-wrap"><canvas id="board" aria-label="盤面"></canvas></div>
+                <div class="side-panel">
+                    <div class="controls">
+                        <div id="speed" class="segmented" role="radiogroup" aria-label="速さ">
+                            <button type="button" role="radio" data-speed="1">×1</button>
+                            <button type="button" role="radio" data-speed="2">×2</button>
+                            <button type="button" role="radio" data-speed="4">×4</button>
+                        </div>
+                        <button id="pause" type="button" class="icon-button" aria-label="一時停止" title="一時停止">
+                            <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path class="icon-pause" d="M8 5v14M16 5v14"/><path class="icon-play" d="M7 5l12 7-12 7z"/></svg>
+                        </button>
+                        <button id="skip" type="button" class="tertiary small">結果へ</button>
+                    </div>
+                    <ol id="log" class="log" aria-label="発動したルール"></ol>
+                </div>
+            </div>
+        </section>
+
+        <!-- オンライン：戦術の提出 -->
+        <section id="screen-submit" class="screen" hidden>
+            <header class="topbar">
+                <button id="submit-home" type="button" class="icon-button" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <h2 class="bar-title">オンライン対戦</h2>
+                <button id="open-help-submit" type="button" class="icon-button" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6V14M12 17.5v.01"/></svg>
+                </button>
+            </header>
+            <div class="submit-body">
+                <p id="submit-vs" class="submit-vs"></p>
+                <div class="row"><label class="row-label" for="submit-tactic">戦術</label>
+                    <select id="submit-tactic" class="select"></select>
+                </div>
+                <button id="submit" type="button" class="primary">この戦術で出す</button>
+                <p id="submit-status" class="submit-status"></p>
+            </div>
+        </section>
+    </main>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="dialog">
+        <div id="help" class="help"></div>
+        <form method="dialog"><button class="primary">閉じる</button></form>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="dialog result-dialog">
+        <h2 id="result-title" class="result-title"></h2>
+        <p id="result-life" class="result-life"></p>
+        <table id="result-stats" class="result-stats"></table>
+        <h3 class="list-head">ルールごとの発動回数</h3>
+        <ol id="result-counts" class="result-counts"></ol>
+        <div class="buttons wrap">
+            <button id="again" type="button" class="primary">もう一度</button>
+            <button id="replay" type="button" class="secondary">リプレイ</button>
+            <button id="edit-from-result" type="button" class="secondary">戦術を直す</button>
+            <button id="share-battle" type="button" class="secondary">共有</button>
+        </div>
+        <button id="result-home" type="button" class="link">タイトルへ</button>
+    </dialog>
+
+    <!-- 出撃ルールの1行 -->
+    <dialog id="line-sheet" class="dialog sheet">
+        <div id="line-body"></div>
+    </dialog>
+
+    <!-- ヒント -->
+    <dialog id="hint-dialog" class="dialog">
+        <h2 class="dialog-title">ヒント</h2>
+        <div id="hint-body"></div>
+        <div class="buttons">
+            <button id="hint-apply" type="button" class="primary">この行を足す</button>
+            <button id="hint-close" type="button" class="tertiary">閉じる</button>
+        </div>
+    </dialog>
+
+    <!-- 共有 -->
+    <dialog id="share-dialog" class="dialog">
+        <h2 class="dialog-title" id="share-title">共有</h2>
+        <input id="share-url" class="share-url" type="url" readonly>
+        <div class="buttons">
+            <button id="share-copy" type="button" class="primary">コピー</button>
+            <button id="share-close" type="button" class="tertiary">閉じる</button>
+        </div>
+    </dialog>
+
+    <!-- 共有された戦術・対戦を開いたとき -->
+    <dialog id="import-dialog" class="dialog">
+        <h2 class="dialog-title" id="import-title"></h2>
+        <p id="import-text" class="import-text"></p>
+        <div class="buttons wrap" id="import-buttons"></div>
+    </dialog>
+
+    <!-- 名前 -->
+    <dialog id="name-dialog" class="dialog">
+        <h2 class="dialog-title">戦術の名前</h2>
+        <form method="dialog" id="name-form">
+            <input id="name-input" class="share-url" type="text" maxlength="16" autocomplete="off">
+            <div class="buttons">
+                <button value="ok" class="primary">決める</button>
+                <button value="cancel" class="tertiary">やめる</button>
+            </div>
+        </form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" hidden></div>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>

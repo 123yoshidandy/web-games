@@ -1,0 +1,18 @@
+{
+    "name": "3rd Force",
+    "short_name": "3rd Force",
+    "description": "条件と行動を並べて戦術を組み、兵器どうしの自動の戦いで勝ちを目指す。CPU と遊べる",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#1b2a2f",
+    "theme_color": "#1b2a2f",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

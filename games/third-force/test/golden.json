@@ -1,0 +1,33 @@
+{
+  "engine": 1,
+  "cases": [
+    {
+      "seed": 1,
+      "a": "kazuki",
+      "b": "sample",
+      "hash": "d51732d5",
+      "winner": 0
+    },
+    {
+      "seed": 2,
+      "a": "sample",
+      "b": "random",
+      "hash": "45b5c338",
+      "winner": 0
+    },
+    {
+      "seed": 3,
+      "a": "defense",
+      "b": "kazuki",
+      "hash": "a5cb0dad",
+      "winner": null
+    },
+    {
+      "seed": 123456789,
+      "a": "random",
+      "b": "random",
+      "hash": "2393faa1",
+      "winner": 0
+    }
+  ]
+}
