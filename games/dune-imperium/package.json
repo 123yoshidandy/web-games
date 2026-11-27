@@ -1,0 +1,28 @@
+{
+  "name": "dune-imperium",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs"
+  },
+  "devDependencies": {
+    "test-kit": "*"
+  },
+  "portal": {
+    "original": "Dune: Imperium",
+    "genres": [
+      "ボードゲーム",
+      "カードゲーム"
+    ]
+  },
+  "standards": {
+    "skip": {
+      "undo": "カードを引く・山札を混ぜる・陰謀カードを奪うなど、隠れた情報と乱数があり、戻すと先が見えて有利になる"
+    }
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  }
+}
