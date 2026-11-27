@@ -16,6 +16,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'blokus';
 const SETTINGS_KEY = 'blokus.settings';
@@ -64,10 +65,15 @@ export default class UI {
         this.selected = null;     // { piece, orient, x, y }
         this.orients = {};        // ピースごとに、最後に使った向き
         this.lastSeq = 0;
-        this.resultTimer = null;
+        this.resultTimer = () => {}; // 結果を出す予約を取り消す関数
         this.drag = null;
         this.buildBoard();
         this.bindStatic();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'ブロックス',
@@ -142,7 +148,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -428,6 +434,7 @@ export default class UI {
         if (!v) return;
         const fresh = new Set();
         v.events.filter(e => e.seq > this.lastSeq && e.type === 'place').forEach(e => e.cells.forEach(([x, y]) => fresh.add(y * SIZE + x)));
+        if (fresh.size) Motion.hold(330); // 置いたピースの現れる動き（CSS）が終わるまで CPU を待たせる
         const last = new Set((v.lastMove?.cells ?? []).map(([x, y]) => y * SIZE + x));
         const hints = new Set();
         if (this.isMyTurn()) anchors(v.board, v.current, v.colors[v.current].placed === 0).forEach(([x, y]) => hints.add(y * SIZE + x));
@@ -513,9 +520,9 @@ export default class UI {
 
     maybeResult() {
         const v = this.view;
-        clearTimeout(this.resultTimer);
+        this.resultTimer();
         if (v.phase !== 'end' || this.shownResult === v.logCount) return;
-        this.resultTimer = setTimeout(() => {
+        this.resultTimer = Motion.afterIdle(() => {
             this.shownResult = v.logCount;
             this.showResult();
         }, RESULT_DELAY_MS);

@@ -86,7 +86,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
     font-size: 16px;
     font-weight: 800;
     cursor: pointer;
-    transition: transform .08s, box-shadow .08s;
+    transition: transform calc(.08s * var(--motion-scale, 1)), box-shadow calc(.08s * var(--motion-scale, 1));
 }
 .btn.primary { color: #2d2104; background: linear-gradient(#f8dc85, var(--gold)); box-shadow: 0 4px 0 var(--gold-deep); }
 .btn.secondary { color: #fff; background: linear-gradient(#6aa7ea, var(--sky)); box-shadow: 0 4px 0 var(--sky-deep); }
@@ -186,7 +186,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
     box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .45), inset -1px -1px 0 rgba(0, 0, 0, .3);
 }
 .cell.last { box-shadow: inset 1px 1px 0 rgba(255, 255, 255, .45), inset -1px -1px 0 rgba(0, 0, 0, .3), inset 0 0 0 2px rgba(255, 255, 255, .65); }
-.cell.drop { animation: drop .32s ease-out backwards; }
+.cell.drop { animation: drop calc(.32s * var(--motion-scale, 1)) ease-out backwards; }
 @keyframes drop { 0% { transform: translateY(-40%) scale(1.15); opacity: .2; } 100% { transform: none; opacity: 1; } }
 .cell.hint::before { content: ''; position: absolute; inset: 36%; border-radius: 50%; background: var(--hc); opacity: .7; }
 .cell.h-blue { --hc: var(--blue); } .cell.h-yellow { --hc: #c99a0d; } .cell.h-red { --hc: var(--red); } .cell.h-green { --hc: var(--green); }
@@ -300,7 +300,7 @@ dialog h2:focus-visible { outline: none; }
     transform: translateX(-50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s;
+    transition: opacity calc(.2s * var(--motion-scale, 1));
 }
 .toast.show { opacity: 1; }
 
@@ -329,3 +329,8 @@ dialog h2:focus-visible { outline: none; }
     .bar > .icon-btn { width: 30px; }
     .pchip { padding: 3px 4px; column-gap: 3px; }
 }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択肢と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #2d2104; background: var(--gold); }
