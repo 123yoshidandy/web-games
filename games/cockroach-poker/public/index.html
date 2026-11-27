@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <meta name="theme-color" content="#2b1b14">
-    <title>ごきぶりポーカー</title>
+    <title>おばけポーカー</title>
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -12,7 +12,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black">
-    <meta name="apple-mobile-web-app-title" content="ごきぶり">
+    <meta name="apple-mobile-web-app-title" content="おばけ">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;800&display=swap">
@@ -24,8 +24,8 @@
         <!-- タイトル画面 -->
         <section id="screen-title" class="screen">
             <div class="title-art" id="title-art" aria-hidden="true"></div>
-            <h1 class="logo">ごきぶりポーカー</h1>
-            <p class="subtitle">KAKERLAKENPOKER</p>
+            <h1 class="logo">おばけポーカー</h1>
+            <p class="subtitle">GHOST POKER</p>
             <div class="setup">
                 <div class="row">人数
                     <div id="player-count" class="segmented" role="radiogroup" aria-label="人数">
@@ -100,19 +100,19 @@
         <h2 tabindex="-1" autofocus>遊び方</h2>
         <div class="help-body">
             <h3>目的</h3>
-            <p>虫のカードを押しつけ合うゲームです。自分の前に<strong>同じ虫が4枚</strong>たまった人の負け。親になったのに手札がない人も負けです。負けた1人以外は、全員の勝ち。</p>
+            <p>おばけや夜の生き物のカードを押しつけ合うゲームです。自分の前に<strong>同じ種類が4枚</strong>たまった人の負け。親になったのに手札がない人も負けです。負けた1人以外は、全員の勝ち。</p>
             <ul class="help-kinds" id="help-kinds"></ul>
             <p>8種類×8枚の64枚を、全員に配ります。</p>
             <h3>親</h3>
-            <p>手札から1枚を伏せてだれかに渡し、「これは○○」と虫を言います。本当でも嘘でもかまいません。</p>
+            <p>手札から1枚を伏せてだれかに渡し、「これは○○」と種類を言います。本当でも嘘でもかまいません。</p>
             <h3>受けた人</h3>
             <p><strong>受ける</strong>：「本当」か「うそ」と答えて、カードを表にします。当たれば渡した人が、外れたら受けた人が、そのカードを自分の前に置きます。</p>
-            <p><strong>見て回す</strong>：カードをこっそり見てから、まだ見ていない人に伏せて渡し、同じ虫か別の虫を言います。全員が見たカードは、受けるしかありません。</p>
+            <p><strong>見て回す</strong>：カードをこっそり見てから、まだ見ていない人に伏せて渡し、同じ種類か別の種類を言います。全員が見たカードは、受けるしかありません。</p>
             <p>カードを置いた人が、次の親です。</p>
             <h3>2人のとき</h3>
-            <p>最初に10枚を伏せたまま除きます。見て回すことはできません。同じ虫が<strong>5枚</strong>で負けです。</p>
+            <p>最初に10枚を伏せたまま除きます。見て回すことはできません。同じ種類が<strong>5枚</strong>で負けです。</p>
             <h3>コツ</h3>
-            <p>前に置かれたカードは表なので、だれが何に困っているかが見えます。表になった枚数を数えると、嘘を見抜けることもあります。迷ったら上の電球のボタンを押すと、おすすめ（渡すカード・相手・言う虫、または答え）を選んで光らせます。</p>
+            <p>前に置かれたカードは表なので、だれが何に困っているかが見えます。表になった枚数を数えると、嘘を見抜けることもあります。迷ったら上の電球のボタンを押すと、おすすめ（渡すカード・相手・言う種類、または答え）を選んで光らせます。</p>
         </div>
         <div class="buttons"><button class="btn secondary" data-close>閉じる</button></div>
     </dialog>

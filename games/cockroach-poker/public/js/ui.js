@@ -55,7 +55,7 @@ export default class UI {
         this.bindStatic();
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
-            title: 'ごきぶりポーカー',
+            title: 'おばけポーカー',
             game: 'cockroach-poker',
             serverUrl: getServerUrl(),
             cpuStepDelayMs: 1100,
@@ -234,7 +234,7 @@ export default class UI {
         return !!v && v.phase === phase && v.answering.includes(v.you);
     }
 
-    // 言う虫を決めて、渡すか回す
+    // 言う種類を決めて、渡すか回す
     declare(claim) {
         const { card, target } = this.pick;
         if (this.myPrompt('give') && card && target !== null) this.send({ type: 'give', card, target, claim });
@@ -274,8 +274,8 @@ export default class UI {
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         this.syncPick(view);
         $('#rule').textContent = view.removedCount
-            ? `同じ虫${view.limit}枚で負け・除いた${view.removedCount}枚`
-            : `同じ虫${view.limit}枚で負け`;
+            ? `同じ種類${view.limit}枚で負け・除いた${view.removedCount}枚`
+            : `同じ種類${view.limit}枚で負け`;
         this.renderOpponents(view);
         this.renderStage(view);
         this.renderMe(view);
@@ -303,7 +303,7 @@ export default class UI {
         if (this.pick.card && !view.players[view.you].hand.includes(this.pick.card)) this.pick.card = null;
     }
 
-    // 前に置いたカードの一覧（虫ごとの枚数。負けに近いものは色を変える）
+    // 前に置いたカードの一覧（種類ごとの枚数。負けに近いものは色を変える）
     tableHtml(view, p, { all = false } = {}) {
         return KIND_ORDER.map(kind => {
             const n = countOf(p.table, kind);

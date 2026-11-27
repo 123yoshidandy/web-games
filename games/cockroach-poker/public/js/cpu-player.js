@@ -6,10 +6,10 @@
  *
  * ふつう
  * - 答える：見えていない枚数（8枚から、自分の手札と全員の前のカードを引く）と、言った人の正直さ（終わった回で、言ったことが本当だった割合）から、
- *   言ったことが本当の確率を出す。そのうえで、外れて自分が引き取る怖さ（負けに近い虫か）と、当たって相手に引き取らせる得を比べて答える。
+ *   言ったことが本当の確率を出す。そのうえで、外れて自分が引き取る怖さ（負けに近い種類か）と、当たって相手に引き取らせる得を比べて答える。
  *   どちらも怖いときや迷うときは、見てから回す
- * - 渡す：相手が負けに近い虫を、自分が引き取っても怖くない範囲で選ぶ。言う虫は、相手が「本当」と答えやすい人なら嘘、「うそ」と答えやすい人なら本当に寄せ、はったりを混ぜる
- * やさしい：答えはほぼ当てずっぽう（3枚とも見えない虫だけ、ときどき見抜く）。渡すカードと相手と言う虫は、でたらめ
+ * - 渡す：相手が負けに近い種類を、自分が引き取っても怖くない範囲で選ぶ。言う種類は、相手が「本当」と答えやすい人なら嘘、「うそ」と答えやすい人なら本当に寄せ、はったりを混ぜる
+ * やさしい：答えはほぼ当てずっぽう（3枚とも見えない種類だけ、ときどき見抜く）。渡すカードと相手と言う種類は、でたらめ
  */
 
 import { createRandom } from './random.js';
@@ -21,7 +21,7 @@ export const CPU_LEVELS = ['easy', 'normal'];
 const count = (list, item) => list.filter(x => x === item).length;
 const sum = (list) => list.reduce((s, v) => s + v, 0);
 
-// ビューから見た、虫ごとの見えていない枚数（自分の手札・全員の前のカード・自分が見た伏せたカードを除く）
+// ビューから見た、種類ごとの見えていない枚数（自分の手札・全員の前のカード・自分が見た伏せたカードを除く）
 export function unseenCounts(view) {
     const me = view.players[view.you];
     const known = [...me.hand, ...view.players.flatMap(p => p.table)];
@@ -93,7 +93,7 @@ export function chooseCommand(view, level = 'normal', rand = viewRandom(view)) {
 const pick = (list, rand) => list[Math.floor(rand() * list.length)];
 const others = (view) => view.players.map(p => p.id).filter(id => id !== view.you);
 
-// 嘘で言う虫：相手の前に多い虫ほど選びやすくする（引き取りたくない虫を言われると迷う）
+// 嘘で言う種類：相手の前に多い種類ほど選びやすくする（引き取りたくない種類を言われると迷う）
 function lieClaim(view, card, target, rand) {
     const table = view.players[target].table;
     const candidates = KIND_ORDER.filter(k => k !== card && count(view.players.flatMap(p => p.table), k) < COPIES - 1);
@@ -137,7 +137,7 @@ function respondNormal(view, rand) {
     const p = truthChance(view);
     const rest = KIND_ORDER.filter(k => k !== r.claim && unseen[k] > 0);
     const restTotal = sum(rest.map(k => unseen[k]));
-    // 言った虫でなかったときの、引き取る痛さの見込み
+    // 言った種類でなかったときの、引き取る痛さの見込み
     const expected = (seat) => (restTotal ? sum(rest.map(k => unseen[k] / restTotal * danger(view, seat, k))) : 0);
     const noise = () => (rand() - 0.5) * 1.5;
     const sayTrue = p * danger(view, r.from, r.claim) - (1 - p) * expected(me) + noise();

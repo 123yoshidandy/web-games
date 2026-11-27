@@ -73,7 +73,7 @@ describe('渡して答える', () => {
         expect(game.players[2].table).toEqual(['rat']);
     });
 
-    it('見てから、まだ見ていない人に回せる。言う虫は変えてよい', () => {
+    it('見てから、まだ見ていない人に回せる。言う種類は変えてよい', () => {
         const game = newGame(4);
         setHand(game, 0, ['bat']);
         give(game, 'bat', 1, 'bat');
@@ -120,7 +120,7 @@ describe('渡して答える', () => {
 });
 
 describe('負けの判定', () => {
-    it('同じ虫が4枚たまった人の負け', () => {
+    it('同じ種類が4枚たまった人の負け', () => {
         const game = newGame(3);
         setHand(game, 0, ['spider']);
         game.players[1].table = ['spider', 'spider', 'spider', 'frog', 'frog', 'frog'];
@@ -189,7 +189,7 @@ describe('負けの判定', () => {
 });
 
 describe('断る操作', () => {
-    it('番でない人・持っていないカード・知らない虫・形の違う答えは断り、状態を変えない', () => {
+    it('番でない人・持っていないカード・知らない種類・形の違う答えは断り、状態を変えない', () => {
         const game = newGame(3);
         setHand(game, 0, ['bat', 'bat']);
         const missing = KIND_ORDER.find(k => !game.players[0].hand.includes(k));

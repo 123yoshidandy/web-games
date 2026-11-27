@@ -34,7 +34,7 @@ describe('CPU どうしの試合', () => {
 });
 
 describe('CPU の見込み', () => {
-    it('8枚とも見えている虫を言われたら、必ず「うそ」と答える', () => {
+    it('8枚とも見えている種類を言われたら、必ず「うそ」と答える', () => {
         const game = cpuGame(3);
         setHand(game, 0, ['spider']);
         game.applyCommand(0, { type: 'give', card: 'spider', target: 1, claim: 'frog' });
@@ -74,7 +74,7 @@ describe('CPU の見込み', () => {
         expect(lies).toBeGreaterThan(120);
     });
 
-    it('負けに近い虫を、その人に渡す', () => {
+    it('負けに近い種類を、その人に渡す', () => {
         const game = cpuGame(3);
         game.current = 1;
         setHand(game, 1, ['spider', 'frog', 'rat']);
@@ -108,7 +108,7 @@ describe('CPU の見込み', () => {
     });
 });
 
-// どの虫も3枚ずつ（何を引き取っても負ける）
+// どの種類も3枚ずつ（何を引き取っても負ける）
 function KIND_ORDER_THREE() {
     return ['cockroach', 'rat', 'bat', 'fly', 'frog', 'scorpion', 'stinkbug', 'spider'].flatMap(k => [k, k, k]);
 }

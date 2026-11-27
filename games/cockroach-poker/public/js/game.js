@@ -1,17 +1,17 @@
 /**
- * ごきぶりポーカーの進行（基本ゲーム）
+ * おばけポーカーの進行（基本ゲーム）
  * DOM に依存しないので、ブラウザ・テスト・オンライン対戦のサーバーのどこでも動く
  * 受け付けた操作を commands に記録し、Game.replay で同じゲームを再現できる（配り方はシードから決まる）
  *
  * ルール（Drei Magier Spiele のルールブックによる）
- * - 8種の虫×8枚の64枚を、全部伏せて配る。割り切れなくてよい
- * - 親は手札から1枚を伏せて好きな人に渡し、「これは○○」と虫の名前を言う（本当でも嘘でもよい）
+ * - 8種×8枚の64枚を、全部伏せて配る。割り切れなくてよい
+ * - 親は手札から1枚を伏せて好きな人に渡し、「これは○○」と種類の名前を言う（本当でも嘘でもよい）
  * - 受けた人は、次のどちらか
  *   1. 受ける：「本当」か「うそ」と答えて表にする。当たれば渡した人が、外れれば受けた人が、そのカードを自分の前に表で置く
- *   2. 回す：こっそり見てから、まだ見ていない人に伏せて渡し、同じ虫か別の虫を言う。全員が見たカードは、受けるしかない
+ *   2. 回す：こっそり見てから、まだ見ていない人に伏せて渡し、同じ種類か別の種類を言う。全員が見たカードは、受けるしかない
  * - カードを置いた人が、次の親になる
- * - 同じ虫が4枚たまった人、または親なのに手札がない人の負け（ほかの全員の勝ち）
- * - 2人のとき：最初に10枚を伏せたまま除く。回すことはできない。同じ虫が5枚で負け
+ * - 同じ種類が4枚たまった人、または親なのに手札がない人の負け（ほかの全員の勝ち）
+ * - 2人のとき：最初に10枚を伏せたまま除く。回すことはできない。同じ種類が5枚で負け
  *
  * ルールブックに書かれていない点は、次のように決めた（README にも書く）
  * - 最初の親はシードから決める。配るのは親から順に1枚ずつ（割り切れない分は、親から順に1枚多い）
@@ -63,7 +63,7 @@ export default class Game {
         this.round = null;    // { card, starter, from, to, claim, seen, chain: [{ from, to, claim }] }
         this.history = [];    // 終わった回（表になったので全員に見せてよい）{ card, chain, answerer, said, correct, taker }
         this.loser = null;
-        this.reason = null;   // 'set'：同じ虫がたまった / 'empty'：親なのに手札がない
+        this.reason = null;   // 'set'：同じ種類がたまった / 'empty'：親なのに手札がない
         this.commands = [];
         this.logs = [];
         this.events = [];
@@ -129,7 +129,7 @@ export default class Game {
         const p = this.players[seat];
         if (!isKind(card) || !p.hand.includes(card)) return this.fail('そのカードは持っていません');
         if (!Number.isInteger(target) || target === seat || !this.players[target]) return this.fail('その人には渡せません');
-        if (!isKind(claim)) return this.fail('虫の名前を選んでください');
+        if (!isKind(claim)) return this.fail('種類を選んでください');
         p.hand.splice(p.hand.indexOf(card), 1);
         this.round = { card, starter: seat, from: seat, to: target, claim, seen: [seat], chain: [{ from: seat, to: target, claim }] };
         this.phase = 'respond';
@@ -174,7 +174,7 @@ export default class Game {
 
     pass(seat, { target, claim }) {
         if (!this.passTargets().includes(target)) return this.fail('その人には回せません');
-        if (!isKind(claim)) return this.fail('虫の名前を選んでください');
+        if (!isKind(claim)) return this.fail('種類を選んでください');
         const r = this.round;
         r.from = seat;
         r.to = target;
@@ -193,7 +193,7 @@ export default class Game {
         this.round = null;
         this.emit({ type: 'end', seat, reason });
         const name = this.players[seat].name;
-        this.log(reason === 'set' ? `${name}の前に同じ虫が${this.limit}枚。${name}の負け` : `${name}は手札がなく、渡せません。${name}の負け`);
+        this.log(reason === 'set' ? `${name}の前に同じ種類が${this.limit}枚。${name}の負け` : `${name}は手札がなく、渡せません。${name}の負け`);
         return true;
     }
 

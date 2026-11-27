@@ -1,4 +1,4 @@
-/* ごきぶりポーカー
+/* おばけポーカー
  * 縦持ちのスマホ（最小 375×548）に、スクロールなしで収める。真ん中の場だけが残りの高さを使う
  */
 
@@ -123,7 +123,7 @@ button {
 }
 .segmented button[aria-checked="true"] { color: #3a1b02; background: var(--accent); }
 
-/* 虫の名前の札 */
+/* 種類の名前の札 */
 .kind-tag {
     display: inline-flex;
     align-items: center;
