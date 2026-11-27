@@ -1,0 +1,42 @@
+{
+    "name": "スピリット・アイランド",
+    "short_name": "スピリット・アイランド",
+    "description": "島の精霊になり、侵略者を恐れさせて追い払う協力ゲーム。CPU の精霊と組むか、全員を1人で動かして遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": [
+        "fullscreen",
+        "standalone"
+    ],
+    "orientation": "portrait",
+    "background_color": "#0f2219",
+    "theme_color": "#11261c",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}
