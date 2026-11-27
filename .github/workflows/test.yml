@@ -47,6 +47,9 @@ jobs:
       # シード付きの乱数の写し（random.js）が、元とそろっているか
       - name: Check random copies
         run: node packages/random/scripts/sync.mjs check --all
+      # PWA の写し（service worker の本体 sw-core.js と、画面の側の pwa.js）が、元とそろっているか
+      - name: Check pwa copies
+        run: node packages/pwa/scripts/sync.mjs check --all
       # 変わったゲームと共通の部品のテスト
       # push の比べる元は、同じブランチで最後に流れきった（成功か失敗の）テストのコミット
       # github.event.before だと、取りやめになった push の変更を、次の実行が見落とす（取りやめたコミットが比べる元になるため）

@@ -29,6 +29,16 @@ const listFiles = (dir, pattern, skip = SKIP_DIRS) => (!existsSync(dir) ? [] : r
     }));
 
 const readText = (path) => (existsSync(path) ? readFileSync(path, 'utf8') : '');
+
+// sw.js と、sw.js が importScripts で読むファイル（packages/pwa の js/sw-core.js など）をつないだ中身
+export const readServiceWorker = (pub) => {
+    const sw = readText(join(pub, 'sw.js'));
+    const imported = [...sw.matchAll(/importScripts\(\s*['"]([^'"]+)['"]\s*\)/g)].map((m) => readText(join(pub, m[1])));
+    return [sw, ...imported].join('\n');
+};
+
+// packages/pwa の写し。ゲームのコードの判定には含めない（ゲームが呼んでいるかは registerServiceWorker( などで見る）
+const PWA_COPIES = /\/js\/(pwa\.m?js|sw-core\.js)$/;
 const readJson = (path) => {
     try { return JSON.parse(readFileSync(path, 'utf8')); } catch { return null; }
 };
@@ -50,7 +60,7 @@ export const gameContext = (gamesDir, game) => {
     const pub = existsSync(join(dir, 'public')) ? join(dir, 'public') : dir;
     const jsFiles = listFiles(join(pub, 'js'), /\.m?js$/);
     // js/sound/ は共通の音のエンジンの写しと曲のデータ。ゲームのコードの判定には含めない
-    const ownJsFiles = jsFiles.filter((file) => !file.includes('/js/sound/'));
+    const ownJsFiles = jsFiles.filter((file) => !file.includes('/js/sound/') && !PWA_COPIES.test(file));
     const testFiles = ['test', 'tests'].flatMap((name) => listFiles(join(dir, name), /\.m?js$/, new Set(['node_modules'])));
     const pkg = readJson(join(dir, 'package.json')) ?? {};
     const soundDir = join(pub, 'js', 'sound');
@@ -66,7 +76,7 @@ export const gameContext = (gamesDir, game) => {
         html: readText(join(pub, 'index.html')),
         css: listFiles(pub, /\.css$/).map(readText).join('\n'),
         manifest: readJson(join(pub, 'manifest.webmanifest')),
-        sw: readText(join(pub, 'sw.js')),
+        sw: readServiceWorker(pub),
         readme: readText(join(dir, 'README.md')),
         testFiles,
         tests: testFiles.map(readText).join('\n'),
@@ -115,7 +125,7 @@ export const ITEMS = [
     },
     {
         id: 'sw-register', name: 'service worker の登録', category: 'PWA', level: '必須',
-        check: (c) => yes(/serviceWorker\.register/.test(c.js + c.html))
+        check: (c) => yes(/serviceWorker\.register|registerServiceWorker\(/.test(c.js + c.html))
     },
     {
         id: 'pwa-test', name: 'PWA のテスト', category: '品質', level: '必須',
@@ -235,7 +245,7 @@ export const ITEMS = [
     // ---- スマホ
     {
         id: 'no-zoom', name: 'ズームの無効化', category: 'スマホ', level: '必須',
-        check: (c) => yes(/user-scalable=no/.test(c.html) && /gesturestart/.test(c.js + c.html))
+        check: (c) => yes(/user-scalable=no/.test(c.html) && /gesturestart|preventZoom\(/.test(c.js + c.html))
     },
     {
         id: 'touch-css', name: 'タッチの CSS', category: 'スマホ', level: '必須',

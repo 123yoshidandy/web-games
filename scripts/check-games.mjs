@@ -15,7 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { gameMetadata } from './portal/metadata.mjs';
 import { LOCK_FILE as SOUND_LOCK, copyProblems } from '../packages/sound/scripts/sync.mjs';
 import { LOCK_FILE as MOTION_LOCK, copyProblems as motionCopyProblems } from '../packages/motion/scripts/sync.mjs';
-import { checkRequired } from './standards.mjs';
+import { checkRequired, readServiceWorker } from './standards.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -55,7 +55,7 @@ export function checkGames(gamesDir, games = listGames(gamesDir), { standards = 
         const publicDir = existsSync(join(gamesDir, game, 'public')) ? join(gamesDir, game, 'public') : join(gamesDir, game);
         const swPath = join(publicDir, 'sw.js');
         if (existsSync(swPath)) {
-            const sw = readFileSync(swPath, 'utf8');
+            const sw = readServiceWorker(publicDir);
             const cache = sw.match(/const CACHE = '([^']+)'/)?.[1];
             if (!cache) errors.push(`${game}: sw.js にキャッシュの名前（const CACHE）がない`);
             else claim('cache', cache.replace(/\d+$/, ''), game);

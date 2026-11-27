@@ -127,3 +127,31 @@ test('アシスト（hint）は、id="hint" のボタンと、suggest の export
     }
     assert.equal(evaluateGame(join(root, 'games'), 'katan').results.hint, OK, 'katan の前からのアシストは ✓ のまま');
 });
+
+test('packages/pwa の形：sw.js が importScripts で読む本体も見て、写しだけでは登録・ズームの無効化を ✓ にしない', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'standards-pwa-'));
+    try {
+        const make = (name, main) => {
+            const pub = join(dir, name, 'public');
+            mkdirSync(join(pub, 'js'), { recursive: true });
+            writeFileSync(join(dir, name, 'package.json'), JSON.stringify({ scripts: { test: 'vitest run' } }));
+            writeFileSync(join(pub, 'index.html'), '<meta name="viewport" content="width=device-width, user-scalable=no"><link href="https://fonts.googleapis.com/css2">');
+            writeFileSync(join(pub, 'sw.js'), "const CACHE = 'a-v1';\nconst PRECACHE = ['./', 'index.html', 'js/main.js', 'js/pwa.js', 'js/pwa.mjs', 'js/sw-core.js'];\nimportScripts('js/sw-core.js');\n");
+            writeFileSync(join(pub, 'js', 'sw-core.js'), "const FONT_HOSTS = ['fonts.gstatic.com'];\nnavigator.serviceWorker.register('sw.js'); document.addEventListener('gesturestart', () => {});");
+            writeFileSync(join(pub, 'js', 'pwa.js'), "navigator.serviceWorker.register('sw.js'); document.addEventListener('gesturestart', () => {});");
+            writeFileSync(join(pub, 'js', 'pwa.mjs'), "import './pwa.js';");
+            writeFileSync(join(pub, 'js', 'main.js'), main);
+        };
+        make('calls', "import { preventZoom, registerServiceWorker } from './pwa.mjs';\npreventZoom();\nregisterServiceWorker();");
+        make('copy-only', "console.log('no pwa');");
+        const results = (name) => evaluateGame(dir, name).results;
+        assert.equal(results('calls').sw, OK);
+        assert.equal(results('calls')['offline-font'], OK, '字体の扱いは本体（sw-core.js）にある');
+        assert.equal(results('calls')['sw-register'], OK);
+        assert.equal(results('calls')['no-zoom'], OK);
+        assert.equal(results('copy-only')['sw-register'], NG);
+        assert.equal(results('copy-only')['no-zoom'], NG);
+    } finally {
+        rmSync(dir, { recursive: true, force: true });
+    }
+});
