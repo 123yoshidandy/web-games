@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0f1d33">
+    <title>スカイチーム</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="スカイチーム">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main>
+        <!-- タイトル -->
+        <section id="screen-title" class="screen title-screen">
+            <div class="title-art" aria-hidden="true"><svg id="title-art" viewBox="0 0 240 120"></svg></div>
+            <h1 class="logo">スカイチーム</h1>
+            <p class="logo-sub">ふたりで飛行機を着陸させる協力ダイスゲーム</p>
+            <div class="panel">
+                <div class="row"><span class="row-label">担当</span>
+                    <div id="role-select" class="segmented" role="radiogroup" aria-label="あなたの担当">
+                        <button type="button" role="radio" data-role="0">機長</button>
+                        <button type="button" role="radio" data-role="1">副操縦士</button>
+                    </div>
+                </div>
+                <div class="row"><span class="row-label">空港</span>
+                    <div id="airport-select" class="segmented" role="radiogroup" aria-label="空港"></div>
+                </div>
+                <div class="row"><span class="row-label">相棒</span>
+                    <div id="level-select" class="segmented" role="radiogroup" aria-label="CPU の強さ">
+                        <button type="button" role="radio" data-level="easy">やさしい</button>
+                        <button type="button" role="radio" data-level="normal">ふつう</button>
+                        <button type="button" role="radio" data-level="hard">つよい</button>
+                    </div>
+                </div>
+                <div class="buttons">
+                    <button id="start" type="button" class="primary">ゲーム開始</button>
+                    <button id="resume" type="button" class="secondary" hidden>続きから</button>
+                </div>
+                <!-- オンライン対戦の接続先がないとき（デプロイ前の公開ページ）は隠す -->
+                <div class="buttons" id="online-row" hidden>
+                    <button id="online" type="button" class="secondary">オンラインで遊ぶ</button>
+                </div>
+                <div class="title-links">
+                    <button id="open-help-title" type="button" class="link">遊び方</button>
+                    <button type="button" class="link sound-toggle" aria-pressed="true">サウンド</button>
+                    <a class="link portal-link" href="../">← ゲーム一覧</a>
+                </div>
+            </div>
+        </section>
+
+        <!-- ゲーム -->
+        <section id="screen-game" class="screen game-screen" hidden>
+            <header class="topbar">
+                <button id="home" type="button" class="icon-button" aria-label="ホーム" title="ホーム">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 11 12 4l8.5 7"/><path d="M6 9.5V20h4.5v-5.5h3V20H18V9.5"/></svg>
+                </button>
+                <div id="round-info" class="round-info"></div>
+                <button id="undo" type="button" class="icon-button" aria-label="待った" title="待った">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+                </button>
+                <button id="hint" type="button" class="icon-button" aria-label="ヒント" title="ヒント">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.5 1.1 1.3 1.1 2.1V16h5v-.1c0-.8.4-1.6 1.1-2.1A6 6 0 0 0 12 3z"/></svg>
+                </button>
+                <button id="open-log" type="button" class="icon-button" aria-label="履歴" title="履歴">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>
+                </button>
+                <button type="button" class="icon-button sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド"><svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg></button>
+                <button id="open-help-game" type="button" class="icon-button" aria-label="遊び方" title="遊び方">
+                    <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.2-2.5 3.8"/><path d="M12 17.2v.1"/></svg>
+                </button>
+            </header>
+
+            <div id="track" class="track" aria-label="進入路"></div>
+            <div id="cockpit" class="cockpit"></div>
+            <div id="prompt" class="prompt" aria-live="polite"></div>
+            <div id="tray" class="tray"></div>
+        </section>
+    </main>
+
+    <!-- 履歴 -->
+    <dialog id="log-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2>履歴</h2><button type="button" class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <ol id="log" class="log"></ol>
+        </div>
+    </dialog>
+
+    <!-- 遊び方 -->
+    <dialog id="help-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2>遊び方</h2><button type="button" class="icon-button close" aria-label="閉じる" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <div id="help" class="help"></div>
+        </div>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="dialog">
+        <div class="dialog-body" tabindex="-1" autofocus>
+            <div class="dialog-head"><h2 id="result-title">結果</h2><button type="button" class="icon-button close" aria-label="盤面を見る" data-close>
+                <svg class="line-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+            <div id="result-art" class="result-art" aria-hidden="true"></div>
+            <ul id="result-body" class="result-body"></ul>
+            <div class="buttons">
+                <button id="again" type="button" class="primary">もう一度</button>
+                <button id="result-home" type="button" class="secondary">ホーム</button>
+            </div>
+        </div>
+    </dialog>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
