@@ -1,10 +1,13 @@
-// 入口のページのログイン（名前だけ）と「自分の記録」。欄とダイアログは build-site.mjs が HTML に書き出す
+// 入口のページのログイン（名前だけ）と「自分の記録」。ボタンとダイアログは build-site.mjs が HTML に書き出す
+// 右上：ログイン前は「ログイン」（押すと名前の入力のダイアログ）、ログイン後は「記録」と「ログアウト」（幅があれば名前も）
 // user-stats.js は netplay-kit の画面側の部品の写し（build-site.mjs が _site/portal/ に置く）。ログインの名前はロビーと同じ
 import { currentUser, login, logout, fetchStats, flushResults, pendingResults, resolveStatsUrl } from './user-stats.js';
 import { cardBadgeText, statsHtml } from './stats-view.js';
 
 const $ = (id) => document.getElementById(id);
 const account = $('account');
+const loginOpen = $('login-open');
+const loginDialog = $('login-dialog');
 const form = $('login-form');
 const nameInput = $('login-name');
 const userBox = $('account-user');
@@ -28,13 +31,13 @@ const renderCards = () => {
 
 const renderAccount = () => {
     const user = currentUser();
-    form.hidden = Boolean(user);
+    loginOpen.hidden = Boolean(user);
     userBox.hidden = !user;
     $('account-name').textContent = user ? `${user} さん` : '';
+    $('account-name').title = user;
     const pending = pendingResults().length;
     const messages = [];
-    if (!user) messages.push('名前でログインすると、遊んだ回数と勝ち負けが残ります（ほかのスマホでも同じ名前で見られます）');
-    else if (!resolveStatsUrl()) messages.push('記録のサーバーがまだ用意されていません');
+    if (user && !resolveStatsUrl()) messages.push('記録のサーバーがまだ用意されていません');
     if (user && pending > 0) messages.push(`送れていない結果が ${pending} 件あります（つながったら送ります）`);
     note.textContent = messages.join('。');
     note.hidden = messages.length === 0;
@@ -53,6 +56,14 @@ const refresh = async () => {
     renderAccount();
 };
 
+loginOpen.addEventListener('click', () => {
+    nameInput.value = '';
+    loginDialog.showModal();
+    nameInput.focus();
+});
+$('login-cancel').addEventListener('click', () => loginDialog.close());
+loginDialog.addEventListener('click', (event) => { if (event.target === loginDialog) loginDialog.close(); });
+
 form.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!login(nameInput.value)) {
@@ -60,6 +71,7 @@ form.addEventListener('submit', (event) => {
         return;
     }
     nameInput.value = '';
+    loginDialog.close();
     refresh();
 });
 
