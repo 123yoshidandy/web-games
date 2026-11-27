@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
     gameState, resetGame, updateGame, loadRows, getSnapshot, receiveGarbage, comboAttack, chainAttack
-} from '../js/game.js';
-import { WIDTH, HEIGHT, BLOCK_SIZE, VERSUS_GARBAGE_DELAY } from '../js/constants.js';
+} from '../public/js/game.js';
+import { WIDTH, HEIGHT, BLOCK_SIZE, VERSUS_GARBAGE_DELAY } from '../public/js/constants.js';
 
 const NO_INPUT = { raise: false, flatten: false, actions: [] };
 const PRACTICE = { difficulty: 'practice', sound: 'off', bgm: 'off' };

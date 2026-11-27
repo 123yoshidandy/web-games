@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { gameState, resetGame, updateGame, loadRows, getSnapshot } from '../js/game.js';
+import { gameState, resetGame, updateGame, loadRows, getSnapshot } from '../public/js/game.js';
 // gameState は withGame で切り替わる（ここでは切り替えないので、いつも同じ状態を指す）
-import { createCpu } from '../js/cpu.js';
-import { createCpuMatch } from '../js/cpu-match.js';
+import { createCpu } from '../public/js/cpu.js';
+import { createCpuMatch } from '../public/js/cpu-match.js';
 import { playMatch } from '../scripts/cpu-match.mjs';
-import { WIDTH, HEIGHT } from '../js/constants.js';
+import { WIDTH, HEIGHT } from '../public/js/constants.js';
 
 const PRACTICE = { difficulty: 'practice', sound: 'off', bgm: 'off' };
 const bottomRow = () => getSnapshot().cells.slice((HEIGHT - 1) * WIDTH);

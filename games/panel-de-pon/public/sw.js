@@ -7,12 +7,11 @@ const CACHE = 'panel-de-pon-v1';
 // 同じサイトにほかのゲームも並ぶので、消すのはこのゲームの古い版のキャッシュだけにする
 const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
-// 画面・アイコン・JS・音。manifest のアイコンは icons/ を読むので、そちらも入れる。
+// 画面・アイコン・JS・音。
 // js/netplay/ は netplay-kit の写しだが、main.js が読み込むので、オフラインで開けるように入れる
 const PRECACHE = [
     './', 'index.html', 'manifest.webmanifest', 'css/style.css',
     'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
-    'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png',
     'js/constants.js', 'js/cpu-match.js', 'js/cpu.js', 'js/game.js', 'js/help.js', 'js/input.js',
     'js/layout.js', 'js/lobby.js', 'js/main.js', 'js/online-config.js', 'js/panel-art.js', 'js/random.js',
     'js/renderer.js', 'js/settings.js', 'js/sound.js', 'js/title.js',

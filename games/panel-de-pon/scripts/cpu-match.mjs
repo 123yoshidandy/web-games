@@ -5,8 +5,8 @@
  * 時間切れ（MAX_FRAMES まで決着しない）の試合があれば、終了コード1にする
  */
 
-import { createCpuMatch } from '../js/cpu-match.js';
-import { FRAME_MS } from '../js/constants.js';
+import { createCpuMatch } from '../public/js/cpu-match.js';
+import { FRAME_MS } from '../public/js/constants.js';
 
 const MAX_FRAMES = 60 * 60 * 30; // 約29分（1フレーム16ms）。練習同士は、両方がしのぎ続けて10分を超えることがある
 
