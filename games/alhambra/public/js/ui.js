@@ -12,6 +12,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
 
 const SETTINGS_KEY = 'alhambra.settings';
 const CPU_NAMES = ['ルカ', 'ミラ', 'ノア', 'エマ', 'カイ'];
@@ -65,9 +66,14 @@ export default class UI {
         this.lastSeq = 0;
         this.fresh = new Set();
         this.seenRounds = 0;
-        this.resultTimer = null;
+        this.resultTimer = () => {}; // 結果を出す予約を取り消す関数
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'アルハンブラ',
@@ -143,7 +149,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer();
         ['#scores', '#player-detail'].forEach(id => { if ($(id).open) $(id).close(); });
     }
 
@@ -383,6 +389,7 @@ export default class UI {
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         this.playSounds(view, fresh);
         this.fresh = new Set(fresh.filter(e => e.seat === view.you && (e.type === 'place' || e.type === 'redesign') && e.x !== null).map(e => keyOf(e.x, e.y)));
+        if (this.fresh.size) Motion.hold(450); // 置いた建物の現れる動き（CSS）が終わるまで CPU を待たせる
 
         this.renderPlayers();
         this.renderMarket();
@@ -443,8 +450,8 @@ export default class UI {
         if (view.roundsScored > this.seenRounds) {
             const round = view.roundsScored - 1;
             this.seenRounds = view.roundsScored;
-            clearTimeout(this.resultTimer);
-            this.resultTimer = setTimeout(() => this.showRound(round, view.phase === 'end'), RESULT_DELAY_MS);
+            this.resultTimer();
+            this.resultTimer = Motion.afterIdle(() => this.showRound(round, view.phase === 'end'), RESULT_DELAY_MS);
         }
     }
 
