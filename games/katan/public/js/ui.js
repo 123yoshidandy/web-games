@@ -14,7 +14,6 @@ import { renderBoard, injectSymbols, resourceIcon, pieceIcon, vertexPips, PLAYER
 import { runCpuStep, CPU_LEVELS } from './cpu-player.js';
 import { unlockSound, playEffect, onSoundChange } from './sound.js';
 import { music } from './music.js';
-import NetplayClient from './netplay/netplay-client.mjs';
 import { renderCoach } from './coach.js';
 import { renderHelpPictures } from './help-pictures.js';
 import { playAnimations } from './animator.js';
@@ -135,8 +134,6 @@ export default class UI {
         this.renderTitleArt();
         this.renderSoundButtons();
         this.renderAssistButtons();
-        $('room-code').maxLength = NetplayClient.ROOM_CODE_LENGTH;
-        $('room-code').placeholder = `${NetplayClient.ROOM_CODE_LENGTH}桁の数字`;
         $('open-online').classList.toggle('hidden', !hasServer());
     }
 
@@ -161,11 +158,23 @@ export default class UI {
         this.showScreen('setup');
     }
 
-    showOnlineMenu({ roomCode = '' } = {}) {
+    // 入口（名前・部屋を作る・参加できる部屋の一覧）を出す。部屋はすべて公開で、部屋番号は画面に出さない
+    // invited: 招待URLで開いたとき（名前と「参加する」だけにする。入る部屋は URL の ?room=）
+    showOnlineMenu({ invited = false } = {}) {
         const session = loadOnlineSession();
         $('online-name').value = session?.name ?? loadSetup()?.seats?.[0]?.name ?? '';
-        $('room-code').value = roomCode;
+        $('screen-online').classList.toggle('invited', invited);
+        $('online-title').textContent = invited ? '招待された部屋に参加' : 'オンライン対戦';
+        $('room-list').replaceChildren(); // 前に取った一覧は古いので消す
+        $('room-note').textContent = '';
         this.showScreen('online');
+        if (invited) $('online-name').focus();
+        else this.showRooms();
+    }
+
+    isInviteScreenShown() {
+        const screen = $('screen-online');
+        return !screen.classList.contains('hidden') && screen.classList.contains('invited');
     }
 
     // 前回入っていた部屋があれば、自動で戻る
@@ -226,10 +235,17 @@ export default class UI {
             }
         });
         $('open-online').addEventListener('click', () => this.showOnlineMenu());
-        $('back-to-setup').addEventListener('click', () => this.showSetup());
+        $('back-to-setup').addEventListener('click', () => {
+            // 部屋に入る前に戻ったら、一覧を取るための接続を閉じ、招待URLの ?room= も消す（再読み込みで、また招待の画面を出さない）
+            this.leaveOnline();
+            this.showSetup();
+        });
         $('create-room').addEventListener('click', () => this.createRoom());
-        $('join-room').addEventListener('click', () => this.joinRoom());
-        $('find-rooms').addEventListener('click', () => this.openRooms());
+        $('join-room').addEventListener('click', () => this.joinInvitedRoom());
+        // 招待で開いたときは、名前を入れて Enter でも参加できる
+        $('online-name').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && this.isInviteScreenShown()) this.joinInvitedRoom();
+        });
         $('refresh-rooms').addEventListener('click', () => this.showRooms());
         $('share-invite').addEventListener('click', () => this.shareInvite());
         $('add-cpu').addEventListener('click', () => this.online?.addCpu());
@@ -521,29 +537,23 @@ export default class UI {
         const name = $('online-name').value.trim();
         if (!name) return this.toast('名前を入れてください');
         try {
-            await this.connectOnline().createRoom(name, { isPublic: $('room-public').checked });
+            await this.connectOnline().createRoom(name);
         } catch (error) {
             this.toast(error.message);
         }
     }
 
-    async joinRoom() {
+    async joinInvitedRoom() {
         const name = $('online-name').value.trim();
-        const code = $('room-code').value.trim();
         if (!name) return this.toast('名前を入れてください');
-        if (!NetplayClient.isRoomCode(code)) return this.toast(`部屋番号（数字${NetplayClient.ROOM_CODE_LENGTH}桁）を入れてください`);
         try {
-            await this.connectOnline().joinRoom(code, name);
+            await this.connectOnline().joinFromInvite(name);
         } catch (error) {
-            this.toast(error.message);
+            // 入れなければ（部屋がもうない・始まっているなど）、いつもの入口に戻して一覧を見せる
+            // サーバーに断られたときの知らせは onError が出すので、ここでは通信の失敗だけ知らせる
+            if (!error.fromServer) return this.toast(error.message);
+            this.showOnlineMenu();
         }
-    }
-
-    // 公開の部屋の一覧を開く（名前がなければ開かない。一覧から入るときに使うため）
-    openRooms() {
-        if (!$('online-name').value.trim()) return this.toast('名前を入れてください');
-        this.showModal($('rooms-dialog'));
-        this.showRooms();
     }
 
     // 一覧を取って描く。サーバーはテーブルを読み通すので、開いたときと「更新」を押したときだけ取る
@@ -554,17 +564,18 @@ export default class UI {
         $('refresh-rooms').disabled = true;
         try {
             const rooms = await this.connectOnline().listRooms();
+            if (!this.isRoomListShown()) return; // 返事を待つ間に、部屋を作った・入った・戻った
             $('room-note').textContent = rooms.length ? note : [note, '待っている部屋はありません'].filter(Boolean).join('。');
             // 名前は参加者が入れた文字なので、textContent で描く（element の text）
             list.replaceChildren(...rooms.map(room => element('button', {
                 className: 'room-item',
                 onClick: () => this.enterPublicRoom(room.roomCode)
             }, [
-                element('span', { className: 'room-host', text: `${room.hostName}の部屋` }),
+                element('span', { className: 'room-host', text: `${room.hostName} の部屋` }),
                 element('span', { className: 'room-meta', text: `${room.players}/${room.maxPlayers}人・${room.settings?.mode === 'realtime' ? 'リアルタイム' : '通常'}` })
             ])));
         } catch {
-            $('room-note').textContent = '部屋の一覧を取れませんでした';
+            if (this.isRoomListShown()) $('room-note').textContent = '部屋の一覧を取れませんでした';
         } finally {
             $('refresh-rooms').disabled = false;
         }
@@ -573,13 +584,18 @@ export default class UI {
     // 一覧の部屋に入る。取ったあとで始まった・満員になった・なくなった部屋なら、一覧を取り直す
     async enterPublicRoom(roomCode) {
         const name = $('online-name').value.trim();
+        if (!name) return this.toast('名前を入れてください');
         try {
             await this.connectOnline().enterRoom(roomCode, name);
-            $('rooms-dialog').close();
         } catch (error) {
             if (['already_started', 'room_full', 'room_not_found'].includes(error.code)) this.showRooms('その部屋には入れませんでした');
             else $('room-note').textContent = error.message;
         }
+    }
+
+    // 入口の一覧が出ているか（招待の画面では一覧を出さない）
+    isRoomListShown() {
+        return this.screen === 'online' && !$('screen-online').classList.contains('invited');
     }
 
     onLobby(lobby) {
@@ -601,8 +617,8 @@ export default class UI {
         }
 
         this.showScreen('lobby');
-        $('lobby-code').textContent = lobby.roomCode;
-        $('lobby-public').classList.toggle('hidden', !lobby.public);
+        const host = lobby.players.find(player => player.seat === lobby.hostSeat);
+        $('lobby-title').textContent = host ? `${host.name} の部屋` : '部屋';
         const isHost = online.isHost();
         const list = $('lobby-players');
         list.replaceChildren();
@@ -628,11 +644,11 @@ export default class UI {
         $('start-online').disabled = lobby.players.length < MIN_PLAYERS;
     }
 
+    // 招待URLを送る。URL には部屋番号が入るが、文字では出さない
     async shareInvite() {
-        const code = this.online?.lobby?.roomCode;
-        if (!code) return;
+        if (!this.online?.lobby?.roomCode) return;
         const url = this.online.inviteUrl();
-        const text = `KATAN で遊ぼう！ 部屋番号 ${code}`;
+        const text = 'KATAN で遊ぼう！';
         try {
             if (navigator.share) {
                 await navigator.share({ title: 'KATAN', text, url });

@@ -204,22 +204,24 @@ describe('オンライン対戦（ゲームの定義）', () => {
         expect(view().phase).toBe('play');
     });
 
-    it('公開の部屋は、モードと人数つきで一覧に出て、始まると消える。非公開の部屋は出ない', async () => {
+    it('部屋はすべて公開で、モードと人数つきで一覧に出て、始まると消える', async () => {
         const server = createTestServer(game);
         const host = server.connect();
         await host.send('create', { name: 'あき', public: true });
         await host.send('setSettings', { settings: { mode: 'realtime' } });
-        const secret = server.connect();
-        await secret.send('create', { name: 'はる' });
+        const other = server.connect();
+        await other.send('create', { name: 'はる' }); // public を付けなくても公開になる
         const finder = server.connect();
         await finder.send('listRooms');
-        expect(finder.last('rooms').rooms).toEqual([expect.objectContaining({
-            roomCode: host.last('joined').roomCode, hostName: 'あき', players: 1, maxPlayers: 4, settings: { mode: 'realtime' }
-        })]);
+        const rooms = finder.last('rooms').rooms;
+        expect(rooms.map(room => room.hostName).sort()).toEqual(['あき', 'はる'].sort());
+        expect(rooms.find(room => room.hostName === 'あき')).toMatchObject({
+            roomCode: host.last('joined').roomCode, players: 1, maxPlayers: 4, settings: { mode: 'realtime' }
+        });
         await host.send('addCpu');
         await host.send('start');
         await finder.send('listRooms');
-        expect(finder.last('rooms').rooms).toEqual([]);
+        expect(finder.last('rooms').rooms.map(room => room.hostName)).toEqual(['はる']);
     });
 
     it('対戦後は、ホストが同じ顔ぶれで再戦できる', async () => {

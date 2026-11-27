@@ -166,27 +166,36 @@ button.link {
     cursor: pointer;
 }
 
-/* ボタンの横に並べるチェック（オンライン対戦の「公開にする」） */
-.check {
-    display: inline-flex;
+/* 招待URLで開いたときは、名前と「参加する」だけにする（いつもの入口では「参加する」を出さない） */
+#screen-online.invited .not-invited,
+#screen-online:not(.invited) .invited-only {
+    display: none;
+}
+
+/* 入口の、参加できる部屋の一覧：作った人の名前と、人数・モード */
+.room-section {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px dashed var(--sand-dark);
+}
+
+.room-head {
+    display: flex;
     align-items: center;
-    gap: 6px;
-    font-weight: 800;
-    white-space: nowrap;
-    cursor: pointer;
+    justify-content: space-between;
+    gap: 10px;
 }
 
-.check input {
-    width: 22px;
-    height: 22px;
+.room-head h3 {
     margin: 0;
-    accent-color: var(--sea-deep);
-    cursor: pointer;
+    font-size: 1rem;
 }
 
-/* 公開の部屋の一覧：作った人の名前と、人数・モード */
-#rooms-dialog {
-    width: min(360px, calc(100vw - 16px));
+/* 部屋が多いときは、一覧の中だけをスクロールする */
+#room-list {
+    max-height: 40vh;
+    overflow-y: auto;
+    padding-bottom: 4px; /* 項目の下の影を切らない */
 }
 
 .room-item {

@@ -63,11 +63,12 @@ export default class OnlineGameController {
 
     // ===== 部屋の操作 =====
 
-    createRoom(name, { isPublic = false } = {}) { return this.net.createRoom(name, { public: isPublic }); }
-    joinRoom(roomCode, name) { return this.net.joinRoom(roomCode, name); }
-    // 公開の部屋の一覧と、一覧から入る（断られたら error.code の付いた reject）
+    // 部屋はすべて公開（一覧に載る）。前の版のサーバーでも公開になるように public: true を付ける
+    createRoom(name) { return this.net.createRoom(name, { public: true }); }
+    // 部屋の一覧と、一覧から入る（断られたら error.code の付いた reject）
     listRooms() { return this.net.listRooms(); }
     enterRoom(roomCode, name) { return this.net.enterRoom(roomCode, name); }
+    joinFromInvite(name) { return this.net.joinFromInvite(name); } // 招待URLの部屋に入る。断られたら reject
     resume() { return this.net.resume(); }
     addCpu() { this.net.addCpu(); }
     removeCpu(seat) { this.net.removeCpu(seat); }
@@ -79,8 +80,10 @@ export default class OnlineGameController {
     stamp(stamp) { this.net.stamp(stamp); }
 
     // 部屋を出る（サーバーに知らせるので、席が「切断中」のまま残らない。保存した参加情報も消す）
+    // 一覧を見ただけで部屋に入っていなければ、接続を閉じるだけにする（退出を送ると「部屋に入っていません」が返る）
     leave() {
-        this.net.leave();
+        if (this.net.isInRoom() || this.net.session) this.net.leave();
+        else this.net.close();
         this.view = null;
         this.updateSetupPing();
     }

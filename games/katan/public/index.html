@@ -83,16 +83,26 @@
         <!-- オンライン対戦の入口 -->
         <section id="screen-online" class="screen hidden">
             <div class="panel narrow">
-                <h2>オンライン対戦</h2>
+                <h2 id="online-title">オンライン対戦</h2>
                 <label class="row">名前 <input id="online-name" maxlength="12" autocomplete="nickname"></label>
-                <div class="buttons">
+                <div class="buttons not-invited">
                     <button id="create-room" class="primary">部屋を作る</button>
-                    <label class="check"><input type="checkbox" id="room-public">公開にする</label>
                 </div>
-                <label class="row">部屋番号 <input id="room-code" inputmode="numeric"></label>
-                <div class="buttons">
+                <!-- 招待URLで開いたときは、名前と「参加する」だけにする -->
+                <div class="buttons invited-only">
                     <button id="join-room" class="primary">参加する</button>
-                    <button id="find-rooms" class="online">公開の部屋を探す</button>
+                </div>
+                <!-- 参加できる部屋の一覧（部屋はすべて公開。部屋番号は出さない）
+                     サーバーはテーブルを読み通すので、入口を開いたときと「更新」を押したときだけ取る -->
+                <div class="room-section not-invited">
+                    <div class="room-head">
+                        <h3>参加できる部屋</h3>
+                        <button id="refresh-rooms" class="small">更新</button>
+                    </div>
+                    <div id="room-list" class="buttons column"></div>
+                    <p id="room-note" class="hint"></p>
+                </div>
+                <div class="buttons">
                     <button id="back-to-setup">戻る</button>
                 </div>
             </div>
@@ -101,7 +111,8 @@
         <!-- ロビー -->
         <section id="screen-lobby" class="screen hidden">
             <div class="panel narrow">
-                <h2>部屋 <span id="lobby-code"></span> <span id="lobby-public" class="badge hidden">公開</span></h2>
+                <!-- 見出しは「作った人の名前 の部屋」（部屋番号は出さない） -->
+                <h2 id="lobby-title">部屋</h2>
                 <div class="buttons">
                     <button id="share-invite">招待URLを共有</button>
                 </div>
@@ -257,19 +268,6 @@
     </dialog>
 
     <!-- 設定（ブラウザに保存する） -->
-    <!-- 公開の部屋の一覧（サーバーはテーブルを読み通すので、開いたときと「更新」を押したときだけ取る） -->
-    <dialog id="rooms-dialog" class="sheet" tabindex="-1">
-        <div class="sheet-head">
-            <h2>公開の部屋</h2>
-            <button class="small icon close-dialog" aria-label="閉じる">✕</button>
-        </div>
-        <div id="room-list" class="buttons column"></div>
-        <p id="room-note" class="hint"></p>
-        <div class="buttons">
-            <button id="refresh-rooms">更新</button>
-        </div>
-    </dialog>
-
     <dialog id="settings-dialog" class="sheet" tabindex="-1">
         <div class="sheet-head">
             <h2>設定</h2>
