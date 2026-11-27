@@ -17,7 +17,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // 写しを持つゲームも流す部品（<部品>.lock.json で見分ける）
 // sound は、ほぼすべてのゲームが写しを持ち、写しの確認（sync.mjs check --all）で足りるので入れない
-const COPIED_PACKAGES = ['clock', 'random'];
+const COPIED_PACKAGES = ['clock', 'motion', 'random'];
 
 const workspaces = (dir) => readdirSync(join(root, dir))
     .filter((name) => existsSync(join(root, dir, name, 'package.json')))
