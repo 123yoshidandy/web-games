@@ -69,6 +69,13 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .segment button + button { border-left: 1px solid var(--panel-line); }
 .segment button.on { background: var(--accent); color: #3a2800; }
 .buttons { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数・CPU と同じ見た目にする */
+#motion-setting .motion-speed-options { border-radius: 10px; border: 1px solid var(--panel-line); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 72px; height: 38px; padding: 0 10px; background: var(--panel); font-size: 15px; font-weight: 800; }
+#motion-setting .motion-speed button + button { border-left: 1px solid var(--panel-line); }
+#motion-setting .motion-speed button[aria-pressed="true"] { background: var(--accent); color: #3a2800; }
+/* 飛んでいるタイル */
+.motion-flyer { filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); }
 .link { border: none; background: none; color: var(--muted); text-decoration: underline; font-size: 14px; cursor: pointer; padding: 4px 8px; }
 
 /* ---- ボタン ---- */
@@ -165,6 +172,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 /* ---- ゲーム一覧へのリンク ----
    タイトル画面だけに置く。ホーム画面に置いたアプリとして開いたときは、一覧へ移ると外のページになるので隠す */
 .title-links { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.title-links .link { display: inline-flex; align-items: center; min-height: 44px; }
 .portal-link { display: inline-flex; align-items: center; min-height: 44px; }
 .portal-link:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; border-radius: 6px; }
 @media (display-mode: standalone), (display-mode: fullscreen) {

@@ -7,8 +7,9 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
-export const CPU_STEP_DELAY_MS = 900;   // CPU の手を目で追える間
+export const CPU_STEP_DELAY_MS = 900;   // CPU の手を目で追える間（動きが終わってから数える）
 const SAVE_KEY = 'qwirkle.save';
 
 export function loadSavedGame() {
@@ -35,7 +36,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.save();
     }
 
@@ -78,11 +79,12 @@ export default class LocalGameController {
         this.scheduleCpu();
     }
 
-    // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する（決めた手が通らなければ、単純な手で進める）
+    // CPU の番なら、動き終わってから間を置いて1手打たせる。例外が出ても必ず次を予約する（決めた手が通らなければ、単純な手で進める）
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
         if (!isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 runCpuStep(this.game);
             } catch (error) {
@@ -106,6 +108,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
     }
 }

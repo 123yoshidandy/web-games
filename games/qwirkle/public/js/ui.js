@@ -13,6 +13,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'qwirkle';
 
@@ -23,6 +24,11 @@ const SETTINGS_KEY = 'qwirkle.settings';
 const CPU_NAMES = ['ノア', 'エマ', 'レオ'];
 const CELL = 100;
 const DRAG_START = 8;   // これだけ指が動いたら、引っぱりとみなす
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 手札・相手の欄から盤へ
+const PLACE_MS = 300;    // 自分が仮置きするとき
+const DRAW_MS = 380;     // 袋から手札へ
+const STAGGER_MS = 110;  // 何枚も動くときの間
 
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -69,6 +75,7 @@ export default class UI {
         $('hint').innerHTML = ICONS.hint;
         $('open-log').innerHTML = ICONS.log;
         $('title-art').innerHTML = this.titleArt();
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
         this.online = new NetplayLobby({
             title: 'クワークル',
@@ -241,15 +248,87 @@ export default class UI {
         if (!this.controller) return;
         const v = this.controller.getView();
         const prev = this.view;
+        // 描き直す前に、動きの出発点（相手の欄・手札・袋）を測る
+        const before = prev && Motion.enabled() ? this.measure() : null;
         this.view = v;
         // 手番が変わったら、置いている途中のものを消す
         if (!prev || prev.turnNo !== v.turnNo) this.resetTurn();
         this.render();
+        if (before) this.animateUpdate(prev, v, before);
         this.playUpdateSound(prev);
         if (v.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.openResult(), 700);
+            const controller = this.controller;
+            Motion.afterIdle(() => {
+                if (this.controller === controller) this.openResult();
+            }, 500);
         }
+    }
+
+    // ---- 動き ----
+
+    measure() {
+        const seats = new Map();
+        $('scores').querySelectorAll('.sc[data-seat]').forEach(el => seats.set(Number(el.dataset.seat), Motion.rectOf(el)));
+        return { seats, hand: Motion.captureRects($('hand'), '.slot[data-key]', 'key'), bag: Motion.rectOf($('bag')) };
+    }
+
+    // 前のビューから増えた出来事（events の seq で見る。手札を出し切って終わる手は turnNo が進まないため）を動かす
+    // ほかの人が置いたタイルは、その人の得点の欄から盤のマスへ飛ぶ。自分の手はもう仮置きで盤にあるので、手札の詰め・補充だけ
+    animateUpdate(prev, v, before) {
+        const lastSeq = Math.max(0, ...(prev.events ?? []).map(e => e.seq));
+        const fresh = (v.events ?? []).filter(e => e.seq > lastSeq);
+        let settle = 0; // 盤へ飛ぶ動きが終わるまで
+        fresh.forEach(e => {
+            if (e.type !== 'play' || e.seat === v.you) return;
+            const from = before.seats.get(e.seat);
+            if (!from) return;
+            e.cells.forEach((c, i) => {
+                const to = $('board').querySelector(`[data-cell="${c.x},${c.y}"]`);
+                const tile = v.board.find(p => p.x === c.x && p.y === c.y)?.tile;
+                if (!to || tile == null) return;
+                Motion.fly(from, to, { content: tileSvg(tile), hide: to, size: { width: 44, height: 44 }, delay: i * STAGGER_MS, duration: FLY_MS });
+                settle = Math.max(settle, i * STAGGER_MS + FLY_MS);
+            });
+        });
+        // 点が変わった人の得点を、タイルが着いたところで目立たせる
+        v.players.forEach(p => {
+            if (p.score === prev.players[p.id]?.score) return;
+            Motion.pulse($('scores').querySelector(`.sc[data-seat="${p.id}"] b`), { delay: settle, scale: 1.35, duration: 360 });
+        });
+        const mine = fresh.find(e => e.seat === v.you && (e.type === 'play' || e.type === 'trade'));
+        if (mine) this.animateHand(prev, v, before, mine.type === 'play' ? mine.cells.length : mine.count);
+    }
+
+    // 自分の手札：残ったタイルは左へ詰め（FLIP）、引いたタイルは袋から飛んでくる
+    animateHand(prev, v, before, removed) {
+        const oldHand = prev.players[prev.you]?.hand ?? [];
+        const hand = v.players[v.you]?.hand ?? [];
+        const kept = Math.max(0, oldHand.length - removed);
+        // 残ったタイルは、前の手札の並びのまま前に詰まる。同じタイルが2枚あっても見た目は同じなので、前から順に合わせる
+        const slots = [...$('hand').querySelectorAll('.slot[data-key]')];
+        let from = 0;
+        slots.forEach((slot, j) => {
+            if (j >= kept) {
+                slot.dataset.key = `new-${j}`;
+                return;
+            }
+            while (from < oldHand.length && oldHand[from] !== hand[j]) from++;
+            slot.dataset.key = String(from++);
+        });
+        Motion.flipFrom(before.hand, $('hand'), '.slot[data-key]', 'key', { duration: 300, enter: null });
+        if (!before.bag) return;
+        slots.slice(kept, hand.length).forEach((slot, i) => {
+            Motion.fly(before.bag, slot, { content: tileSvg(hand[kept + i]), hide: slot, size: { width: 40, height: 40 }, delay: 120 + i * 90, duration: DRAW_MS });
+        });
+    }
+
+    // 自分が仮置きしたタイルを、手札（または引っぱっていた位置）からマスへ飛ばす。from は描き直す前に測った位置
+    flyPending(placed) {
+        placed.forEach(({ x, y, tile, from }, i) => {
+            const to = $('board').querySelector(`g[data-x="${x}"][data-y="${y}"]`);
+            if (from && to) Motion.fly(from, to, { content: tileSvg(tile), hide: to, delay: i * STAGGER_MS, duration: PLACE_MS });
+        });
     }
 
     // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
@@ -311,7 +390,7 @@ export default class UI {
         const v = this.view;
         if (!v) return;
         // 得点の欄
-        $('scores').innerHTML = v.players.map(p => `<div class="sc${p.id === v.current && v.phase !== 'end' ? ' cur' : ''}${v.winners.includes(p.id) ? ' win' : ''}">`
+        $('scores').innerHTML = v.players.map(p => `<div data-seat="${p.id}" class="sc${p.id === v.current && v.phase !== 'end' ? ' cur' : ''}${v.winners.includes(p.id) ? ' win' : ''}">`
             + `<span class="sc-name">${escapeHtml(p.name)}</span><b>${p.score}</b><small>${p.handCount}枚</small></div>`).join('');
         $('bag').innerHTML = `<span class="bag-icon"></span>${v.bagCount}`;
         this.renderBoard();
@@ -384,7 +463,7 @@ export default class UI {
         const parts = [];
         // 置ける場所
         targets.forEach(c => parts.push(`<rect class="target" data-x="${c.x}" data-y="${c.y}" x="${c.x * CELL + 4}" y="${c.y * CELL + 4}" width="${CELL - 8}" height="${CELL - 8}" rx="12"/>`));
-        v.board.forEach(p => parts.push(tileGroup(p.tile, p.x * CELL, p.y * CELL, CELL, lastCells.has(keyOf(p.x, p.y)) ? 'last' : '')));
+        v.board.forEach(p => parts.push(`<g data-cell="${p.x},${p.y}">${tileGroup(p.tile, p.x * CELL, p.y * CELL, CELL, lastCells.has(keyOf(p.x, p.y)) ? 'last' : '')}</g>`));
         this.pending.forEach(p => parts.push(`<g data-x="${p.x}" data-y="${p.y}">${tileGroup(p.tile, p.x * CELL, p.y * CELL, CELL, 'pending')}</g>`));
         const w = (maxX - minX + 1) * CELL;
         const h = (maxY - minY + 1) * CELL;
@@ -399,11 +478,11 @@ export default class UI {
         const slots = [];
         for (let i = 0; i < HAND_SIZE; i++) {
             if (i >= hand.length) {
-                slots.push('<div class="slot empty"></div>');
+                slots.push(`<div class="slot empty" data-key="${i}"></div>`);
                 continue;
             }
             const cls = ['slot', used.has(i) ? 'used' : '', this.selected === i ? 'sel' : '', this.tradeSet.has(i) ? 'trade' : '', mine ? '' : 'wait'].join(' ');
-            slots.push(`<button class="${cls}" data-i="${i}" aria-label="タイル${i + 1}">${used.has(i) ? '' : tileSvg(hand[i])}</button>`);
+            slots.push(`<button class="${cls}" data-i="${i}" data-key="${i}" aria-label="タイル${i + 1}">${used.has(i) ? '' : tileSvg(hand[i])}</button>`);
         }
         $('hand').innerHTML = slots.join('');
     }
@@ -415,6 +494,7 @@ export default class UI {
         if (!this.myTurn()) return;
         const command = this.controller.suggest();
         if (!command) return;
+        const slotRects = Motion.captureRects($('hand'), '.slot[data-i]', 'i');
         this.resetTurn();
         const hand = this.myHand();
         const take = (tile, used) => {
@@ -434,6 +514,7 @@ export default class UI {
         this.hinted = true;
         music.play('select');
         this.render();
+        this.flyPending(this.pending.map(p => ({ ...p, from: slotRects.get(String(p.index)) })));
     }
 
     openLog() {
@@ -475,16 +556,19 @@ export default class UI {
         this.placeAt(this.selected, x, y);
     }
 
-    placeAt(index, x, y) {
+    // from：飛び立つ位置（引っぱっていた位置）。省くと手札のその位置から
+    placeAt(index, x, y, from = null) {
         const tile = this.myHand()[index];
         if (!this.targets(tile).some(c => c.x === x && c.y === y)) {
             music.play('error');
             return false;
         }
+        const start = from ?? Motion.rectOf($('hand').querySelector(`[data-i="${index}"]`));
         this.pending.push({ x, y, tile, index });
         music.play('place');
         this.selected = null;
         this.render();
+        this.flyPending([{ x, y, tile, from: start }]);
         return true;
     }
 
@@ -538,6 +622,7 @@ export default class UI {
             window.removeEventListener('pointermove', move);
             window.removeEventListener('pointerup', up);
             window.removeEventListener('pointercancel', up);
+            const ghostRect = dragging ? Motion.rectOf(ghost) : null;
             ghost.hidden = true;
             if (!dragging) {
                 this.tapHand(index);
@@ -545,7 +630,7 @@ export default class UI {
             }
             // 指の少し上（タイルの見えている位置）のマスに置く
             const target = document.elementFromPoint(e.clientX, e.clientY - 42)?.closest('[data-x]');
-            if (!target || !this.placeAt(index, Number(target.dataset.x), Number(target.dataset.y))) {
+            if (!target || !this.placeAt(index, Number(target.dataset.x), Number(target.dataset.y), ghostRect)) {
                 this.selected = null;
                 this.render();
             }
