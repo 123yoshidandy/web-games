@@ -44,6 +44,17 @@ button:disabled { cursor: default; opacity: .4; }
 .segmented { flex: 1; display: flex; background: var(--panel); border-radius: 10px; padding: 3px; gap: 3px; }
 .segmented button { flex: 1; min-height: 40px; border-radius: 8px; font-weight: 800; color: var(--muted); }
 .segmented button[aria-checked="true"] { background: var(--accent); color: var(--accent-ink); }
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択と同じ見た目にする */
+#motion-setting { flex: 1; display: flex; }
+#motion-setting .motion-speed { flex: 1; }
+#motion-setting .motion-speed-options { flex: 1; border: none; border-radius: 10px; background: var(--panel); padding: 3px; gap: 3px; }
+#motion-setting .motion-speed button { flex: 1; justify-content: center; min-height: 40px; border-radius: 8px; font-weight: 800; color: var(--muted); }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+/* 飛んでいるカード・弾んで置かれるタイル（SVG はマスの中心から弾ませる） */
+.motion-flyer { filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .45)); }
+.motion-flyer.card { display: flex; align-items: center; }
+.board-svg .space { transform-box: fill-box; transform-origin: center; }
 .buttons { display: flex; gap: 8px; }
 /* タイトルのボタンは、狭い画面で折り返す（オンラインで遊ぶ） */
 #screen-title .buttons { flex-wrap: wrap; justify-content: center; }

@@ -12,6 +12,7 @@ import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { suggest } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -20,6 +21,9 @@ const $ = id => document.getElementById(id);
 const KEYS = { settings: 'tm.settings.v1', save: 'tm.save.v1' };
 const CPU_NAMES = ['アレス', 'ルナ', 'ヴェガ', 'オリオン'];
 const CPU_DELAY = Number(new URLSearchParams(location.search).get('cpuDelay')) || undefined;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 出したカード
+const POP_MS = 320;      // 置いたタイル
 
 const store = {
     load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
@@ -36,6 +40,7 @@ let resultShown = false;
 let sheet = null; // いま開いているシートの種類
 let sending = false; // 自分の操作を送っている間（効果音は送った操作で決める）
 let soundSeq = 0;    // 効果音を決めるのに見た出来事の番号
+let motionSeq = 0;   // 動きを決めるのに見た出来事の番号
 const camera = { scale: 1, x: 0, y: 0 };
 
 const nameOf = seat => (seat === view.seat ? 'あなた' : view.players[seat].name);
@@ -82,6 +87,7 @@ function beginGame(next) {
     resultShown = false;
     controller = next;
     view = controller.getView();
+    motionSeq = view.eventSeq;
     showScene('game');
     resetCamera();
     render();
@@ -100,16 +106,68 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
+    Motion.cancelAll();
     showScene('title');
 }
 
 function onUpdate() {
     if (!controller) return;
     const wasMine = !!mine();
+    // 描き直す前に、動きの出発点（手札のボタン・上の欄の位置と、資源・地球の数）を測る
+    const before = view && Motion.enabled() ? snapshot() : null;
     view = controller.getView();
     if (!sending) playUpdate(wasMine);
     saveProgress();
     render();
+    animateUpdate(before);
+}
+
+// ---------- 動き ----------
+
+function statsOf(v) {
+    const p = v.players[v.seat];
+    return { res: RESOURCES.map(r => `${p.res[r]}/${p.prod[r]}`), params: [v.temperature, v.oxygen, v.oceans, p.tr], hand: v.hand.length };
+}
+
+function snapshot() {
+    return {
+        hand: Motion.rectOf(document.querySelector('#panel [data-act="openHand"]')) ?? Motion.rectOf($('panel')),
+        status: Motion.rectOf($('status')),
+        stats: statsOf(view)
+    };
+}
+
+// 出したカードは手札のボタン（相手は上の欄）から、自分の企業の欄・記録の欄へ飛び、置いたタイルは弾んで現れる。変わった資源・地球の数は弾む
+function animateUpdate(before) {
+    const fresh = view.events.filter(e => e.seq > motionSeq);
+    motionSeq = view.eventSeq;
+    if (!before || !fresh.length) return;
+    let settle = 0;
+    let k = 0;
+    fresh.forEach(e => {
+        if (e.type === 'play') {
+            const c = cardOf(e.card);
+            const to = e.seat === view.seat ? $('mine').querySelector('.corp') : $('panel').querySelector('.feed');
+            const from = e.seat === view.seat ? before.hand : before.status;
+            Motion.fly(from, to, {
+                content: `<div class="card t-${c.type}"><div class="card-head"><span class="cost">${c.cost}</span><b>${esc(c.name)}</b></div></div>`,
+                size: { width: 190, height: 40 }, duration: FLY_MS, delay: k * 120
+            });
+            settle = Math.max(settle, k * 120 + FLY_MS);
+            k++;
+        }
+    });
+    fresh.forEach(e => {
+        if (e.type === 'tile') Motion.popIn($('map-inner').querySelector(`.space[data-space="${e.space}"]`), { delay: settle, duration: POP_MS });
+    });
+    const now = statsOf(view);
+    now.params.forEach((value, i) => {
+        if (value !== before.stats.params[i]) Motion.pulse($('params').children[i], { delay: settle, scale: 1.2, duration: 360 });
+    });
+    now.res.forEach((value, i) => {
+        if (value !== before.stats.res[i]) Motion.pulse($('mine').children[i + 1], { delay: settle, scale: 1.2, duration: 360 });
+    });
+    if (now.hand !== before.stats.hand) Motion.pulse($('mine').querySelector('.corp'), { delay: settle, scale: 1.15, duration: 320 });
 }
 
 function onError(message) {
@@ -146,6 +204,7 @@ const online = new NetplayLobby({
     onError: (message) => onError(message),
     onExit: () => {
         controller = null;
+        Motion.cancelAll();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         showScene('title');
     }
@@ -272,7 +331,7 @@ function render() {
     if (view.phase === 'end') recordLocalResult(view);
     if (view.phase === 'end' && !resultShown) {
         resultShown = true;
-        setTimeout(showResult, 600);
+        Motion.afterIdle(showResult, 600);
     }
 }
 
@@ -594,6 +653,7 @@ function setup() {
     $('title-art').innerHTML = '<svg viewBox="0 0 320 140" aria-hidden="true"><rect width="320" height="140" fill="#140806"/><circle cx="160" cy="150" r="120" fill="#b5562f"/><path d="M60 110q50-30 100-10t100-20" stroke="#3f9b3f" stroke-width="10" fill="none" opacity=".8"/><path d="M90 96q20-10 40 0" stroke="#2b7fd4" stroke-width="8" fill="none"/><circle cx="260" cy="30" r="6" fill="#ffe08a"/>' + Array.from({ length: 14 }, (_, i) => `<circle cx="${(i * 47) % 320}" cy="${(i * 29) % 70}" r="1.2" fill="#fff"/>`).join('') + '</svg>';
     setupDialogs();
     setupMapGestures();
+    Motion.mountSpeedSetting($('motion-setting'), { label: '' });
     const segment = (id, apply) => $(id).addEventListener('click', e => {
         const b = e.target.closest('button');
         if (!b) return;
