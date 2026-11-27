@@ -12,6 +12,7 @@ import {
 import { LEVELS } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { GOOD_COLORS, PLAYER_COLORS, goodIcon, anyIcon, rubyIcon, coinIcon, cardIcon, merchantToken, assistantToken, familyToken } from './art.js';
@@ -265,15 +266,29 @@ export default class UI {
     onUpdate() {
         if (!this.controller) return;
         this.wasMyTurn = !!this.view && this.myTurn() && this.view.phase !== 'end';
+        const wasEnd = this.view?.phase === 'end';
         this.view = this.controller.getView();
         const view = this.view;
         if (view.turn !== view.you || view.step.stage !== 'move') this.moveCard = null;
         this.announce();
         this.render();
         if (view.phase === 'end') {
+            if (!wasEnd) this.recordLocalResult(view);
             clearTimeout(this.resultTimer);
             this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
         }
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: 'istanbul',
+            id: `istanbul-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(view.winners, view.you, view.players.length)
+        });
     }
 
     // 新しい出来事のうち、サイコロとルビーを短く知らせる

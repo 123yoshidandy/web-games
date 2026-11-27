@@ -12,6 +12,7 @@ import { music } from './music.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'kingoftokyo.settings.v1', save: 'kingoftokyo.save.v1' };
@@ -246,8 +247,17 @@ function render() {
     renderHint();
     if (view.phase === 'end' && !resultShown) {
         resultShown = true;
+        recordLocalResult();
         setTimeout(showResult, 900);
     }
+}
+
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）。全員の体力が0で終わったときは引き分け
+function recordLocalResult() {
+    if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+    const outcome = view.winner === null ? 'draw' : view.winner === view.seat ? 'win' : 'loss';
+    recordResult({ game: 'king-of-tokyo', id: `king-of-tokyo-${controller.game.options.seed}`, outcome });
 }
 
 function renderStatus() {

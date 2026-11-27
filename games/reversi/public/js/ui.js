@@ -13,6 +13,9 @@ import { symbolsSvg, stoneSvg, COLOR_NAME } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
+
+const GAME = 'reversi';
 
 const SETTINGS_KEY = 'reversi.settings';
 const RESULT_DELAY_MS = 1100;
@@ -115,6 +118,15 @@ export default class UI {
         this.toast(message);
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id は始めた時刻から作る（同じ対戦を2回数えない）。2人で1台を使う対戦は送らない
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || this.hotseat(view) || !controller.game.options.startedAt) return;
+        const outcome = view.winner === null ? 'draw' : view.winner === view.you ? 'win' : 'loss';
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.startedAt}`, outcome });
+    }
+
     // 同じ端末で2人が交代で打つ遊び方か（オンラインは、それぞれの端末で自分の席だけを打つ）
     hotseat(view) {
         return !this.controller?.isOnline && view.players.every(p => !p.isCPU);
@@ -143,7 +155,7 @@ export default class UI {
             ? [{ name: '黒', isCPU: false }, { name: '白', isCPU: false }]
             : [{ name: 'あなた', isCPU: false }, { name: 'CPU', isCPU: true, cpuLevel: level }];
         if (mode === 'cpu' && color === 2) players.reverse();
-        this.startGame({ players, options: {} });
+        this.startGame({ players, options: { startedAt: Date.now() } });
     }
 
     stopGame() {
@@ -339,7 +351,10 @@ export default class UI {
         const move = [...fresh].reverse().find(e => e.type === 'move');
         // 音：終わったら勝ち負け、自分の手は石を返す音、CPU の手のあとは自分の番（2人で遊ぶときは、どちらの手も自分の手）
         const twoPlayers = this.hotseat(view);
-        if (view.over && !prev.over) music.play(view.winner === null ? 'notify' : twoPlayers || view.winner === view.you ? 'win' : 'lose');
+        if (view.over && !prev.over) {
+            music.play(view.winner === null ? 'notify' : twoPlayers || view.winner === view.you ? 'win' : 'lose');
+            this.recordLocalResult(view);
+        }
         else if (move && (twoPlayers || move.seat === view.you)) music.play('capture');
         else if (move) music.play(this.myTurn() ? 'turn' : 'notify');
         if (move && !reduceMotion()) {

@@ -98,6 +98,14 @@ export default {
 
     isOver: (game) => game.isOver(),
 
+    // 利用者ごとの記録：game.result は関数なので、共通部品が自動では読めない。席ごとの順位（同点は同じ順位）にして渡す
+    result(game) {
+        if (!game.isOver()) return null;
+        const ranks = [];
+        for (const entry of game.result().standings) ranks[entry.seat] = entry.rank;
+        return { ranks };
+    },
+
     // 対戦中に部屋を出た人の席は、CPU が引き継ぐ（切断は戻ってくるかもしれないので待つ。砂時計は止まらない）
     onPlayerGone(ctx, { seat, reason }) {
         if (reason !== 'left' || ctx.game.isOver()) return ctx.ignore();

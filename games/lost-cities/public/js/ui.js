@@ -11,6 +11,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { symbolsSvg, icon, cardHtml, chipHtml, cardBackHtml } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
 
@@ -294,6 +295,7 @@ export default class UI {
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         const roundEnd = fresh.find(e => e.type === 'roundEnd');
         this.playSound(fresh);
+        if (fresh.some(e => e.type === 'end')) this.recordLocalResult(view);
         if (roundEnd) {
             // ラウンドが終わったときは、新しいラウンドが配られているので動かさず、結果を出す。見ている間は CPU を止める
             this.controller.pause();
@@ -302,6 +304,18 @@ export default class UI {
         } else {
             playEvents(fresh, before, { you: view.you });
         }
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: 'lost-cities',
+            id: `lost-cities-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(view.winners, view.you, view.players.length)
+        });
     }
 
     // 1つの更新に1つの音。自分は出す・捨てる・引く、相手の手は notify、自分の番になったら turn

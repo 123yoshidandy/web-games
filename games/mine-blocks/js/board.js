@@ -345,6 +345,9 @@ function checkBoardCompletion() {
 
         // クリア回数をカウントアップ
         gameState.clearedCount++;
+
+        // ログインしていれば、クリアを記録する（同じ問題は1回だけ数える）
+        recordLocalResult(`mine-blocks-${gameState.seed}`, 'win');
         
         // クリアモーダルの内容を更新（クリア時間とクリア回数を表示）
         elements.clearTimeDisplay.textContent = Math.floor((Date.now() - gameState.startTime) / 1000);

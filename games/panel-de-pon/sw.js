@@ -16,7 +16,7 @@ const PRECACHE = [
     'js/constants.js', 'js/cpu-match.js', 'js/cpu.js', 'js/game.js', 'js/help.js', 'js/input.js',
     'js/layout.js', 'js/lobby.js', 'js/main.js', 'js/online-config.js', 'js/panel-art.js', 'js/random.js',
     'js/renderer.js', 'js/settings.js', 'js/sound.js', 'js/title.js',
-    'js/netplay/netplay-client.mjs', 'js/netplay/netplay-client.js',
+    'js/netplay/netplay-client.mjs', 'js/netplay/netplay-client.js', 'js/netplay/user-stats.js',
     'sounds/swap.m4a', 'sounds/pop.m4a', 'sounds/chain.m4a', 'sounds/combo.m4a', 'sounds/land.m4a', 'sounds/gameover.m4a', 'sounds/bgm.m4a'
 ];
 

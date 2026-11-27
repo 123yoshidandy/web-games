@@ -48,6 +48,8 @@ export default {
     },
 
     isOver: (game) => game.isOver(),
+    // 利用者ごとの記録：局ごとの game.result ではなく、終局の順位（game.final）から取る
+    result: (game) => (game.final ? { ranks: game.final.reduce((ranks, entry) => { ranks[entry.seat] = entry.rank; return ranks; }, Array(game.players.length).fill(null)) } : null),
 
     // 鳴きの確認では複数の人が同時に答えるので、CPU の席を1つずつ進める
     cpu: {

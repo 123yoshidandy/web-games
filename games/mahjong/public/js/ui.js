@@ -8,7 +8,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { music } from './music.js';
 import { DRAW_REASONS, roundName, PLAYER_COUNT } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 import { windName } from './tiles.js';
 import { handPoints } from './scoring.js';
 import { symbolsSvg, tileHtml, kindTileHtml, titleArtHtml } from './art.js';
@@ -344,6 +345,19 @@ export default class UI {
 
     // ---- 描画 ----
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(winners) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || this.recordedController === controller) return;
+        this.recordedController = controller;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(winners, controller.humanSeat, controller.game.players.length)
+        });
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
@@ -360,6 +374,7 @@ export default class UI {
         this.renderActions(view);
         this.renderBubbles(view);
         this.renderResult(view);
+        if (view.phase === 'end' && view.final) this.recordLocalResult(view.final.filter(f => f.rank === 1).map(f => f.seat)); // 東風・半荘の終了時、1位の席が勝ち
         this.autoActions(view);
     }
 

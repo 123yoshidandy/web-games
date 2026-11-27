@@ -12,7 +12,7 @@ const PRECACHE = [
     'css/style.css', 'css/animations.css', 'css/coach.css',
     'js/main.js', 'js/ui.js', 'js/board-view.js', 'js/board.js', 'js/game-controller.js', 'js/online-controller.js',
     'js/online-config.js', 'js/game.js', 'js/game-view.js', 'js/cpu-player.js', 'js/coach.js', 'js/animator.js',
-    'js/help-pictures.js', 'js/random.js', 'js/sound.js', 'js/netplay/netplay-client.mjs',
+    'js/help-pictures.js', 'js/random.js', 'js/sound.js', 'js/netplay/netplay-client.mjs', 'js/netplay/user-stats.js',
     'js/music.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js'
 ];
 

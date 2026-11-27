@@ -32,6 +32,9 @@ export default {
     // シードは共通部品の乱数から作る（テストでは乱数を固定できる）
     create: ({ players, random }) => new Game(players, { seed: Math.floor(random() * 2 ** 32) }),
 
+    // 利用者ごとの記録：勝った席は game.result.winner（同点は先にゴールした方）
+    result: (game) => (game.result ? { winners: [game.result.winner] } : null),
+
     // 保存するのは記録だけ。読み込むたびに記録から再現する
     persist: (game) => ({
         players: game.players.map(p => ({ name: p.name, isCPU: p.isCPU })),

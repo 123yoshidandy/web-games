@@ -14,6 +14,7 @@ import { music } from './music.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'loveletter.settings.v1', save: 'loveletter.save.v1' };
@@ -158,12 +159,21 @@ function onUpdate() {
     const fresh = view.events.filter(e => e.seq > seenSeq);
     seenSeq = view.eventSeq;
     playSound(fresh);
+    if (fresh.some(e => e.type === 'end')) recordLocalResult();
     const play = fresh.find(e => e.type === 'play');
     if (play) showSpotlight(play, fresh);
     const roundEnd = fresh.find(e => e.type === 'roundEnd');
     if (roundEnd) showRoundSoon(roundEnd, ROUND_DIALOG_DELAY_MS);
     saveProgress();
     render();
+}
+
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）
+function recordLocalResult() {
+    if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+    const outcome = view.winner === null ? 'draw' : view.winner === view.seat ? 'win' : 'loss';
+    recordResult({ game: 'love-letter', id: `love-letter-${controller.game.options.seed}`, outcome });
 }
 
 // 1つの更新に1つの音。自分の手は置く（相手を脱落させたら capture）、相手の手は notify、自分の番になったら turn

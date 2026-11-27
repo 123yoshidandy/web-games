@@ -322,8 +322,10 @@ export default class UI {
             if (!prev.result) {
                 music.play(v.result.won ? 'win' : 'lose');
                 // ローカル対戦の結果を、ログインしていれば記録する（オンライン対戦はサーバーが記録する）
+                // 1台で複数の人が操作するとき（人が2人以上）は、誰の記録か分からないので送らない
                 const seed = this.controller?.game?.options.seed;
-                if (!this.controller?.isOnline && seed !== undefined) recordResult({ game: 'horrified', id: `horrified-${seed}`, outcome: v.result.won ? 'win' : 'loss' });
+                const humans = this.controller?.game?.players.filter(p => !p.isCPU).length;
+                if (!this.controller?.isOnline && humans === 1 && seed !== undefined) recordResult({ game: 'horrified', id: `horrified-${seed}`, outcome: v.result.won ? 'win' : 'loss' });
             }
             return;
         }

@@ -11,6 +11,7 @@ import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import BoardView from './board-view.js';
 import { symbolsSvg, icon, terrainHex, locationHex, houseSvg, PLAYER_COLORS } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
@@ -345,6 +346,18 @@ export default class UI {
         if ($('#log').open) this.renderLog();
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: 'kingdom-builder',
+            id: `kingdom-builder-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(view.winners, view.you, view.players.length)
+        });
+    }
+
     // 1つの更新に1つの音。自分の手は建てる・タイルを得る、ほかの人の手は notify、自分の番になったら turn
     playSound(view) {
         const last = view.events.at(-1)?.seq ?? 0;
@@ -360,7 +373,10 @@ export default class UI {
         this.soundSeq = last;
         const wasMyTurn = this.wasMyTurn;
         this.wasMyTurn = myTurn;
-        if (fresh.some(e => e.type === 'end')) return music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+        if (fresh.some(e => e.type === 'end')) {
+            this.recordLocalResult(view);
+            return music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+        }
         const mine = fresh.filter(e => e.seat === view.you).map(e => e.type);
         if (mine.includes('take')) return music.play('gain');
         if (mine.includes('build') || mine.includes('move')) return music.play('place');

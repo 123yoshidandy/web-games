@@ -12,6 +12,7 @@ import { solve } from './solver.js';
 import { staticBoard, robotElements, centerOf, targetMark, targetIcon, trailPath, ghostRobots, arrowsFor, titleArt, UNIT } from './render.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 
 const CPU_NAMES = ['ロボ博士', 'ギア', 'ボルト'];
 const HUMAN_NAME = 'あなた';
@@ -728,8 +729,17 @@ function useHint(kind) {
 
 // ===== 終局と結果 =====
 
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// ひとり用の練習は勝ち負けがないので回数だけ。id はシードから作る（同じ対戦を2回数えない）
+function recordLocalResult(view, controller) {
+    if (controller.isOnline || controller.isReplay || !controller.setup?.seed) return;
+    const outcome = view.mode === 'solo' ? null : outcomeFromWinners(view.result?.winners, view.viewer, view.players.length);
+    recordResult({ game: 'ricochet-robots', id: `ricochet-robots-${controller.setup.seed}`, outcome });
+}
+
 function onGameEnd(view) {
     const controller = app.controller;
+    recordLocalResult(view, controller);
     if (view.mode === 'solo' && !controller.isReplay && !controller.isOnline) {
         const best = bestRecord();
         const { points, time } = view.result;

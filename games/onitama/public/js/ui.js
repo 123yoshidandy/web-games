@@ -14,7 +14,8 @@ import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, pieceSvg, templeSvg, cardHtml, gridSvg, SEAT_NAME } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const SETTINGS_KEY = 'onitama.settings';
 const RESULT_DELAY_MS = 900;
@@ -289,6 +290,19 @@ export default class UI {
 
     // ---- ゲーム画面 ----
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。
+    recordLocalResult(winners) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || this.recordedController === controller) return;
+        this.recordedController = controller;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(winners, controller.humanSeat, controller.game.players.length)
+        });
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
@@ -302,6 +316,7 @@ export default class UI {
         this.renderBoard(view);
         this.renderRows(view);
         if ($('#log').open) this.renderLog();
+        if (view.over) this.recordLocalResult(view.winner === null ? [0, 1] : [view.winner]); // 引き分けは両方の席を勝ちとして渡す
         if (view.over && !$('#result').open && !this.resultTimer && !this.resultShown) {
             this.resultTimer = setTimeout(() => {
                 this.resultTimer = null;

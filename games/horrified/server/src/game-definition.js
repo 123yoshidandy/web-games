@@ -51,6 +51,9 @@ export default {
 
     isOver: (game) => game.isOver(),
 
+    // 利用者ごとの記録：協力のゲームなので、全員が勝ちか負け（game.result.won）
+    result: (game) => (game.result ? { coop: true, won: game.result.won } : null),
+
     // CPU の席が操作する番なら進める
     cpu: {
         needsStep: (game) => isCpuTurn(game),

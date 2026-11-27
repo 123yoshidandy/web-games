@@ -8,7 +8,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { symbolsSvg, cardHtml, chipHtml, landmarkHtml, artSvg, coinHtml, dieHtml, icon } from './art.js';
 
@@ -287,6 +288,19 @@ export default class UI {
 
     // ---- ゲーム画面 ----
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。
+    recordLocalResult(winners) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || this.recordedController === controller) return;
+        this.recordedController = controller;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(winners, controller.humanSeat, controller.game.players.length)
+        });
+    }
+
     render() {
         if (!this.controller) return;
         const prev = this.view;
@@ -300,6 +314,7 @@ export default class UI {
         this.playEvents(view, prev);
         this.updatePrompts(view);
         if ($('#log').open) this.renderLog();
+        if (view.winner !== null) this.recordLocalResult([view.winner]);
         if (view.winner !== null && !$('#result').open && !this.resultTimer) {
             this.resultTimer = setTimeout(() => {
                 this.resultTimer = null;

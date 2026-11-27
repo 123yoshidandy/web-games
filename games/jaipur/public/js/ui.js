@@ -13,6 +13,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
 import { symbolsSvg, icon, cardHtml, cardBackHtml, tokenHtml, sealHtml } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
 
@@ -355,6 +356,8 @@ export default class UI {
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         const roundEnd = fresh.find(e => e.type === 'roundEnd');
         this.playSound(fresh);
+        const end = fresh.find(e => e.type === 'end');
+        if (end) this.recordLocalResult(end.winner);
         if (roundEnd) {
             // ラウンドが終わったときは、新しいラウンドが配られているので動かさず、結果を出す。見ている間は CPU を止める
             this.controller.pause();
@@ -363,6 +366,15 @@ export default class UI {
         } else {
             playEvents(fresh, before, { you: view.you });
         }
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(winner) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        const outcome = winner === null ? 'draw' : winner === this.view.you ? 'win' : 'loss';
+        recordResult({ game: 'jaipur', id: `jaipur-${controller.game.options.seed}`, outcome });
     }
 
     // 1つの更新に1つの音。自分の手は取る・売る、相手の手は notify、自分の番になったら turn

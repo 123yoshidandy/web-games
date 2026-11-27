@@ -11,6 +11,7 @@ import { showTitle } from './title.js';
 import { showHelp, showConfirm } from './help.js';
 import { showOnlineEntry, showRoomList, isRoomListShown, getInvitedRoomCode, clearInvite, showLobby, setOnlineMessage, hideOnline } from './lobby.js';
 import NetplayClient from './netplay/netplay-client.mjs';
+import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { playEventSounds, playSound, setSoundEnabled, setBgmEnabled, startBgm, stopBgm } from './sound.js';
 import { FRAME_MS, SNAPSHOT_INTERVAL } from './constants.js';
@@ -32,6 +33,7 @@ let paused = false; // CPU 対戦で、遊び方や確認の画面を開いて�
 // CPU 対戦
 let cpuMatch = null; // 自分と CPU の盤面（cpu-match.js）
 let cpuWins = [0, 0]; // タイトルから続けて遊んだ勝ち数（自分・CPU）
+let cpuSeed = null; // 今の CPU 対戦のシード（記録の id に使う）
 
 // オンライン対戦
 let net = null; // サーバーとの通信（NetplayClient）
@@ -171,7 +173,8 @@ function startSolo(selected) {
 
 // 新しい試合を始める（リトライも同じ）。盤面の並びは毎回変える
 function startCpuMatch() {
-    cpuMatch = createCpuMatch({ settings, seed: createSeed() });
+    cpuSeed = createSeed();
+    cpuMatch = createCpuMatch({ settings, seed: cpuSeed });
     hideVersusResult();
     setVersusVisible(true);
     doLayout('versus');
@@ -203,6 +206,8 @@ function stepCpuMatch() {
     if (loser === 'cpu') cpuWins[0]++;
     if (loser === 'player') cpuWins[1]++;
     resultTitle = loser === 'cpu' ? 'WIN' : loser === 'player' ? 'LOSE' : 'DRAW';
+    // ログインしていれば、結果を記録する（オンライン対戦はサーバーが記録する。id は盤面のシードから作り、同じ対戦を2回数えない）
+    recordResult({ game: 'panel-de-pon', id: `panel-de-pon-${cpuSeed}`, outcome: resultTitle === 'WIN' ? 'win' : resultTitle === 'LOSE' ? 'loss' : 'draw' });
     playSound(resultTitle === 'WIN' ? 'chain' : 'gameover', resultTitle === 'WIN' ? 1.5 : 1);
     showVersusResult(resultTitle, `${cpuWins[0]} - ${cpuWins[1]}`, { labels: { rematch: 'リトライ', room: 'タイトルへ' } });
 }

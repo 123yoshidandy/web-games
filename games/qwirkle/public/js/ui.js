@@ -12,6 +12,9 @@ import { HELP_HTML } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+
+const GAME = 'qwirkle';
 
 // 自分の操作の音：並べて決める（点を得る）・交換する（袋に戻して引き直す）・パス
 const COMMAND_SOUND = { play: 'gain', trade: 'shuffle', pass: 'select' };
@@ -249,12 +252,23 @@ export default class UI {
         }
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で人が交代する対戦（人が2人以上）は送らない
+    recordLocalResult(v) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: outcomeFromWinners(v.winners, v.you, v.players.length) });
+    }
+
     // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
     playUpdateSound(prev) {
         const v = this.view;
         if (!prev) return;
         if (v.phase === 'end') {
-            if (prev.phase !== 'end') music.play(!v.winners.includes(v.you) ? 'lose' : v.winners.length > 1 ? 'notify' : 'win');
+            if (prev.phase !== 'end') {
+                music.play(!v.winners.includes(v.you) ? 'lose' : v.winners.length > 1 ? 'notify' : 'win');
+                this.recordLocalResult(v);
+            }
             return;
         }
         if (this.sending) return;

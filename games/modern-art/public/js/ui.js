@@ -8,7 +8,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS, suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 // 自分の操作の効果音（買ったときは、出来事から pay にする）
 const COMMAND_SOUNDS = { play: 'place', second: 'place', bid: 'place', price: 'place', buy: 'pay', pass: 'cancel' };
@@ -278,6 +279,19 @@ export default class UI {
 
     // ---- 描画 ----
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。
+    recordLocalResult(winners) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || this.recordedController === controller) return;
+        this.recordedController = controller;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(winners, controller.humanSeat, controller.game.players.length)
+        });
+    }
+
     render() {
         if (!this.controller) return;
         const prev = this.view;
@@ -362,6 +376,7 @@ export default class UI {
             this.showRound(view, view.history.at(-1));
             return;
         }
+        if (view.phase === 'end') this.recordLocalResult(view.winners);
         if (view.phase === 'end' && !$('#round').open && !this.resultShown) this.showResult();
     }
 

@@ -16,6 +16,9 @@ import { fly, land, explode, bump, rectOf, reducedMotion } from './animator.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+
+const GAME = 'quacks';
 
 // 自分の操作の音：袋から引く・止める・選ぶ・取る・買う
 const COMMAND_SOUND = { draw: 'draw', stop: 'select', choose: 'select', pick: 'gain', shop: 'pay' };
@@ -268,12 +271,23 @@ export default class UI {
         this.playUpdateSound(previous, fresh);
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で人が交代する対戦（人が2人以上）は送らない
+    recordLocalResult(v) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: outcomeFromWinners(v.winners, v.you, v.players.length) });
+    }
+
     // 1回の更新に1つの音。自分の操作はその音（引いて爆発したら払う音）。CPU が引くたびには鳴らさず、場面が変わったら知らせる
     playUpdateSound(previous, fresh) {
         const view = this.view;
         if (!previous) return;
         if (view.phase === 'end') {
-            if (previous.phase !== 'end') music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+            if (previous.phase !== 'end') {
+                music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+                this.recordLocalResult(view);
+            }
         } else if (this.sending) {
             const exploded = fresh.some(e => e.type === 'explode' && e.seat === view.you);
             music.play(exploded ? 'pay' : COMMAND_SOUND[this.sending.type] ?? 'select');

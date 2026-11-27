@@ -53,6 +53,9 @@ export default {
 
     view: (game, seat) => createGameView(game, seat),
 
+    // 利用者ごとの記録：勝者は game.result.winnerId（プレイヤーの番号＝席）。終わっていなければ null
+    result: (game) => (game.result ? { winners: [game.result.winnerId] } : null),
+
     actions: {
         command({ game, seat, message, reject }) {
             // 操作の中身の検証と、記録する項目の絞り込みは Game.applyCommand が行う

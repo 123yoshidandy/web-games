@@ -8,6 +8,7 @@ import { isLevel, DEFAULT_LEVEL } from './cpu-level.js';
 import { suggest } from './cpu-player.js';
 import OnlineGameController, { loadOnlineSession } from './online-controller.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { SIZE, MIN_PLAYERS, MAX_PLAYERS, canPlace } from './game.js';
 import { element, cloverTile, renderPictureGarden } from './tiles.js';
 import { captureLayout, detectChanges, animateChanges, FLY_MS, SECOND_DELAY_MS } from './tile-motion.js';
@@ -424,12 +425,25 @@ export default class UI {
         const changes = detectChanges(this.lastView, view);
         animateChanges(changes, layout);
         this.playSounds(changes, this.lastView, view);
+        if (this.lastView && view.result && !this.lastView.result) this.recordLocalResult(view);
         this.lastView = view;
         this.scheduleAutoDraw(view);
         this.markHint(view);
     }
 
     // ===== ヒント（手元の対戦だけ。オンラインでは出さない） =====
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で複数の人が交代で遊ぶ対戦は、誰の記録か分からないので送らない
+    recordLocalResult(view) {
+        const game = this.localGame();
+        if (!game || game.players.filter(p => !p.isCPU).length !== 1 || !view.me) return;
+        recordResult({
+            game: 'lucky-numbers',
+            id: `lucky-numbers-${game.seed}`,
+            outcome: outcomeFromWinners(view.result.winnerIds, view.me.id, view.players.length)
+        });
+    }
 
     localGame() {
         return this.controller instanceof LocalGameController ? this.controller.game : null;

@@ -10,6 +10,7 @@ import * as storage from './storage.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 
 const CPU_NAMES = ['エドガー', 'マティルダ', 'オスカー'];
 const HUMAN_NAME = 'あなた';
@@ -188,7 +189,22 @@ function update() {
     playSound(view, previous, moved);
     render(view);
     playAfter(moved, before, view.viewer);
-    if (view.phase === 'end' && previous && previous.phase !== 'end') setTimeout(showResult, 1200);
+    if (view.phase === 'end' && previous && previous.phase !== 'end') {
+        recordLocalResult(view);
+        setTimeout(showResult, 1200);
+    }
+}
+
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline || !view.result || controller.setup.players.filter(p => !p.isCPU).length !== 1) return;
+    recordResult({
+        game: 'kingdomino',
+        id: `kingdomino-${controller.setup.seed}`,
+        outcome: outcomeFromWinners(view.result.winners, view.viewer, view.players.length)
+    });
 }
 
 const myTurn = view => view.phase !== 'end' && view.currentSeat === view.viewer;

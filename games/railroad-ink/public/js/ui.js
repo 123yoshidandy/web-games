@@ -13,6 +13,9 @@ import { HELP_HTML } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+
+const GAME = 'railroad-ink';
 
 const SETTINGS_KEY = 'railroad-ink.settings';
 const CPU_NAMES = ['ジョー', 'ハンク', 'ケイト', 'ビリー', 'モリー'];
@@ -343,12 +346,23 @@ export default class UI {
         return ok;
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で人が交代する対戦（人が2人以上）は送らない
+    recordLocalResult(v) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: outcomeFromWinners(v.winners, v.you, v.players.length) });
+    }
+
     // 1回の更新に1つの音。新しいラウンドはダイス、ほかの人が描き終えたら知らせ、終わったら勝ち負け
     playUpdateSound(previous) {
         const view = this.view;
         if (!previous) return;
         if (view.phase === 'end') {
-            if (previous.phase !== 'end') music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+            if (previous.phase !== 'end') {
+                music.play(view.winners.includes(view.you) ? 'win' : 'lose');
+                this.recordLocalResult(view);
+            }
         } else if (view.round !== previous.round) {
             music.play('dice');
         } else if (this.sending) {

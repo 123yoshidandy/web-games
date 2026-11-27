@@ -60,6 +60,9 @@ export default {
         ctx.endMatch();
     },
 
+    // 利用者ごとの記録：負けた席の相手が勝ち。勝ち負けのつかなかった対戦（abort）は null（回数だけ数える）
+    result: (game) => (game.loser === null ? null : { winners: game.ids.map((id, seat) => seat).filter(seat => seat !== game.loser) }),
+
     // 通算の勝ち数を、参加者の id ごとに残す（席が変わっても引き継げるように）
     carryOver: (game) => ({ wins: Object.fromEntries(game.ids.map((id, seat) => [id, game.wins[seat]])) })
 };

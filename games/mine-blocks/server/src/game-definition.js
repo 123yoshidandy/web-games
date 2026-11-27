@@ -60,6 +60,11 @@ export default {
     // 誰かが勝ち数に届いたら試合終了
     isOver: (game) => game.wins.some(wins => wins >= game.winsNeeded),
 
+    // 利用者ごとの記録：勝ち数の多い順（同じ勝ち数は同じ順位）。勝ち数に届いた人がいなければ null
+    result: (game) => (game.wins.some(wins => wins >= game.winsNeeded)
+        ? { ranks: game.wins.map(wins => 1 + game.wins.filter(other => other > wins).length) }
+        : null),
+
     // まだ解いている人が切断・退出したら、残りの人を確かめる（誰もいなければ勝者なしで問題を終える）
     onPlayerGone(ctx) {
         if (!endRoundIfNobodyLeft(ctx)) ctx.ignore();

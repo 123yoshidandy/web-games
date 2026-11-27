@@ -24,7 +24,7 @@ const PRECACHE = [
     'js/ui/animator.js', 'js/ui/best-decks.js', 'js/ui/card-view.js', 'js/ui/deck-screen.js', 'js/ui/game-screen.js',
     'js/ui/motifs.js', 'js/ui/press.js', 'js/ui/sheets.js', 'js/ui/trainer-motifs.js',
     'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js',
-    'js/netplay/netplay-client.mjs', 'js/netplay/netplay-client.js',
+    'js/netplay/netplay-client.mjs', 'js/netplay/netplay-client.js', 'js/netplay/user-stats.js',
     // 最強のデッキ（scripts/deck-search.mjs が GitHub Actions で更新する）
     'data/best-decks.json'
 ];

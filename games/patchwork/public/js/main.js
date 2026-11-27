@@ -5,7 +5,8 @@
 
 import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 import {
     ORIENTATIONS, END, INCOME_SPACES, QUILT_SIZE, BONUS_POINTS, placementCells, rotateOrient, flipOrient
 } from './game.js';
@@ -249,7 +250,22 @@ function update() {
     app.view = view;
     render(view);
     playUpdateSound(view, previous);
+    recordLocalResult(view);
     if (view.phase === 'end' && previous && previous.phase !== 'end') setTimeout(showResult, 1200);
+}
+
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）。同点は先にゴールした方の勝ちなので、引き分けはない
+let recordedController = null;
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline || !view.result || recordedController === controller) return;
+    recordedController = controller;
+    recordResult({
+        game: GAME,
+        id: `${GAME}-${controller.setup.seed}`,
+        outcome: outcomeFromWinners([view.result.winner], view.viewer, view.players.length)
+    });
 }
 
 // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム

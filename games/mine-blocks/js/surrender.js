@@ -32,6 +32,7 @@ function surrender() {
     selectBlock(-1);
     clearHoverPreview();
     clearSavedProgress(); // 想定解を見た問題は続きからに残さない
+    recordLocalResult(`mine-blocks-${gameState.seed}`, 'loss'); // ログインしていれば、降参を負けとして記録する
 
     renderSolutionBoard(elements.solutionBoard);
     elements.surrenderModal.classList.add('active');

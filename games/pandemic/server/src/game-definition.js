@@ -28,6 +28,9 @@ export default {
         level: Object.hasOwn(LEVELS, settings.level) ? settings.level : 'standard'
     }),
 
+    // 利用者ごとの記録：協力のゲームなので、全員が同じ結果（4色の治療薬がそろえば勝ち）
+    result: (game) => (game.result ? { coop: true, won: game.result.won } : null),
+
     persist: (game) => game.persist(),
     restore: (saved) => Game.replay(saved.players, saved.options, saved.commands),
 

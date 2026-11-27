@@ -13,6 +13,7 @@ import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 
 // 自分の操作の効果音（依頼を果たしたら gain）
 const COMMAND_SOUNDS = { place: 'place', pick: 'gain', quest: 'draw', buy: 'pay', intrigue: 'place', opponent: 'select', option: 'select', target: 'select' };
@@ -450,11 +451,26 @@ export default class UI {
         }
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(v) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: 'lords-of-waterdeep',
+            id: `lords-of-waterdeep-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(v.winners, v.you, v.players.length)
+        });
+    }
+
     // 1つの更新に1つの音。自分の操作は結果の音、ほかの人の手は notify、自分が動ける番になったら turn
     playSound(prev, v) {
         if (!prev || prev.commandCount === v.commandCount) return;
         if (v.phase === 'over') {
-            if (prev.phase !== 'over') music.play(v.winners.includes(v.you) ? 'win' : 'lose');
+            if (prev.phase !== 'over') {
+                this.recordLocalResult(v);
+                music.play(v.winners.includes(v.you) ? 'win' : 'lose');
+            }
             return;
         }
         if (this.sending) {

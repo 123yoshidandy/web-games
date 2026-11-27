@@ -12,6 +12,9 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+
+const GAME = 'port-royal';
 
 // 自分の操作の音（取るカードは、船ならコインを得る・人物なら払う）
 const COMMAND_SOUND = { draw: 'draw', stop: 'select', repel: 'capture', keep: 'place', claim: 'gain', pass: 'select' };
@@ -214,12 +217,23 @@ export default class UI {
         return ok;
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で人が交代する対戦（人が2人以上）は送らない
+    recordLocalResult(v) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: outcomeFromWinners(v.winners, v.you, v.players.length) });
+    }
+
     // 1回の更新に1つの音。自分の操作の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム
     playUpdateSound(previous) {
         const v = this.view;
         if (!previous) return;
         if (v.phase === 'end') {
-            if (previous.phase !== 'end') music.play(!v.winners.includes(v.you) ? 'lose' : v.winners.length > 1 ? 'notify' : 'win');
+            if (previous.phase !== 'end') {
+                music.play(!v.winners.includes(v.you) ? 'lose' : v.winners.length > 1 ? 'notify' : 'win');
+                this.recordLocalResult(v);
+            }
             return;
         }
         if (this.sending) return;

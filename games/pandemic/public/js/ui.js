@@ -13,7 +13,8 @@ import { mapSvg, miniMapSvg, shortestPath, DISEASE_COLORS } from './map.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 // オンラインのコントローラーを、画面が使うローカルの形（send(seat, command)・canControl(seat) など）に合わせる
 // オンラインでは自分の席だけを動かす。ヒント・任せる・自動で進める処理はない
@@ -366,10 +367,21 @@ export default class UI {
         if (discarder !== undefined) this.openDiscard(discarder);
         else if (v.phase === 'forecast' && this.can(v.forecastBy)) this.openForecast();
         else if (['discard', 'forecast'].includes(this.sheetKind)) this.closeSheet();
+        this.recordLocalResult(v);
         if (v.result && !this.resultShown) {
             this.resultShown = true;
             setTimeout(() => this.openResult(), 600);
         }
+    }
+
+    // ローカル対戦（人1人と CPU の「CPU に任せる」）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // 協力のゲームなので勝ち・負けのどちらか。「全員を操作」は1台で複数の人が遊ぶので送らない
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(v) {
+        const controller = this.controller;
+        if (!v.result || !controller || controller.isOnline || controller.mode !== 'team' || this.recordedController === controller) return;
+        this.recordedController = controller;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: v.result.won ? 'win' : 'loss' });
     }
 
     // 1回の更新に1つの音。自分の操作の音は send で鳴らす。CPU の手は知らせ、自分のアクションの番になったらチャイム

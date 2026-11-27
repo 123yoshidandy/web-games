@@ -14,6 +14,9 @@ import { actionIcon, chipIcon, swordIcon, titleArt, describeEvent, ACTION_BONUS,
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+
+const GAME = 'race-for-the-galaxy';
 
 // 自分の操作の音：行動を選ぶ・捨てる・探索で残す・開発/入植・交易/消費/思わぬ収穫
 const COMMAND_SOUND = { action: 'place', startDiscard: 'pay', discard: 'pay', explore: 'draw', develop: 'place', settle: 'place', trade: 'gain', consume: 'gain', windfall: 'gain' };
@@ -191,12 +194,22 @@ function onUpdate() {
     playUpdateSound(previous);
 }
 
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）。1台で人が交代する対戦（人が2人以上）は送らない
+function recordLocalResult() {
+    if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+    recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: outcomeFromWinners(view.winners ?? [], view.seat, view.players.length) });
+}
+
 // 1回の更新に1つの音。CPU の手は知らせ、自分が選ぶ番になったらチャイム、終わったら勝ち負け
 function playUpdateSound(previous) {
     if (!previous) return;
     if (view.phase === 'end') {
         const winners = view.winners ?? [];
-        if (previous.phase !== 'end') music.play(!winners.includes(view.seat) ? 'lose' : winners.length > 1 ? 'notify' : 'win');
+        if (previous.phase !== 'end') {
+            music.play(!winners.includes(view.seat) ? 'lose' : winners.length > 1 ? 'notify' : 'win');
+            recordLocalResult();
+        }
         return;
     }
     if (sending) return;

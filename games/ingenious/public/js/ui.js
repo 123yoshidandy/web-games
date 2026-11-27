@@ -10,6 +10,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { COLORS, COLOR_ORDER } from './colors.js';
 import { CELLS, CELL_COUNT, NEIGHBORS, START_SYMBOLS } from './board.js';
@@ -475,11 +476,21 @@ export default class UI {
         });
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer) {
+            if (fresh.some(e => e.type === 'end')) this.recordLocalResult(view);
             this.resultTimer = setTimeout(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // ローカル対戦（人1人と CPU、または1人用）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1人用は勝ち負けがないので、回数だけ数える
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        const outcome = view.mode === 'solo' ? null : outcomeFromWinners(view.winners, view.players[view.you].side, view.sides.length);
+        recordResult({ game: 'ingenious', id: `ingenious-${controller.game.options.seed}`, outcome });
     }
 
     sideName(view, i) {

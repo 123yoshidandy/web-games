@@ -14,6 +14,7 @@ import { KINDS } from './rules.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { symbolsSvg, pieceShape, pieceSvg, cellCenter, hexPoints, HEX_R } from './art.js';
 
@@ -528,7 +529,19 @@ export default class UI {
             const passer = fresh.filter(e => e.type === 'pass').at(-1).seat;
             this.toast(passer === view.seat ? '動かせる駒がないので、パスしました' : `${view.players[passer].name}はパスしました`);
         }
-        if (view.over && fresh.some(e => e.type === 'end')) setTimeout(() => this.showResult(), 900);
+        if (view.over && fresh.some(e => e.type === 'end')) {
+            this.recordLocalResult(view);
+            setTimeout(() => this.showResult(), 900);
+        }
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        const outcome = view.winner === null ? 'draw' : view.winner === view.seat ? 'win' : 'loss';
+        recordResult({ game: 'hive', id: `hive-${controller.game.options.seed}`, outcome });
     }
 
     // 1つの更新に1つの音。自分の手は置く、相手の手は notify、自分の番になったら turn

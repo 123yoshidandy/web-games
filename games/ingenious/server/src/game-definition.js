@@ -50,6 +50,9 @@ export default {
 
     isOver: (game) => game.isOver(),
 
+    // 利用者ごとの記録：game.winners は勝った単位（sides の番号）なので、組み合わせ戦（team）では、その単位の2人の席に直す
+    result: (game) => (game.isOver() ? { winners: game.winners.flatMap(i => game.sides[i].members) } : null),
+
     cpu: {
         needsStep: (game) => isCpuTurn(game),
         step: (game) => runCpuStep(game),

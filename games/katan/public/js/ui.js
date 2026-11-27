@@ -6,6 +6,7 @@
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import OnlineGameController, { loadOnlineSession } from './online-controller.js';
 import { getServerUrl, hasServer } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
 import Game, {
     MIN_PLAYERS, MAX_PLAYERS, RESOURCES, RESOURCE_NAMES, COSTS, DEV_NAMES, PIECE_NAMES, hasCards, countCards
 } from './game.js';
@@ -732,6 +733,7 @@ export default class UI {
         this.renderDialogs(view);
         this.renderResult(view);
         this.playSounds(previous, view);
+        if (previous && view.result && !previous.result) this.recordLocalResult(view);
         playAnimations(previous, view, { board: $('board'), fx: $('fx'), players: $('screen-game'), hand: $('hand'), dice: $('dice') });
         this.lastView = view;
         this.scheduleAutoRoll(view);
@@ -1347,6 +1349,19 @@ export default class UI {
         buttons.append(element('button', { text: 'ホーム', onClick: () => this.goHome() }));
         panel.append(buttons);
         box.append(panel);
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で複数の人が交代で遊ぶ対戦は、誰の記録か分からないので送らない
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller === this.online || !(controller instanceof LocalGameController)) return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1 || !view.me) return;
+        recordResult({
+            game: 'katan',
+            id: `katan-${controller.game.seed}`,
+            outcome: view.result.winnerId === view.me.id ? 'win' : 'loss'
+        });
     }
 
     // ===== 音・自動の操作 =====

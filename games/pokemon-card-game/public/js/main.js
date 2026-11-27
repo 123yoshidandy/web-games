@@ -9,6 +9,7 @@ import { deckProblem, mainEnergyType } from './deck-builder.js';
 import LocalGameController, { loadSavedCpuGame } from './game-controller.js';
 import OnlineGameController, { loadOnlineSession } from './online-controller.js';
 import NetplayClient from './netplay/netplay-client.mjs';
+import { recordResult } from './netplay/user-stats.js';
 import GameScreen from './ui/game-screen.js';
 import DeckScreens from './ui/deck-screen.js';
 import BestDecksScreen from './ui/best-decks.js';
@@ -215,13 +216,24 @@ function showTitle() {
 
 // ===== CPU 対戦 =====
 
+// CPU 戦（人1人）の決着を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）。決着のあとの更新で何度も送らないよう、送った対戦は覚える
+const recordedCpuGames = new Set();
+function recordCpuResult(controller) {
+    const { winner } = controller.game;
+    const id = `pokemon-card-game-${controller.options.seed}`;
+    if (winner == null || recordedCpuGames.has(id)) return;
+    recordedCpuGames.add(id);
+    recordResult({ game: 'pokemon-card-game', id, outcome: winner === 'draw' ? 'draw' : winner === 0 ? 'win' : 'loss' });
+}
+
 // 保存した途中の CPU 戦を、記録から作り直して続ける（作り直せなければ、新しく始める）
 function resumeCpuGame() {
     const saved = loadSavedCpuGame();
     screen.stop();
     let controller;
     try {
-        controller = new LocalGameController(saved, { onUpdate: () => screen.render(), onError: message => screen.showError(message) });
+        controller = new LocalGameController(saved, { onUpdate: () => { screen.render(); recordCpuResult(controller); }, onError: message => screen.showError(message) });
     } catch (error) {
         console.error(error);
         toast('続きを読み込めませんでした');
@@ -239,7 +251,7 @@ function startCpuGame() {
     screen.stop();
     const controller = new LocalGameController(
         { name: 'あなた', decks: [expandDeck(mine), expandDeck(cpu)] },
-        { onUpdate: () => screen.render(), onError: message => screen.showError(message) }
+        { onUpdate: () => { screen.render(); recordCpuResult(controller); }, onError: message => screen.showError(message) }
     );
     setScene('game');
     screen.start(controller);

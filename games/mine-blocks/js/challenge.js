@@ -14,6 +14,7 @@ const CHALLENGE_TIME_BONUS = 20;
 const challengeState = {
     active: false,      // チャレンジモード中かどうか（結果表示中も含む）
     solved: 0,          // 解いた問題数
+    startedAt: 0,       // 始めた時刻（記録の id に使う）
     deadline: 0,        // 時間切れになる時刻（ミリ秒）
     intervalId: null    // 残り時間表示を更新するインターバルID
 };
@@ -22,6 +23,7 @@ const challengeState = {
 function startChallenge() {
     challengeState.active = true;
     challengeState.solved = 0;
+    challengeState.startedAt = Date.now();
     challengeState.deadline = Date.now() + CHALLENGE_INITIAL_TIME * 1000;
 
     elements.clearModal.classList.remove('active');
@@ -83,6 +85,8 @@ function tickChallenge() {
 
 // チャレンジを終える（時間切れ・降参とも）：タイマーを止め、解いた数と最後の問題の想定解を表示する
 function finishChallenge() {
+    // 終わった1回だけ記録する（勝ち負けはないので、回数だけ数える）
+    if (challengeState.intervalId !== null) recordLocalResult(`mine-blocks-challenge-${challengeState.startedAt}`, null);
     clearInterval(challengeState.intervalId);
     challengeState.intervalId = null;
     selectBlock(-1);
