@@ -111,6 +111,14 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 
 .link { border: none; background: none; color: var(--muted); font-size: 15px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; padding: 8px; }
 
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数・CPU と同じ見た目にする */
+.motion-setting .motion-speed { display: inline-flex; align-items: center; gap: 8px; }
+.motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .3); }
+.motion-setting .motion-speed button { min-width: 44px; height: 44px; padding: 0 10px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 700; cursor: pointer; }
+.motion-setting .motion-speed button[aria-pressed="true"] { color: #fff; background: var(--primary); }
+#motion-setting-help { margin-bottom: 8px; color: var(--muted); font-size: 14px; font-weight: 700; }
+/* 飛んでいるダイス */
+.motion-flyer { filter: drop-shadow(0 4px 6px rgba(0, 0, 0, .5)); }
 .segmented { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .3); }
 .segmented button {
     min-width: 44px;

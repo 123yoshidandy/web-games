@@ -16,13 +16,18 @@ import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
+import * as Motion from './motion/motion.js';
 
 // 自分の操作の音：窓を選ぶ・ダイスを取って置く・置く・道具（払う）・値を決める・番を終える
 const COMMAND_SOUND = { choose: 'place', draft: 'place', place: 'place', tool: 'pay', fluxValue: 'select', end: 'select' };
 
 const SETTINGS_KEY = 'sagrada.settings';
 const CPU_NAMES = ['マリア', 'ジョルディ', 'ヌリア'];
-const RESULT_DELAY_MS = 900;
+const RESULT_DELAY_MS = 900;   // 動きが終わってから数える
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // ダイスがプールから窓へ・窓の中で動く
+const DICE_MS = 380;     // ダイスが転がる
+const STAGGER_MS = 70;   // 何個も動くときの間
 const DRAG_PX = 8;
 
 // 道具ごとの手順。pay：1人用の払い、die：プールのダイス、delta：増減、track：ラウンドトラックのダイス、
@@ -100,6 +105,8 @@ export default class UI {
         });
         this.bindStatic();
         this.renderHelp();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '動き' });
     }
 
     // ---- 画面の切り替え ----
@@ -145,7 +152,7 @@ export default class UI {
     // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
     beginGame(controller) {
         if (this.controller !== controller) this.controller?.stop();
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         this.controller = controller;
@@ -170,7 +177,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -607,6 +614,9 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        const prev = this.view;
+        // 描き直す前に、動きの出発点（プールのダイス・窓のマス）を測る
+        const before = prev && Motion.enabled() ? this.measure() : null;
         this.view = view;
         // 場面が変わったら、選択と道具の手順を消す
         const key = `${view.phase}:${view.round}:${view.turnIndex}:${view.turn?.drafted}:${view.turn?.toolUsed}:${view.pending?.kind ?? ''}:${view.actors.join(',')}`;
@@ -627,14 +637,76 @@ export default class UI {
         this.renderMine(view);
         this.renderActions(view);
         this.markHint();
+        if (before) this.animateUpdate(prev, view, before);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && !this.resultShown && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            const controller = this.controller;
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
+                if (this.controller !== controller) return;
                 this.resultShown = true;
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // ---- 動き ----
+
+    measure() {
+        const cells = new Map();
+        document.querySelectorAll('#my-window .cell[data-cell]').forEach(el => cells.set(`you:${el.dataset.cell}`, Motion.rectOf(el)));
+        document.querySelectorAll('#opponents .opponent[data-seat]').forEach(op => op.querySelectorAll('.cell[data-cell]').forEach(el => cells.set(`${op.dataset.seat}:${el.dataset.cell}`, Motion.rectOf(el))));
+        return { pool: Motion.captureRects($('#pool'), '.die[data-die]', 'die'), cells };
+    }
+
+    // ダイスが転がって現れる
+    tumble(el, delay) {
+        if (!Motion.enabled() || !el) return;
+        const length = Motion.ms(DICE_MS);
+        const animation = el.animate([
+            { transform: 'rotate(-220deg) scale(.4)', opacity: 0 },
+            { transform: 'rotate(18deg) scale(1.12)', opacity: 1, offset: 0.7 },
+            { transform: 'rotate(0) scale(1)', opacity: 1 }
+        ], { duration: length, delay: Motion.ms(delay), easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' });
+        Motion.track(animation, length + Motion.ms(delay));
+    }
+
+    // 前のビューから増えた出来事（events の seq で見る）を動かす
+    // 置いたダイスはプールから窓のマスへ、道具で動かしたダイスは窓の中を飛ぶ。プールの残りは詰め、新しいラウンドのダイス・振り直したダイスは転がる
+    animateUpdate(prev, v, before) {
+        const lastSeq = Math.max(0, ...(prev.events ?? []).map(e => e.seq));
+        const fresh = (v.events ?? []).filter(e => e.seq > lastSeq);
+        const owner = (seat) => (seat === v.you ? 'you' : String(seat));
+        const cellEl = (seat, i) => (seat === v.you ? document.querySelector(`#my-window .cell[data-cell="${i}"]`) : document.querySelector(`#opponents .opponent[data-seat="${seat}"] .cell[data-cell="${i}"]`));
+        fresh.forEach(e => {
+            if (e.type === 'place' && e.cell !== null && e.cell !== undefined) {
+                const to = cellEl(e.seat, e.cell)?.querySelector('.die');
+                const from = before.pool.get(String(e.die.id));
+                if (!to) return;
+                if (!from) return Motion.popIn(to);
+                Motion.fly(from, to, { content: dieHtml(e.die), hide: to, duration: FLY_MS });
+            } else if (e.type === 'move') {
+                const to = cellEl(e.seat, e.to)?.querySelector('.die');
+                const from = before.cells.get(`${owner(e.seat)}:${e.from}`);
+                if (to && from) Motion.fly(from, to, { content: to, hide: to, duration: FLY_MS });
+            }
+        });
+        // プール：残ったダイスは詰め、新しいラウンドのダイスは現れ、振り直したダイスは転がる
+        Motion.flipFrom(before.pool, $('#pool'), '.die[data-die]', 'die', { duration: 260, stagger: 60, enter: 'pop' });
+        const old = new Map(prev.pool.map(d => [d.id, d.value]));
+        v.pool.forEach(d => {
+            if (old.has(d.id) && old.get(d.id) !== d.value) this.tumble($('#pool').querySelector(`.die[data-die="${d.id}"]`), 0);
+        });
+        // ラウンドトラックに積まれたダイス
+        document.querySelectorAll('#track .slot.done').forEach((el, r) => {
+            if (!prev.roundTrack[r]) Motion.popIn(el, { delay: 100 });
+        });
+        // 好意トークンが変わった人
+        v.players.forEach(p => {
+            if (p.tokens === prev.players[p.id]?.tokens) return;
+            const el = p.id === v.you ? $('#my-window').querySelector('.tokens') : document.querySelector(`#opponents .opponent[data-seat="${p.id}"] .tokens`);
+            Motion.pulse(el, { scale: 1.4, duration: 400 });
+        });
     }
 
     renderOpponents(view) {
