@@ -42,9 +42,13 @@ describe('CPU', () => {
         expect(game.applyCommand(0, choice)).toBe(true);
     });
 
+    // CPU は時間で打ち切らず、判断もシードだけで決まるので、勝敗は毎回同じになる。
+    // 1試合が手元で約1.6秒かかり、CI は2倍ほど遅いので、試合数は10に抑え、時間にも余裕を持たせる。
+    // 先手の有利で結果がゆがまないよう、席を入れ替えて半分ずつ戦う。
     it('ふつうは、やさしいより多く勝つ', () => {
-        const r = runMatches({ games: 20, profiles: ['normal', 'easy'], seedBase: 100 });
-        expect(r.finished).toBe(20);
-        expect(r.wins[0]).toBeGreaterThan(r.wins[1]);
-    });
+        const first = runMatches({ games: 5, profiles: ['normal', 'easy'], seedBase: 100 });
+        const second = runMatches({ games: 5, profiles: ['easy', 'normal'], seedBase: 100 });
+        expect(first.finished + second.finished).toBe(10);
+        expect(first.wins[0] + second.wins[1]).toBeGreaterThanOrEqual(7);
+    }, 120000);
 });
