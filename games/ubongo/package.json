@@ -1,0 +1,29 @@
+{
+  "name": "ubongo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs",
+    "puzzles": "node scripts/gen-puzzles.mjs"
+  },
+  "devDependencies": {
+    "test-kit": "*"
+  },
+  "portal": {
+    "original": "Ubongo",
+    "genres": [
+      "パズル",
+      "ボードゲーム"
+    ]
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  },
+  "standards": {
+    "skip": {
+      "undo": "時間を競う早解きで、手番がない。置いたピースはいつでもトレイに戻せるので、戻す手がない"
+    }
+  }
+}

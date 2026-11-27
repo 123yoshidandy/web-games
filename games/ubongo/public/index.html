@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#7a3b12">
+    <title>ウボンゴ</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="ウボンゴ">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <!-- 宝石の図柄（自作）。色ごとに形も変え、色だけに頼らず見分けられるようにする -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+        <defs>
+            <symbol id="gem-ruby" viewBox="0 0 20 20">
+                <path d="M10 1.5 17.5 6v8L10 18.5 2.5 14V6z" fill="#d23a4a" stroke="#7a1420" stroke-width="1.2"/>
+                <path d="M10 1.5v6l7.5-1.5M10 7.5 2.5 6M10 7.5v11" fill="none" stroke="#f3a0a8" stroke-width="0.9" opacity=".8"/>
+            </symbol>
+            <symbol id="gem-sapphire" viewBox="0 0 20 20">
+                <path d="M10 1 18.5 10 10 19 1.5 10z" fill="#2f6fd0" stroke="#123a7a" stroke-width="1.2"/>
+                <path d="M1.5 10h17M10 1v18" fill="none" stroke="#a8c8f6" stroke-width="0.9" opacity=".75"/>
+            </symbol>
+            <symbol id="gem-emerald" viewBox="0 0 20 20">
+                <path d="M6 2h8l4 4v8l-4 4H6l-4-4V6z" fill="#2fa86a" stroke="#0f5a34" stroke-width="1.2"/>
+                <rect x="6.5" y="6.5" width="7" height="7" fill="none" stroke="#a7e6c4" stroke-width="0.9" opacity=".8"/>
+            </symbol>
+            <symbol id="gem-amber" viewBox="0 0 20 20">
+                <circle cx="10" cy="10" r="8.2" fill="#efb52c" stroke="#8a5a08" stroke-width="1.2"/>
+                <circle cx="10" cy="10" r="4.2" fill="none" stroke="#fbe3a1" stroke-width="0.9" opacity=".85"/>
+            </symbol>
+            <symbol id="gem-amethyst" viewBox="0 0 20 20">
+                <path d="M10 1.5 18.5 17.5H1.5z" fill="#8c4fc6" stroke="#46186e" stroke-width="1.2"/>
+                <path d="M10 1.5 10 17.5M10 11 1.5 17.5M10 11l8.5 6.5" fill="none" stroke="#d6b6f2" stroke-width="0.9" opacity=".75"/>
+            </symbol>
+            <symbol id="gem-pearl" viewBox="0 0 20 20">
+                <rect x="2.5" y="2.5" width="15" height="15" rx="4" fill="#eee8dc" stroke="#7d7466" stroke-width="1.2"/>
+                <path d="M6 6h8v8H6z" fill="none" stroke="#fff" stroke-width="1"/>
+            </symbol>
+            <symbol id="icon-speaker" viewBox="0 0 24 24">
+                <path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor"/>
+                <path class="wave" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen title-screen">
+            <div class="title-head">
+                <svg class="title-art" viewBox="0 0 120 60" aria-hidden="true">
+                    <rect x="8" y="8" width="104" height="44" rx="6" fill="#f7e4b8" stroke="#7a3b12" stroke-width="2"/>
+                    <g stroke="#3a1f0c" stroke-width="1.5" stroke-linejoin="round">
+                        <path d="M14 14h30v10H34v10H14z" fill="#e8a33d"/>
+                        <path d="M44 14h20v20H34V24h10z" fill="#4f9fd8"/>
+                        <path d="M64 14h40v10H74v20H64z" fill="#d65f9b"/>
+                        <path d="M14 34h20v12H14z" fill="#8bbf4a"/>
+                        <path d="M34 34h40v12H34z" fill="#7a6fd6"/>
+                        <path d="M74 24h30v22H74z" fill="#5bb7c4"/>
+                    </g>
+                </svg>
+                <h1 class="logo">ウボンゴ</h1>
+                <p class="subtitle">ピースで形をうめる、早解きパズル</p>
+            </div>
+
+            <div class="options">
+                <div class="option">
+                    <span class="option-label">人数</span>
+                    <div id="count-select" class="segmented" role="group" aria-label="人数">
+                        <button type="button" data-value="1">1人</button>
+                        <button type="button" data-value="2">2人</button>
+                        <button type="button" data-value="3">3人</button>
+                        <button type="button" data-value="4">4人</button>
+                    </div>
+                </div>
+                <div class="option">
+                    <span class="option-label">ピース</span>
+                    <div id="difficulty-select" class="segmented" role="group" aria-label="ピースの数">
+                        <button type="button" data-value="3">3つ</button>
+                        <button type="button" data-value="4">4つ</button>
+                    </div>
+                </div>
+                <div class="option race-only">
+                    <span class="option-label">時間</span>
+                    <div id="time-select" class="segmented" role="group" aria-label="制限時間">
+                        <button type="button" data-value="60000">60秒</button>
+                        <button type="button" data-value="90000">90秒</button>
+                        <button type="button" data-value="120000">120秒</button>
+                    </div>
+                </div>
+                <div class="option race-only">
+                    <span class="option-label">CPU</span>
+                    <div id="level-select" class="segmented" role="group" aria-label="CPU の強さ">
+                        <button type="button" data-value="easy">やさしい</button>
+                        <button type="button" data-value="normal">ふつう</button>
+                        <button type="button" data-value="hard">つよい</button>
+                    </div>
+                </div>
+                <p id="mode-note" class="mode-note"></p>
+            </div>
+
+            <div class="title-actions">
+                <button type="button" id="start" class="primary">はじめる</button>
+                <button type="button" id="resume-button" hidden>続きから</button>
+                <button type="button" id="online-button" hidden>オンラインで遊ぶ</button>
+            </div>
+
+            <div class="title-foot">
+                <button type="button" id="open-help-title" data-action="help">遊び方</button>
+                <button type="button" class="sound-toggle" aria-pressed="true">サウンド</button>
+                <a class="portal-link" href="../">← ゲーム一覧</a>
+            </div>
+        </section>
+
+        <!-- 遊ぶ画面 -->
+        <section id="screen-game" class="screen game-screen" hidden>
+            <header class="topbar">
+                <button type="button" id="home" class="icon-button" data-action="home" aria-label="ホーム">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11 12 3l9 8v10h-6v-6H9v6H3z" fill="currentColor"/></svg>
+                </button>
+                <div class="round-info">
+                    <span id="round-label" class="round-label">1/9</span>
+                    <span id="die" class="die" aria-label="ダイス"></span>
+                </div>
+                <div class="timer" aria-live="off">
+                    <div class="timer-track"><div id="timer-bar" class="timer-bar"></div></div>
+                    <span id="timer-text" class="timer-text">90</span>
+                </div>
+                <button type="button" id="open-help-game" class="icon-button" data-action="help" aria-label="遊び方">?</button>
+                <button type="button" class="icon-button sound-toggle" aria-pressed="true" aria-label="サウンド">
+                    <svg aria-hidden="true"><use href="#icon-speaker"/></svg>
+                </button>
+            </header>
+
+            <div id="players" class="players"></div>
+
+            <div id="play" class="play">
+                <div id="board-area" class="board-area"></div>
+                <div id="tray" class="tray"></div>
+                <svg id="board" class="board" aria-label="盤面"></svg>
+                <div id="pieces" class="pieces"></div>
+                <div id="banner" class="banner" hidden></div>
+            </div>
+
+            <footer class="controls">
+                <button type="button" id="flip" data-action="flip">反転</button>
+                <button type="button" id="hint" data-action="hint">ヒント</button>
+                <button type="button" id="give-up" data-action="give-up">あきらめる</button>
+                <button type="button" id="log-button" data-action="log">ログ</button>
+            </footer>
+
+            <!-- ラウンドの前のカウント -->
+            <div id="countdown" class="overlay countdown" hidden>
+                <div class="countdown-card">
+                    <p id="countdown-round" class="countdown-round"></p>
+                    <div id="countdown-die" class="die big"></div>
+                    <p id="countdown-note" class="countdown-note"></p>
+                    <p id="countdown-count" class="countdown-count"></p>
+                </div>
+            </div>
+
+            <!-- 宝石を取る -->
+            <div id="collect" class="overlay collect" hidden>
+                <div class="collect-card">
+                    <h2 class="collect-title">宝石を取る</h2>
+                    <ol id="collect-order" class="collect-order"></ol>
+                    <p id="collect-note" class="collect-note"></p>
+                    <div id="gem-board" class="gem-board"></div>
+                    <div id="my-gems" class="my-gems"></div>
+                </div>
+            </div>
+
+            <!-- 記録を見ている間 -->
+            <div id="replay-bar" class="replay-bar" hidden>
+                <span id="replay-label">記録</span>
+                <button type="button" data-action="replay-speed" id="replay-speed">×2</button>
+                <button type="button" data-action="replay-next">次へ</button>
+                <button type="button" data-action="replay-close">閉じる</button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 遊び方 -->
+    <dialog id="help" class="dialog">
+        <h2>遊び方</h2>
+        <div class="help-body">
+            <p>毎ラウンド、全員が自分の盤面の形を受け取ります。ダイスの目で決まる3つ（むずかしいは4つ）のピースで、形をすき間なくちょうど埋めてください。</p>
+            <ul>
+                <li>ピースは<b>ドラッグ</b>で盤面に置きます。マスにぴったり合う所に吸いつきます</li>
+                <li><b>タップ</b>で右に回し、<b>2回タップ</b>か「反転」で裏返します</li>
+                <li>盤面の外に落としたピースはトレイに戻ります</li>
+                <li>全部のピースで埋まったら、解けたことになります</li>
+            </ul>
+            <p>砂時計（上のバー）が尽きる前に解いた人は、早い順に宝石を取ります。1位はコマを3列まで、2位は2列、3位は1列まで動かせ、4位は動けません。止まった列の手前から宝石を2個取ります。</p>
+            <p>9ラウンドで終わり、<b>1色をいちばん多く</b>集めた人の勝ちです。同じなら、2番目に多い色で比べます。</p>
+            <p>1人で遊ぶとタイムアタックです。9問を解く時間の合計を競います。ヒントは正しいピースを1つ置きますが、1回ごとにタイムに10秒足されます。あきらめると、そのラウンドの宝石はなし（タイムアタックでは60秒足して次へ）です。</p>
+        </div>
+        <form method="dialog"><button>閉じる</button></form>
+    </dialog>
+
+    <!-- ログ -->
+    <dialog id="log" class="dialog">
+        <h2>ログ</h2>
+        <ol id="log-list" class="log-list"></ol>
+        <form method="dialog"><button>閉じる</button></form>
+    </dialog>
+
+    <!-- 結果 -->
+    <dialog id="result-dialog" class="dialog result-dialog">
+        <h2 id="result-title">結果</h2>
+        <div id="result-body"></div>
+        <div class="result-actions">
+            <button type="button" class="primary" data-action="rematch">もう一度</button>
+            <button type="button" id="replay-button" data-action="replay">記録を見る</button>
+            <button type="button" id="result-home" data-action="home">タイトルへ</button>
+        </div>
+    </dialog>
+
+    <!-- お知らせ -->
+    <dialog id="note-dialog" class="dialog">
+        <h2 id="note-title"></h2>
+        <p id="note-text"></p>
+        <form method="dialog"><button>閉じる</button></form>
+    </dialog>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
