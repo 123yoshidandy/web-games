@@ -1,12 +1,15 @@
 # まとめたオンライン対戦のサーバー（スタック web-games-online）を、main への push で自動デプロイする（docs/server-merge.md）
 # netplay-kit の template/deploy-server.yml をもとに、次を変えた
 # - 動く条件：サーバーと、サーバーが読み込むゲームのロジックが変わったときだけ
-# - テスト：変わったゲームと netplay-kit（scripts/changed-games.mjs）。netplay-kit のサーバー側が変わったら全ゲーム
+# - テスト：サーバーを守るものだけ（束ねたサーバーの読み込み・netplay-kit・変わったゲームの game-definition）
+#   画面を含むゲームの全部のテストは test.yml が流す。test.yml はデプロイを止めない（個人用のリポジトリなので、CI は知らせるだけ）
 # - Secret の AWS_DEPLOY_ROLE_ARN がないあいだは、デプロイを飛ばす（IAM のロールを作る前の push で失敗しないように）
 # AWS への認証は OIDC で行い、アクセスキーは使わない。リポジトリは公開なので、AWS のアカウント番号はログで伏せる
 name: deploy-server
 
-# サーバーは画面側の public/js・js のロジックも読み込むので、ゲームの側はそこまで見る
+# サーバーは画面側の public/js・js のロジック（game.js・cpu-player.js・rules.js など）も読み込むので、ゲームの側はそこまで見る
+# ただし、画面だけのファイル（main.js・ui.js・art.js・netplay/・sound/ など）は、どのゲームでもサーバーに入らないので外す
+# （esbuild の metafile で、束ねた入力にこれらの名前がないことを確かめた。入り込んだら「束ねた入力の確認」の手順で警告が出る）
 # サーバーに変わりがなければ、sam deploy は「No changes to deploy」で終わる
 on:
   push:
@@ -17,13 +20,34 @@ on:
       - 'games/*/server/**'
       - 'games/*/public/js/**'
       - 'games/*/js/**'
+      # paths は {a,b} の書き方を使えないので、1行ずつ並べる。下の「束ねた入力の確認」の正規表現と同じものにする
+      - '!games/*/public/js/netplay/**'
+      - '!games/*/public/js/sound/**'
+      - '!games/*/public/js/main.js'
+      - '!games/*/public/js/online-config.js'
+      - '!games/*/public/js/music.js'
+      - '!games/*/public/js/game-controller.js'
+      - '!games/*/public/js/ui.js'
+      - '!games/*/public/js/art.js'
+      - '!games/*/public/js/help.js'
+      - '!games/*/public/js/animator.js'
+      - '!games/*/public/js/storage.js'
+      - '!games/*/public/js/board-view.js'
+      - '!games/*/public/js/sound.js'
+      # js/ に置く古い3本（mine-blocks・panel-de-pon・wordle）は、共通の写しだけを外す
+      - '!games/*/js/netplay/**'
+      - '!games/*/js/sound/**'
   workflow_dispatch:
 
 permissions:
   id-token: write
   contents: read
+  # 最後に成功したデプロイのコミットを、gh run list で調べる
+  actions: read
 
-# デプロイを同時に2つ動かさない（後から来たものは、前のものが終わるのを待つ）
+# デプロイを同時に2つ動かさない。動いているものは止めない（cancel-in-progress: false）
+# 待てるのは1つだけで、新しい push が来ると、待っていたものは新しいものに置き換わる
+# 待っていたものが動き出すときは、イベントのコミットではなく main の先端を取り出すので、いつも最新のコミットを出す
 concurrency:
   group: deploy-server
   cancel-in-progress: false
@@ -56,9 +80,11 @@ jobs:
     if: needs.check.outputs.enabled == 'true'
     runs-on: ubuntu-latest
     steps:
+      # github.sha（イベントのコミット）ではなく、動き出した時点のブランチの先端を取り出す
       - name: リポジトリを取り出す
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.ref }}
           fetch-depth: 0
 
       - name: Node.js 22 を用意する
@@ -70,26 +96,37 @@ jobs:
       - name: 依存を入れる
         run: npm ci
 
-      - name: 直下のスクリプトのテスト（束ねたサーバーの読み込みを含む）
-        run: node --test "scripts/**/*.test.mjs"
+      # 全ゲームの chunk を一時フォルダに束ね、偽の @aws-sdk の上で handler.mjs・stats-handler.mjs を読み込んで呼ぶ
+      - name: 束ねたサーバーのテスト
+        run: node --test scripts/server-bundle.test.mjs
 
-      # 全ゲームのサーバーが1つの Lambda に入るので、netplay-kit のサーバー側が変わったときは全ゲームを流す
-      # 手で動かしたときと、比べる元がないときも全部流す
-      - name: テスト（失敗したらデプロイしない）
+      # chrome.test.js はヘッドレス Chrome で画面側の部品を見るもので、サーバーには関わらないので外す
+      - name: netplay-kit のテスト
+        run: npm test -w packages/netplay-kit -- --exclude test/chrome.test.js
+
+      # 比べる元は、最後に成功したデプロイのコミット（github.event.before だと、置き換わって流れなかった push の変更を見落とす）
+      # 見つからないとき（初めてのデプロイ・手で動かしたときの履歴の欠けなど）は、全ゲームを流す。全部でも2分ほど
+      - name: 変わったゲームの game-definition のテスト
         env:
-          BASE: ${{ github.event.before }}
-          EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "$EVENT" != "push" ] || [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null \
-            || [ -n "$(git diff --name-only "$BASE" HEAD -- packages/netplay-kit/server/)" ]; then
-            targets=$(ls -d packages/netplay-kit/ games/*/ | sed 's|/$||')
+          base=$(gh run list -R "$GITHUB_REPOSITORY" --workflow deploy-server.yml --branch main --status success \
+            --limit 1 --json headSha --jq '.[0].headSha // empty' || true)
+          if [ -n "$base" ] && git cat-file -e "$base^{commit}" 2>/dev/null; then
+            echo "比べる元: $base（最後に成功したデプロイ）"
+            targets=$(node scripts/changed-games.mjs "$base" | grep '^games/' || true)
           else
-            targets=$(node scripts/changed-games.mjs "$BASE")
+            echo "比べる元が見つからないので、全ゲームを流す"
+            targets=$(ls -d games/*/ | sed 's|/$||')
+          fi
+          if [ -z "$targets" ]; then
+            echo "変わったゲームはありません"
+            exit 0
           fi
           failed=""
           for target in $targets; do
             echo "::group::$target"
-            npm test --if-present -w "$target" || failed="$failed $target"
+            npm test --if-present -w "$target" -- --passWithNoTests game-definition || failed="$failed $target"
             echo "::endgroup::"
           done
           if [ -n "$failed" ]; then
@@ -117,6 +154,17 @@ jobs:
       # ゲームごとの chunk ができなかったら、ここで失敗する（scripts/build-server.mjs）
       - name: サーバーをビルドする
         run: npm run build:server
+
+      # 束ねた出力には、元のファイルを示す「// games/<名前>/public/js/<ファイル>」の注記が残る
+      # on.push.paths で外した画面だけのファイルが入り込んでいたら、そのファイルの変更ではデプロイが動かないので、警告する
+      # （デプロイは止めない。直すのは on.push.paths のほう）
+      - name: 束ねた入力の確認（外したファイルが入っていないか）
+        run: |
+          leaked=$(grep -rhoE '^// games/[^/]+/(public/js/((netplay|sound)/.*|(main|online-config|music|game-controller|ui|art|help|animator|storage|board-view|sound)\.js)|js/(netplay|sound)/.*)$' server/dist | sort -u || true)
+          if [ -n "$leaked" ]; then
+            echo "::warning::on.push.paths で外したファイルがサーバーに入っています。deploy-server.yml の paths を直してください:"
+            echo "$leaked"
+          fi
 
       # GitHub 用のロールにできるのは、CloudFormation 用のロール（web-games-cfn-deploy）を渡して変更セットを作ることと、
       # 成果物を共有のバケットの web-games-online/ の下に置くことだけ
