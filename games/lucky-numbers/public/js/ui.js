@@ -709,8 +709,10 @@ export default class UI {
         $('pool-button').addEventListener('click', () => this.controller?.send({ type: 'draw' }));
 
         // 音は、ブラウザの制限で、最初に画面を触ったときから鳴らせる（触るたびに、止まっていれば再開する）
-        document.addEventListener('pointerdown', unlockSound, true);
-        document.addEventListener('keydown', unlockSound, true);
+        // タッチの pointerdown は操作に数えられないので、指を離したとき（touchend・click）にも呼ぶ
+        for (const type of ['pointerdown', 'touchend', 'click', 'keydown']) {
+            document.addEventListener(type, unlockSound, true);
+        }
         document.querySelectorAll('.sound-toggle').forEach(button => {
             button.addEventListener('click', () => toggleAllSound());
         });
