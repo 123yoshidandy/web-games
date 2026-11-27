@@ -9,6 +9,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, icon, tileHtml, sunHtml } from './art.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
@@ -23,11 +24,13 @@ const SETTINGS_KEY = 'ra.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
 const RESULT_DELAY_MS = 900;
 const FLOAT_MS = 1100;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 引いたタイル・取ったタイル・出した太陽駒
+const STAGGER_MS = 80;   // 何枚も動くときの間
 const ROWS = { god: '神', gold: '金', pharaoh: 'ファラオ', river: 'ナイル河', civ: '文明', monument: 'モニュメント', sun: '太陽駒' };
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function loadSettings() {
     try {
@@ -59,7 +62,8 @@ export default class UI {
         this.godMode = false;
         this.godPicks = [];
         this.discardPicks = [];
-        this.resultTimer = null;
+        this.resultTimer = null;   // Motion.afterIdle の取り消す関数
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         $('#symbols').innerHTML = symbolsSvg();
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
         this.online = new NetplayLobby({
@@ -113,8 +117,66 @@ export default class UI {
 
     onControllerUpdate() {
         const previous = this.view;
+        // 描き直す前に、動きの出発点（競りのトラック・袋・席・太陽駒の位置）を測る
+        const snap = previous && Motion.enabled() ? this.measure() : null;
         this.render();
         this.playUpdateSound(previous);
+        if (snap) this.animate(snap);
+    }
+
+    // ---- 動き ----
+
+    // 描き直す前の、動きの出発点
+    measure() {
+        const slots = new Map();
+        document.querySelectorAll('#table .auction .tile[data-slot]').forEach(el => {
+            const rect = Motion.rectOf(el);
+            if (rect) slots.set(Number(el.dataset.slot), { rect, type: el.dataset.type });
+        });
+        const others = new Map();
+        document.querySelectorAll('#others .other[data-player]').forEach(el => others.set(Number(el.dataset.player), Motion.rectOf(el)));
+        const suns = new Map();
+        document.querySelectorAll('#me .sun[data-sun]').forEach(el => suns.set(Number(el.dataset.sun), Motion.rectOf(el)));
+        return { slots, others, suns, bag: Motion.rectOf(document.querySelector('#status .bag')) };
+    }
+
+    // 新しい出来事を動かす：引いたタイルは袋から競りのトラック（ラーはラーのトラック）へ、取ったタイルは取った人へ、出した太陽駒は競りの欄へ飛ぶ
+    animate(snap) {
+        const v = this.view;
+        const me = v.you;
+        const fresh = this.freshEvents ?? [];
+        const seatEl = (seat, own, other) => (seat === me ? document.querySelector(own) : document.querySelector(`#others [data-player="${seat}"] ${other}`));
+        let k = 0;
+        const land = (to, i) => Motion.pulse(to, { delay: i * STAGGER_MS + FLY_MS, scale: 1.2, duration: 320 });
+        fresh.forEach(e => {
+            if (e.type === 'draw') {
+                const to = e.tile === 'ra' ? [...document.querySelectorAll('#table .ra-slot.on .tile')].at(-1) : [...document.querySelectorAll('#table .auction .tile')].at(-1);
+                if (to && snap.bag) Motion.fly(snap.bag, to, { content: to, hide: to, duration: FLY_MS, delay: k * STAGGER_MS });
+                k++;
+            } else if (e.type === 'win' || e.type === 'god') {
+                const dest = seatEl(e.seat, '#me .me-tiles', '.o-tiles');
+                if (!dest) return;
+                const used = new Set();
+                (e.tiles ?? []).forEach((type, i) => {
+                    // 競りのトラックのうち、同じ種類で、まだ使っていない場所から飛ばす
+                    const idx = !used.has(i) && snap.slots.get(i)?.type === type ? i : [...snap.slots.keys()].find(j => !used.has(j) && snap.slots.get(j).type === type);
+                    const from = idx === undefined ? null : snap.slots.get(idx).rect;
+                    if (idx !== undefined) used.add(idx);
+                    if (!from) return;
+                    Motion.fly(from, dest, { content: tileHtml(type, { cls: 'mini' }), size: { width: 34, height: 34 }, duration: FLY_MS, delay: (k + i) * STAGGER_MS });
+                });
+                land(dest, k + (e.tiles?.length ?? 1));
+                if (e.type === 'win') Motion.pulse(document.querySelector('#table .center'), { delay: FLY_MS, scale: 1.3, duration: 360 });
+                k += e.tiles?.length ?? 1;
+            } else if (e.type === 'bid') {
+                const from = e.seat === me ? snap.suns.get(e.sun) : snap.others.get(e.seat);
+                const to = document.querySelector('#table .note');
+                if (!from || !to) return;
+                Motion.fly(from, to, { content: sunHtml(e.sun, { cls: 'big' }), size: { width: 40, height: 40 }, duration: FLY_MS, delay: k * STAGGER_MS });
+                land(to, k);
+                k++;
+            }
+        });
     }
 
     onControllerError(message) {
@@ -125,7 +187,7 @@ export default class UI {
     // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
     beginGame(controller) {
         if (this.controller !== controller) this.controller?.stop();
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('#fx').innerHTML = '';
@@ -147,8 +209,9 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
+        Motion.cancelAll();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('#fx').innerHTML = '';
     }
@@ -415,7 +478,7 @@ export default class UI {
         this.playEvents(view, prev);
         if ($('#log').open) this.renderLog();
         if (view.over && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
@@ -572,6 +635,7 @@ export default class UI {
 
     playEvents(view, prev) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
+        this.freshEvents = fresh;
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
         fresh.forEach(e => {
@@ -594,7 +658,8 @@ export default class UI {
         el.style.left = `${rect.left + rect.width / 2}px`;
         el.style.top = `${rect.top}px`;
         $('#fx').appendChild(el);
-        setTimeout(() => el.remove(), reduceMotion() ? 600 : FLOAT_MS);
+        setTimeout(() => el.remove(), Motion.enabled() ? FLOAT_MS : 600);
+        Motion.pulse(target, { scale: 1.3, duration: 360 });
     }
 
     toast(message) {
