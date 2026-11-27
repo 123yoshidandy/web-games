@@ -78,12 +78,12 @@ const cards = entries.map(({ game, name, shortName, icon, color, players, online
 }).join('\n');
 
 const chip = (key, value, label) => `<button type="button" data-key="${key}" data-value="${escapeHtml(value)}" aria-pressed="false">${escapeHtml(label)}</button>`;
-const group = (id, label, buttons) => `            <div class="group" role="group" aria-labelledby="${id}">
-                <span class="label" id="${id}">${label}</span>
-                <div class="chips">
-                    ${buttons.join('\n                    ')}
-                </div>
-            </div>`;
+const group = (id, label, buttons) => `                <div class="group" role="group" aria-labelledby="${id}">
+                    <span class="label" id="${id}">${label}</span>
+                    <div class="chips">
+                        ${buttons.join('\n                        ')}
+                    </div>
+                </div>`;
 const usedGenres = GENRES.filter((genre) => entries.some((e) => e.genres.includes(genre)));
 
 const filters = [
@@ -92,7 +92,8 @@ const filters = [
         ...PLAYER_CHOICES.map((n) => chip('players', String(n), n === MANY_PLAYERS ? `${n}人以上` : `${n}人`))
     ]),
     group('label-online', 'オンライン<small>（対戦）</small>', [chip('online', '', 'すべて'), chip('online', 'yes', 'できる'), chip('online', 'no', 'できない')]),
-    group('label-genre', 'ジャンル', [chip('genre', '', 'すべて'), ...usedGenres.map((g) => chip('genre', g, g))])
+    // ジャンルはいくつでも選べる（どれかに当たるものを残す）
+    group('label-genre', 'ジャンル<small>（複数可）</small>', [chip('genre', '', 'すべて'), ...usedGenres.map((g) => chip('genre', g, g))])
 ].join('\n');
 
 writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
@@ -114,6 +115,8 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         form { margin: 0; }
         input[type="search"] { width: 100%; font: inherit; font-size: 1rem; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: inherit; }
         input[type="search"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+        #filter-groups { display: grid; gap: 10px; }
+        #filter-groups[hidden] { display: none; }
         .group { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 10px; }
         .label { flex: 0 0 auto; min-width: 7.5em; font-size: 0.8rem; font-weight: 600; color: var(--muted); }
         .label small { font-weight: 400; }
@@ -122,9 +125,13 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         #filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
         #filters button:focus-visible, #empty button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
         .status { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .actions { display: flex; align-items: center; gap: 6px; }
+        #filters .toggle { font-weight: 600; }
+        #filters .toggle::after { content: "▾"; margin-left: 4px; }
+        #filters .toggle[aria-expanded="true"]::after { content: "▴"; }
+        #filters .toggle.active { border-color: var(--accent); color: var(--accent); }
         #count { margin: 0; font-size: 0.9rem; color: var(--muted); }
         #filters .reset, #empty button { border-radius: 8px; font: inherit; font-size: 0.85rem; padding: 6px 12px; min-height: 34px; border: 1px solid var(--line); background: transparent; color: var(--accent); cursor: pointer; }
-        #filters .reset:disabled { color: var(--muted); opacity: 0.5; cursor: default; }
         #empty { max-width: 1080px; margin: 0 auto; padding: 24px 16px; text-align: center; color: var(--muted); }
         #empty p { margin: 0 0 12px; }
         #games { list-style: none; margin: 0 auto; padding: 16px; max-width: 1080px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
@@ -136,7 +143,7 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         .tags { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; margin-top: auto; }
         .tags span { font-size: 0.7rem; line-height: 1.4; padding: 1px 7px; border-radius: 999px; background: var(--bg); color: var(--muted); white-space: nowrap; }
         @media (max-width: 480px) {
-            #filters { gap: 8px; }
+            #filters, #filter-groups { gap: 8px; }
             .group { flex-wrap: nowrap; align-items: flex-start; gap: 8px; }
             .label { min-width: 0; flex: 0 0 5.4em; padding-top: 7px; line-height: 1.3; white-space: nowrap; }
             .label small { display: block; font-size: 0.65rem; }
@@ -155,10 +162,15 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         <form role="search">
             <input type="search" id="q" placeholder="名前で探す（例：かたん、Azul）" aria-label="ゲームの名前で探す" autocomplete="off" enterkeyhint="search">
         </form>
-${filters}
         <div class="status">
+            <div class="actions">
+                <button type="button" id="filter-toggle" class="toggle" aria-expanded="false" aria-controls="filter-groups">絞り込み<span id="filter-count"></span></button>
+                <button type="button" id="filter-clear" class="reset" hidden>解除</button>
+            </div>
             <p id="count" aria-live="polite">全 ${entries.length} 本</p>
-            <button type="button" class="reset" data-reset>条件をクリア</button>
+        </div>
+        <div id="filter-groups" hidden>
+${filters}
         </div>
     </section>
     <main>

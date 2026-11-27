@@ -5,10 +5,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { normalize, parseState, stateToSearch, matches, playersLabel, EMPTY_STATE } from './filter.js';
+import { normalize, parseState, stateToSearch, matches, playersLabel, toggleGenre, activeFilterCount, clearFilters, isEmptyState, EMPTY_STATE } from './filter.js';
 import { gameMetadata, playersFromCode } from './metadata.mjs';
 
-const GENRES = ['ボードゲーム', '協力'];
+const GENRES = ['ボードゲーム', '協力', 'パズル'];
 const game = (overrides) => ({ search: normalize('カタン/catan'), players: [2, 3, 4], online: true, genres: ['ボードゲーム'], ...overrides });
 const state = (overrides) => ({ ...EMPTY_STATE, ...overrides });
 
@@ -31,20 +31,76 @@ test('人数・オンライン・ジャンルで絞り込み、組み合わせ�
     assert.ok(matches(game(), state({ players: 2 })));
     assert.ok(!matches(game(), state({ players: 1 })));
     assert.ok(!matches(game(), state({ players: 5 })));
-    assert.ok(matches(game({ players: [3, 4, 5, 6] }), state({ players: 5 })), '5人以上は、5人以上で遊べるもの');
     assert.ok(matches(game(), state({ online: 'yes' })));
     assert.ok(!matches(game(), state({ online: 'no' })));
-    assert.ok(matches(game(), state({ genre: 'ボードゲーム' })));
-    assert.ok(!matches(game(), state({ genre: '協力' })));
-    assert.ok(matches(game(), state({ q: 'かたん', players: 4, online: 'yes', genre: 'ボードゲーム' })));
+    assert.ok(matches(game(), state({ genres: ['ボードゲーム'] })));
+    assert.ok(!matches(game(), state({ genres: ['協力'] })));
+    assert.ok(matches(game(), state({ q: 'かたん', players: 4, online: 'yes', genres: ['ボードゲーム'] })));
     assert.ok(!matches(game(), state({ q: 'かたん', players: 4, online: 'no' })));
 });
 
+test('5人は5人ちょうどで遊べるもの、6人以上は6人以上で遊べるもの', () => {
+    const upTo5 = game({ players: [3, 4, 5] });
+    const upTo6 = game({ players: [3, 4, 5, 6] });
+    const only7 = game({ players: [7] });
+    assert.ok(matches(upTo5, state({ players: 5 })));
+    assert.ok(!matches(upTo5, state({ players: 6 })), '5人までのものは、6人以上に入らない');
+    assert.ok(matches(upTo6, state({ players: 5 })));
+    assert.ok(matches(upTo6, state({ players: 6 })));
+    assert.ok(!matches(only7, state({ players: 5 })));
+    assert.ok(matches(only7, state({ players: 6 })), '7人だけのものも、6人以上に入る');
+    assert.ok(!matches(game({ players: [2, 4] }), state({ players: 3 })), '人数が飛んでいれば、間の人数には入らない');
+});
+
+test('ジャンルはいくつでも選べ、どれか1つに当たれば残し、ほかの条件とはすべてを満たすものだけ残す', () => {
+    const coop = game({ genres: ['協力'] });
+    const both = game({ genres: ['ボードゲーム', '協力'] });
+    const puzzle = game({ genres: ['パズル'], online: false });
+    const picked = state({ genres: ['ボードゲーム', '協力'] });
+    assert.ok(matches(game(), picked));
+    assert.ok(matches(coop, picked));
+    assert.ok(matches(both, picked));
+    assert.ok(!matches(puzzle, picked));
+    assert.ok(matches(puzzle, state({ genres: [] })), '選んでいなければすべて');
+    // 種類の違う条件とは、すべてを満たすもの
+    assert.ok(!matches(coop, state({ genres: ['ボードゲーム', '協力'], players: 5 })));
+    assert.ok(!matches(both, state({ genres: ['協力', 'パズル'], online: 'no' })));
+    assert.ok(matches(puzzle, state({ genres: ['協力', 'パズル'], online: 'no' })));
+    assert.ok(!matches(both, state({ genres: ['協力', 'パズル'], q: 'azul' })));
+});
+
+test('ジャンルのボタンで、選んでいなければ足し、選んでいれば外し、並びは一覧の順にそろえる', () => {
+    assert.deepEqual(toggleGenre([], 'パズル', GENRES), ['パズル']);
+    assert.deepEqual(toggleGenre(['パズル'], 'ボードゲーム', GENRES), ['ボードゲーム', 'パズル']);
+    assert.deepEqual(toggleGenre(['ボードゲーム', 'パズル'], 'パズル', GENRES), ['ボードゲーム']);
+    assert.deepEqual(toggleGenre(['ボードゲーム'], 'ボードゲーム', GENRES), []);
+});
+
 test('URL の状態を読み書きでき、おかしな値は無視する', () => {
-    const s = { q: 'かたん', players: 2, online: 'yes', genre: '協力' };
+    const s = { q: 'かたん', players: 6, online: 'yes', genres: ['ボードゲーム', 'パズル'], open: false };
     assert.deepEqual(parseState(stateToSearch(s), GENRES), s);
+    assert.equal(stateToSearch(s), `?q=${encodeURIComponent('かたん')}&players=6&online=yes&genre=${encodeURIComponent('ボードゲーム')}&genre=${encodeURIComponent('パズル')}`);
     assert.equal(stateToSearch(EMPTY_STATE), '');
     assert.deepEqual(parseState('?players=9&online=maybe&genre=xyz', GENRES), EMPTY_STATE);
+    // ジャンル1つだけの前の形の URL も読め、重なりと知らない値は捨て、並びは一覧の順にする
+    assert.deepEqual(parseState('?genre=協力', GENRES).genres, ['協力']);
+    assert.deepEqual(parseState('?genre=パズル&genre=xyz&genre=協力&genre=パズル', GENRES).genres, ['協力', 'パズル']);
+});
+
+test('絞り込みの欄の開け閉めは URL に残し、条件には数えない', () => {
+    assert.equal(stateToSearch(state({ open: true })), '?panel=open');
+    assert.equal(parseState('?panel=open', GENRES).open, true);
+    assert.equal(parseState('?panel=xyz', GENRES).open, false);
+    assert.deepEqual(parseState(stateToSearch(state({ players: 5, open: true })), GENRES), state({ players: 5, open: true }));
+    assert.ok(isEmptyState(state({ open: true })), '開いているだけなら、絞っていない');
+});
+
+test('欄の中で選んでいる条件の数を数え、「解除」は欄の中の条件だけを外す', () => {
+    assert.equal(activeFilterCount(EMPTY_STATE), 0);
+    assert.equal(activeFilterCount(state({ q: 'かたん' })), 0, '検索の文字は数えない');
+    assert.equal(activeFilterCount(state({ players: 6, online: 'no', genres: ['協力', 'パズル'] })), 4);
+    const cleared = clearFilters(state({ q: 'かたん', players: 6, online: 'no', genres: ['協力'], open: true }));
+    assert.deepEqual(cleared, state({ q: 'かたん', open: true }));
 });
 
 test('人数の表記', () => {
