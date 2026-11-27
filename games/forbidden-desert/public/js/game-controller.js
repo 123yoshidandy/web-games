@@ -10,6 +10,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { suggest, runCpuStep, isCpuTurn } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_STEP_DELAY_MS = 600;
 export const STORM_DELAY_MS = 750;     // 嵐のカードを自動で引くまでの間
@@ -40,8 +41,8 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = Math.max(0, this.game.players.findIndex(p => !p.isCPU));
-        this.cpuTimer = null;
-        this.stormTimer = null;
+        this.cancelCpu = null;
+        this.cancelStorm = null;
         this.save();
     }
 
@@ -107,9 +108,9 @@ export default class LocalGameController {
 
     // CPU の番（か、手番でない CPU の仲間が水を分けるとき）なら、間を置いて1手打たせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (this.mode !== 'team' || !isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 if (!runCpuStep(this.game)) this.game.applyCommand(this.game.current, { type: this.game.phase === 'storm' ? 'storm' : 'pass' });
             } catch (error) {
@@ -128,10 +129,10 @@ export default class LocalGameController {
 
     // 自分が動かす人の嵐のカードは、間を置いて自動で引く
     scheduleStorm() {
-        clearTimeout(this.stormTimer);
+        this.cancelStorm?.();
         const g = this.game;
         if (g.isOver() || g.phase !== 'storm' || !this.canControl(g.current) || g.players[g.current].isCPU) return;
-        this.stormTimer = setTimeout(() => {
+        this.cancelStorm = Motion.afterIdle(() => {
             if (this.game.phase === 'storm' && !this.game.isOver()) this.send(this.game.current, { type: 'storm' });
         }, STORM_DELAY_MS);
     }
@@ -144,7 +145,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
-        clearTimeout(this.stormTimer);
+        this.cancelCpu?.();
+        this.cancelStorm?.();
     }
 }

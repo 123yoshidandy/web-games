@@ -14,6 +14,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 // オンラインのコントローラーを、画面が使うローカルの形（send(seat, command)・canControl(seat) など）に合わせる
 // オンラインでは自分の席だけを動かす。ヒント・待った・自動で引く処理はない（嵐のカードは自分で引く）
@@ -43,6 +44,7 @@ const COMMAND_SOUND = {
 };
 
 const SETTINGS_KEY = 'forbidden-desert.settings';
+const SLIDE_MS = 450;   // 嵐で動くタイル・嵐の目（CSS の transition と合わせる）
 const CPU_NAMES = ['ハル', 'ミナ', 'ソラ', 'ユキ'];
 const ROLE_MARK = { archeologist: '考', climber: '登', explorer: '探', meteorologist: '気', navigator: '航', waterCarrier: '水' };
 const PART = Object.fromEntries(PARTS.map(p => [p.key, p]));
@@ -360,7 +362,7 @@ export default class UI {
         if (v.result && !this.resultShown) {
             this.resultShown = true;
             this.recordLocalResult(v);
-            setTimeout(() => this.openResult(), 900);
+            Motion.afterIdle(() => this.openResult(), Motion.ms(900));
         }
     }
 
@@ -485,6 +487,7 @@ export default class UI {
                 board.append(el);
                 this.tileEls.set(c.home, el);
             }
+            if (el.dataset.pos !== undefined && el.dataset.pos !== String(pos)) Motion.hold(SLIDE_MS);
             el.dataset.pos = String(pos);
             el.style.setProperty('--r', rowOf(pos));
             el.style.setProperty('--c', colOf(pos));
@@ -503,6 +506,8 @@ export default class UI {
                 this.tileEls.delete(home);
             }
         });
+        if (this.stormEl.dataset.pos !== undefined && this.stormEl.dataset.pos !== String(v.storm)) Motion.hold(SLIDE_MS);
+        this.stormEl.dataset.pos = String(v.storm);
         this.stormEl.style.setProperty('--r', rowOf(v.storm));
         this.stormEl.style.setProperty('--c', colOf(v.storm));
         const stormPart = v.parts.find(pt => pt.state === 'placed' && pt.pos === v.storm && !cellAt(v, v.storm));
