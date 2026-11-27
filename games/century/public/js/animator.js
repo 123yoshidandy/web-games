@@ -7,11 +7,12 @@
  */
 
 import { merchantHtml, pointHtml, cubeHtml } from './art.js';
+import * as Motion from './motion/motion.js';
 
 const DURATION_MS = 480;
 const MAX_EVENTS = 6; // これより多く溜まっていたら（裏のタブから戻ったときなど）、動かさない
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = () => !Motion.enabled(); // 速さが「なし」（動きを減らす設定を含む）
 const rectOf = (el) => {
     const rect = el?.getBoundingClientRect();
     return rect && rect.width > 0 && rect.height > 0 ? rect : null;
@@ -52,10 +53,11 @@ function fly(html, from, to, { delay = 0, size = null, cls = '' } = {}) {
         { transform: 'translate(0, 0) scale(1)', opacity: 1 },
         { transform: `translate(${dx / 2}px, ${dy / 2 + lift}px) scale(${(1 + scale) / 2})`, opacity: 1, offset: 0.5 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.6 }
-    ], { duration: DURATION_MS, delay, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+    ], { duration: Motion.ms(DURATION_MS), delay: Motion.ms(delay), easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+    Motion.track(animation, Motion.ms(DURATION_MS + delay)); // CPU は飛び終わってから動く
     const done = () => el.remove();
     animation.finished.then(done, done);
-    setTimeout(done, DURATION_MS + delay + 400);
+    setTimeout(done, Motion.ms(DURATION_MS + delay) + 400);
 }
 
 // before：描く前の位置、you：画面の持ち主の席

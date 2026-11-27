@@ -19,6 +19,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'century';
 const SETTINGS_KEY = 'century.settings';
@@ -70,6 +71,11 @@ export default class UI {
         this.lastSeq = 0;
         this.clearSelection();
         this.bindStatic();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'センチュリー：スパイスロード',
@@ -437,7 +443,7 @@ export default class UI {
             this.toast(`得点カードが${view.endCount}枚に届きました。この巡で終わりです`);
         }
         if (!view.lastRound) this.lastRoundShown = false;
-        if (view.phase === 'end' && !$('#result').open) setTimeout(() => this.showResult(), 900);
+        if (view.phase === 'end' && !$('#result').open) Motion.afterIdle(() => this.showResult(), 900);
     }
 
     renderTop() {
