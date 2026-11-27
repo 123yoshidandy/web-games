@@ -472,43 +472,17 @@ button {
     opacity: 0.5;
 }
 
-/* 部屋を作るボタンの横に、公開の切り替えを並べる */
-.online-create {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-.online-create .online-button {
-    min-width: 0;
-}
-
-.public-toggle {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 10px 14px;
-    font-size: 15px;
-    font-weight: 800;
-    color: var(--accent2);
-    background: #f4effc;
-    border-radius: 999px;
-    cursor: pointer;
-}
-
-.public-toggle input {
-    width: 18px;
-    height: 18px;
-    margin: 0;
-    accent-color: var(--accent2);
-}
-
-/* 公開の部屋の一覧（ロビーの参加者と同じ札。押すとその部屋に入る） */
+/* 参加できる部屋の一覧（ロビーの参加者と同じ札。押すとその部屋に入る。多いときは一覧の中でスクロールする） */
 .lobby-players li {
     list-style: none;
 }
 
-.public-room {
+.online-rooms {
+    max-height: 34vh;
+    overflow-y: auto;
+}
+
+.online-room {
     width: 100%;
     font-family: inherit;
     color: var(--ink);
@@ -517,25 +491,17 @@ button {
     cursor: pointer;
 }
 
-.public-room .lobby-name {
+.online-room .lobby-name {
+    flex: 1;
+    min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
 }
 
-.public-room:active {
+.online-room:active {
     transform: translateY(2px);
     box-shadow: 0 1px 0 #e5dcf6;
-}
-
-.public-badge {
-    margin-left: 8px;
-    padding: 2px 10px;
-    font-size: 13px;
-    vertical-align: middle;
-    color: #fff;
-    background: var(--accent2);
-    border-radius: 999px;
 }
 
 /* 低い画面では、入口の間隔を詰めて、スクロールなしで収める */

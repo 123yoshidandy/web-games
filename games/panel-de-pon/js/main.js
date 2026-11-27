@@ -9,7 +9,7 @@ import { createCpuMatch } from './cpu-match.js';
 import { createSeed } from './random.js';
 import { showTitle } from './title.js';
 import { showHelp, showConfirm } from './help.js';
-import { showOnlineEntry, showPublicRooms, isPublicRoomsShown, showLobby, setOnlineMessage, hideOnline } from './lobby.js';
+import { showOnlineEntry, showRoomList, isRoomListShown, getInvitedRoomCode, clearInvite, showLobby, setOnlineMessage, hideOnline } from './lobby.js';
 import NetplayClient from './netplay/netplay-client.mjs';
 import { getServerUrl } from './online-config.js';
 import { playEventSounds, playSound, setSoundEnabled, setBgmEnabled, startBgm, stopBgm } from './sound.js';
@@ -219,7 +219,11 @@ function openOnline(selected) {
         setOnlineMessage('オンライン対戦のサーバーが準備中です');
         return;
     }
-    if (net) return;
+    if (!net) createNet(serverUrl);
+    findRooms();
+}
+
+function createNet(serverUrl) {
     net = new NetplayClient({ serverUrl, storageKey: 'panel-de-pon.online' });
     net.on('joined', () => { resuming = true; });
     net.on('lobby', receiveLobby);
@@ -235,39 +239,44 @@ function openOnline(selected) {
     });
 }
 
-// オンライン対戦の入口（名前・部屋を作る・部屋番号で参加・公開の部屋を探す）
+// オンライン対戦の入口（名前・部屋を作る・参加できる部屋の一覧。招待URLで開いたときは、その部屋に参加する）
 function showEntry() {
     showOnlineEntry({
-        onCreate: (name, options) => connectAnd(() => net.createRoom(name, options)),
-        onJoin: (roomCode, name) => connectAnd(() => net.joinRoom(roomCode, name)),
-        onFind: findRooms,
+        onCreate: (name) => connectAnd(() => net.createRoom(name)),
+        onJoin: joinRoom,
+        onRefresh: findRooms,
         onBack: leaveOnline
     });
 }
 
-// 公開の部屋の一覧を取って出す（開いたときと「更新」を押したときだけ取る）
+// 参加できる部屋の一覧を取って出す（入口を開いたときと「一覧を更新」を押したときだけ取る）
 async function findRooms() {
-    if (!net) return;
-    const show = (rooms) => showPublicRooms({ rooms, onEnter: enterPublicRoom, onRefresh: findRooms, onBack: showEntry });
-    show(null);
+    if (!net || !isRoomListShown()) return;
+    showRoomList(null);
     try {
         const rooms = await net.listRooms();
-        if (scene === 'online' && isPublicRoomsShown()) show(rooms);
+        if (scene === 'online' && isRoomListShown()) showRoomList(rooms);
     } catch (error) {
-        if (scene === 'online' && isPublicRoomsShown()) {
-            show([]);
+        if (scene === 'online' && isRoomListShown()) {
+            showRoomList([]);
             setOnlineMessage(error.message);
         }
     }
 }
 
-// 一覧の部屋に入る。押すまでに始まった・満員になった・消えた部屋なら、一覧を取り直して理由を出す
-async function enterPublicRoom(roomCode, name) {
+// 一覧の部屋か、招待URLの部屋に入る。押すまでに始まった・満員になった・消えた部屋なら、一覧を取り直して理由を出す
+async function joinRoom(roomCode, name) {
+    if (!net) return;
     setOnlineMessage('接続しています…');
     try {
         await net.enterRoom(roomCode, name);
     } catch (error) {
-        if (['already_started', 'room_full', 'room_not_found'].includes(error.code)) await findRooms();
+        // 招待の部屋に入れなければ、URL から外して、ふだんの入口（一覧）に戻す
+        if (error.fromServer && roomCode === getInvitedRoomCode()) {
+            clearInvite();
+            showEntry();
+        }
+        if (['already_started', 'room_full', 'room_not_found'].includes(error.code)) findRooms();
         setOnlineMessage(error.message);
     }
 }
@@ -287,6 +296,7 @@ function leaveOnline() {
     // 一覧を見ただけで部屋に入っていなければ、接続を閉じるだけにする（退出を送ると「部屋に入っていません」が返る）
     if (net?.isInRoom() || net?.session) net.leave();
     else net?.close();
+    clearInvite();
     net = null;
     lobby = null;
     matchId = null;

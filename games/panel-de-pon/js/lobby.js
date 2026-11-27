@@ -3,7 +3,6 @@
 import NetplayClient from './netplay/netplay-client.mjs';
 
 const NAME_KEY = 'panel-de-pon.name';
-const ROOM_CODE_LENGTH = NetplayClient.ROOM_CODE_LENGTH;
 
 let screen = null;
 
@@ -47,28 +46,35 @@ export function getInvitedRoomCode() {
     return NetplayClient.isRoomCode(code) ? code : '';
 }
 
-// 入口の画面。onCreate(name, { public }) / onJoin(roomCode, name) / onFind() / onBack()
-export function showOnlineEntry({ onCreate, onJoin, onFind, onBack }) {
+// URL から招待の部屋番号を外す（入れなかった・タイトルへ戻ったときに。読み込み直しで、また招待の画面を出さない）
+export function clearInvite() {
+    const url = new URL(location.href);
+    if (!url.searchParams.has('room')) return;
+    url.searchParams.delete('room');
+    history.replaceState(history.state, '', url);
+}
+
+// 入口の画面。onCreate(name) / onJoin(roomCode, name) / onRefresh() / onBack()
+// 部屋はすべて公開で、下の「参加できる部屋」の一覧から入る（一覧は showRoomList で描く）。部屋番号は出さない
+// 招待URLで開いたときは、その部屋に入る「招待された部屋に参加する」だけを出す
+export function showOnlineEntry({ onCreate, onJoin, onRefresh, onBack }) {
     const element = ensureScreen();
+    const invitedCode = getInvitedRoomCode();
     element.dataset.view = 'entry';
     element.innerHTML = `
         <div class="title-content online-content">
-            <h2 class="online-title">オンライン対戦</h2>
+            <h2 class="online-title">${invitedCode ? '招待された部屋に参加' : 'オンライン対戦'}</h2>
             <label class="online-field">名前
                 <input class="online-name" maxlength="12" autocomplete="nickname" value="${escapeHtml(loadName())}">
             </label>
-            <div class="online-create">
-                <button type="button" class="online-button" data-action="create">部屋を作る</button>
-                <label class="public-toggle" title="公開の部屋の一覧に出し、部屋番号を知らない人も入れるようにします">
-                    <input type="checkbox" class="online-public">公開
-                </label>
-            </div>
-            <div class="online-or">または</div>
-            <label class="online-field">部屋番号
-                <input class="online-code" inputmode="numeric" maxlength="${ROOM_CODE_LENGTH}" placeholder="数字${ROOM_CODE_LENGTH}桁" value="${getInvitedRoomCode()}">
-            </label>
+            ${invitedCode ? `
             <button type="button" class="online-button" data-action="join">参加する</button>
-            <button type="button" class="online-button sub" data-action="find">公開の部屋を探す</button>
+            ` : `
+            <button type="button" class="online-button" data-action="create">部屋を作る</button>
+            <div class="online-or">または、参加できる部屋を押して入る</div>
+            <ul class="lobby-players online-rooms"></ul>
+            <button type="button" class="online-button sub" data-action="refresh">一覧を更新</button>
+            `}
             <p class="online-message"></p>
             <button type="button" class="online-link" data-action="back">タイトルへ</button>
         </div>
@@ -78,53 +84,56 @@ export function showOnlineEntry({ onCreate, onJoin, onFind, onBack }) {
         saveName(value);
         return value;
     };
+    // 一覧の部屋を押したときも、入口の名前の欄の名前で入る
+    element.onJoinRoom = (roomCode) => onJoin(roomCode, name());
     bindActions(element, {
-        create: () => onCreate(name(), { public: element.querySelector('.online-public').checked }),
-        find: () => {
-            name(); // 一覧から入るときに使う名前を覚えておく
-            onFind();
-        },
-        join: () => {
-            const code = element.querySelector('.online-code').value.trim();
-            if (!NetplayClient.isRoomCode(code)) {
-                setOnlineMessage(`部屋番号は数字${ROOM_CODE_LENGTH}桁で入れてください`);
-                return;
-            }
-            onJoin(code, name());
-        },
+        create: () => onCreate(name()),
+        join: () => onJoin(invitedCode, name()),
+        refresh: onRefresh,
         back: onBack
     });
 }
 
-// 公開の部屋の一覧（rooms が null の間は取りに行っている）。押すとその部屋に入る
-// onEnter(roomCode, name) / onRefresh() / onBack()
-export function showPublicRooms({ rooms, onEnter, onRefresh, onBack }) {
-    const element = ensureScreen();
-    element.dataset.view = 'rooms';
-    const list = !rooms ? '<p class="online-guide">探しています…</p>'
-        : rooms.length === 0 ? '<p class="online-guide">待っている部屋はありません</p>'
-        : `<ul class="lobby-players">${rooms.map(room => `
-            <li><button type="button" class="lobby-player public-room" data-room-code="${escapeHtml(room.roomCode)}">
-                <span class="lobby-name">${escapeHtml(room.hostName)}の部屋</span>
-            </button></li>
-        `).join('')}</ul>`;
-    element.innerHTML = `
-        <div class="title-content online-content">
-            <h2 class="online-title">公開の部屋</h2>
-            ${list}
-            <button type="button" class="online-button" data-action="refresh" ${rooms ? '' : 'disabled'}>更新</button>
-            <p class="online-message"></p>
-            <button type="button" class="online-link" data-action="back">戻る</button>
-        </div>
-    `;
-    for (const button of element.querySelectorAll('[data-room-code]')) {
-        button.addEventListener('click', () => onEnter(button.dataset.roomCode, loadName()));
+// 入口の「参加できる部屋」の一覧を描く（rooms が null の間は取りに行っている）。押すとその部屋に入る
+// 名前は参加者が入れた文字なので textContent で描く
+export function showRoomList(rooms) {
+    const list = screen?.dataset.view === 'entry' ? screen.querySelector('.online-rooms') : null;
+    if (!list) return;
+    const note = (text) => {
+        const item = document.createElement('li');
+        item.className = 'lobby-player empty';
+        item.textContent = text;
+        return item;
+    };
+    if (!rooms) {
+        list.replaceChildren(note('探しています…'));
+        return;
     }
-    bindActions(element, { refresh: onRefresh, back: onBack });
+    if (rooms.length === 0) {
+        list.replaceChildren(note('待っている部屋はありません'));
+        return;
+    }
+    list.replaceChildren(...rooms.map(room => {
+        const item = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'lobby-player online-room';
+        const host = document.createElement('span');
+        host.className = 'lobby-name';
+        host.textContent = `${room.hostName} の部屋`;
+        const count = document.createElement('span');
+        count.className = 'lobby-note';
+        count.textContent = `${room.players}/${room.maxPlayers}人`;
+        button.append(host, count);
+        button.addEventListener('click', () => screen?.onJoinRoom?.(room.roomCode));
+        item.append(button);
+        return item;
+    }));
 }
 
-export function isPublicRoomsShown() {
-    return screen?.dataset.view === 'rooms';
+// 入口（参加できる部屋の一覧）を出しているか
+export function isRoomListShown() {
+    return Boolean(screen?.dataset.view === 'entry' && screen.querySelector('.online-rooms'));
 }
 
 // 部屋の画面。lobby はサーバーから届いた部屋の状態（seat は自分の席）、isHost は部屋を作った人（の役）か、
@@ -144,7 +153,7 @@ export function showLobby({ lobby, isHost, winsOf, onStart, onLeave, onAbort, on
         guide = '対戦が終わりました';
         action = '<button type="button" class="online-button" data-action="lobby">部屋に戻る</button>';
     } else if (!players[1]) {
-        guide = lobby.public ? '公開の部屋の一覧で相手を待っています' : '招待URLか部屋番号を相手に伝えてください';
+        guide = '参加できる部屋の一覧で相手を待っています（招待URLを送っても呼べます）';
     } else if (!ready) {
         guide = '相手の接続が切れています';
     } else if (isHost) {
@@ -168,7 +177,7 @@ export function showLobby({ lobby, isHost, winsOf, onStart, onLeave, onAbort, on
     element.dataset.view = 'room';
     element.innerHTML = `
         <div class="title-content online-content">
-            <h2 class="online-title">部屋 ${escapeHtml(lobby.roomCode)}${lobby.public ? '<span class="public-badge">公開</span>' : ''}</h2>
+            <h2 class="online-title">対戦の部屋</h2>
             <button type="button" class="online-link" data-action="invite">招待URLを送る</button>
             <ul class="lobby-players">${players.map(slot).join('')}</ul>
             <p class="online-guide">${guide}</p>
@@ -186,12 +195,12 @@ export function showLobby({ lobby, isHost, winsOf, onStart, onLeave, onAbort, on
     });
 }
 
-// 招待URLを共有する（共有メニューがなければクリップボードにコピー）
+// 招待URLを共有する（共有メニューがなければクリップボードにコピー）。部屋番号は URL の中にだけ入れ、文字では出さない
 async function shareInvite(roomCode) {
     const url = `${location.origin}${location.pathname}?room=${roomCode}`;
     try {
         if (navigator.share) {
-            await navigator.share({ title: 'パネルでポン 対戦の招待', url });
+            await navigator.share({ title: 'パネルでポン 対戦の招待', text: 'パネルでポンの部屋に招待します', url });
         } else {
             await navigator.clipboard.writeText(url);
             setOnlineMessage('招待URLをコピーしました');
