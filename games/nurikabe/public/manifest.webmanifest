@@ -1,0 +1,19 @@
+{
+    "name": "ぬりかべ",
+    "short_name": "ぬりかべ",
+    "description": "マスを塗って壁にし、数字と同じ大きさの島を作る論理パズル。壁はつながり、2×2 にかたまらない。答えは1つ。今日のパズル・タイムアタック・オンラインの早解き",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "orientation": "portrait",
+    "display_override": ["fullscreen", "standalone"],
+    "background_color": "#f4efe4",
+    "theme_color": "#f4efe4",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

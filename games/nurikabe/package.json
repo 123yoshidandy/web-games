@@ -1,0 +1,33 @@
+{
+  "name": "nurikabe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs",
+    "sw": "node ../../packages/puzzle-kit/tools/precache.mjs ."
+  },
+  "portal": {
+    "original": "Nurikabe",
+    "aliases": [
+      "ぬりかべ",
+      "ヌリカベ",
+      "島と壁",
+      "Islands in the Stream"
+    ],
+    "genres": [
+      "パズル"
+    ],
+    "players": [1, 2, 3, 4],
+    "minutes": [
+      5,
+      20
+    ],
+    "weight": 2
+  },
+  "dependencies": {
+    "netplay-kit": "*",
+    "puzzle-kit": "*"
+  }
+}

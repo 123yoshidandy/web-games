@@ -1,0 +1,6 @@
+/* ぬりかべの色（共通の css/style.css の変数を上書きする）：紙の地に、紫の差し色 */
+:root {
+    --accent: #6a4a9c;
+    --accent-strong: #4f3578;
+    --accent-soft: rgba(106, 74, 156, .13);
+}
