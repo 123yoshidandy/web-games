@@ -20,12 +20,44 @@ describe('楽器', () => {
     });
 });
 
-// renderEffect は OfflineAudioContext を使うので、偽の context で同じ処理を通す
-function runEffect(context, effect) {
+describe('耳につく高域をなだめる', () => {
+    const lowpasses = (context) => context.filters.filter(f => f.type === 'lowpass').map(f => Math.round(f.frequency.value));
+
+    it('チップは、音の高さに合わせたローパスで丸める（1800〜3500Hz）', () => {
+        const context = fakeContext();
+        runEffect(context, [{ instrument: 'chip', notes: 'C3:1 C5:1 C7:1', unit: 0.1 }]);
+        expect(lowpasses(context)).toEqual([1800, 3140, 3500]);
+    });
+
+    it('チップは cutoff: 0 で丸めない（昔の音）', () => {
+        const context = fakeContext();
+        runEffect(context, [{ instrument: { instrument: 'chip', cutoff: 0 }, notes: 'C5:1', unit: 0.1 }]);
+        expect(lowpasses(context)).toEqual([]);
+    });
+
+    it('曲の出口で高域を下げ、tone で変えたり外したりできる', () => {
+        const shelves = (tone) => {
+            const context = fakeContext();
+            const song = { bpm: 100, tone, parts: { p: { instrument: 'piano' } }, sections: { A: { bars: 1, p: 'C5:4' } }, loop: ['A'] };
+            run(context, () => Sound.renderSong(song));
+            return context.filters.filter(f => f.type === 'highshelf').map(f => [f.frequency.value, f.gain.value]);
+        };
+        expect(shelves(undefined)).toEqual([[5000, -3]]);
+        expect(shelves({ gain: -6 })).toEqual([[5000, -6]]);
+        expect(shelves(false)).toEqual([]);
+    });
+});
+
+// renderEffect・renderSong は OfflineAudioContext を使うので、偽の context で同じ処理を通す
+function run(context, render) {
     sandbox.OfflineAudioContext = function () { return Object.assign(context, { startRendering: () => Promise.resolve(null), destination: {} }); };
     try {
-        Sound.renderEffect(effect);
+        render();
     } finally {
         delete sandbox.OfflineAudioContext;
     }
+}
+
+function runEffect(context, effect) {
+    run(context, () => Sound.renderEffect(effect));
 }
