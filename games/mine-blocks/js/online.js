@@ -327,7 +327,7 @@ function playCountdownSound(roundNumber, remaining) {
     const key = `${onlineState.gameMatchId}-${roundNumber}-${remaining}`;
     if (onlineState.lastCountdownSound === key) return;
     onlineState.lastCountdownSound = key;
-    playSound(remaining === 'go' ? 'go' : 'count');
+    music.play(remaining === 'go' ? 'turn' : 'notify');
 }
 
 function stopCountdown() {
@@ -348,7 +348,7 @@ function onlineSurrender() {
     if (getOnlineStage() !== 'playing' || onlineState.currentRound === null) return;
     selectBlock(-1);
     clearHoverPreview();
-    playSound('surrender');
+    music.play('lose');
     net.send('surrender', { round: onlineState.currentRound });
 }
 
@@ -493,8 +493,8 @@ function playOnlineResultSound(stage, round) {
     onlineState.lastResultSound = key;
 
     const won = round.winner === net.seat;
-    if (stage === 'matchEnd') playSound(won ? 'victory' : 'lose');
-    else if (round.winner !== null) playSound(won ? 'clear' : 'lose');
+    if (stage === 'matchEnd') music.play(won ? 'win' : 'lose');
+    else if (round.winner !== null) music.play(won ? 'gain' : 'lose');
 }
 
 // 再戦するボタン：押したら、ほかの人を待つ表示にする。退出して1人になったら押せない

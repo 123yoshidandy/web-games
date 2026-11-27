@@ -55,11 +55,11 @@ function showAssist() {
     const tray = elements.blocksContainer.children[hint.blockIndex];
     // 置き場にあるピースなら選んでおく（光ったマスを押せば置ける）。盤の別の場所にあるなら、置き先だけを光らせる
     if (tray && !tray.classList.contains('used')) {
-        if (gameState.selectedBlockIndex === hint.blockIndex) playSound('select');
+        if (gameState.selectedBlockIndex === hint.blockIndex) music.play('select');
         selectBlock(hint.blockIndex);
         tray.classList.add('recommended');
     } else {
-        playSound('select');
+        music.play('select');
     }
     hint.cells.forEach(([r, c]) => {
         document.querySelector(`.cell[data-row="${r}"][data-col="${c}"]`)?.classList.add('recommended');

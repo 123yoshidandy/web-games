@@ -62,7 +62,7 @@ function onChallengePuzzleSolved() {
     updateChallengeDisplay();
     showChallengeBonus();
     spawnConfetti(24); // すぐ次の問題に進むので、紙吹雪だけ出す
-    playSound('bonus');
+    music.play('gain');
 }
 
 // 残り時間の横に「+20秒」を表示する（続けて解いても毎回アニメーションを最初から再生する）
@@ -95,7 +95,7 @@ function finishChallenge() {
     elements.challengeResult.textContent = challengeState.solved;
     renderSolutionBoard(elements.challengeSolutionBoard);
     elements.challengeModal.classList.add('active');
-    playSound('timeUp');
+    music.play('lose');
 }
 
 // チャレンジのカウントダウン中かどうか（時間切れ後の結果表示中は含まない）
@@ -117,7 +117,7 @@ function updateChallengeDisplay() {
     // 残り10秒以下は残り時間を赤く表示し、1秒ごとに時計の音で知らせる
     elements.remainingStat.classList.toggle('low', remaining <= 10);
     if (isChallengeRunning() && remaining <= 10 && remaining > 0 && remaining !== challengeState.lastTickSecond) {
-        playSound('tick');
+        music.play('select');
     }
     challengeState.lastTickSecond = remaining;
 }

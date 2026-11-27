@@ -264,7 +264,7 @@ function renderBlocks() {
 
 // ブロックを選択
 function selectBlock(index) {
-    if (index !== -1 && index !== gameState.selectedBlockIndex) playSound('select');
+    if (index !== -1 && index !== gameState.selectedBlockIndex) music.play('select');
 
     // 前の選択を解除
     if (gameState.selectedBlockIndex !== -1) {

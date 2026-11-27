@@ -71,7 +71,7 @@ function handleCellClick(row, col) {
         // ボードが完成したかチェック
         checkBoardCompletion();
     } else {
-        playSound('invalid');
+        music.play('error');
     }
 }
 
@@ -172,7 +172,7 @@ function placeBlock(startRow, startCol, block) {
     blockElement.style.pointerEvents = 'none';
 
     // 続きからで置き直すときは、音を鳴らさない
-    if (!restoringSave) playSound('place');
+    if (!restoringSave) music.play('place');
     saveProgress();
 }
 
@@ -202,7 +202,7 @@ function removeBlock(blockIndex) {
     blockElement.style.visibility = '';
     blockElement.style.pointerEvents = '';
 
-    playSound('remove');
+    music.play('cancel');
     saveProgress();
 }
 

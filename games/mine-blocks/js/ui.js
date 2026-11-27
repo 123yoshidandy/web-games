@@ -18,8 +18,7 @@ function setupEventListeners() {
     setupFeedback();
 
     // BGM と効果音（最初の操作で鳴り始める）と、その切り替えボタン
-    setupSound();
-    setupSoundControls();
+    setupMusic();
 
     // 共有ボタン（トップ画面にだけある。トップから始める問題番号のURLを共有）
     elements.shareButton.addEventListener('click', shareGame);
@@ -44,19 +43,6 @@ function setupEventListeners() {
     elements.clearHomeButton.addEventListener('click', goToTop);
 }
 
-// サウンドのボタン（ヘッダーとトップ画面）：どちらも BGM と効果音をまとめて切り替える。ON/OFF は aria-pressed で伝え、文言は変えない
-function setupSoundControls() {
-    elements.soundButton.addEventListener('click', toggleAllSound);
-    elements.topSound.addEventListener('click', toggleAllSound);
-
-    const render = ({ effects, bgm }) => {
-        const anyOn = String(effects || bgm);
-        elements.soundButton.setAttribute('aria-pressed', anyOn);
-        elements.topSound.setAttribute('aria-pressed', anyOn);
-    };
-    onSoundSettingsChange(render);
-    render(getSoundSettings());
-}
 
 // ゲームのページのURLを共有して、友達を誘う
 // スマホでは共有シート、パソコンではクリップボードへのコピー、どちらも使えなければダイアログで表示

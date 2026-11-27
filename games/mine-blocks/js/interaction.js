@@ -134,7 +134,7 @@ function handleDrop(e) {
             selectBlock(-1);
             checkBoardCompletion();
         } else {
-            playSound('invalid');
+            music.play('error');
         }
     }
 }
@@ -283,7 +283,7 @@ function handleBodyTouchEnd(e) {
             selectBlock(-1);
             checkBoardCompletion();
         } else {
-            playSound('invalid');
+            music.play('error');
         }
     }
     
