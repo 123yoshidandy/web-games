@@ -1,4 +1,4 @@
-// netplay-kit 1.11.0（645ea0c）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.12.0（dbed6ed）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * オンライン対戦の入口とロビーの画面（どのゲームでも同じ見た目と流れ）と、ローカル対戦と同じ形のコントローラー
  * 画面は自分で作る（body の下に重ねて出す）。ゲームの側は、始まった・更新された・抜けた、の知らせを受けて盤面を描くだけ
@@ -203,20 +203,17 @@ const STYLE = `
   border:1px solid var(--np-line,#c9ced6);border-radius:10px;cursor:pointer}
 .netplay-lobby button.np-primary{color:var(--np-accent-fg,#fff);background:var(--np-accent,#2f6fde);border-color:transparent}
 .netplay-lobby button:disabled{opacity:.45;cursor:default}
-.np-check{display:inline-flex;align-items:center;gap:6px;min-height:44px;font-size:14px}
-.np-check input{width:20px;height:20px}
 .np-message{margin:8px 0;padding:8px 10px;border-radius:8px;font-size:14px;background:var(--np-warn-bg,#fff1e5);color:var(--np-warn-fg,#8a3b00)}
 .np-note{margin:8px 0;font-size:14px;color:var(--np-muted,#57606a);text-align:center}
 .np-rooms,.np-players{list-style:none;margin:8px 0;padding:0}
 .np-rooms li{margin:6px 0}
-.np-rooms button{width:100%;text-align:left}
+.np-rooms button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left}
+.np-rooms .np-room-meta{font-size:13px;font-weight:400;color:var(--np-muted,#57606a)}
+.np-subtitle{margin:16px 0 4px;font-size:14px;font-weight:700;color:var(--np-muted,#57606a)}
 .np-players li{display:flex;align-items:center;gap:8px;min-height:44px;padding:4px 10px;margin:6px 0;border-radius:10px;background:var(--np-button,#eef1f4)}
 .np-players .np-name{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .np-players .np-tag{flex:0 0 auto;font-size:12px;padding:2px 8px;border-radius:999px;background:var(--np-bg,#fffdf8);color:var(--np-muted,#57606a)}
 .np-players button{min-height:36px;padding:4px 10px;font-size:13px}
-.np-code{margin:0 0 4px;text-align:center;font-size:15px}
-.np-code b{font-size:26px;letter-spacing:.12em;margin:0 4px}
-.np-badge{font-size:12px;padding:2px 8px;border-radius:999px;background:var(--np-accent,#2f6fde);color:var(--np-accent-fg,#fff);vertical-align:middle}
 .np-setting{margin:10px 0}
 .np-setting>span{display:block;font-size:14px;color:var(--np-muted,#57606a);margin-bottom:4px}
 .np-segment{display:flex;gap:6px}
@@ -233,20 +230,19 @@ const HTML = `
   <p class="np-message" data-ref="message" hidden></p>
   <section class="np-panel" data-panel="menu">
     <label class="np-field"><span>名前</span><input type="text" data-ref="name" maxlength="${MAX_NAME_LENGTH}" autocomplete="nickname" enterkeyhint="done"></label>
-    <div class="np-row" data-ref="create-row">
-      <button type="button" class="np-primary" data-act="create">部屋を作る</button>
-      <label class="np-check" title="公開の部屋の一覧に出し、部屋番号を知らない人も入れるようにします"><input type="checkbox" data-ref="public">公開</label>
+    <div data-ref="create-row">
+      <div class="np-row"><button type="button" class="np-primary" data-act="create">部屋を作る</button></div>
+      <p class="np-note">作った部屋は、下の「参加できる部屋」に出ます</p>
     </div>
-    <label class="np-field" data-ref="code-row"><span>部屋番号</span><input type="text" data-ref="code" inputmode="numeric" autocomplete="off" enterkeyhint="go"></label>
-    <div class="np-row"><button type="button" class="np-primary" data-act="join">参加する</button></div>
+    <div class="np-row" data-ref="join-row" hidden><button type="button" class="np-primary" data-act="join">参加する</button></div>
     <div data-ref="find-row">
-      <div class="np-row"><button type="button" data-act="find">公開の部屋を探す</button></div>
+      <p class="np-subtitle">参加できる部屋</p>
       <ul class="np-rooms" data-ref="rooms"></ul>
+      <div class="np-row"><button type="button" data-act="find">一覧を更新</button></div>
     </div>
     <div class="np-row"><button type="button" data-act="close">戻る</button></div>
   </section>
   <section class="np-panel" data-panel="lobby" hidden>
-    <p class="np-code">部屋<b data-ref="room-code"></b><span class="np-badge" data-ref="room-public">公開</span></p>
     <p class="np-note" data-ref="count"></p>
     <div class="np-row"><button type="button" data-act="invite">招待URLを共有</button></div>
     <ul class="np-players" data-ref="players"></ul>
@@ -332,19 +328,20 @@ export class NetplayLobby {
         return false;
     }
 
-    // 入口（名前・部屋を作る・部屋番号で入る・公開の部屋）を出す
-    open({ roomCode = '', invited = false } = {}) {
+    // 入口（名前・部屋を作る・参加できる部屋の一覧）を出す。部屋はすべて公開で、部屋番号は画面に出さない
+    // invited: 招待URLの部屋に入る画面（名前と「参加する」「戻る」だけ）
+    open({ roomCode = null, invited = false } = {}) {
         if (!this.available) return;
         this.mount();
+        this.invitedCode = invited ? roomCode : null;
         this.ref('name').value = this.savedName();
-        this.ref('code').value = roomCode;
-        this.ref('code').maxLength = NetplayClient.ROOM_CODE_LENGTH;
-        this.ref('code').placeholder = `${NetplayClient.ROOM_CODE_LENGTH}桁の数字`;
         this.ref('rooms').replaceChildren();
-        this.root.querySelector('#np-title').textContent = invited ? `部屋 ${roomCode} に参加` : `${this.title}：オンライン対戦`;
-        ['create-row', 'code-row', 'find-row'].forEach(name => { this.ref(name).hidden = invited; });
+        this.root.querySelector('#np-title').textContent = invited ? `${this.title}：招待された部屋に参加` : `${this.title}：オンライン対戦`;
+        ['create-row', 'find-row'].forEach(name => { this.ref(name).hidden = invited; });
+        this.ref('join-row').hidden = !invited;
         this.show('menu');
         if (invited && !this.savedName()) this.ref('name').focus();
+        if (!invited) this.findRooms();
     }
 
     // 結果の「もう一度」：ロビーを出す（ホストが「ゲーム開始」で再戦する）
@@ -471,24 +468,25 @@ export class NetplayLobby {
     async create() {
         const name = this.readName();
         if (!name) return;
-        const isPublic = this.ref('public').checked;
         this.showWait('部屋を作っています…');
         this.pending = 'create';
         try {
-            await this.net.createRoom(name, { public: isPublic });
+            await this.net.createRoom(name);
         } catch (error) {
             this.show('menu');
             this.showMessage(errorText(error));
         }
     }
 
-    async join(roomCode = this.ref('code').value.trim()) {
+    // 一覧の部屋か、招待URLの部屋に入る
+    async join(roomCode = this.invitedCode) {
         const name = this.readName();
         if (!name) return;
         if (!NetplayClient.isRoomCode(roomCode)) {
-            this.showMessage(`部屋番号は${NetplayClient.ROOM_CODE_LENGTH}桁の数字です`);
+            this.showMessage('その部屋には入れません');
             return;
         }
+        const invited = roomCode === this.invitedCode;
         this.showWait('部屋に入っています…');
         this.pending = 'join';
         try {
@@ -496,7 +494,8 @@ export class NetplayLobby {
         } catch (error) {
             this.pending = null;
             if (error.fromServer) this.net.setRoomUrl(null);
-            this.open({ roomCode });
+            // 通信の失敗なら、招待の画面のまま（もう一度試せる）。断られたら、一覧を取り直した入口に戻す
+            this.open(invited && !error.fromServer ? { roomCode, invited: true } : {});
             this.showMessage(errorText(error));
         }
     }
@@ -504,8 +503,10 @@ export class NetplayLobby {
     async findRooms() {
         const list = this.ref('rooms');
         list.replaceChildren(this.item('探しています…'));
+        const stale = () => this.mode !== 'menu';  // 返事を待つ間に、部屋を作った・入った・閉じた
         try {
             const rooms = await this.net.listRooms();
+            if (stale()) return;
             if (!rooms.length) {
                 list.replaceChildren(this.item('待っている部屋はありません'));
                 return;
@@ -514,29 +515,60 @@ export class NetplayLobby {
                 const li = document.createElement('li');
                 const button = document.createElement('button');
                 button.type = 'button';
-                button.textContent = `${room.hostName} の部屋（${room.players}/${room.maxPlayers}人）`;
+                const host = document.createElement('span');
+                host.textContent = `${room.hostName} の部屋`;
+                const meta = document.createElement('span');
+                meta.className = 'np-room-meta';
+                meta.textContent = this.roomDetails(room);
+                button.append(host, meta);
                 button.addEventListener('click', () => this.join(room.roomCode));
                 li.append(button);
                 return li;
             }));
         } catch (error) {
-            list.replaceChildren(this.item(errorText(error)));
+            if (!stale()) list.replaceChildren(this.item(errorText(error)));
         }
     }
 
+    // 一覧の部屋の説明（人数と、ロビーの設定の今の値。部屋番号は出さない）
+    roomDetails(room) {
+        const settings = this.settings.map(({ key, label, options }) => {
+            const option = options.find(item => item.value === room.settings?.[key]);
+            return option ? `${label}：${option.label}` : null;
+        }).filter(Boolean);
+        return [`${room.players}/${room.maxPlayers}人`, ...settings].join('・');
+    }
+
+    // 招待URLを送る。URL には部屋番号が入るが、文字では出さない
     async invite() {
-        const url = this.controller?.net.inviteUrl();
+        const net = this.controller?.net;
+        const url = net?.inviteUrl();
         if (!url) return;
         try {
             if (navigator.share) {
-                await navigator.share({ title: this.title, text: `${this.title}で遊ぼう（部屋 ${this.controller.lobby?.roomCode}）`, url });
+                await navigator.share({ title: this.title, text: `${this.title}の部屋に招待します`, url });
                 return;
             }
             await navigator.clipboard.writeText(url);
             this.showMessage('招待URLをコピーしました');
         } catch (error) {
-            if (error?.name !== 'AbortError') this.showMessage(`招待URL: ${url}`);
+            if (error?.name === 'AbortError') return;
+            // コピーできなければ、このページの URL を招待URLにする（アドレスバーから送ってもらう）
+            net.setRoomUrl(this.controller.lobby?.roomCode ?? net.session?.roomCode);
+            this.showMessage('コピーできませんでした。このページのURLを送ると、この部屋に招待できます');
         }
+    }
+
+    // 入口の「戻る」。部屋に入っていなければ、一覧を取るための接続を閉じて、入口を閉じるだけ
+    closeMenu() {
+        const net = this.controller?.net;
+        if (net && (net.isInRoom() || net.session)) {
+            this.leave();
+            return;
+        }
+        if (this.invitedCode) net?.setRoomUrl(null); // 読み込み直しで、また招待の画面を出さない
+        net?.close();
+        this.close();
     }
 
     // ===== 描画 =====
@@ -572,14 +604,15 @@ export class NetplayLobby {
             if (action === 'start') net?.start();
             if (action === 'leave') this.leave();
             if (action === 'back-to-game') this.backToGame();
-            if (action === 'close' || action === 'cancel') {
+            if (action === 'close') this.closeMenu();
+            if (action === 'cancel') {
                 if (this.controller) this.leave();
                 else this.close();
             }
         });
         this.root.addEventListener('keydown', (event) => {
             if (event.key !== 'Enter' || event.isComposing) return;
-            if (event.target === this.ref('code')) this.join();
+            if (event.target === this.ref('name') && this.invitedCode) this.join();
         });
     }
 
@@ -633,8 +666,6 @@ export class NetplayLobby {
         const isHost = me === lobby.hostSeat;
         const players = lobby.players.filter(player => !player.left);
         const inGame = lobby.status !== 'lobby';
-        this.ref('room-code').textContent = lobby.roomCode;
-        this.ref('room-public').hidden = !lobby.public;
         this.ref('count').textContent = `${players.length}/${this.maxPlayers}人（${this.minPlayers === this.maxPlayers ? this.minPlayers : `${this.minPlayers}〜${this.maxPlayers}`}人で遊べます）`;
         this.ref('players').replaceChildren(...players.map(player => {
             const li = document.createElement('li');

@@ -1,4 +1,4 @@
-// netplay-kit 1.11.0（99f76fe）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.12.0（dbed6ed）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * オンライン対戦のサーバーとの通信（画面側、ゲームに共通の部分）
  * 接続・再接続・参加情報の保存・ping・時計のずれの補正・送信・招待URL・イベント通知を行う。画面の描画はしない
@@ -10,7 +10,7 @@
  *   net.on('lobby', (lobby) => ...);       // 部屋の状態（対戦中も、参加者が変わるたびに届く）
  *   net.on('state', (state) => ...);       // 自分のビュー（CPU の手は cpuStepDelayMs ごとに順に届く）
  *   net.on('relay', (message) => ...);     // ゲーム独自のメッセージは type 名で受け取る
- *   await net.createRoom('あお');                       // { public: true } で公開の部屋にする
+ *   await net.createRoom('あお');                       // 部屋はすべて公開（listRooms の一覧に載る）
  *   const rooms = await net.listRooms();               // 入れる公開の部屋の一覧（{ spectate: true } で観戦できる部屋）
  *   await net.spectate(roomCode, 'あか');               // 観戦で入る（席を持たず、操作は送れない）
  *   net.send('solved', { round: 1 });
@@ -208,11 +208,12 @@
 
         // ===== 部屋の操作 =====
 
-        // { public: true } で公開の部屋にする（listRooms の一覧に載り、部屋番号を知らない人も入れる）
-        async createRoom(name, { public: isPublic = false } = {}) {
+        // 部屋はすべて公開（listRooms の一覧に載る）。2つめの引数（{ public }）は、前の版の呼び方のために受け取って無視する
+        // 1.12.0 より前のサーバーでも公開になるように、public: true を付けて送る
+        async createRoom(name) {
             await this.ensureConnected();
             this.pendingName = name;
-            return this.request({ action: 'create', name, ...(isPublic ? { public: true } : {}) });
+            return this.request({ action: 'create', name, public: true });
         }
 
         // 入れる公開の部屋の一覧を取る。[{ roomCode, hostName, players, maxPlayers, settings, createdAt }] で resolve する

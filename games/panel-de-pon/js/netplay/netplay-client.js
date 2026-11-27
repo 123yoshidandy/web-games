@@ -1,4 +1,4 @@
-// netplay-kit 1.8.0（00e8556）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
+// netplay-kit 1.12.0（dbed6ed）からコピーしたファイル。ここでは直さず、netplay-kit で直してから同期する
 /**
  * オンライン対戦のサーバーとの通信（画面側、ゲームに共通の部分）
  * 接続・再接続・参加情報の保存・ping・時計のずれの補正・送信・招待URL・イベント通知を行う。画面の描画はしない
@@ -10,8 +10,9 @@
  *   net.on('lobby', (lobby) => ...);       // 部屋の状態（対戦中も、参加者が変わるたびに届く）
  *   net.on('state', (state) => ...);       // 自分のビュー（CPU の手は cpuStepDelayMs ごとに順に届く）
  *   net.on('relay', (message) => ...);     // ゲーム独自のメッセージは type 名で受け取る
- *   await net.createRoom('あお');                       // { public: true } で公開の部屋にする
- *   const rooms = await net.listRooms();               // 入れる公開の部屋の一覧
+ *   await net.createRoom('あお');                       // 部屋はすべて公開（listRooms の一覧に載る）
+ *   const rooms = await net.listRooms();               // 入れる公開の部屋の一覧（{ spectate: true } で観戦できる部屋）
+ *   await net.spectate(roomCode, 'あか');               // 観戦で入る（席を持たず、操作は送れない）
  *   net.send('solved', { round: 1 });
  */
 
@@ -42,7 +43,7 @@
 
             this.listeners = new Map();
             this.socket = null;
-            this.session = this.loadSession(); // { roomCode, token, seat, name }
+            this.session = this.loadSession(); // { roomCode, token, seat, name, spectator }
             this.lobby = null;                 // 最後に届いた部屋の状態（部屋に入っていなければ null）
             this.seat = this.session?.seat ?? null;
             this.matchId = null;
@@ -207,16 +208,18 @@
 
         // ===== 部屋の操作 =====
 
-        // { public: true } で公開の部屋にする（listRooms の一覧に載り、部屋番号を知らない人も入れる）
-        async createRoom(name, { public: isPublic = false } = {}) {
+        // 部屋はすべて公開（listRooms の一覧に載る）。2つめの引数（{ public }）は、前の版の呼び方のために受け取って無視する
+        // 1.12.0 より前のサーバーでも公開になるように、public: true を付けて送る
+        async createRoom(name) {
             await this.ensureConnected();
             this.pendingName = name;
-            return this.request({ action: 'create', name, ...(isPublic ? { public: true } : {}) });
+            return this.request({ action: 'create', name, public: true });
         }
 
         // 入れる公開の部屋の一覧を取る。[{ roomCode, hostName, players, maxPlayers, settings, createdAt }] で resolve する
         // 入るときは、roomCode を enterRoom・joinRoom に渡す
-        async listRooms({ timeoutMs = LIST_TIMEOUT_MS } = {}) {
+        // spectate: true なら、観戦できる部屋（対戦中の公開の部屋）の一覧。項目に spectators・maxSpectators が足される。入るときは spectate に渡す
+        async listRooms({ timeoutMs = LIST_TIMEOUT_MS, spectate = false } = {}) {
             await this.ensureConnected();
             return new Promise((resolve, reject) => {
                 const listError = (message, code) => Object.assign(new Error(message), { code });
@@ -226,27 +229,36 @@
                     if (error) reject(error); else resolve(rooms);
                 };
                 const offs = [
-                    this.on('rooms', message => done(null, message.rooms ?? [])),
+                    // 観戦の一覧と、ふだんの一覧を取り違えない
+                    this.on('rooms', message => { if (Boolean(message.spectate) === spectate) done(null, message.rooms ?? []); }),
                     this.on('connection', open => { if (!open) done(listError('サーバーとの接続が切れました', 'disconnected')); })
                 ];
                 const timer = setTimeout(() => done(listError('サーバーから返事がありません', 'timeout')), timeoutMs);
-                if (!this.request({ action: 'listRooms' })) done(listError('サーバーに接続できませんでした', 'not_connected'));
+                if (!this.request({ action: 'listRooms', ...(spectate ? { spectate: true } : {}) })) done(listError('サーバーに接続できませんでした', 'not_connected'));
             });
         }
 
-        // 同じ部屋に入ったことがあれば、その席に戻る
-        async joinRoom(roomCode, name) {
+        // 同じ部屋に入ったことがあれば、その席に戻る（観戦していたなら、観戦者として戻る）
+        // spectate: true なら観戦者として入る（対戦中でも入れる。席を持たず、操作は送れない）
+        async joinRoom(roomCode, name, { spectate = false } = {}) {
             await this.ensureConnected();
             this.pendingName = name;
             const code = String(roomCode ?? '').trim();
-            const token = this.session?.roomCode === code ? this.session.token : undefined;
-            return this.request({ action: 'join', roomCode: code, name, token });
+            // 観戦で入るときは、観戦者として保存した token だけを使う（同じ端末の参加者の席を、観戦で取ってしまわないように）
+            const sameRoom = this.session?.roomCode === code && (!spectate || this.session.spectator === true);
+            const token = sameRoom ? this.session.token : undefined;
+            return this.request({ action: 'join', roomCode: code, name, token, ...(spectate ? { spectate: true } : {}) });
+        }
+
+        // 観戦で入る（enterRoom の spectate: true と同じ）。断られたら（spectate_unavailable・spectators_full など）reject する
+        spectate(roomCode, name, options = {}) {
+            return this.enterRoom(roomCode, name, { ...options, spectate: true });
         }
 
         // joinRoom と同じだが、参加できたら（joined）resolve し、断られたら reject する
         // reject の Error には code がある（サーバーのコード、または 'disconnected'・'timeout'・'not_connected'）
         // fromServer はサーバーに断られたとき true。'error' のイベントも、これまでどおり届く
-        async enterRoom(roomCode, name, { timeoutMs = JOIN_TIMEOUT_MS } = {}) {
+        async enterRoom(roomCode, name, { timeoutMs = JOIN_TIMEOUT_MS, spectate = false } = {}) {
             let settle;
             const result = new Promise((resolve, reject) => { settle = { resolve, reject }; });
             result.catch(() => {}); // 呼んだ側が受け取る前に断られても、未処理の reject にしない
@@ -266,7 +278,7 @@
             ];
             const timer = setTimeout(() => done(roomError('サーバーから返事がありません', 'timeout')), timeoutMs);
             try {
-                if (!await this.joinRoom(roomCode, name)) done(roomError('サーバーに接続できませんでした', 'not_connected'));
+                if (!await this.joinRoom(roomCode, name, { spectate })) done(roomError('サーバーに接続できませんでした', 'not_connected'));
             } catch (error) {
                 done(Object.assign(error, { code: 'not_connected', fromServer: false }));
             }
@@ -337,7 +349,12 @@
         }
 
         isHost() {
-            return this.lobby !== null && this.lobby.hostSeat === this.seat;
+            return this.lobby !== null && this.seat !== null && this.lobby.hostSeat === this.seat;
+        }
+
+        // 観戦者として部屋にいるか（観戦者の lobby には spectator: true が付く）
+        isSpectator() {
+            return this.lobby ? this.lobby.spectator === true : Boolean(this.session?.spectator);
         }
 
         // サーバーの今の時刻（開始時刻などを端末の時計に直すときに使う）
@@ -362,6 +379,7 @@
                     this.lastVersion = -Infinity;
                     this.seat = message.seat;
                     this.session = { roomCode: message.roomCode, token: message.token, seat: message.seat, name: this.pendingName ?? this.session?.name };
+                    if (message.spectator) this.session.spectator = true;
                     this.saveSession(this.session);
                     break;
                 case 'lobby':
