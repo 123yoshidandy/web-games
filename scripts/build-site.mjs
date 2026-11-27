@@ -156,7 +156,7 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
 <body>
     <header>
         <h1>web-games</h1>
-        <p>ブラウザで遊べるボードゲーム・パズルゲーム ${entries.length} 本</p>
+        <p>ブラウザで遊べるゲーム ${entries.length} 本</p>
     </header>
     <section id="filters" aria-label="検索と絞り込み" hidden>
         <form role="search">
