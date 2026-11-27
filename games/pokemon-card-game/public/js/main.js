@@ -258,14 +258,16 @@ function connectOnline() {
     return online;
 }
 
-// invited：招待URLで開いたとき（名前と「参加する」だけにする）
-function showOnlineMenu({ roomCode = '', invited = false } = {}) {
+// invited：招待URLで開いたとき（名前と「参加する」だけにする）。ふだんは参加できる部屋の一覧も取る
+// 部屋はすべて公開で、部屋番号は画面に出さない
+function showOnlineMenu({ invited = false } = {}) {
     screen.stop();
     $('online-name').value = knownName();
     $('online-screen').classList.toggle('invited', invited);
-    $('online-title').textContent = invited ? `部屋 ${roomCode} に参加` : 'オンライン対戦';
+    $('online-title').textContent = invited ? '招待された部屋に参加' : 'オンライン対戦';
     setScene('online');
     if (invited) $('online-name').focus();
+    else loadRooms();
 }
 
 const isInviteShown = () => scene === 'online' && $('online-screen').classList.contains('invited');
@@ -285,38 +287,61 @@ async function createRoom() {
     const name = readName();
     if (!name) return;
     try {
-        await connectOnline().createRoom(name, { isPublic: $('room-public').checked });
+        await connectOnline().createRoom(name);
     } catch (error) {
         toast(error.message);
     }
 }
 
-// 公開の部屋の一覧（開いたときと「更新」を押したときだけ取る。続けて取り続けない）
-async function showRooms() {
+// 参加できる部屋の一覧（開いたときと「一覧を更新」を押したときだけ取る。続けて取り続けない）
+// 名前は参加者が入れた文字なので textContent で描く。部屋番号は出さない
+async function loadRooms() {
     const list = $('room-list');
-    if (!$('rooms').open) $('rooms').showModal();
-    list.innerHTML = '<li class="room-note">さがしています…</li>';
+    const note = text => {
+        const li = document.createElement('li');
+        li.className = 'room-note';
+        li.textContent = text;
+        return li;
+    };
+    const stale = () => scene !== 'online' || isInviteShown(); // 返事を待つ間に、部屋に入った・入口を閉じた
+    list.replaceChildren(note('さがしています…'));
     $('refresh-rooms').disabled = true;
     try {
         const rooms = await connectOnline().listRooms();
-        list.innerHTML = rooms.length
-            ? rooms.map(room => `<li class="room-row">
-                <span class="room-host">${escapeHtml(room.hostName)}</span>
-                <span class="room-count">${room.players}/${room.maxPlayers}人</span>
-                <span class="room-code">部屋 ${escapeHtml(room.roomCode)}</span>
-                <button type="button" class="btn btn-primary btn-small" data-enter-room="${escapeHtml(room.roomCode)}">入る</button>
-            </li>`).join('')
-            : '<li class="room-note">いま入れる公開の部屋はありません。「部屋を作る」で「公開する」にすると、ここに載ります</li>';
+        if (stale()) return;
+        if (!rooms.length) {
+            list.replaceChildren(note('待っている部屋はありません'));
+            return;
+        }
+        list.replaceChildren(...rooms.map(room => {
+            const li = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'room-row';
+            const host = document.createElement('span');
+            host.className = 'room-host';
+            host.textContent = `${room.hostName} の部屋`;
+            const count = document.createElement('span');
+            count.className = 'room-count';
+            count.textContent = `${room.players}/${room.maxPlayers}人`;
+            const enter = document.createElement('span');
+            enter.className = 'room-enter';
+            enter.textContent = '入る';
+            button.append(host, count, enter);
+            button.addEventListener('click', () => enterListedRoom(room.roomCode));
+            li.append(button);
+            return li;
+        }));
     } catch (error) {
-        list.innerHTML = `<li class="room-note">${escapeHtml(error.message)}</li>`;
+        if (!stale()) list.replaceChildren(note(error.message));
     } finally {
         $('refresh-rooms').disabled = false;
     }
 }
 
+// 一覧の部屋に入る。押すまでに始まった・満員になった・消えた部屋なら、一覧を取り直す
 async function enterListedRoom(code) {
     const name = readName();
-    $('rooms').close();
     if (!name) {
         $('online-name').focus();
         return;
@@ -324,26 +349,16 @@ async function enterListedRoom(code) {
     try {
         await connectOnline().enterRoom(code, name);
     } catch (error) {
-        // 満員になった・なくなったなど、サーバーに断られたときの知らせは onError が出す
+        // サーバーに断られたときの知らせは onError が出すので、ここでは通信の失敗だけ知らせる
         if (!error.fromServer) toast(error.message);
+        if (['already_started', 'room_full', 'room_not_found'].includes(error.code) && scene === 'online') loadRooms();
     }
 }
 
-async function joinRoom() {
+// 招待の画面の「参加する」
+function joinRoom() {
     const name = readName();
-    if (!name) return;
-    if (isInviteShown()) return joinInvitedRoom(name);
-    const code = $('room-code').value.trim();
-    if (!NetplayClient.isRoomCode(code)) {
-        toast(`部屋番号（数字${NetplayClient.ROOM_CODE_LENGTH}桁）を入れてください`);
-        return;
-    }
-    try {
-        await connectOnline().enterRoom(code, name);
-    } catch (error) {
-        // サーバーに断られたときの知らせは onError が出すので、ここでは通信の失敗だけ知らせる
-        if (!error.fromServer) toast(error.message);
-    }
+    if (name) joinInvitedRoom(name);
 }
 
 // 招待の部屋に入る。入れなければ（部屋がもうないなど）、いつもの入口に戻す
@@ -380,8 +395,6 @@ function onLobby(lobby) {
 
 function renderLobby(lobby) {
     const isHost = online.isHost();
-    $('lobby-code').textContent = lobby.roomCode;
-    $('lobby-public').hidden = !lobby.public;
     $('lobby-players').innerHTML = lobby.players.map(player => {
         const badges = [
             player.seat === lobby.hostSeat ? '<span class="badge">ホスト</span>' : '',
@@ -403,11 +416,11 @@ function escapeHtml(text) {
     return String(text).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 }
 
+// 招待URLを送る。URL には部屋番号が入るが、文字では出さない
 async function shareInvite() {
-    const code = online?.lobby?.roomCode;
-    if (!code) return;
+    if (!online?.lobby) return;
     const url = online.inviteUrl(); // 接続先の指定 ?server= は共通部品が引き継ぐ
-    const text = `ポケモンカードゲームで対戦しよう！ 部屋番号 ${code}`;
+    const text = 'ポケモンカードゲームで対戦しよう！';
     try {
         if (navigator.share) {
             await navigator.share({ title: 'ポケモンカードゲーム', text, url });
@@ -415,8 +428,11 @@ async function shareInvite() {
             await navigator.clipboard.writeText(url);
             toast('招待URLをコピーしました');
         }
-    } catch {
-        // 共有をやめたときなど
+    } catch (error) {
+        if (error?.name === 'AbortError') return; // 共有をやめたとき
+        // コピーできなければ、このページの URL を招待URLにする（アドレスバーから送ってもらう）
+        online.showRoomInUrl();
+        toast('コピーできませんでした。このページのURLを送ると、この部屋に招待できます');
     }
 }
 
@@ -455,15 +471,8 @@ $('open-decks').addEventListener('click', openDecks);
 ['deck-picker', 'confirm'].forEach(id => closeOnBackdrop($(id)));
 $('create-room').addEventListener('click', createRoom);
 $('join-room').addEventListener('click', joinRoom);
-$('open-rooms').addEventListener('click', showRooms);
-$('refresh-rooms').addEventListener('click', showRooms);
-$('room-list').addEventListener('click', event => {
-    const button = event.target.closest('[data-enter-room]');
-    if (button) enterListedRoom(button.dataset.enterRoom);
-});
-closeOnBackdrop($('rooms'));
+$('refresh-rooms').addEventListener('click', loadRooms);
 $('online-name').addEventListener('keydown', event => { if (event.key === 'Enter' && isInviteShown()) joinRoom(); });
-$('room-code').addEventListener('keydown', event => { if (event.key === 'Enter') joinRoom(); });
 $('online-back').addEventListener('click', () => {
     if (isInviteShown()) clearInviteUrl();
     showTitle();
@@ -533,7 +542,7 @@ async function boot() {
     // 招待のURL（?room=部屋番号）で開いたら、その部屋に参加する
     const roomCode = NetplayClient.inviteRoomCode();
     if (roomCode) {
-        showOnlineMenu({ roomCode, invited: true });
+        showOnlineMenu({ invited: true });
         if (knownName()) await joinInvitedRoom(knownName());
         return;
     }

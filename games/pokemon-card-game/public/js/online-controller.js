@@ -11,7 +11,7 @@ import { DECKS, expandDeck } from './decks.js';
 const STORAGE_KEY = 'pokemon-card-game.online'; // 再接続に使う部屋番号とトークン
 const CPU_STEP_DELAY_MS = 650;                   // CPU の手は CPU 対戦と同じ間隔で順に見せる
 const RESPONSE_TIMEOUT_MS = 5000;                // 操作の返事がこれだけ来なければ、入り直して今の状態を受け取り直す
-export const DEPLOYED_SERVER_URL = 'wss://9flzja5gdi.execute-api.ap-northeast-1.amazonaws.com/prod'; // スタック pokemon-card-game-online の WebSocketUrl
+export const DEPLOYED_SERVER_URL = 'wss://kuhds82pzk.execute-api.ap-northeast-1.amazonaws.com/prod?game=pokemon-card-game'; // スタック pokemon-card-game-online の WebSocketUrl
 
 export function loadOnlineSession() {
     try {
@@ -74,9 +74,9 @@ export default class OnlineGameController {
 
     // ===== 部屋の操作 =====
 
-    // isPublic なら公開の部屋（一覧に載り、部屋番号を知らない人も入れる）
-    createRoom(name, { isPublic = false } = {}) { return this.net.createRoom(name, { public: isPublic }); }
-    // 入れる公開の部屋の一覧（部屋に入っていなくても取れる）
+    // 部屋はすべて公開（参加できる部屋の一覧に載る）
+    createRoom(name) { return this.net.createRoom(name); }
+    // 参加できる部屋の一覧（部屋に入っていなくても取れる）。部屋番号は入るときに使うだけで、画面には出さない
     listRooms() { return this.net.listRooms(); }
     enterRoom(code, name) { return this.net.enterRoom(code, name); }
     joinFromInvite(name) { return this.net.joinFromInvite(name); }
@@ -87,6 +87,8 @@ export default class OnlineGameController {
     backToLobby() { this.net.backToLobby(); }
     isHost() { return this.net.isHost(); }
     inviteUrl() { return this.net.inviteUrl(); }
+    // このページの URL を招待URLにする（コピーできなかったとき、アドレスバーから送ってもらう）
+    showRoomInUrl() { this.net.setRoomUrl(this.lobby?.roomCode ?? this.session?.roomCode); }
 
     // 部屋を出る（対戦中なら、以後は CPU が代わりに打つ。保存した参加情報も消す）
     leave() {

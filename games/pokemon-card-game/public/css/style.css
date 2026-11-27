@@ -234,23 +234,46 @@ button { font: inherit; color: inherit; }
     -webkit-user-select: text;
 }
 .text-input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 2px rgba(245, 197, 66, 0.25); }
-.online-join { display: flex; gap: 10px; align-items: center; }
-.code-input { width: 130px; letter-spacing: 0.15em; text-align: center; }
-.online-create { display: flex; gap: 12px; align-items: center; }
-.check { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-dim); cursor: pointer; }
-.check input { width: 18px; height: 18px; margin: 0; accent-color: var(--gold); }
+.online-create { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 12px; align-items: center; }
+/* 招待URLで開いたときは「参加する」だけ。ふだんは「参加する」を出さない */
 #online-screen.invited .online-create,
 #online-screen.invited .online-rooms,
-#online-screen.invited .code-input { display: none; }
-/* 公開の部屋の一覧 */
-.sheet .room-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; min-width: min(420px, 80vw); }
-.room-row { display: flex; align-items: center; gap: 10px; padding: 6px 8px 6px 12px; border-radius: 10px; background: var(--panel); }
+#online-screen:not(.invited) #join-room { display: none; }
+/* 参加できる部屋の一覧（入口に置く。部屋番号は出さない） */
+.online-rooms { width: 100%; max-width: 420px; display: grid; gap: 6px; }
+.online-rooms-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.online-rooms-title { margin: 0; font-size: 15px; font-weight: 800; }
+.room-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+    max-height: max(96px, calc(var(--app-h) * 0.32));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+}
+.room-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px 8px 12px;
+    border: none;
+    border-radius: 10px;
+    background: var(--panel);
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.room-row:active { filter: brightness(1.15); }
 .room-host { flex: 1; min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.room-count, .room-code { font-size: 12px; color: var(--ink-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.room-count { font-size: 12px; color: var(--ink-dim); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.room-enter { padding: 3px 10px; border-radius: 8px; font-size: 13px; font-weight: 800; color: #fff; background: var(--accent); }
 .room-note { padding: 8px 2px; font-size: 13px; line-height: 1.6; color: var(--ink-dim); }
 /* 招待で開いたときは「参加する」が主な操作 */
 #online-screen.invited #join-room { background: var(--accent); box-shadow: 0 4px 0 var(--accent-dark); }
-.lobby-code { color: var(--gold); letter-spacing: 0.12em; }
 .lobby-players {
     list-style: none;
     margin: 0;
