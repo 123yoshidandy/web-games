@@ -5,6 +5,7 @@
 
 import GameController from './game-controller.js';
 import UIController from './ui-controller.js';
+import NetplayClient from './netplay/netplay-client.mjs';
 
 // 長押し・右クリックでブラウザのメニューを出さない（入力欄では貼り付けなどに使うので出す）
 // カードの右クリックで説明を出す処理（press-handler.js）は、カードの要素で先に動く
@@ -29,10 +30,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // 動作確認用（ヘッドレス Chrome から状態を見る）
     window.__app = { gameController, uiController };
     
-    // 招待のURL（?room=部屋コード）で開いたら、オンライン対戦の参加画面を出す
-    const roomCode = new URLSearchParams(location.search).get('room');
+    // 招待のURL（?room=部屋コード）で開いたら、オンライン対戦の参加画面を出す（部屋番号は画面に出さない）
+    const roomCode = NetplayClient.inviteRoomCode();
     if (roomCode) {
-        uiController.showOnlineMenu({ roomCode });
+        uiController.showOnlineMenu({ invitedRoom: roomCode });
     } else {
         uiController.showGameSetup();
     }

@@ -23,8 +23,7 @@ const DEFAULT_SETTINGS = {
     playerCount: 2,           // ローカル対戦の人数
     localPlayers: [],         // ローカル対戦の各席の { name, isCPU }
     realtime: false,          // ローカル対戦をリアルタイムモードで遊ぶ（CPUが同時に番を進める。人間が1人のときだけ）
-    onlineName: '',           // オンライン対戦で使う名前
-    onlinePublic: false       // オンライン対戦の部屋を公開で作る（公開の部屋の一覧に出す）
+    onlineName: ''            // オンライン対戦で使う名前
 };
 
 class UIController {
@@ -169,8 +168,10 @@ class UIController {
     
     // ===== オンライン対戦 =====
     
+    // オンライン対戦の入口を出す。招待の画面でなければ、参加できる部屋の一覧も取る
     showOnlineMenu(options = {}) {
         this.modal.showOnlineMenu(options);
+        if (!options.invitedRoom) this.loadOnlineRooms();
     }
     
     // オンライン対戦のコントローラーに切り替える（まだなら作る）
@@ -196,36 +197,38 @@ class UIController {
         }
     }
     
-    createOnlineRoom(name, options) {
-        return this.enterOnlineRoom(controller => controller.createRoom(name, options));
+    createOnlineRoom(name) {
+        return this.enterOnlineRoom(controller => controller.createRoom(name));
     }
 
-    // 公開の部屋の一覧を取って出す（開いたときと、更新を押したときだけ取る）。つながらなければオンラインのメニューにエラーを出す
-    async showPublicRooms({ error = '' } = {}) {
-        this.modal.showPublicRooms({ rooms: null, error });
+    // 参加できる部屋の一覧を取って、入口に出す（開いたときと「一覧を更新」を押したときだけ取る。続けて取り続けない）
+    async loadOnlineRooms() {
+        this.modal.showOnlineRooms(null);
         try {
             const rooms = await this.useOnlineController().listRooms();
-            if (this.modal.kind === 'public-rooms') this.modal.showPublicRooms({ rooms, error });
-        } catch (listError) {
-            if (this.modal.kind === 'public-rooms') this.showOnlineMenu({ error: listError.message });
+            if (this.modal.kind === 'online-menu') this.modal.showOnlineRooms(rooms);
+        } catch (error) {
+            if (this.modal.kind === 'online-menu') this.modal.showOnlineRooms(null, error.message);
         }
     }
 
-    // 一覧の部屋に入る。押すまでに始まった・満員になった・消えた部屋なら、一覧を取り直す
-    async enterPublicRoom(roomCode, name) {
+    // 一覧の部屋か、招待URLの部屋に入る。押すまでに始まった・満員になった・消えた部屋なら、一覧を取り直した入口に戻す
+    async enterListedRoom(roomCode, name) {
+        this.enteringRoom = true;
         try {
             await this.useOnlineController().enterRoom(roomCode, name);
         } catch (error) {
-            if (['already_started', 'room_full', 'room_not_found'].includes(error.code)) {
-                this.showPublicRooms({ error: error.message });
-            } else {
-                this.showOnlineMenu({ error: error.message });
-            }
+            if (error.fromServer) this.gameController.clearRoomUrl?.();
+            this.showOnlineMenu({ error: error.message });
+        } finally {
+            this.enteringRoom = false;
         }
     }
-    
-    joinOnlineRoom(roomCode, name) {
-        return this.enterOnlineRoom(controller => controller.joinRoom(roomCode, name));
+
+    // 招待の画面で「戻る」：URL から部屋番号を外して、ふだんの入口に戻る
+    cancelInvite() {
+        this.useOnlineController().clearRoomUrl();
+        this.showOnlineMenu();
     }
     
     resumeOnlineRoom() {
@@ -244,8 +247,8 @@ class UIController {
     
     // サーバーから受け付けられなかった操作の理由が届いた
     handleOnlineError(message) {
-        // 公開の部屋の一覧から入れなかったときは、enterPublicRoom が一覧を取り直す
-        if (this.modal.kind === 'public-rooms') return;
+        // 一覧や招待の部屋に入れなかったときは、enterListedRoom が入口に戻して知らせる
+        if (this.enteringRoom) return;
         if (this.modal.kind === 'online-menu' || !this.gameController.lobby) {
             this.showOnlineMenu({ error: message });
             return;
@@ -371,7 +374,7 @@ class UIController {
         
         // オンライン対戦でゲームが始まった・ゲーム中の部屋に戻ったら、ロビーや参加の画面を閉じる
         // 同じ顔ぶれでもう一度始めたときは、前のゲームの結果の画面も閉じる
-        if (['lobby', 'online-menu', 'public-rooms'].includes(this.modal.kind) || (this.modal.kind === 'result' && !view.result)) {
+        if (['lobby', 'online-menu'].includes(this.modal.kind) || (this.modal.kind === 'result' && !view.result)) {
             this.modal.closeModal();
         }
         

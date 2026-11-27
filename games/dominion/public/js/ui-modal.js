@@ -5,7 +5,6 @@
 
 import { loadOnlineSession } from './online-controller.js';
 import { loadSavedGame } from './game-controller.js';
-import NetplayClient from './netplay/netplay-client.mjs';
 import { CARD_SETS, CARD_SET_LABELS, LANDSCAPE_KIND_LABELS } from './card-types.js';
 import { ALL_CARDS } from './card-data.js';
 import { getCardArt, CARD_BACK } from './card-art.js';
@@ -123,7 +122,7 @@ class UIModal {
 
         document.getElementById('resume-btn')?.addEventListener('click', () => this.uiController.resumeGame());
         document.getElementById('start-game-btn').addEventListener('click', () => this.uiController.startGame());
-        document.getElementById('online-btn').addEventListener('click', () => this.showOnlineMenu());
+        document.getElementById('online-btn').addEventListener('click', () => this.uiController.showOnlineMenu());
         document.getElementById('title-help-btn').addEventListener('click', () => this.showHelp({ backdrop: 'title', onClose: () => this.showGameSetup() }));
 
         // モーダルを表示（閉じると何も操作できなくなるので×は出さない）
@@ -279,7 +278,7 @@ class UIModal {
                 ${section('オンライン対戦', `
                     <ol>
                         <li>タイトル画面の「オンラインで遊ぶ」で名前を入れ、「部屋を作る」を押します。</li>
-                        <li>「招待URLを共有」で友人にURLを送ります（部屋番号の数字${NetplayClient.ROOM_CODE_LENGTH}桁でも参加できます）。</li>
+                        <li>作った部屋は、オンライン対戦の画面の「参加できる部屋」に出ます。友人はそこから入るか、「招待URLを共有」で送ったURLから参加します。</li>
                         <li>部屋を作った人が、CPUの追加や拡張を選んで「ゲーム開始」を押します。</li>
                     </ol>
                     <p>接続が切れても、同じ席に戻れます。途中で抜けた人の席は、CPUが代わりに続けます。</p>
@@ -304,31 +303,33 @@ class UIModal {
 
     // ===== オンライン対戦 =====
     
-    // 名前を入れて、部屋を作るか部屋コードで参加する
-    showOnlineMenu({ roomCode = '', error = '' } = {}) {
+    // 名前を入れて、部屋を作るか、参加できる部屋の一覧から入る。部屋はすべて公開で、部屋番号は画面に出さない
+    // invitedRoom: 招待URLの部屋に入る画面（名前と「参加する」「戻る」だけ）
+    showOnlineMenu({ invitedRoom = '', error = '' } = {}) {
         const session = loadOnlineSession();
-        this.elements.modalTitle.textContent = 'オンライン対戦';
+        this.elements.modalTitle.textContent = invitedRoom ? '招待された部屋に参加' : 'オンライン対戦';
         this.elements.modalBody.innerHTML = `
             <div class="setup-form online-form">
                 <label class="field">
                     <span>名前</span>
                     <input type="text" id="online-name" maxlength="12" value="${escapeHtml(this.uiController.settings.onlineName || session?.name || '')}" placeholder="表示する名前">
                 </label>
-                <div class="online-create">
-                    <button id="create-room-btn" class="primary">部屋を作る</button>
-                    <label class="setting-toggle public-toggle" for="public-room" title="公開の部屋の一覧に出し、部屋番号を知らない人も入れるようにします">
-                        <span>公開</span>
-                        <input type="checkbox" id="public-room" ${this.uiController.settings.onlinePublic ? 'checked' : ''}>
-                    </label>
-                </div>
-                <div class="online-join">
-                    <input type="text" id="room-code" maxlength="${NetplayClient.ROOM_CODE_LENGTH}" value="${escapeHtml(roomCode)}" placeholder="部屋番号（数字${NetplayClient.ROOM_CODE_LENGTH}桁）" inputmode="numeric" pattern="[0-9]*" autocomplete="off">
-                    <button id="join-room-btn" class="primary secondary">参加する</button>
-                </div>
-                <button id="find-rooms-btn" class="primary secondary">公開の部屋を探す</button>
-                ${session && !roomCode ? `<button id="resume-room-btn" class="primary secondary">前の部屋（${escapeHtml(session.roomCode)}）に戻る</button>` : ''}
+                ${invitedRoom ? `
+                    <button id="join-invited-btn" class="primary">参加する</button>
+                ` : `
+                    <div class="online-create">
+                        <button id="create-room-btn" class="primary">部屋を作る</button>
+                        <p class="lobby-note">作った部屋は、下の「参加できる部屋」に出ます</p>
+                    </div>
+                    <div class="online-rooms">
+                        <p class="online-rooms-title">参加できる部屋</p>
+                        <ul class="public-rooms" id="online-room-list"></ul>
+                        <button id="refresh-rooms-btn" class="primary secondary">一覧を更新</button>
+                    </div>
+                    ${session ? '<button id="resume-room-btn" class="primary secondary">前の部屋に戻る</button>' : ''}
+                `}
                 ${error ? `<p class="online-error">${escapeHtml(error)}</p>` : ''}
-                <button id="back-to-local-btn" class="link-button">ひとりで遊ぶ（CPU対戦）に戻る</button>
+                <button id="back-to-local-btn" class="link-button">${invitedRoom ? '戻る' : 'ひとりで遊ぶ（CPU対戦）に戻る'}</button>
             </div>
         `;
         
@@ -336,85 +337,93 @@ class UIModal {
         const name = () => nameInput.value.trim();
         nameInput.addEventListener('change', () => this.uiController.updateSettings({ onlineName: name() }));
         
-        // 部屋番号は数字だけを受け付ける
-        const roomCodeInput = document.getElementById('room-code');
-        roomCodeInput.addEventListener('input', () => {
-            roomCodeInput.value = roomCodeInput.value.replace(/[^0-9]/g, '');
-        });
+        // 名前が入っていれば保存して、その名前を返す。空なら入力欄に戻す
         const requireName = () => {
-            if (name()) return true;
+            if (name()) {
+                this.uiController.updateSettings({ onlineName: name() });
+                return name();
+            }
             nameInput.focus();
             nameInput.placeholder = '名前を入れてください';
-            return false;
+            return null;
         };
+        this.requireOnlineName = requireName;
         
-        const publicInput = document.getElementById('public-room');
-        publicInput.addEventListener('change', () => this.uiController.updateSettings({ onlinePublic: publicInput.checked }));
-        document.getElementById('create-room-btn').addEventListener('click', () => {
-            if (!requireName()) return;
-            this.uiController.updateSettings({ onlineName: name() });
-            this.uiController.createOnlineRoom(name(), { public: publicInput.checked });
-        });
-        document.getElementById('find-rooms-btn').addEventListener('click', () => {
-            if (!requireName()) return;
-            this.uiController.updateSettings({ onlineName: name() });
-            this.uiController.showPublicRooms();
-        });
-        document.getElementById('join-room-btn').addEventListener('click', () => {
-            const code = roomCodeInput.value.trim();
-            if (!requireName() || !code) return;
-            this.uiController.updateSettings({ onlineName: name() });
-            this.uiController.joinOnlineRoom(code, name());
-        });
-        document.getElementById('resume-room-btn')?.addEventListener('click', () => this.uiController.resumeOnlineRoom());
-        document.getElementById('back-to-local-btn').addEventListener('click', () => this.uiController.leaveOnline());
+        if (invitedRoom) {
+            document.getElementById('join-invited-btn').addEventListener('click', () => {
+                const playerName = requireName();
+                if (playerName) this.uiController.enterListedRoom(invitedRoom, playerName);
+            });
+            // 招待をやめたら、ふだんの入口（一覧のある画面）に戻る
+            document.getElementById('back-to-local-btn').addEventListener('click', () => this.uiController.cancelInvite());
+        } else {
+            document.getElementById('create-room-btn').addEventListener('click', () => {
+                const playerName = requireName();
+                if (playerName) this.uiController.createOnlineRoom(playerName);
+            });
+            document.getElementById('refresh-rooms-btn').addEventListener('click', () => this.uiController.loadOnlineRooms());
+            document.getElementById('resume-room-btn')?.addEventListener('click', () => this.uiController.resumeOnlineRoom());
+            document.getElementById('back-to-local-btn').addEventListener('click', () => this.uiController.leaveOnline());
+        }
         
         this.openModal({ closable: false, kind: 'online-menu' });
     }
 
-    // 公開の部屋の一覧。押すとその部屋に入る（rooms が null の間は取りに行っている）
-    showPublicRooms({ rooms, error = '' }) {
-        const name = this.uiController.settings.onlineName;
-        this.elements.modalTitle.textContent = '公開の部屋';
-        this.elements.modalBody.innerHTML = `
-            <div class="setup-form online-form">
-                ${!rooms ? '<p class="lobby-note">探しています…</p>' : rooms.length === 0 ? '<p class="lobby-note">待っている部屋はありません</p>' : `
-                    <ul class="public-rooms">
-                        ${rooms.map(room => `
-                            <li>
-                                <button class="public-room" data-room-code="${escapeHtml(room.roomCode)}">
-                                    <span class="public-room-name">${escapeHtml(room.hostName)}の部屋</span>
-                                    <span class="public-room-count">${room.players}/${room.maxPlayers}人</span>
-                                    <span class="public-room-note">${escapeHtml(cardSetSummary(room.settings?.cardSets ?? []))}${room.settings?.realtime ? '・リアルタイム' : ''}</span>
-                                </button>
-                            </li>
-                        `).join('')}
-                    </ul>
-                `}
-                ${error ? `<p class="online-error">${escapeHtml(error)}</p>` : ''}
-                <button id="refresh-rooms-btn" class="primary secondary" ${rooms ? '' : 'disabled'}>更新</button>
-                <button id="back-to-online-btn" class="link-button">戻る</button>
-            </div>
-        `;
-        this.elements.modalBody.querySelectorAll('[data-room-code]').forEach(button => {
-            button.addEventListener('click', () => this.uiController.enterPublicRoom(button.dataset.roomCode, name));
-        });
-        document.getElementById('refresh-rooms-btn').addEventListener('click', () => this.uiController.showPublicRooms());
-        document.getElementById('back-to-online-btn').addEventListener('click', () => this.showOnlineMenu());
-        this.openModal({ closable: false, kind: 'public-rooms' });
+    // 参加できる部屋の一覧を描く（rooms が null の間は取りに行っている）。押すとその部屋に入る
+    // 名前は参加者が入れた文字なので textContent で描く。部屋番号は出さない
+    showOnlineRooms(rooms, message = '') {
+        const list = document.getElementById('online-room-list');
+        if (!list) return;
+        const note = (text) => {
+            const li = document.createElement('li');
+            li.className = 'lobby-note';
+            li.textContent = text;
+            return li;
+        };
+        if (message) {
+            list.replaceChildren(note(message));
+            return;
+        }
+        if (!rooms) {
+            list.replaceChildren(note('探しています…'));
+            return;
+        }
+        if (rooms.length === 0) {
+            list.replaceChildren(note('待っている部屋はありません'));
+            return;
+        }
+        list.replaceChildren(...rooms.map(room => {
+            const li = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'public-room';
+            const host = document.createElement('span');
+            host.className = 'public-room-name';
+            host.textContent = `${room.hostName} の部屋`;
+            const count = document.createElement('span');
+            count.className = 'public-room-count';
+            count.textContent = `${room.players}/${room.maxPlayers}人`;
+            const detail = document.createElement('span');
+            detail.className = 'public-room-note';
+            detail.textContent = `${cardSetSummary(room.settings?.cardSets ?? [])}${room.settings?.realtime ? '・リアルタイム' : ''}`;
+            button.append(host, count, detail);
+            button.addEventListener('click', () => {
+                const playerName = this.requireOnlineName?.();
+                if (playerName) this.uiController.enterListedRoom(room.roomCode, playerName);
+            });
+            li.append(button);
+            return li;
+        }));
     }
 
     // ロビー：参加者と使うカードを確認し、部屋を作った人がゲームを始める
     showLobby(lobby, { isHost }) {
-        const shareUrl = `${location.origin}${location.pathname}?room=${lobby.roomCode}`;
-        
         this.elements.modalTitle.textContent = 'オンライン対戦の部屋';
         this.elements.modalBody.innerHTML = `
             <div class="setup-form lobby">
-                <div class="lobby-code">
-                    <span>部屋番号${lobby.public ? '<span class="host-badge public-badge">公開</span>' : ''}</span>
-                    <b>${escapeHtml(lobby.roomCode)}</b>
-                    <button id="share-room-btn" class="primary secondary">招待URLを共有</button>
+                <div class="lobby-invite">
+                    <span>この部屋は「参加できる部屋」の一覧に出ます</span>
+                    <button id="share-room-btn" class="primary">招待URLを共有</button>
                 </div>
                 <ul class="lobby-players">
                     ${lobby.players.map(player => `
@@ -442,7 +451,7 @@ class UIModal {
         `;
         
         const controller = this.uiController.gameController;
-        document.getElementById('share-room-btn').addEventListener('click', () => this.shareRoom(shareUrl));
+        document.getElementById('share-room-btn').addEventListener('click', () => this.shareRoom());
         document.getElementById('leave-room-btn').addEventListener('click', () => this.uiController.leaveOnline());
         if (isHost) {
             // 拡張は別の画面で選ぶ。選んでいる間に届いた部屋の更新は、決定して戻ったときに出す
@@ -464,17 +473,23 @@ class UIModal {
         this.openModal({ closable: false, kind: 'lobby' });
     }
     
-    // 招待URLを共有する（スマホでは共有メニュー、使えなければコピー）
-    async shareRoom(url) {
+    // 招待URLを共有する（スマホでは共有メニュー、使えなければコピー）。URL には部屋番号が入るが、文字では出さない
+    async shareRoom() {
+        const controller = this.uiController.gameController;
+        const url = controller.inviteUrl?.();
+        if (!url) return;
         try {
             if (navigator.share) {
-                await navigator.share({ title: 'ドミニオンの部屋', url });
+                await navigator.share({ title: 'ドミニオンの部屋', text: 'ドミニオンの部屋に招待します', url });
                 return;
             }
             await navigator.clipboard.writeText(url);
             this.uiController.showToast('招待URLをコピーしました');
-        } catch {
-            this.uiController.showToast(url);
+        } catch (error) {
+            if (error?.name === 'AbortError') return;
+            // コピーできなければ、このページの URL を招待URLにする（アドレスバーから送ってもらう）
+            controller.showRoomInUrl();
+            this.uiController.showToast('コピーできませんでした。このページのURLを送ると、この部屋に招待できます');
         }
     }
 

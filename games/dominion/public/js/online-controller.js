@@ -47,13 +47,18 @@ class OnlineGameController {
 
     // ===== 部屋の操作 =====
 
-    // { public: true } で公開の部屋にする（公開の部屋の一覧に出て、部屋番号を知らない人も入れる）
-    createRoom(name, options) { return this.net.createRoom(name, options); }
-    joinRoom(roomCode, name) { return this.net.joinRoom(roomCode, name); }
-    // 公開の部屋の一覧から入る（断られたら reject する。error.code で理由が分かる）
+    // 部屋はすべて公開（参加できる部屋の一覧に出る）
+    createRoom(name) { return this.net.createRoom(name); }
+    // 一覧の部屋か、招待URLの部屋に入る（断られたら reject する。error.code で理由が分かる）
     enterRoom(roomCode, name) { return this.net.enterRoom(roomCode, name); }
     listRooms() { return this.net.listRooms(); }
     resume() { return this.net.resume(); }
+    // 招待URL（URL には部屋番号が入るが、画面には文字で出さない）
+    inviteUrl() { return this.net.inviteUrl(); }
+    // このページの URL を招待URLにする（コピーできなかったとき、アドレスバーから送ってもらう）
+    showRoomInUrl() { this.net.setRoomUrl(this.lobby?.roomCode ?? this.net.session?.roomCode); }
+    // URL から招待の部屋番号を外す（読み込み直しで、また招待の画面を出さない）
+    clearRoomUrl() { this.net.setRoomUrl(null); }
     // 部屋を出る（対戦中なら、自分の席は以後CPUが代わりに操作する）
     // 一覧を見ただけで部屋に入っていなければ、接続を閉じるだけにする（サーバーに退出を送ると「部屋に入っていません」が返る）
     leave() {
