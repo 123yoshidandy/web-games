@@ -7,7 +7,7 @@
 import { resolveOnlineServerUrl } from './netplay/netplay-lobby.js';
 
 export const GAME = 'reversi';
-export const DEPLOYED_SERVER_URL = '';
+export const DEPLOYED_SERVER_URL = 'wss://kuhds82pzk.execute-api.ap-northeast-1.amazonaws.com/prod';
 
 // ?server= で接続先を変えられる。どの接続先にも ?game=reversi を付ける。つなぐ先がなければ null
 export const getServerUrl = () => resolveOnlineServerUrl({ game: GAME, deployed: DEPLOYED_SERVER_URL });

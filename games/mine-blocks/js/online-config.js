@@ -4,4 +4,4 @@
  * 手元（localhost）で開いたときはテスト用サーバー（npm run dev:server）につなぎ、?server=wss://... で接続先を変えられる
  */
 
-const ONLINE_DEPLOYED_SERVER_URL = 'wss://0oz8smh26m.execute-api.ap-northeast-1.amazonaws.com/prod';
+const ONLINE_DEPLOYED_SERVER_URL = 'wss://kuhds82pzk.execute-api.ap-northeast-1.amazonaws.com/prod?game=mine-blocks';

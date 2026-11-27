@@ -3,7 +3,7 @@
  * AWS にデプロイしたら、出力された WebSocketUrl を DEPLOYED_SERVER_URL に書く
  */
 
-const DEPLOYED_SERVER_URL = 'wss://gd2u9xnzm2.execute-api.ap-northeast-1.amazonaws.com/prod';
+const DEPLOYED_SERVER_URL = 'wss://kuhds82pzk.execute-api.ap-northeast-1.amazonaws.com/prod?game=panel-de-pon';
 const LOCAL_SERVER_URL = 'ws://localhost:8787'; // npm run dev:server で起動するテスト用サーバー
 
 // ?server=wss://... で接続先を変えられる。手元（localhost）で開いたときはテスト用サーバーにつなぐ。

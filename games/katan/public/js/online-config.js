@@ -5,7 +5,7 @@
 
 import NetplayClient from './netplay/netplay-client.mjs';
 
-const DEPLOYED_SERVER_URL = 'wss://4bq36mhf28.execute-api.ap-northeast-1.amazonaws.com/prod';
+const DEPLOYED_SERVER_URL = 'wss://kuhds82pzk.execute-api.ap-northeast-1.amazonaws.com/prod?game=katan';
 
 // ?server=wss://... で接続先を変えられる。手元（localhost）で開いたときはテスト用サーバー（ws://localhost:8787）につなぐ
 export function getServerUrl() {
