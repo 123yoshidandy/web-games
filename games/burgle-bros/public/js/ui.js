@@ -13,6 +13,7 @@ import {
 import { floorHtml, pawnHtml, guardPath, titleArtHtml } from './board.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult } from './netplay/user-stats.js';
@@ -123,6 +124,7 @@ export default class UI {
     // ---- タイトル ----
 
     bindTitle() {
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         const seg = (id, key, parse = (v) => v) => $(id).addEventListener('click', event => {
             const button = event.target.closest('button');
             if (!button) return;
@@ -205,6 +207,7 @@ export default class UI {
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.view = null;
+        this.cancelResult?.();
         this.update();
     }
 
@@ -279,6 +282,9 @@ export default class UI {
         if (!this.controller) return;
         const v = this.controller.getView();
         const prev = this.view;
+        // 駒と見張りの位置は、描き直す前に測る（見せる階が変わるときは動かさない）
+        const before = Motion.captureRects($('grid'), '.pawn, .guard', 'key');
+        const floorBefore = this.viewFloor;
         this.soundFrom = prev?.logTotal ?? 0;
         this.view = v;
         // 手番の人が変わった・階を移ったら、その人の階を見せる
@@ -289,6 +295,7 @@ export default class UI {
         if (this.pick && (!prev || prev.logTotal !== v.logTotal || prev.current !== v.current)) this.setPick(null);
         this.flash = new Set(prev && prev.logTotal !== v.logTotal ? v.events.filter(e => e.type === 'reveal' && floorOf(e.at) === this.viewFloor).map(e => cellOf(e.at)) : []);
         this.render();
+        if (prev) this.animateChanges(prev, v, before, floorBefore === this.viewFloor);
         this.playUpdateSound(prev);
         this.showRoll(v, prev);
         if (v.phase === 'spot' && this.can(v.current) && this.sheetKind !== 'spot') this.openSpot();
@@ -298,8 +305,34 @@ export default class UI {
             // ローカル対戦の結果を、ログインしている人の記録に送る（オンライン対戦はサーバーが記録する）
             if (!this.controller.isOnline) recordResult({ game: GAME, id: `${GAME}-${this.controller.seed}`, outcome: v.result.won ? 'win' : 'loss' });
             this.setPick(null);
-            setTimeout(() => this.openResult(), 700);
+            this.cancelResult = Motion.afterIdle(() => this.openResult(), 700);
         }
+    }
+
+    // 描き直したあと：前のビューとの差を動かす（泥棒と見張りは部屋から部屋へ滑り、めくった部屋は裏返り、鳴った警報は弾み、ハック・隠密・宝は変わると目立つ）
+    animateChanges(prev, v, before, sameFloor) {
+        if (!Motion.enabled() || prev.logTotal === v.logTotal) return;
+        const grid = $('grid');
+        if (sameFloor) Motion.flipFrom(before, grid, '.pawn, .guard', 'key', { duration: 360, enter: null });
+        const f = this.viewFloor;
+        const tileOf = (c) => grid.querySelector(`.tile[data-cell="${c}"]`);
+        v.floors[f].tiles.forEach((t, c) => {
+            const old = prev.floors[f]?.tiles[c];
+            if (!old) return;
+            if (t.revealed && !old.revealed) Motion.flipCard(tileOf(c), { duration: 380 });
+            if (t.alarm && !old.alarm) Motion.popIn(tileOf(c)?.querySelector('.siren'), { duration: 360, delay: 100 });
+            if (t.cracked && !old.cracked) Motion.pulse(tileOf(c)?.querySelector('.num'), { duration: 380, scale: 1.4 });
+        });
+        for (const k of HACK_TYPES) {
+            if (v.hacks[k] !== prev.hacks[k]) Motion.pulse($('hacks').querySelector(`.hk.${k}`), { duration: 380, scale: 1.3 });
+        }
+        v.players.forEach(p => {
+            const old = prev.players[p.id];
+            const row = $('team').querySelector(`[data-seat="${p.id}"]`);
+            if (!old || !row) return;
+            if (p.stealth !== old.stealth) Motion.pulse(row.querySelector('.stealth'), { duration: 380, scale: 1.3 });
+            if (p.loot.length > old.loot.length) Motion.pulse(row.querySelector('.loot'), { duration: 420, scale: 1.4 });
+        });
     }
 
     // 1回の更新に1つの音。自分の操作の音は send で鳴らす。ほかの人の手は知らせ、自分の番になったらチャイム

@@ -11,6 +11,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { suggest, runCpuStep, isCpuTurn } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_STEP_DELAY_MS = 550;
 const SAVE_KEY = 'burgle-bros.save';
@@ -40,7 +41,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = Math.max(0, this.game.players.findIndex(p => !p.isCPU));
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.save();
     }
 
@@ -103,9 +104,10 @@ export default class LocalGameController {
 
     // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (this.mode !== 'team' || !isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        // 盤やカードの動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 runCpuStep(this.game);
             } catch (error) {
@@ -129,6 +131,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

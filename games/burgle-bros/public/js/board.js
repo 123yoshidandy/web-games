@@ -34,13 +34,13 @@ export const ROOM_ICONS = {
 const GUARD_ICON = '<svg class="guard-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a6 6 0 0 1 6 6v2H6V8a6 6 0 0 1 6-6z"/><path d="M4 10h16" /><circle cx="12" cy="15" r="5"/><path d="M9.5 15h5"/></svg>';
 
 // 泥棒の駒（色と頭文字）
-export function pawnHtml(char, extra = '') {
+export function pawnHtml(char, extra = '', attrs = '') {
     const c = CHARACTERS[char];
-    return `<span class="pawn ${extra}" style="--pc:${c.color}" title="${c.name}">${c.name[0]}</span>`;
+    return `<span class="pawn ${extra}" ${attrs} style="--pc:${c.color}" title="${c.name}">${c.name[0]}</span>`;
 }
 
-export function guardHtml(extra = '') {
-    return `<span class="guard ${extra}" title="見張り">${GUARD_ICON}</span>`;
+export function guardHtml(extra = '', attrs = '') {
+    return `<span class="guard ${extra}" ${attrs} title="見張り">${GUARD_ICON}</span>`;
 }
 
 // 1つの階の盤
@@ -85,7 +85,7 @@ export function floorHtml(v, f, opts = {}) {
         if (t.alarm) inner += '<span class="siren" aria-label="警報"></span>';
         if (g.active && g.dest === c) inner += '<span class="dest" title="見張りの行き先">◎</span>';
         const pawns = v.players.filter(p => !p.escaped && p.floor === f && p.cell === c);
-        const people = pawns.map(p => pawnHtml(p.char, p.id === v.current ? 'cur' : '')).join('') + (g.active && g.cell === c ? guardHtml() : '');
+        const people = pawns.map(p => pawnHtml(p.char, p.id === v.current ? 'cur' : '', `data-key="p${p.id}"`)).join('') + (g.active && g.cell === c ? guardHtml('', 'data-key="guard"') : '');
         if (people) inner += `<span class="people">${people}</span>`;
         cells.push(`<button type="button" class="${cls}" data-cell="${c}" aria-label="${t.revealed ? ROOMS[t.type].name : '未確認の部屋'}">${inner}</button>`);
     }
