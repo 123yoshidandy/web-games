@@ -1,0 +1,6 @@
+/* ナンバーリンクの色（共通の css/style.css の変数を上書きする）：紙の地に、梅色の差し色 */
+:root {
+    --accent: #7a3b6e;
+    --accent-strong: #5c2b53;
+    --accent-soft: rgba(122, 59, 110, .12);
+}
