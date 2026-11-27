@@ -76,6 +76,12 @@ export default {
 
     isOver: (game) => game.phase === 'end',
 
+    // 利用者ごとの記録に使う結果：当てた席（同じラウンドなら全員）。誰も当てられなければ引き分け
+    result: (game) => {
+        if (game.phase !== 'end') return null;
+        return game.winners.length > 0 ? { winners: game.winners } : { draw: true };
+    },
+
     // 対戦中に抜けた人は待たない（切断は戻ってくるかもしれないので待つ）
     // 抜けたことを全員の表示に出すため、公開しなくてもビューを送る
     onPlayerGone(ctx, { seat, reason }) {

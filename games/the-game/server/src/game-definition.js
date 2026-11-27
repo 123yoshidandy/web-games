@@ -61,6 +61,8 @@ export default {
     },
 
     isOver: (game) => game.isOver,
+    // 協力のゲーム：98枚を出し切れたら成功
+    result: (game) => (game.result ? { coop: true, won: Boolean(game.result.win) } : null),
 
     cpu: {
         needsStep: (game) => hasCpuWork(game),

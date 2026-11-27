@@ -12,7 +12,8 @@ import ReplayPlayer from './replay-player.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const CPU_NAMES = ['ゾラ', 'キボ', 'ネマ'];
 const HUMAN_NAME = 'あなた';
@@ -740,8 +741,22 @@ function showLog() {
 
 // ===== 結果 =====
 
+// ローカル対戦（人1人と CPU・ひとり）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）。ひとり用は勝ち負けがないので、回数だけ
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline || app.replay) return;
+    const winners = view.ranking.filter(r => r.rank === 1).map(r => r.seat);
+    recordResult({
+        game: GAME,
+        id: `${GAME}-${controller.options.seed}`,
+        outcome: view.mode === 'solo' ? null : outcomeFromWinners(winners, mySeat(view), view.players.length)
+    });
+}
+
 function finishGame(view) {
     const me = mySeat(view);
+    recordLocalResult(view);
     if (view.mode === 'solo') {
         const best = app.best[view.difficulty];
         const record = !best || view.soloTotal < best;

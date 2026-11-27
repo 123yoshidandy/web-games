@@ -6,6 +6,7 @@
 import { BLANK, MAX_ROWS, baseKana, boardWidth, checkGuess, createRandom, cycleVariant, evaluateGuess, normalizeLetter, pickAnswer, suggest, trimBlanks, usesBlank } from './logic.js';
 import { resultMessage, setupOnline } from './online.js';
 import { music } from './music.js';
+import { recordResult } from './netplay/user-stats.js';
 
 const MODE_STORAGE_KEY = 'wordle-mode';
 const GAME_STORAGE_KEY = 'wordle-game'; // 1人プレイの途中経過（モード・シード・入れた単語）
@@ -403,6 +404,9 @@ function clearHint() {
 function checkGameEnd(word) {
     if (word === state.secret || state.currentRow >= MAX_ROWS) {
         state.gameOver = true;
+        // ひとり用の結果を、ログインしている人の記録に送る（当てたら勝ち、外したら負け）
+        // id はシードから作る（同じ対戦を2回数えない）。オンライン対戦はサーバーが記録する
+        recordResult({ game: 'wordle', id: `wordle-${state.seed}`, outcome: word === state.secret ? 'win' : 'loss' });
     }
 
     const secret = state.secret;

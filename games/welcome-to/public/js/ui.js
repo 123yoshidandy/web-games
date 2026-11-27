@@ -16,7 +16,8 @@ import { HELP_HTML } from './help.js';
 import { suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const SETTINGS_KEY = 'welcome-to.settings';
 const CPU_NAMES = ['ベティ', 'フランク', 'ドリス', 'ハロルド', 'ルース'];
@@ -590,9 +591,23 @@ export default class UI {
         this.openDialog('others-dialog');
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。ひとり用は勝ち負けがないので、回数だけ
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !controller.game) return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: view.players.length === 1 ? null : outcomeFromWinners(view.winners, view.you, view.players.length)
+        });
+    }
+
     showResult() {
         const view = this.controller?.getView();
         if (!view || view.phase !== 'end') return;
+        this.recordLocalResult(view);
         const won = view.winners.includes(view.you);
         const solo = view.players.length === 1;
         $('result-title').textContent = solo ? `${view.players[0].score.total}点` : won ? 'あなたの勝ち！' : 'あなたの負け';

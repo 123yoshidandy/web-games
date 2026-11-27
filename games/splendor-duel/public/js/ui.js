@@ -9,7 +9,8 @@ import {
 } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS } from './game-controller.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 import { symbolsSvg, tokenChip, cardHtml, cardBackHtml, royalHtml, gemIcon, lineIcon, scrollIcon } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
@@ -423,9 +424,23 @@ export default class UI {
         else if (prevCurrent !== view.you) music.play('notify');
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を何度送っても1回しか数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || view.phase !== 'end') return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners(view.winners, view.you, view.players.length)
+        });
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        this.recordLocalResult(view);
         const before = captureAnchors();
         const prevCurrent = this.view?.current;
         this.view = view;

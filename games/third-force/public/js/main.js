@@ -19,6 +19,7 @@ import { helpMarkup } from './help.js';
 import { music } from './music.js';
 import { KEYS, store, loadRulesets, saveRulesets, newId, MAX_SAVED } from './storage.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
+import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
 
 const $ = (id) => document.getElementById(id);
@@ -212,6 +213,9 @@ function finishBattle() {
     if (s.winner === null) music.play('notify');
     else if (mode === 'watch' || mode === 'replay') music.play('notify');
     else music.play(won ? 'win' : 'lose');
+    // CPU との対戦だけ、ログインしている人の記録に送る（観戦・リプレイは数えない。オンラインはサーバーが記録する）
+    // id はシードから作る（同じ対戦を2回数えない）
+    if (mode === 'cpu') recordResult({ game: GAME, id: `${GAME}-${run.record.seed}`, outcome: s.winner === null ? 'draw' : won ? 'win' : 'loss' });
     setTimeout(() => showResult(s), reducedMotion ? 0 : 700);
 }
 

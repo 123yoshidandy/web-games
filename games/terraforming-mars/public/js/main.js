@@ -13,7 +13,8 @@ import { helpMarkup } from './help.js';
 import { suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'tm.settings.v1', save: 'tm.save.v1' };
@@ -268,6 +269,7 @@ function render() {
     if ((mine('setup') || mine('research')) && sheet !== 'buy') openSheet('buy');
     else if (sheet) renderSheet();
     markHint();
+    if (view.phase === 'end') recordLocalResult(view);
     if (view.phase === 'end' && !resultShown) {
         resultShown = true;
         setTimeout(showResult, 600);
@@ -542,7 +544,17 @@ function openLog() {
     body.scrollTop = body.scrollHeight;
 }
 
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）。1台で複数の人が遊ぶ対戦は送らない
+function recordLocalResult(view) {
+    if (!controller || controller.isOnline || !controller.game) return;
+    const { players, options } = controller.game;
+    if (players.filter(p => !p.isCPU).length !== 1) return;
+    recordResult({ game: GAME, id: `${GAME}-${options.seed}`, outcome: outcomeFromWinners(view.winners, view.seat, players.length) });
+}
+
 function showResult() {
+
     if (!view || view.phase !== 'end') return;
     const winners = view.winners ?? [];
     $('result-title').textContent = winners.includes(view.seat) ? 'あなたの勝ち' : `${winners.map(nameOf).join('・')}の勝ち`;

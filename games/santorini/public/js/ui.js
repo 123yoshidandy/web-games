@@ -11,7 +11,8 @@ import { N, xOf, yOf } from './rules.js';
 import * as art from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
 
 const SETTINGS_KEY = 'santorini.settings';
 const $ = (id) => document.getElementById(id);
@@ -222,6 +223,7 @@ export default class UI {
         const previous = this.view;
         this.render();
         this.playUpdateSound(previous);
+        this.recordLocalResult(previous);
     }
 
     onControllerError(message) {
@@ -253,6 +255,18 @@ export default class UI {
     get myTurn() {
         const v = this.view;
         return !!v && !v.over && v.current === v.seat;
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // 終局に切り替わった1回だけ送る。id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(previous) {
+        const v = this.view;
+        const controller = this.controller;
+        if (!previous || !v || controller?.isOnline || controller?.isReplay) return;
+        const finished = v.over;
+        const wasOver = previous.over;
+        if (!finished || wasOver) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: v.winner === null || v.winner === undefined ? null : v.winner === v.seat ? 'win' : 'loss' });
     }
 
     // 1回の更新に1つの音。自分の手の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム

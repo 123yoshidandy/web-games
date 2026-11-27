@@ -62,6 +62,9 @@ export default {
 
     isOver: game => game.isOver(),
 
+    // 利用者ごとの記録：協力のゲームなので、着陸できたかどうか（全員が同じ結果）
+    result: game => ({ coop: true, won: game.won }),
+
     cpu: {
         needsStep: game => cpuSeatsToAct(game).length > 0,
         step: game => {

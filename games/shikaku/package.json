@@ -20,10 +20,7 @@
       "パズル"
     ],
     "players": [1, 2, 3, 4],
-    "minutes": [
-      5,
-      20
-    ],
+    "minutes": [5, 20],
     "weight": 2
   },
   "dependencies": {

@@ -39,6 +39,8 @@ export default {
     },
 
     isOver: (game) => game.isOver(),
+    // 勝った席（最多の勝利点。同点は全員）。ゲームの勝者は game.state.winners にある
+    result: (game) => ({ winners: game.state.winners }),
 
     // 手番は1人ずつなので、手番の人が CPU なら進める
     cpu: {

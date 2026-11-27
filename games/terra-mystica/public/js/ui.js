@@ -8,7 +8,8 @@ import Game, { MIN_PLAYERS, MAX_PLAYERS, CONVERSIONS, SPECIALS } from './game.js
 import { LEVELS, paymentPlan } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame, CPU_DELAY_MS } from './game-controller.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 import { MIN_PLAYERS as ONLINE_MIN, MAX_PLAYERS as ONLINE_MAX } from './game.js';
 import BoardView, { buildingSvg } from './board-view.js';
 import {
@@ -386,6 +387,7 @@ export default class UI {
 
     afterRender() {
         const s = this.view.state;
+        if (s.phase === 'end') this.recordLocalResult(s);
         if (s.phase === 'end') {
             if (!this.resultShown) {
                 this.resultShown = true;
@@ -984,6 +986,16 @@ export default class UI {
         $('#log').showModal();
         const list = $('#log-list');
         list.scrollTop = list.scrollHeight;
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で複数の人が遊ぶ対戦は送らない
+    recordLocalResult(s) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !controller.game) return;
+        const { players, options } = controller.game;
+        if (players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({ game: GAME, id: `${GAME}-${options.seed}`, outcome: outcomeFromWinners(s.winners, this.you, s.players.length) });
     }
 
     showResult() {

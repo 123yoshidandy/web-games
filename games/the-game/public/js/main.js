@@ -9,7 +9,8 @@ import { CPU_HELP, LEVELS, LEVEL_NAMES } from './cpu.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
@@ -150,7 +151,18 @@ function update() {
     if (app.scene === 'game') render(view);
 }
 
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）。1台で複数の人が遊ぶ対戦は送らない
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline) return;
+    if (controller.setup.players.filter(p => !p.isCPU).length !== 1) return;
+    recordResult({ game: GAME, id: `${GAME}-${controller.setup.seed}`, outcome: view.result.win ? 'win' : 'loss' });
+}
+
 function onGameEnd(view, live) {
+    recordLocalResult(view);
+
     // 出し切りは win、10枚以下は notify、それ以外は lose
     if (live) music.play(view.result.win ? 'win' : view.result.excellent ? 'notify' : 'lose');
     clearTimeout(app.resultTimer);

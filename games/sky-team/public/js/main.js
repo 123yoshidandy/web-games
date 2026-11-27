@@ -10,7 +10,8 @@ import { music } from './music.js';
 import { AIRPORTS, AIRPORT_KEYS, SLOTS, SLOT_IDS, REASON_TEXT, ROLE_NAMES, canPlaceWithReserve } from './rules.js';
 import { PLAYERS } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'skyteam.settings', save: 'skyteam.save' };
@@ -166,6 +167,18 @@ function goHome() {
 
 // ---------- 更新 ----------
 
+// ローカル対戦（人1人と CPU の協力）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を何度送っても1回しか数えない）
+function recordLocalResult() {
+    if (!controller || controller.isOnline || view.phase !== 'end') return;
+    if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+    recordResult({
+        game: GAME,
+        id: `${GAME}-${controller.game.options.seed}`,
+        outcome: view.result?.win ? 'win' : 'loss'
+    });
+}
+
 function onUpdate() {
     if (!controller) return;
     const prev = view;
@@ -177,6 +190,7 @@ function onUpdate() {
     if (fresh.length) ui.hint = null;
     playSound(fresh, prev);
     saveProgress();
+    recordLocalResult();
     render();
     renderLog();
     flash(fresh);

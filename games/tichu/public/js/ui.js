@@ -14,7 +14,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { cardHtml } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const SETTINGS_KEY = 'tichu.settings';
 const NAMES = ['あなた', 'ロン', '味方のメイ', 'ハク'];
@@ -339,6 +340,7 @@ export default class UI {
 
         // 竜の場を渡す相手を選ぶ
         if (view.phase === 'dragon' && view.dragonFrom === view.seat && !$('#dragon').open) this.showDragon();
+        if (view.phase === 'end') this.recordLocalResult(view);
         const roundEnd = fresh.filter(e => e.type === 'roundEnd').at(-1);
         if (roundEnd) this.showRound(roundEnd.result);
         else if (view.phase === 'end' && !$('#round').open && !$('#result').open) this.showResult();
@@ -594,6 +596,16 @@ export default class UI {
             <tr><td colspan="3" class="muted round-note">上がった順：${result.finished.map(s => escapeHtml(view.players[s].name)).join(' → ')}${calls.length ? `<br>${calls.map(escapeHtml).join('・')}` : ''}</td></tr>`;
         $('#round-next').textContent = view.phase === 'end' ? '結果を見る' : '次のラウンドへ';
         if (!$('#round').open) $('#round').showModal();
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で複数の人が遊ぶ対戦は送らない
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !controller.game) return;
+        const { players, options } = controller.game;
+        if (players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({ game: GAME, id: `${GAME}-${options.seed}`, outcome: view.winner === teamOf(view.seat) ? 'win' : 'loss' });
     }
 
     showResult() {

@@ -6,7 +6,7 @@
  * 各プレイヤーには、そのプレイヤーから見える状態（ビュー）だけを送る。ほかの人の手札と、渡した札は送らない
  */
 
-import Game, { PLAYERS, COMMAND_FIELDS } from '../../public/js/game.js';
+import Game, { PLAYERS, COMMAND_FIELDS, teamOf } from '../../public/js/game.js';
 import { createGameView } from '../../public/js/game-view.js';
 import { runCpuStep, isCpuTurn } from '../../public/js/cpu-player.js';
 
@@ -40,6 +40,11 @@ export default {
     },
 
     isOver: (game) => game.isOver(),
+
+    // 利用者ごとの記録に使う結果：勝ったチーム（席 % 2）の全員。game.winner はチームの番号なので、席として読ませない
+    result: (game) => (game.winner === null || game.winner === undefined
+        ? null
+        : { winners: [0, 1, 2, 3].filter((seat) => teamOf(seat) === game.winner) }),
 
     // CPU の手番なら進める
     cpu: {

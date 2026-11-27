@@ -56,6 +56,8 @@ export default {
     },
 
     isOver: (game) => game.isOver,
+    // 協力のゲーム：ミッションの成功・失敗
+    result: (game) => (game.result ? { coop: true, won: Boolean(game.result.success) } : null),
 
     cpu: {
         needsStep: (game) => hasCpuWork(game),

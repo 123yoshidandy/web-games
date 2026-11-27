@@ -9,7 +9,8 @@ import { cardDefs, cardSvg, cardLabel } from './card-art.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 
 const CPU_NAMES = ['ミナ', 'ソウタ', 'リオ'];
 const HUMAN_NAME = 'あなた';
@@ -208,6 +209,7 @@ function update() {
     if (view.phase === 'end' && !app.resultShown) {
         app.resultShown = true;
         onFinished(view);
+        if (previous) recordLocalResult(view);
         setTimeout(() => showResult(), previous ? RESULT_DELAY_MS : 0);
     }
 }
@@ -452,6 +454,15 @@ function onFinished(view) {
     const rank = best.indexOf(entry);
     app.bestRank = rank >= 0 ? rank : null;
     storage.save('best', best);
+}
+
+// ローカル対戦（人1人と CPU、またはひとりのタイムアタック）の結果を、ログインしている人の記録に送る
+// オンライン対戦はサーバーが記録する。id はシードから作る（同じ対戦を2回数えない）。タイムアタックは勝ち負けがないので回数だけ
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline || controller.isReplay || !view.result) return;
+    const outcome = view.players.length === 1 ? null : outcomeFromWinners(view.result.winners, view.viewer, view.players.length);
+    recordResult({ game: GAME, id: `${GAME}-${controller.game.seed}`, outcome });
 }
 
 function showResult() {

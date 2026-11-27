@@ -13,7 +13,8 @@ import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, icon, dieHtml, windowHtml, difficultyDots, colorChip, titleArtSvg } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 
 // 自分の操作の音：窓を選ぶ・ダイスを取って置く・置く・道具（払う）・値を決める・番を終える
@@ -133,6 +134,7 @@ export default class UI {
         const previous = this.view;
         this.render();
         this.playUpdateSound(previous);
+        this.recordLocalResult(previous);
     }
 
     onControllerError(message) {
@@ -289,6 +291,18 @@ export default class UI {
         this.sending = false;
         // ラウンドが変わったときは、新しいダイスの音（playUpdateSound）だけにする
         if (ok && this.view.phase === phase && this.view.round === round) music.play(command.type === 'place' && command.cell === null ? 'cancel' : COMMAND_SOUND[command.type] ?? 'place');
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // 終局に切り替わった1回だけ送る。id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(previous) {
+        const v = this.view;
+        const controller = this.controller;
+        if (!previous || !v || controller?.isOnline || controller?.isReplay) return;
+        const finished = v.phase === 'end';
+        const wasOver = previous.phase === 'end';
+        if (!finished || wasOver) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: v.solo ? (v.winners.length ? 'win' : 'loss') : outcomeFromWinners(v.winners, v.you, v.players.length) });
     }
 
     // 1回の更新に1つの音。自分の手の音は send で鳴らす。新しいラウンドはダイス、CPU の手は知らせ、自分の番になったらチャイム

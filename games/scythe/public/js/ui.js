@@ -18,7 +18,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import BoardView, { RES_COLORS, RES_GLYPH } from './board-view.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 
 // 自分の操作の音（書いていない行動は place）
 const COMMAND_SOUND = {
@@ -243,6 +244,7 @@ export default class UI {
         const previous = this.view;
         this.view = this.controller.getView();
         this.playUpdateSound(previous);
+        this.recordLocalResult(previous);
         const v = this.view;
         const key = `${v.turnCount}:${v.step}:${v.section}:${v.combat ? v.combat.hex : ''}`;
         if (key !== this.selKey) {
@@ -254,6 +256,18 @@ export default class UI {
         this.handleEvents();
         this.render();
         this.openDialogs();
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // 終局に切り替わった1回だけ送る。id はシードから作る（同じ対戦を2回数えない）
+    recordLocalResult(previous) {
+        const v = this.view;
+        const controller = this.controller;
+        if (!previous || !v || controller?.isOnline || controller?.isReplay) return;
+        const finished = v.phase === 'end';
+        const wasOver = previous.phase === 'end';
+        if (!finished || wasOver) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: outcomeFromWinners(v.winners, v.you, v.players.length) });
     }
 
     // 1回の更新に1つの音。自分の操作の音は send で鳴らす。CPU の手は知らせ、自分の番になったらチャイム

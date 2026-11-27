@@ -14,7 +14,8 @@ import { mapSvg, titleArtSvg, TERRAIN_COLORS } from './map.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 // オンラインのコントローラーを、画面が使うローカルの形（send(seat, command)・canControl(seat) など）に合わせる
 // オンラインでは自分の精霊だけを動かす。ヒントはない
@@ -191,7 +192,7 @@ export default class UI {
             ? { name: i === 0 ? 'あなた' : CPU_NAMES[i - 1], isCPU: i > 0 }
             : { name: `${i + 1}P`, isCPU: false }));
         clearSavedGame();
-        this.startWith({ players, options: { level, spirits }, mode: team ? 'team' : 'all' });
+        this.startWith({ players, options: { level, spirits, seed: Math.floor(Math.random() * 2 ** 32) }, mode: team ? 'team' : 'all' });
     }
 
     startWith(setup) {
@@ -349,10 +350,20 @@ export default class UI {
         if (this.pick && !this.pickStillValid()) this.pick = null;
         this.render();
         this.playUpdateSound(prev);
+        this.recordLocalResult(v);
         if (v.result && !this.resultShown) {
             this.resultShown = true;
             setTimeout(() => this.openResult(), 700);
         }
+    }
+
+// ローカル対戦（人1人と CPU の協力）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // 1台で複数の人が交代で遊ぶ対戦は送らない。id はシードから作る（同じ対戦を何度送っても1回しか数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !view.result) return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({ game: GAME, id: `${GAME}-${controller.game.options.seed}`, outcome: view.result.won ? 'win' : 'loss' });
     }
 
     pickStillValid() {

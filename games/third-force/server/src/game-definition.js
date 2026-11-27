@@ -98,6 +98,8 @@ export default {
     },
 
     isOver: (game) => game.phase === 'over',
+    // 勝った席。引き分け（winner が null）は draw
+    result: (game) => (game.result ? (game.result.winner === null ? { draw: true } : { winners: [game.result.winner] }) : null),
     carryOver: (game) => ({ wins: [...game.wins] }),
 
     // CPU の席（抜けた人の席も）は、ロビーで選んだ組み込みの戦術を出す

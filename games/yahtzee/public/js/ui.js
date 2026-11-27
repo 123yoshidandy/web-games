@@ -12,7 +12,8 @@ import { loadRecords, bestOf } from './records.js';
 import { dieSvg, miniDie, pipsSvg } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const SETTINGS_KEY = 'yahtzee.settings';
 const MAX_CPUS = 3;
@@ -494,9 +495,23 @@ export default class UI {
 
     // ---- 結果と記録 ----
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。ひとり用は勝ち負けがないので、回数だけ
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !controller.game) return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: view.players.length === 1 ? null : outcomeFromWinners(view.winners, view.you, view.players.length)
+        });
+    }
+
     showResult() {
         const view = this.view;
         if (!view || view.phase !== 'end' || $('#result').open) return;
+        this.recordLocalResult(view);
         const me = view.results[view.you];
         const multi = view.players.length > 1;
         const youWon = view.winners.includes(view.you);

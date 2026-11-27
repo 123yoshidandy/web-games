@@ -11,7 +11,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import { CPU_LEVELS, suggest } from './cpu-player.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { symbolsSvg, tileGroup, tileSvg, stoneSvg, trailPath, pointXY, dotHtml, dragonBadge, U, PAD, COLORS } from './art.js';
 
@@ -339,6 +340,7 @@ export default class UI {
         this.renderHand(view);
         this.tick();
         if ($('#log').open) this.renderLog();
+        if (view.over) this.recordLocalResult(view);
         if (view.over && !$('#result').open && !this.resultTimer && !this.resultShown) {
             const wait = Math.max(0, ...this.anims.map(a => a.start + a.dur - performance.now()));
             this.resultTimer = setTimeout(() => {
@@ -587,6 +589,16 @@ export default class UI {
 
     renderLog() {
         $('#log-list').innerHTML = this.view.logs.slice(-200).map(text => `<li>${escapeHtml(text)}</li>`).join('');
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。1台で複数の人が遊ぶ対戦は送らない
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !controller.game) return;
+        const { players, options } = controller.game;
+        if (players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({ game: GAME, id: `${GAME}-${options.seed}`, outcome: outcomeFromWinners(view.winners, view.you, view.players.length) });
     }
 
     showResult() {

@@ -12,7 +12,8 @@
 import { FLOWER, SKULL, WINS_NEEDED } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS } from './game-controller.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { discHtml, coasterHtml, PLAYER_COLORS } from './art.js';
 import { music } from './music.js';
@@ -353,9 +354,23 @@ export default class UI {
 
     // ---- 描く ----
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を何度送っても1回しか数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || view.phase !== 'end') return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners([view.winner], view.seat, view.players.length)
+        });
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        this.recordLocalResult(view);
         const prevCurrent = this.view?.current;
         this.view = view;
         if (view.phase === 'bid' && this.bidding === null && view.current === view.seat) this.bidding = view.bid + 1;

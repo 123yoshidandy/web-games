@@ -10,7 +10,8 @@ import { CPU_HELP } from './cpu.js';
 import * as storage from './storage.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
@@ -210,9 +211,19 @@ function resetSelection() {
     app.prepSel = [];
 }
 
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を2回数えない）。1台で複数の人が遊ぶ対戦は送らない
+function recordLocalResult(result) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline) return;
+    if (controller.setup.players.filter(p => !p.isCPU).length !== 1) return;
+    recordResult({ game: GAME, id: `${GAME}-${controller.setup.seed}`, outcome: result.success ? 'win' : 'loss' });
+}
+
 // ゲームが終わったら、航海日誌に挑戦の回数を書く（遭難信号を使ったら1回増やす）
 function onGameEnd(result) {
     music.play(result.success ? 'win' : 'lose');
+    recordLocalResult(result);
     const view = app.controller.getView();
     const m = view.mission;
     const attempts = (app.progress.attempts[m] ?? 0) + 1 + (view.distressUsed ? 1 : 0);

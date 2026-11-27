@@ -13,7 +13,8 @@ import { SIZE, SENTE, GOTE, HAND_TYPES, PROMOTE, sideOf, typeOf } from './rules.
 import { SIDE_MARK, SIDE_NAME, KAN, PIECE_NAME, squareName } from './notation.js';
 import LocalGameController, { loadSavedGame, clearSavedGame, CPU_MOVE_MS } from './game-controller.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { getServerUrl, GAME } from './online-config.js';
+import { recordResult } from './netplay/user-stats.js';
 import { PLAYERS, CLOCK_PRESETS } from './game.js';
 import { reading, isLow, formatClock } from './clock.js';
 import { CPU_LEVELS } from './cpu-player.js';
@@ -160,7 +161,8 @@ export default class UI {
             ? [{ name: '先手', isCPU: false }, { name: '後手', isCPU: false }]
             : [{ name: 'あなた', isCPU: false }, { name: 'CPU', isCPU: true, cpuLevel: level }];
         if (mode === 'cpu' && side === 1) players.reverse();
-        this.startGame({ players, options: clock ? { clock } : {} });
+        // startedAt は記録の id に使う（将棋にはシードがないので、始めた時刻で対局を区別する）
+        this.startGame({ players, options: { ...(clock ? { clock } : {}), startedAt: Date.now() } });
     }
 
     stopGame() {
@@ -374,6 +376,7 @@ export default class UI {
         const view = this.controller.getView();
         const prev = this.view;
         this.view = view;
+        this.recordLocalResult(prev);
         // ヒントと待ったはローカル対局だけ
         $('#hint').hidden = Boolean(this.controller.isOnline);
         $('#undo').hidden = Boolean(this.controller.isOnline);
@@ -392,6 +395,19 @@ export default class UI {
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // 終局に切り替わった1回だけ送る。id は対局を始めた時刻から作る（同じ対局を2回数えない）。2人で遊ぶ対局（人が2人）は送らない
+    recordLocalResult(prev) {
+        const v = this.view;
+        const controller = this.controller;
+        if (!prev || controller.isOnline || v.twoPlayers || v.you === null) return;
+        if (!v.over || prev.over) return;
+        const startedAt = controller.game.options.startedAt;
+        if (!startedAt) return;
+        const outcome = v.winner === null ? 'draw' : v.winner === v.you ? 'win' : 'loss';
+        recordResult({ game: GAME, id: `${GAME}-${startedAt}`, outcome });
     }
 
     sideLabel(side) {

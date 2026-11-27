@@ -15,7 +15,7 @@
 import { GameError } from 'netplay-kit/server/room-service.js';
 import {
     createGame, applyCommand, viewFor, takeOver, nextEventTime, pickerOf, isOver,
-    LEVELS, TIME_LIMITS, DEFAULT_TIME_LIMIT, DIFFICULTIES, MAX_PLAYERS
+    LEVELS, TIME_LIMITS, DEFAULT_TIME_LIMIT, DIFFICULTIES, MAX_PLAYERS, rankingOf
 } from '../../public/js/game.js';
 import { cpuCommand, chooseRow } from '../../public/js/cpu-player.js';
 
@@ -100,6 +100,14 @@ export default {
     },
 
     isOver: (game) => isOver(game),
+
+    // 利用者ごとの記録に使う結果：席ごとの順位（宝石の数で比べた順位。同じなら同順位）
+    result: (game) => {
+        if (!isOver(game)) return null;
+        const ranks = Array(game.players.length).fill(1);
+        for (const { seat, rank } of rankingOf(game)) ranks[seat] = rank;
+        return { ranks };
+    },
 
     // CPU が宝石を取る番なら、続けて取る
     cpu: {

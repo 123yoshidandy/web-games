@@ -7,7 +7,8 @@
 import { CARDS, FACTIONS, TRADE_CARDS, EXPLORER, SCOUT, VIPER } from './cards.js';
 import LocalGameController, { loadSavedGame, clearSavedGame, CPU_ACTION_DELAY_MS } from './game-controller.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 import { CPU_LEVELS } from './cpu-player.js';
 import { symbolsSvg, cardHtml, icon, emblem } from './art.js';
@@ -405,9 +406,23 @@ export default class UI {
         if (fresh.some(e => e.type === 'attack' && e.seat !== view.you)) music.play('notify');
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を何度送っても1回しか数えない）
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || view.phase !== 'end') return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: outcomeFromWinners([view.winner], view.you, view.players.length)
+        });
+    }
+
     render() {
         if (!this.controller) return;
         const view = this.controller.getView();
+        this.recordLocalResult(view);
         this.view = view;
         // 始めた時点までの出来事は鳴らさない
         const lastSeq = this.lastSeq;

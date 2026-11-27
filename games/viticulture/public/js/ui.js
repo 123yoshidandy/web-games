@@ -11,7 +11,8 @@ import { symbolsSvg, sym, titleArtHtml } from './art.js';
 import { helpHtml } from './help.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const SETTINGS_KEY = 'viticulture.settings';
 const CPU_NAMES = ['ジュリア', 'マルコ', 'ソフィア', 'ニコロ', 'キアラ'];
@@ -536,9 +537,23 @@ ${seat === view.you && p.hand.length ? p.hand.map(cardHtml).join('') : ''}`;
         list.scrollTop = list.scrollHeight;
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。ひとり用は勝ち負けがないので、回数だけ
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !controller.game) return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: view.players.length === 1 ? null : outcomeFromWinners(view.winners, view.you, view.players.length)
+        });
+    }
+
     showResult() {
         const view = this.view;
         if (!view) return;
+        this.recordLocalResult(view);
         const wineTotal = (p) => Object.values(p.cellar).flat().reduce((s, v) => s + v, 0);
         const ranked = [...view.players].sort((a, b) => b.vp - a.vp || b.lira - a.lira || wineTotal(b) - wineTotal(a));
         const won = view.winners.includes(view.you);

@@ -16,7 +16,8 @@ import {
 import { createSeed } from './random.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 
 const $ = (id) => document.getElementById(id);
 const SETTINGS_KEY = 'wingspan.settings';
@@ -725,9 +726,23 @@ export default class UI {
         this.openSheet('mybonus', body);
     }
 
+    // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+    // id はシードから作る（同じ対戦を2回数えない）。ひとり用は勝ち負けがないので、回数だけ
+    recordLocalResult(view) {
+        const controller = this.controller;
+        if (!controller || controller.isOnline || !controller.game) return;
+        if (controller.game.players.filter(p => !p.isCPU).length !== 1) return;
+        recordResult({
+            game: GAME,
+            id: `${GAME}-${controller.game.options.seed}`,
+            outcome: view.players.length === 1 ? null : outcomeFromWinners(view.winners, view.you, view.players.length)
+        });
+    }
+
     showResult() {
         const v = this.view;
         if (!v?.results) return;
+        this.recordLocalResult(v);
         const rows = [['鳥', 'birds'], ['ボーナス', 'bonus'], ['目標', 'goals'], ['卵', 'eggs'], ['貯えた餌', 'cache'], ['差し込み', 'tucked']];
         const order = [...v.results].sort((a, b) => b.total - a.total || b.food - a.food);
         $('result-title').textContent = v.winners.includes(v.you) ? 'あなたの勝ち' : `${v.winners.map(s => v.players[s].name).join('と')}の勝ち`;

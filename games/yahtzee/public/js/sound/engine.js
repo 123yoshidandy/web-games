@@ -1,4 +1,4 @@
-// packages/sound 0.3.0 からコピーしたファイル。ここでは直さず、packages/sound で直してから同期する
+// packages/sound 0.4.0 からコピーしたファイル。ここでは直さず、packages/sound で直してから同期する
 /**
  * ゲームの BGM と効果音の再生エンジン（packages/sound）
  * 音は Web Audio API でその場で合成する（音声ファイルも鳴らせる）。曲と効果音は、各ゲームのデータ（sound/bgm.js）で書く
@@ -24,7 +24,7 @@
 (function () {
     'use strict';
 
-    const VERSION = '0.3.0';
+    const VERSION = '0.4.0';
     const LOOKAHEAD_SEC = 0.35;   // BGM は、この先の分まで前もって予約する
     const SCHEDULE_MS = 60;       // 予約を確かめる間隔
     const UNLOCK_EVENTS = ['pointerdown', 'touchend', 'click', 'keydown'];
@@ -783,7 +783,7 @@
             const { time, frequency, velocity, duration } = note;
             const filter = context.createBiquadFilter();
             filter.type = 'lowpass';
-            filter.frequency.value = p.cutoff ?? 2200;
+            filter.frequency.value = p.cutoff ?? 1700;
             filter.Q.value = 0.5;
             const amp = context.createGain();
             const stop = envelope(amp.gain, time, duration, { attack: p.attack ?? 0.02, decay: 0.4, sustain: 0.75, release: p.release ?? 0.18 }, 0.16 * velocity);
@@ -802,11 +802,22 @@
 
         // チップチューン（ファミコンのような音）：wave は 'pulse'（duty で幅を変える）・'square'・'triangle'
         // envelope: 'decay' は昔の mine-blocks の音（鳴らしてから、音の長さで消えていく）
+        // 耳につく高い倍音を、音の高さに合わせたローパスで丸める（cutoff で変え、0 で丸めない）
         chip(context, out, note, p) {
             const { time, frequency, velocity, duration } = note;
             const osc = oscillator(context, p.wave === 'pulse' ? pulseWave(context, p.duty ?? 0.25) : (p.wave ?? 'square'), frequency, time);
             applyGlide(osc, note);
             const amp = context.createGain();
+            let input = amp;
+            const cutoff = p.cutoff ?? clamp(frequency * 6, 1800, 3500);
+            if (cutoff > 0) {
+                const filter = context.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = cutoff;
+                filter.Q.value = 0.5;
+                filter.connect(amp);
+                input = filter;
+            }
             const peak = (p.level ?? 0.3) * velocity;
             let stop;
             if (p.envelope === 'decay') {
@@ -815,10 +826,11 @@
                 amp.gain.exponentialRampToValueAtTime(0.0001, time + duration);
                 stop = time + duration;
             } else {
-                stop = envelope(amp.gain, time, duration, { attack: 0.002, decay: p.decay ?? 0.3, sustain: p.sustain ?? 0.6, release: p.release ?? 0.04 }, peak);
+                stop = envelope(amp.gain, time, duration, { attack: p.attack ?? 0.006, decay: p.decay ?? 0.3, sustain: p.sustain ?? 0.6, release: p.release ?? 0.06 }, peak);
             }
             addVibrato(context, [osc], time, stop, { depth: p.vibrato ?? 0, rate: 6, delay: p.vibratoDelay ?? 0.18 });
-            osc.connect(amp).connect(out);
+            osc.connect(input);
+            amp.connect(out);
             osc.start(time);
             osc.stop(stop + 0.02);
         },
@@ -917,7 +929,7 @@
             const { time, frequency, velocity, duration } = note;
             const filter = context.createBiquadFilter();
             filter.type = 'lowpass';
-            filter.frequency.value = clamp(frequency * 6, 1200, 5000) * (p.brightness ?? 1);
+            filter.frequency.value = clamp(frequency * 5, 1200, 3500) * (p.brightness ?? 1);
             filter.Q.value = 0.7;
             const amp = context.createGain();
             const stop = envelope(amp.gain, time, duration, { attack: p.attack ?? 0.18, decay: 0.6, sustain: 0.85, release: p.release ?? 0.35 }, 0.09 * velocity);
@@ -939,14 +951,14 @@
             const { time, frequency, velocity, duration } = note;
             const filter = context.createBiquadFilter();
             filter.type = 'lowpass';
-            filter.Q.value = 1;
-            const open = frequency * (p.brightness ?? 5) * (0.6 + 0.4 * velocity);
+            filter.Q.value = 0.7;
+            const open = frequency * (p.brightness ?? 3.5) * (0.6 + 0.4 * velocity);
             filter.frequency.setValueAtTime(frequency * 1.5, time);
-            filter.frequency.linearRampToValueAtTime(Math.min(open, 9000), time + 0.06);
-            filter.frequency.setTargetAtTime(Math.min(frequency * 3.5, 7000), time + 0.06, 0.3);
+            filter.frequency.linearRampToValueAtTime(Math.min(open, 6000), time + 0.06);
+            filter.frequency.setTargetAtTime(Math.min(frequency * 3, 5000), time + 0.06, 0.3);
             const amp = context.createGain();
             const stop = envelope(amp.gain, time, duration, { attack: p.attack ?? 0.035, decay: 0.5, sustain: 0.8, release: p.release ?? 0.12 }, 0.14 * velocity);
-            const oscs = [['sawtooth', -4, 1], ['square', 4, 0.4]].map(([type, detune, level]) => {
+            const oscs = [['sawtooth', -4, 1], ['square', 4, 0.3]].map(([type, detune, level]) => {
                 const osc = oscillator(context, type, frequency, time);
                 osc.detune.setValueAtTime(detune - 35, time);
                 osc.detune.linearRampToValueAtTime(detune, time + 0.06);
@@ -1327,11 +1339,23 @@
         return { ...kept, ...override };
     }
 
+    // 曲の出口で高い音を少し下げる（合成の音の、耳につく高域をなだめる）。曲の tone: { frequency, gain } で変え、false で外す
+    const SONG_TONE = { frequency: 5000, gain: -3 };
+
     // 曲ごとのミキサー（曲の音量の出口と、リバーブ・エコー・パートの通り道）
     function createMixer(context, destination, song, compiled, overrides = {}) {
         const bus = context.createGain();
         bus.gain.value = song.gain ?? 1;
-        bus.connect(destination);
+        if (song.tone === false) {
+            bus.connect(destination);
+        } else {
+            const tone = { ...SONG_TONE, ...song.tone };
+            const shelf = context.createBiquadFilter();
+            shelf.type = 'highshelf';
+            shelf.frequency.value = tone.frequency;
+            shelf.gain.value = tone.gain;
+            bus.connect(shelf).connect(destination);
+        }
         const reverb = song.reverb ? createReverb(context, song.reverb) : null;
         if (reverb) reverb.output.connect(bus);
         const echo = song.delay ? createEcho(context, song.delay, compiled.stepSeconds * 4) : null;

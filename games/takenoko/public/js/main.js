@@ -5,7 +5,8 @@
 
 import LocalGameController, { CPU_STEP_DELAY_MS } from './game-controller.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { getServerUrl } from './online-config.js';
+import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import { getServerUrl, GAME } from './online-config.js';
 import BoardView, { TILE_COLORS, improvementIcon } from './board.js';
 import {
     CARDS, SHAPES, COLOR_NAMES, IMPROVEMENTS, IMPROVEMENT_NAMES, CARD_TYPES, CARD_TYPE_NAMES, WEATHER_NAMES,
@@ -183,12 +184,26 @@ function resetModes() {
 
 // ===== 描画 =====
 
+// ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
+// id はシードから作る（同じ対戦を何度送っても1回しか数えない）
+function recordLocalResult(view) {
+    const controller = app.controller;
+    if (!controller || controller.isOnline || !view.result) return;
+    if (controller.setup.players.filter(p => !p.isCPU).length !== 1) return;
+    recordResult({
+        game: GAME,
+        id: `${GAME}-${controller.setup.seed}`,
+        outcome: outcomeFromWinners(view.result.winners, view.viewer, view.players.length)
+    });
+}
+
 function update() {
     if (!app.controller) return;
     const previous = app.view;
     const view = app.controller.getView();
     if (previous && view.commandCount !== previous.commandCount) resetModes();
     app.view = view;
+    recordLocalResult(view);
     if (previous && view.commandCount !== previous.commandCount) playSound(view, previous);
     render(view);
     scheduleAutoEnd(view);

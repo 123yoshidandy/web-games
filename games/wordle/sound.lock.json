@@ -1,9 +1,9 @@
 {
-  "version": "0.3.0",
+  "version": "0.4.0",
   "dir": "js/sound",
   "files": {
-    "js/sound/engine.js": "33e53811785923e198a4c3031cc74056b2441bffaaa928785b822e9a3013d1ae",
-    "js/sound/engine.mjs": "13da609e6dfa1a75e913d263b4644e5782eaf8b409cab79bc751ad3e98ca0a01",
-    "js/sound/effects.js": "6b8932f1373cb1bdfcc521bf1b1cbfc780716cfd91f12f64e611ee9e33e3d5e3"
+    "js/sound/engine.js": "5619486a9cca524fc68b9e1a6dd5e0f361a6241a8a6c70974af628c3de068336",
+    "js/sound/engine.mjs": "73d5d724c6b32f1a56b65e1b40f76866b333adc334c9a56031c75ff2a737d805",
+    "js/sound/effects.js": "5421050633e909bd96af6468eb2ce6180a874a8499b3a64c20944b767d7a2159"
   }
 }
