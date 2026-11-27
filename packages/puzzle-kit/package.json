@@ -1,0 +1,24 @@
+{
+  "name": "puzzle-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./testing.js": "./testing.js",
+    "./tools/precache.mjs": "./tools/precache.mjs",
+    "./tools/cpu-match.mjs": "./tools/cpu-match.mjs",
+    "./scripts/sync.mjs": "./scripts/sync.mjs"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "sync": "node scripts/sync.mjs",
+    "check": "node scripts/sync.mjs check --all"
+  },
+  "dependencies": {
+    "netplay-kit": "*",
+    "test-kit": "*"
+  },
+  "devDependencies": {
+    "vitest": "^5.0.3"
+  }
+}
