@@ -1,0 +1,42 @@
+{
+    "name": "ドブル",
+    "short_name": "ドブル",
+    "description": "2枚のカードに1つだけある同じマークを、誰よりも早く見つける。タワー（CPU 対戦）・タイムアタック・オンライン対戦",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "orientation": "portrait",
+    "display_override": [
+        "fullscreen",
+        "standalone"
+    ],
+    "background_color": "#0f3341",
+    "theme_color": "#0f3341",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ]
+}
