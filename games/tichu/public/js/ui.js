@@ -12,6 +12,8 @@ import { MAHJONG, DRAGON, classify, beats, rankOf, rankLabel, comboLabel, points
 import { teamOf, PLAYERS } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { cardHtml } from './art.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate } from './animator.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
@@ -72,6 +74,8 @@ export default class UI {
         });
         $('#title-art').innerHTML = [DRAGON, 51, 38, 12, MAHJONG].map((c, i) => cardHtml(c, { cls: `fan fan-${i}` })).join('');
         $('#help-cards').innerHTML = [MAHJONG, 53, 54, DRAGON].map(c => cardHtml(c, { cls: 'mini' })).join('');
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '' });
         window.addEventListener('resize', () => { if (this.view) this.fitHand(); });
     }
 
@@ -126,6 +130,8 @@ export default class UI {
     }
 
     stopGame() {
+        this.cancelLater?.();
+        this.cancelLater = null;
         this.controller?.stop();
         this.controller = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
@@ -318,6 +324,7 @@ export default class UI {
         if (!this.controller) return;
         const view = this.controller.getView();
         const prev = this.view;
+        const before = measure(prev);
         this.view = view;
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         this.selected = this.selected.filter(c => view.hand.includes(c));
@@ -337,13 +344,25 @@ export default class UI {
         this.renderActions();
         this.markHint();
         this.notify(fresh);
+        animate(before, prev, view, fresh);
 
         // 竜の場を渡す相手を選ぶ
         if (view.phase === 'dragon' && view.dragonFrom === view.seat && !$('#dragon').open) this.showDragon();
         if (view.phase === 'end') this.recordLocalResult(view);
         const roundEnd = fresh.filter(e => e.type === 'roundEnd').at(-1);
-        if (roundEnd) this.showRound(roundEnd.result);
-        else if (view.phase === 'end' && !$('#round').open && !$('#result').open) this.showResult();
+        // ラウンドの結果と最後の結果は、札の動きが終わってから出す
+        if (roundEnd) this.later(() => this.showRound(roundEnd.result));
+        else if (view.phase === 'end' && !$('#round').open && !$('#result').open) this.later(() => this.showResult());
+    }
+
+    // 動きが終わってから出す（待っている間に対戦を離れたら出さない）
+    later(show) {
+        this.cancelLater?.();
+        const controller = this.controller;
+        this.cancelLater = Motion.afterIdle(() => {
+            this.cancelLater = null;
+            if (this.controller === controller && this.controller) show();
+        }, 350);
     }
 
     // 新しい出来事から効果音を1つ鳴らす。自分の手はその音、自分の番になったら turn、終わりは勝ち負け（チーム）
@@ -449,7 +468,7 @@ export default class UI {
             const popped = fresh.some(e => e.type === 'play') ? 'pop' : '';
             el.innerHTML = `<div class="trick">
                 <div class="trick-head"><b>${escapeHtml(view.players[top.seat].name)}</b>：${escapeHtml(comboLabel(top.combo))}</div>
-                <div class="trick-cards ${popped}">${top.combo.cards.map(c => cardHtml(c, { cls: 'mini' })).join('')}</div>
+                <div class="trick-cards ${popped}">${top.combo.cards.map(c => cardHtml(c, { cls: 'mini', attrs: `data-card="${c}"` })).join('')}</div>
                 <div class="trick-foot">${wish}<span>場の点 ${points}</span>${view.table.length > 1 ? `<span class="muted">${view.table.length}組目</span>` : ''}</div></div>`;
         } else {
             const trick = [...view.events].reverse().find(e => e.type === 'trick' || e.type === 'exchange' || e.type === 'deal');

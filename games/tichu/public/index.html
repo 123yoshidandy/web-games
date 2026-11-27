@@ -39,6 +39,9 @@
                         <button type="button" role="radio" data-target="500">500点</button>
                     </div>
                 </div>
+                <div class="setup-row">動き
+                    <div id="motion-setting" class="motion-setting"></div>
+                </div>
                 <div class="buttons">
                     <button id="start" class="btn primary">ゲーム開始</button>
                     <button id="resume" class="btn secondary" hidden>続きから</button>
@@ -146,6 +149,8 @@
                 <li><strong>爆弾</strong>（同じ数の4枚・同じ色の5枚以上の階段）は、自分の番でなくても、場にどの組があっても出せる</li>
                 <li>味方どうしが1・2番目に上がれば<strong>ダブル勝利</strong>（200点）。そうでなければ、最後の人の手札は相手のチームへ、取った札は1番目の人へ。札の点（5は5点・10とKは10点・竜25・不死鳥−25）を数える</li>
             </ul>
+            <h3>動き</h3>
+            <div id="motion-setting-help" class="motion-setting"></div>
             <h3>画面</h3>
             <p>手札は数の順に並びます。札を押して選ぶか、下の<strong>組の候補</strong>を押すと、その札がまとめて選ばれます。番でないときに爆弾が出せると「爆弾」のボタンが出ます。</p>
             <h3>CPU の考え方</h3>
