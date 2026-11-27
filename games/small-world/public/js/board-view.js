@@ -20,6 +20,13 @@ const el = (name, attrs = {}) => {
     return node;
 };
 
+// 動く部品を、描き直しの前後で見分けられる名前を付けた g に包む（piece-motion.js）。group を省くと「値」として扱う
+const mk = (node, key, group, value = 1) => {
+    const wrap = el('g', { 'data-mk': key, ...(group ? { 'data-mg': group } : {}), 'data-mv': value });
+    wrap.append(node);
+    return wrap;
+};
+
 export default class BoardView {
     // root：地図を入れる要素。onTap(region)：領域をタップした（地図の外なら -1）
     constructor(root, { onTap } = {}) {
@@ -156,16 +163,18 @@ export default class BoardView {
             if (r.race === 'lost') {
                 mark('lost', 0, 0, 1.05);
             } else if (r.race) {
+                const unit = el('g');
                 const band = state.bands[r.race];
                 const seat = band.seat;
-                g.append(el('circle', {
+                unit.append(el('circle', {
                     r: 6.4, class: band.declined ? 'tok declined' : 'tok',
                     fill: band.declined ? '#625e58' : PLAYER_COLORS[seat],
                     stroke: band.declined ? PLAYER_COLORS[seat] : PLAYER_LINES[seat]
                 }));
                 const t = el('text', { y: 2.7, 'text-anchor': 'middle', class: 'tok-n', fill: band.declined ? '#ffffff' : PLAYER_TEXT[seat] });
                 t.textContent = r.count;
-                g.append(t);
+                unit.append(t);
+                g.append(mk(unit, `tk-${id}-${r.race}`, `tk-${r.race}`, r.count));
             }
             tokens.append(g);
         });

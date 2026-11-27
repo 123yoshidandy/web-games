@@ -19,6 +19,8 @@ import BoardView from './board-view.js';
 import { symbolsSvg, icon, coinIcon, tokenSvg, PLAYER_COLORS } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import * as PieceMotion from './piece-motion.js';
 
 const SETTINGS_KEY = 'small-world.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
@@ -49,11 +51,12 @@ export default class UI {
         this.settings = loadSettings();
         this.controller = null;
         this.view = null;
+        this.animateNext = false; // 前のゲームの盤との差も動かさない
         this.selected = -1;
         this.lastSeq = 0;
         this.pickShownAt = -1;
-        this.resultTimer = null;
-        this.autoTimer = null;
+        this.cancelResult = null;
+        this.cancelAuto = null;
         this.toastTimer = null;
         $('#symbols').innerHTML = symbolsSvg();
         $('#title-art').innerHTML = titleArtHtml();
@@ -80,6 +83,7 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     }
 
     // ---- 画面の切り替え ----
@@ -149,16 +153,16 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
-        clearTimeout(this.autoTimer);
-        this.resultTimer = null;
+        this.cancelResult?.();
+        this.cancelAuto?.();
+        this.cancelResult = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
     send(command) {
         this.hintCommand = null;
         if (!this.controller) return false;
-        clearTimeout(this.autoTimer);
+        this.cancelAuto?.();
         return this.controller.send(command);
     }
 
@@ -316,14 +320,18 @@ export default class UI {
         if (prev && (prev.current !== v.current || prev.stage !== v.stage)) this.selected = -1;
         if (this.selected >= 0 && this.selected >= v.regions.length) this.selected = -1;
         this.board.setMap(getMap(v.players.length));
+        // 描き直す前に駒・点の位置を測り、描いたあとで前との差を動かす
+        const before = this.animateNext ? PieceMotion.measure($('#screen-game')) : null;
+        this.animateNext = true;
         this.renderBoard();
         this.renderStatus();
         this.renderPlayers();
+        PieceMotion.animate(before, $('#screen-game'));
         this.renderPanel();
         if (!this.isMine()) this.hintCommand = null;
         this.markHint();
         this.showEvents(v, prev);
-        clearTimeout(this.autoTimer);
+        this.cancelAuto?.();
         if (this.isMine() && v.stage === 'pick' && this.pickShownAt !== v.commandCount && !document.querySelector('dialog[open]')) {
             this.pickShownAt = v.commandCount;
             this.openRaces();
@@ -331,12 +339,13 @@ export default class UI {
         // 征服でできることが残っていなければ、少し間を置いて再配置に移る
         if (this.isMine() && v.stage === 'conquer' && !canDecline(v) && !canRoll(v)
             && conquestTargets(v).length === 0 && dragonTargets(v).length === 0 && sorceryTargets(v).length === 0) {
-            this.autoTimer = setTimeout(() => {
+            // 盤の動きが終わってから移る
+            this.cancelAuto = Motion.afterIdle(() => {
                 if (this.view === v) this.send({ type: 'redeploy' });
             }, AUTO_MS);
         }
-        if (v.phase === 'end' && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+        if (v.phase === 'end' && !this.cancelResult) {
+            this.cancelResult = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
     }
 
@@ -377,7 +386,7 @@ export default class UI {
             const declined = p.declined.map(r => RACES[r].name).join('・');
             return `<div class="pl${p.id === v.current && v.phase === 'play' ? ' active' : ''}${v.winners.includes(p.id) ? ' win' : ''}" style="--c:${PLAYER_COLORS[p.id]}">
                 <div class="pl-top"><span class="pl-name">${escapeHtml(p.name)}</span></div>
-                <div class="pl-bottom"><span class="pl-coins">${coinIcon(12)}${p.coins}</span>${active ? `<span class="pl-race">${active}</span>` : ''}${declined ? `<span class="pl-dec">${declined}</span>` : ''}</div>
+                <div class="pl-bottom"><span class="pl-coins" data-mk="coins-${p.id}" data-mv="${p.coins}">${coinIcon(12)}${p.coins}</span>${active ? `<span class="pl-race">${active}</span>` : ''}${declined ? `<span class="pl-dec">${declined}</span>` : ''}</div>
             </div>`;
         }).join('');
     }
