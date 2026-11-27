@@ -1,0 +1,6 @@
+/* 橋をかけろの色（共通の css/style.css の変数を上書きする）：紙の地に、海の青緑の差し色 */
+:root {
+    --accent: #1f6f8b;
+    --accent-strong: #16536a;
+    --accent-soft: rgba(31, 111, 139, .12);
+}
