@@ -143,7 +143,6 @@ netplay-kit の `template/deploy-server.yml` をもとに、次を変える。
         - 'packages/netplay-kit/server/**'
         - 'games/*/server/**'
         - 'games/*/public/js/**'
-        - 'games/*/js/**'
     workflow_dispatch:
   ```
 

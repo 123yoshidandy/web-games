@@ -178,7 +178,7 @@ AWS SAM CLI と AWS CLI が必要です。プロフィールは環境変数で�
 AWS_PROFILE=<プロフィール名> npm run deploy:server
 ```
 
-初めてデプロイしたときは、出力される `WebSocketUrl` を `public/js/online-config.js` の `ONLINE_DEPLOYED_SERVER_URL` に書きます。画面は main ブランチに push すると GitHub Pages に反映されます。
+初めてデプロイしたときは、出力される `WebSocketUrl` を `public/js/online-config.js` の `DEPLOYED_SERVER_URL` に書きます（?game= は付けない）。画面は main ブランチに push すると GitHub Pages に反映されます。
 
 ## 利用方法
 

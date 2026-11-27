@@ -7,7 +7,7 @@
 # AWS への認証は OIDC で行い、アクセスキーは使わない。リポジトリは公開なので、AWS のアカウント番号はログで伏せる
 name: Deploy Server
 
-# サーバーは画面側の public/js・js のロジック（game.js・cpu-player.js・rules.js など）も読み込むので、ゲームの側はそこまで見る
+# サーバーは画面側の public/js のロジック（game.js・cpu-player.js・rules.js など）も読み込むので、ゲームの側はそこまで見る
 # ただし、画面だけのファイル（main.js・ui.js・art.js・netplay/・sound/ など）は、どのゲームでもサーバーに入らないので外す
 # （esbuild の metafile で、束ねた入力にこれらの名前がないことを確かめた。入り込んだら「Check bundle inputs」の手順で警告が出る）
 # サーバーに変わりがなければ、sam deploy は「No changes to deploy」で終わる
@@ -19,7 +19,6 @@ on:
       - 'packages/netplay-kit/server/**'
       - 'games/*/server/**'
       - 'games/*/public/js/**'
-      - 'games/*/js/**'
       # paths は {a,b} の書き方を使えないので、1行ずつ並べる。下の「Check bundle inputs」の手順の正規表現と同じものにする
       - '!games/*/public/js/netplay/**'
       - '!games/*/public/js/sound/**'
@@ -34,9 +33,6 @@ on:
       - '!games/*/public/js/storage.js'
       - '!games/*/public/js/board-view.js'
       - '!games/*/public/js/sound.js'
-      # js/ に置く古い3本（mine-blocks・panel-de-pon・wordle）は、共通の写しだけを外す
-      - '!games/*/js/netplay/**'
-      - '!games/*/js/sound/**'
   workflow_dispatch:
 
 permissions:
@@ -166,7 +162,7 @@ jobs:
       # （デプロイは止めない。直すのは on.push.paths のほう）
       - name: Check bundle inputs
         run: |
-          leaked=$(grep -rhoE '^// games/[^/]+/(public/js/((netplay|sound)/.*|(main|online-config|music|game-controller|ui|art|help|animator|storage|board-view|sound)\.js)|js/(netplay|sound)/.*)$' server/dist | sort -u || true)
+          leaked=$(grep -rhoE '^// games/[^/]+/(public/js/((netplay|sound)/.*|(main|online-config|music|game-controller|ui|art|help|animator|storage|board-view|sound)\.js))$' server/dist | sort -u || true)
           if [ -n "$leaked" ]; then
             echo "::warning::on.push.paths で外したファイルがサーバーに入っています。deploy-server.yml の paths を直してください:"
             echo "$leaked"

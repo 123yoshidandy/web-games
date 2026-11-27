@@ -62,8 +62,8 @@ export const playersFromCode = (dir) => {
 export const hasOnlinePlay = (gameDir, publicDir) => existsSync(join(publicDir, 'js', 'netplay'))
     && existsSync(join(gameDir, 'server', 'src', 'handler.js'));
 
-// 配備したサーバーの接続先（js/ の直下のファイルの DEPLOYED_SERVER_URL・ONLINE_DEPLOYED_SERVER_URL に書いた wss:// の URL）
-const DEPLOYED_URL = /\b(?:ONLINE_)?DEPLOYED_SERVER_URL\s*=\s*(['"`])wss:\/\/[^'"`\s]+\1/;
+// 配備したサーバーの接続先（js/ の直下のファイルの DEPLOYED_SERVER_URL に書いた wss:// の URL）
+const DEPLOYED_URL = /\bDEPLOYED_SERVER_URL\s*=\s*(['"`])wss:\/\/[^'"`\s]+\1/;
 export const hasDeployedServer = (publicDir) => {
     const dir = join(publicDir, 'js');
     if (!existsSync(dir)) return false;

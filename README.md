@@ -74,7 +74,6 @@ node scripts/build-site.mjs   # _site/ に集める（_site/<名前>/ と、ゲ�
 
 もとは単独のリポジトリで公開していた7本も、ここに入っています：dominion・katan・lucky-numbers・mine-blocks・panel-de-pon・pokemon-card-game・wordle。
 
-- mine-blocks・panel-de-pon・wordle は `public/` がなく、ゲームのフォルダが公開するファイルです（`index.html` が直下にある。公開するときは、サーバー・テスト・設定などのファイルを除きます）
 - オンライン対戦のサーバー（AWS SAM。API Gateway の WebSocket・Lambda・DynamoDB）を、今はゲームごとに持っています（`games/<名前>/server/`）
 - 保存の名前（localStorage）は、もとの公開先と同じです（新しい公開先には、もとのデータは引き継がれません）
 

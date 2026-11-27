@@ -40,7 +40,7 @@ export function checkGames(gamesDir, games = listGames(gamesDir), { standards = 
     for (const game of games) {
         for (const error of gameMetadata(gamesDir, game).errors) errors.push(`${game}: ${error}`);
         // BGM のエンジンの写しは、同期したときのまま、packages/sound と同じであること
-        const hasEngine = ['public/js/sound/engine.js', 'js/sound/engine.js'].some((file) => existsSync(join(gamesDir, game, file)));
+        const hasEngine = existsSync(join(gamesDir, game, 'public/js/sound/engine.js'));
         if (existsSync(join(gamesDir, game, SOUND_LOCK))) {
             for (const problem of copyProblems(join(gamesDir, game))) errors.push(`${game}: BGM のエンジンの写しが packages/sound と違う（${problem}）。node packages/sound/scripts/sync.mjs ${game} で同期する`);
         } else if (hasEngine) {
