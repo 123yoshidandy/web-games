@@ -14,6 +14,8 @@ import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff } from './anim.js';
 
 const GAME = 'puerto-rico';
 
@@ -177,8 +179,48 @@ function onUpdate() {
     const previous = view;
     view = controller.getView();
     saveProgress();
+    // 手が進んだときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+    const moved = Boolean(previous) && view.eventSeq !== previous.eventSeq;
+    const before = moved ? captureMotion() : null;
     render();
+    if (moved) animateMotion(before);
     playUpdateSound(previous);
+}
+
+// ---------- 動き（描き直しの前後の差） ----------
+
+// 目印は、置き場ごとの何番目か（役割・船の積み荷・商館・島・都市・数）。値はその中身
+const MOTION_PARTS = [
+    { root: 'board', selector: '.role-chip', change: el => Motion.pulse(el, { duration: 380, scale: 1.2 }) },
+    { root: 'board', selector: '.ship i, .house > *', change: el => Motion.popIn(el, { duration: 320 }) },
+    { root: 'island', selector: ':scope > *', change: el => Motion.popIn(el, { duration: 320 }) },
+    { root: 'city', selector: ':scope > *', change: el => Motion.popIn(el, { duration: 320 }) },
+    { root: 'opponents', selector: '.opp-stats > span' },
+    { root: 'my-summary', selector: ':scope > span' },
+    { root: 'supply', selector: ':scope > span' }
+];
+const partKey = el => {
+    const owner = el.closest('[data-seat]')?.dataset.seat ?? '';
+    const ship = el.closest('.ship');
+    const shipNo = ship ? [...ship.parentElement.children].indexOf(ship) : '';
+    return `${owner}:${shipNo}:${el.tagName}:${[...el.parentElement.children].indexOf(el)}`;
+};
+// 選んでいる間だけ付く印（入植者を並べ替える間の pickable など）は、値に入れない
+const PASSING = new Set(['pickable', 'turn', 'active', 'sel', 'can']);
+const partValue = el => `${[...el.classList].filter(c => !PASSING.has(c)).join(' ')}|${el.innerHTML}`;
+
+function captureMotion() {
+    return MOTION_PARTS.map(part => snapshot($(part.root), part.selector, { key: partKey, value: partValue }));
+}
+
+// 取った役割・数の変化は目立たせ、船に積んだ品・商館に売った品・島に置いたタイルと入植者・都市に建てた建物は、はねて出す
+function animateMotion(before) {
+    MOTION_PARTS.forEach((part, i) => animateDiff(before[i], $(part.root), part.selector, {
+        key: partKey,
+        value: partValue,
+        enter: null,
+        ...(part.change ? { change: part.change } : {})
+    }));
 }
 
 // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
@@ -241,7 +283,8 @@ function render() {
     checkSummary();
     if (view.phase === 'end' && !resultShown) {
         resultShown = true;
-        setTimeout(showResult, 800);
+        // 結果の画面は、最後の手の動きが終わってから出す
+        Motion.afterIdle(showResult, 800);
     }
 }
 
@@ -550,6 +593,7 @@ function onAct(act) {
 function setup() {
     $('title-art').innerHTML = titleArt();
     setupDialogs();
+    Motion.mountSpeedSetting($('motion-setting'), { label: '' });
     const segment = (id, apply) => $(id).addEventListener('click', e => {
         const b = e.target.closest('button');
         if (!b) return;
