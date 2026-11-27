@@ -16,6 +16,7 @@ import { CPU_LEVELS } from './cpu-player.js';
 import { JACK, DETECTIVE, visibleSuspects, wallOf, pickOrder } from './game.js';
 import { SUSPECTS, DETECTIVES, TOKENS, ACTION_NAMES, ROUNDS, HOURGLASSES_TO_WIN } from './data.js';
 import { TRACK, spaceCell } from './board.js';
+import * as Motion from './motion/motion.js';
 import { symbolsSvg, icon, districtShape, detectiveShape, actionIcon, portraitSvg } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
@@ -24,6 +25,8 @@ import { getServerUrl, GAME } from './online-config.js';
 
 const SETTINGS_KEY = 'mr-jack-pocket.settings';
 const RESULT_DELAY_MS = 1400;
+const SLIDE_MS = 420;  // 刑事・タイルが動く長さ（普通の速さ）
+const ROTATE_MS = 420; // タイルが回る長さ
 const CPU_ACTION_DELAY_MS = 900; // game-controller.js と同じ（オンラインの CPU の間）
 const NAME = Object.fromEntries(SUSPECTS.map(s => [s.key, s.name]));
 const DET_NAME = Object.fromEntries(DETECTIVES.map(d => [d.key, d.name]));
@@ -127,7 +130,7 @@ export default class UI {
     // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
     beginGame(controller) {
         if (this.controller !== controller) this.controller?.stop();
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         this.controller = controller;
@@ -153,7 +156,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -168,6 +171,7 @@ export default class UI {
         });
         segment('#role', 'data-role', (v) => { this.settings.role = Number(v); });
         segment('#cpu-level', 'data-level', (v) => { this.settings.level = v; });
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         $('#start').addEventListener('click', () => this.newGame());
         $('#resume').addEventListener('click', () => {
             const saved = loadSavedGame();
@@ -371,6 +375,7 @@ export default class UI {
         if (!this.controller) return;
         const view = this.controller.getView();
         if (!view) return;
+        const prev = this.view;
         this.view = view;
         if (!this.myTurn()) this.sel = null;
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
@@ -380,17 +385,72 @@ export default class UI {
         this.renderBoard(view);
         this.renderNote(view);
         this.renderActions(view);
+        if (prev && fresh.length) this.animateChanges(prev, view);
         $('#hint').disabled = !this.myTurn();
         $('#hint').hidden = Boolean(this.controller?.isOnline); // ヒントはローカル対戦だけ
         this.announce(view, fresh);
         if ($('#log').open) this.renderLog();
         if (view.phase === 'end' && view.winner !== null) this.recordLocalResult([view.winner]);
         if (view.phase === 'end' && !$('#result').open && !this.resultTimer && !this.resultShown) {
-            this.resultTimer = setTimeout(() => {
+            // 盤の動きが終わってから出す
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
         }
+    }
+
+    // 描き直したあと：前のビューとの差を動かす（刑事は道を進み、タイルは入れ替わり・回り、無実になった容疑者は目立ち、砂時計は増えると目立つ）
+    animateChanges(prev, view) {
+        if (!Motion.enabled()) return;
+        const board = $('#board');
+        const slide = (el, ox, oy, nx, ny) => {
+            if (!el || (Math.abs(ox - nx) < 0.3 && Math.abs(oy - ny) < 0.3)) return;
+            const length = Motion.ms(SLIDE_MS);
+            const animation = el.animate([
+                { transform: `translate(${ox - nx}px, ${oy - ny}px)` },
+                { transform: 'translate(0, 0)' }
+            ], { duration: length, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+            Motion.track(animation, length);
+        };
+        const spots = (detectives) => {
+            const pos = {};
+            const bySpace = {};
+            DETECTIVES.forEach(d => { (bySpace[detectives[d.key]] ??= []).push(d.key); });
+            Object.entries(bySpace).forEach(([space, keys]) => {
+                const { x, y } = spaceXY(Number(space));
+                keys.forEach((key, i) => {
+                    pos[key] = [x + (keys.length > 1 ? (i - (keys.length - 1) / 2) * 3 : 0), y + (keys.length > 2 ? (i % 2) * 1.5 : 0)];
+                });
+            });
+            return pos;
+        };
+        const before = spots(prev.detectives);
+        const after = spots(view.detectives);
+        DETECTIVES.forEach(d => slide(board.querySelector(`.detective.${d.key}`), ...before[d.key], ...after[d.key]));
+        view.tiles.forEach((t, pos) => {
+            const oldPos = prev.tiles.findIndex(o => o.suspect === t.suspect);
+            const old = prev.tiles[oldPos];
+            const el = board.querySelector(`.dslot[data-suspect="${t.suspect}"]`);
+            if (!old || !el) return;
+            if (oldPos !== pos) {
+                const a = tileXY(oldPos);
+                const b = tileXY(pos);
+                slide(el, a.x, a.y, b.x, b.y);
+            }
+            const was = wallOf(old);
+            const now = wallOf(t);
+            if (was !== null && now !== null && was !== now) {
+                // 回転：古い向きから、時計回りに今の向きまで回す
+                const turns = (now - was + 4) % 4;
+                const length = Motion.ms(ROTATE_MS);
+                const animation = el.animate([{ transform: `rotate(${-turns * 90}deg)` }, { transform: 'rotate(0deg)' }],
+                    { duration: length, easing: 'ease-in-out', fill: 'backwards' });
+                Motion.track(animation, length);
+            }
+            if (t.cleared && !old.cleared) Motion.pulse(el, { duration: 420, delay: 120, scale: 1.18 });
+        });
+        if ((view.totalHourglasses ?? view.hourglasses) > (prev.totalHourglasses ?? prev.hourglasses)) Motion.pulse($('#info').querySelector('.glass'), { duration: 380, scale: 1.25 });
     }
 
     renderStatus(view) {
@@ -430,7 +490,7 @@ export default class UI {
         [[5, 5], [45, 5], [5, 45], [45, 45]].forEach(([x, y]) => { body += `<g class="gaslamp"><circle cx="${x}" cy="${y}" r="2.6"/><circle class="flame" cx="${x}" cy="${y}" r="1"/></g>`; });
         tiles.forEach((t, pos) => {
             const { x, y } = tileXY(pos);
-            body += districtShape(t, x, y, wallOf(t), { seen: seen.has(t.suspect) && !t.cleared, jack: view.jack === t.suspect && !t.cleared });
+            body += `<g class="dslot" data-suspect="${t.suspect}">${districtShape(t, x, y, wallOf(t), { seen: seen.has(t.suspect) && !t.cleared, jack: view.jack === t.suspect && !t.cleared })}</g>`;
             if (seen.has(t.suspect) && !t.cleared) body += `<use class="eye" href="#i-eye" x="${x + 6.6}" y="${y + 0.4}" width="3" height="3"/>`;
         });
         // 刑事（同じマスなら少しずらす）

@@ -120,6 +120,13 @@ button {
     cursor: pointer;
 }
 .segmented button[aria-checked="true"] { color: #2e2203; background: var(--gold); }
+/* 動きの速さ（共通の部品 motion の切り替え）を、ほかの切り替えと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .3); border: none; gap: 0; }
+#motion-setting .motion-speed button { min-width: 44px; height: 36px; padding: 0 10px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; justify-content: center; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #2e2203; background: var(--gold); }
+/* 街区のタイルが回る・動く、刑事が動く動きは、その形の中心を基準にする */
+#board .dslot { transform-box: fill-box; transform-origin: center; }
 
 /* ---- 盤（SVG。1マスは 10） ---- */
 
