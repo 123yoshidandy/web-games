@@ -11,6 +11,8 @@ import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff, flyIn } from './anim.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
@@ -24,6 +26,14 @@ const SETTINGS_KEY = 'dune-imperium.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
 export const COLORS = ['#e2554a', '#4d8fe6', '#3fae5a', '#e8c33a'];
 const RESULT_DELAY_MS = 900;
+
+// 動きの目印：エージェントは「場所:席」、旗は場所、影響力は「勢力:何番目」、数は欄ごとの何番目か
+const AGENTS = { key: el => `${el.closest('[data-space]')?.dataset.space}:${el.dataset.seat}`, value: () => '' };
+const FLAGS = { key: el => el.closest('[data-space]')?.dataset.space, value: el => el.style.getPropertyValue('--c') };
+const MARKS = { key: el => `${el.closest('.fcol')?.className}:${[...el.parentElement.children].indexOf(el)}` };
+const AMOUNT_ITEM = ':scope > span:not(.pl-name):not(.first), :scope > .chip:not(.leader)';
+const amountKey = el => `${el.closest('.pl')?.dataset.seat ?? 'me'}:${[...el.parentElement.children].indexOf(el)}`;
+const amountsOf = () => [...document.querySelectorAll('#players .pl, #me .me-row')].flatMap(row => [...row.querySelectorAll(AMOUNT_ITEM)]);
 const ROUNDS = 10;
 const ZONE_NAME = { hand: '手札', played: '出した', discard: '捨て札' };
 
@@ -163,6 +173,7 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     }
 
     // ---- 画面の切り替え ----
@@ -232,7 +243,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         this.decideKey = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
@@ -508,6 +519,9 @@ export default class UI {
         if (!this.controller) return;
         const prev = this.view;
         const v = this.controller.getView();
+        // 手が進んだときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+        const moved = Boolean(prev) && v.commandCount !== prev.commandCount;
+        const before = moved ? this.captureMotion() : null;
         this.view = v;
         this.playSound(prev, v);
         const me = v.players[v.you];
@@ -531,10 +545,50 @@ export default class UI {
         if (this.myBuy()) this.openMarket(v, false);
         else if ($('#market').open) $('#market').close();
         if ($('#intrigue').open) this.renderIntrigue(v);
+        if (moved) this.animateMotion(v, before);
+        // 結果の画面は、最後の手の動きが終わってから出す
         if (v.phase === 'over' && !this.resultTimer && !$('#result').open) {
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.resultTimer = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
         this.markHint();
+    }
+
+    // ---- 動き（描き直しの前後の差） ----
+
+    // 描き直す前：置いたエージェント・支配の旗・勢力の影響力・紛争・各プレイヤーの数
+    captureMotion() {
+        const amounts = new Map(amountsOf().map(el => [amountKey(el), { value: el.textContent.trim() }]));
+        return {
+            agents: snapshot($('#board'), '.agent.on[data-seat]', AGENTS),
+            flags: snapshot($('#board'), '.flag', FLAGS),
+            marks: snapshot($('#board'), '.mk', MARKS),
+            conflict: snapshot($('#conflict'), '.cname, .str', { key: el => `${el.className}:${[...el.parentElement.children].indexOf(el)}` }),
+            amounts
+        };
+    }
+
+    // 描いたあと：エージェントはその人の欄から置いた場所へ飛ばし、新しい旗と新しい紛争ははねて出し、
+    // 影響力・紛争の強さ・点・資源・部隊などの数の変化を目立たせる
+    animateMotion(v, before) {
+        animateDiff(before.agents, $('#board'), '.agent.on[data-seat]', {
+            ...AGENTS,
+            enter: el => flyIn(el, this.playerPanel(v, Number(el.dataset.seat)))
+        });
+        animateDiff(before.flags, $('#board'), '.flag', { ...FLAGS, change: el => Motion.popIn(el, { duration: 320 }) });
+        animateDiff(before.marks, $('#board'), '.mk', MARKS);
+        animateDiff(before.conflict, $('#conflict'), '.cname, .str', {
+            key: el => `${el.className}:${[...el.parentElement.children].indexOf(el)}`,
+            change: el => (el.classList.contains('cname') ? Motion.popIn(el, { duration: 320 }) : Motion.pulse(el, { duration: 380, scale: 1.2 }))
+        });
+        if (!Motion.enabled()) return;
+        for (const el of amountsOf()) {
+            const old = before.amounts.get(amountKey(el));
+            if (old && old.value !== el.textContent.trim()) Motion.pulse(el, { duration: 380, scale: 1.2 });
+        }
+    }
+
+    playerPanel(v, seat) {
+        return seat === v.you ? $('#me .me-row') : $(`#players .pl[data-seat="${seat}"]`);
     }
 
     // 1つの更新に1つの音。自分の操作は結果の音、ほかの人の手は notify、自分が動ける番になったら turn
@@ -597,7 +651,7 @@ export default class UI {
             const cost = s.cost ? `<span class="sp-cost">${shortCost(costFor(v, s))}</span>` : '';
             const bonus = s.desert && v.bonusSpice[s.id] ? `<span class="bonus">+${v.bonusSpice[s.id]}</span>` : '';
             const flag = owner !== null && owner !== undefined ? `<span class="flag" style="--c:${COLORS[owner]}" title="支配"></span>` : '';
-            const who = occ.map(seat => `<i class="agent on" style="--c:${COLORS[seat]}"></i>`).join('');
+            const who = occ.map(seat => `<i class="agent on" data-seat="${seat}" style="--c:${COLORS[seat]}"></i>`).join('');
             return `<button type="button" class="${cls}" data-space="${s.id}">
                 <span class="sp-name">${s.name}</span>
                 <span class="sp-gain">${cost}${s.need ? '<span class="need">フ2</span>' : ''}${shortText(s.effects)}${bonus}</span>
