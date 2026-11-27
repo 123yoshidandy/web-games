@@ -224,18 +224,19 @@
                         <span>名前</span>
                         <input id="onlineName" type="text" maxlength="12" autocomplete="nickname" placeholder="プレイヤー">
                     </label>
-                    <button id="onlineCreate" class="primary-button">部屋を作る</button>
-                    <div class="online-divider"><span>または</span></div>
-                    <label class="online-field">
-                        <span>部屋番号</span>
-                        <input id="onlineCode" type="text" inputmode="numeric" maxlength="4" placeholder="数字4桁">
-                    </label>
-                    <button id="onlineJoin" class="secondary-button">参加する</button>
+                    <!-- 招待URLで開いたときだけ：その部屋に入る -->
+                    <button id="onlineJoin" class="primary-button" hidden>招待された部屋に参加する</button>
+                    <div id="onlineFind">
+                        <button id="onlineCreate" class="primary-button">部屋を作る</button>
+                        <p class="result-note online-create-note">作った部屋は、下の「参加できる部屋」に出ます</p>
+                        <div class="online-divider"><span>または</span></div>
+                        <p class="result-label">参加できる部屋</p>
+                        <ul class="online-rooms" id="onlineRooms"></ul>
+                        <button id="onlineRefresh" class="secondary-button">一覧を更新</button>
+                    </div>
                 </div>
 
                 <div id="onlineLobby" hidden>
-                    <p class="result-label">部屋番号</p>
-                    <p class="online-code" id="onlineRoomCode">-----</p>
                     <button id="onlineInvite" class="secondary-button online-invite">招待URLを共有</button>
                     <ul class="online-players" id="onlinePlayers"></ul>
                     <label class="online-field online-wins">

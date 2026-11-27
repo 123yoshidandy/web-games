@@ -21,18 +21,19 @@ const onlineState = {
     game: null,          // 対戦の中身（問題・勝ち数・段階。今の試合のものだけ）
     gameMatchId: null,   // game がどの試合のものか
     currentRound: null,  // 盤面に出している問題の番号
-    countdownTimer: null
+    countdownTimer: null,
+    invitedRoomCode: null // 招待URLで開いて、まだ入っていない部屋（画面には出さない）
 };
 
 // ===== 準備 =====
 
 function setupOnline() {
     elements.onlineName.value = loadOnlineName();
-    // 部屋番号の桁数は netplay-kit に合わせる
-    elements.onlineCode.maxLength = NetplayClient.ROOM_CODE_LENGTH;
-    elements.onlineCode.placeholder = `数字${NetplayClient.ROOM_CODE_LENGTH}桁`;
 
-    net.on('joined', (message) => setOnlineRoomUrl(message.roomCode));
+    net.on('joined', (message) => {
+        onlineState.invitedRoomCode = null;
+        setOnlineRoomUrl(message.roomCode);
+    });
     net.on('lobby', (lobby) => {
         onlineState.lobby = lobby;
         // ロビーに戻ったら、前の試合の中身は使わない
@@ -58,17 +59,19 @@ function setupOnline() {
     // 参加画面を × で閉じたら、ホーム（トップ画面）に戻る（招待URLで開いたときも同じ）
     elements.onlineClose.addEventListener('click', () => {
         elements.onlineModal.classList.remove('active');
-        if (!isOnlineActive()) showTop();
+        if (!isOnlineActive()) {
+            // 招待を断ったら、読み込み直しでまた参加画面を出さないように URL から部屋を外す。一覧を取るための接続も閉じる
+            if (onlineState.invitedRoomCode) {
+                onlineState.invitedRoomCode = null;
+                net.setRoomUrl(null);
+            }
+            net.close();
+            showTop();
+        }
     });
     elements.onlineCreate.addEventListener('click', () => enterRoom(name => net.createRoom(name)));
-    elements.onlineJoin.addEventListener('click', () => {
-        const roomCode = elements.onlineCode.value.trim();
-        if (!NetplayClient.isRoomCode(roomCode)) {
-            showOnlineError(`部屋番号（数字${NetplayClient.ROOM_CODE_LENGTH}桁）を入れてください`);
-            return;
-        }
-        enterRoom(name => net.joinRoom(roomCode, name));
-    });
+    elements.onlineJoin.addEventListener('click', () => joinListedRoom(onlineState.invitedRoomCode));
+    elements.onlineRefresh.addEventListener('click', findOnlineRooms);
     elements.onlineInvite.addEventListener('click', shareOnlineInvite);
     elements.onlineWins.addEventListener('change', () => {
         net.setSettings({ winsNeeded: Number(elements.onlineWins.value) });
@@ -85,20 +88,82 @@ function setupOnline() {
     // 招待URL（?room=部屋番号）で開いたら、前に入った部屋なら同じ席に戻り、初めてなら参加画面を出す
     const roomCode = NetplayClient.roomCodeFromUrl();
     if (roomCode) {
-        elements.onlineCode.value = roomCode;
         if (net.session?.roomCode === roomCode) {
             net.resume().catch(error => showToast(error.message));
         } else {
+            onlineState.invitedRoomCode = roomCode;
             openOnline();
         }
     }
 }
 
-// オンライン対戦の参加画面を出す（トップ画面の「オンライン対戦」から）
+// オンライン対戦の参加画面を出す（トップ画面の「オンライン対戦」から）。開いたら参加できる部屋の一覧を取る
 function openOnline() {
     showOnlineError('');
     renderOnlineModal();
     elements.onlineModal.classList.add('active');
+    if (!onlineState.invitedRoomCode) findOnlineRooms();
+}
+
+// 参加できる部屋の一覧を取って出す（開いたときと「一覧を更新」を押したときだけ取る。部屋番号は出さない）
+async function findOnlineRooms() {
+    const list = elements.onlineRooms;
+    list.replaceChildren(createRoomNote('探しています…'));
+    // 返事を待つ間に、部屋に入った・参加画面を閉じたなら描かない
+    const stale = () => isOnlineActive() || !elements.onlineModal.classList.contains('active');
+    try {
+        const rooms = await net.listRooms();
+        if (stale()) return;
+        if (!rooms.length) {
+            list.replaceChildren(createRoomNote('待っている部屋はありません'));
+            return;
+        }
+        list.replaceChildren(...rooms.map(room => {
+            const item = document.createElement('li');
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'online-room';
+            const host = document.createElement('span');
+            host.className = 'online-room-name';
+            host.textContent = `${room.hostName} の部屋`;
+            const count = document.createElement('span');
+            count.className = 'online-room-count';
+            count.textContent = `${room.players}/${room.maxPlayers}人`;
+            button.append(host, count);
+            button.addEventListener('click', () => joinListedRoom(room.roomCode));
+            item.appendChild(button);
+            return item;
+        }));
+    } catch (error) {
+        if (!stale()) list.replaceChildren(createRoomNote(error.message));
+    }
+}
+
+function createRoomNote(text) {
+    const item = document.createElement('li');
+    item.className = 'online-room-note';
+    item.textContent = text;
+    return item;
+}
+
+// 一覧の部屋か、招待URLの部屋に入る。断られたら（始まった・満員・もうない）、一覧を取り直す
+async function joinListedRoom(roomCode) {
+    const name = elements.onlineName.value.trim();
+    saveOnlineName(name);
+    showOnlineError('');
+    try {
+        await net.enterRoom(roomCode, name);
+    } catch (error) {
+        if (error.fromServer && onlineState.invitedRoomCode) {
+            // 招待の部屋に入れなければ、URL から部屋を外して、ふだんの参加画面に戻す
+            onlineState.invitedRoomCode = null;
+            net.setRoomUrl(null);
+        }
+        renderOnlineModal();
+        showOnlineError(error.message);
+        elements.onlineModal.classList.add('active');
+        if (!onlineState.invitedRoomCode) findOnlineRooms();
+    }
 }
 
 function isOnlineActive() {
@@ -297,11 +362,14 @@ function renderOnlineModal() {
     elements.onlineLobby.hidden = !inLobby;
     // 部屋に入っている間は閉じられない（開き直す入口がないため。出るときは「部屋を出る」）
     elements.onlineClose.hidden = inLobby;
+    // 招待URLで開いたときは、その部屋に入るボタンだけを出す
+    const invited = Boolean(onlineState.invitedRoomCode);
+    elements.onlineJoin.hidden = !invited;
+    elements.onlineFind.hidden = invited;
     if (!inLobby) return;
 
     const isHost = net.isHost();
     const enough = lobby.players.filter(player => !player.left).length >= 2;
-    elements.onlineRoomCode.textContent = lobby.roomCode;
     renderPlayerList(elements.onlinePlayers, { showHost: true });
     elements.onlineWins.value = String(lobby.settings.winsNeeded);
     elements.onlineWins.disabled = !isHost;
@@ -473,13 +541,12 @@ function showToast(message) {
 
 // ===== 招待 =====
 
-// 招待URLを共有する（スマホでは共有シート、パソコンではクリップボードへのコピー）
+// 招待URLを共有する（スマホでは共有シート、パソコンではクリップボードへのコピー）。部屋番号は URL の中にだけ入れ、文字では出さない
 async function shareOnlineInvite() {
     const url = net.inviteUrl();
-    const roomCode = onlineState.lobby.roomCode;
     if (window.matchMedia('(pointer: coarse)').matches && navigator.share) {
         try {
-            await navigator.share({ title: 'MINE BLOCKS', text: `MINE BLOCKS で対戦しよう！ 部屋番号 ${roomCode}`, url });
+            await navigator.share({ title: 'MINE BLOCKS', text: 'MINE BLOCKS の部屋に招待します', url });
         } catch {
             // 共有シートをキャンセルした場合などは何もしない
         }
@@ -489,7 +556,8 @@ async function shareOnlineInvite() {
         await navigator.clipboard.writeText(url);
         showToast('招待URLをコピーしました');
     } catch {
-        window.prompt('このURLを送ってください', url);
+        // コピーできなければ、このページの URL（部屋が入っている）を送ってもらう。URL を文字では出さない
+        showToast('コピーできませんでした。このページのURLを送ると、この部屋に招待できます');
     }
 }
 

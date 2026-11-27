@@ -1231,13 +1231,65 @@ button:focus-visible {
     width: 100%;
 }
 
-.online-code {
-    font-size: 2.2rem;
-    font-weight: 800;
-    letter-spacing: 0.15em;
+.online-create-note {
+    margin: 8px 0 0;
+    font-size: 0.75rem;
+}
+
+/* 参加できる部屋の一覧（作った人の名前と人数。押すとその部屋に入る） */
+.online-rooms {
+    list-style: none;
+    margin: 6px 0 10px;
+    padding: 4px 12px;
+    max-height: 30vh;
+    overflow-y: auto;
+    border-radius: var(--radius-md);
+    background-color: var(--surface-sub);
+    text-align: left;
+}
+
+.online-rooms li + li {
+    border-top: 1px solid rgba(31, 42, 55, 0.08);
+}
+
+.online-room {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 0;
+    font: inherit;
+    color: var(--text);
+    text-align: left;
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.online-room:active {
+    opacity: 0.6;
+}
+
+.online-room-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 600;
+    color: var(--accent-dark);
+}
+
+.online-room-count {
+    font-size: 0.8rem;
     font-variant-numeric: tabular-nums;
-    line-height: 1.2;
-    margin-bottom: 10px;
+    color: var(--text-sub);
+}
+
+.online-room-note {
+    padding: 10px 0;
+    font-size: 0.85rem;
+    color: var(--text-sub);
 }
 
 .online-waiting:empty {
