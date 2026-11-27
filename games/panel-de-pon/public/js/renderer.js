@@ -60,10 +60,10 @@ export function initRenderer({ onRematch, onBackToRoom, onHome, onSound, onHelp 
     playMenuElement = document.createElement('div');
     playMenuElement.classList.add('play-menu');
     playMenuElement.innerHTML = `
-        <button type="button" class="play-menu-button" data-action="home">ホーム</button>
+        <button type="button" id="home" class="play-menu-button" data-action="home">ホーム</button>
         <div class="play-menu-group">
             <button type="button" class="play-menu-button sound-toggle" data-action="sound" aria-pressed="true">サウンド</button>
-            <button type="button" class="play-menu-button" data-action="help">遊び方</button>
+            <button type="button" id="open-help-game" class="play-menu-button" data-action="help">遊び方</button>
         </div>
     `;
     const menuActions = { home: onHome, sound: onSound, help: onHelp };

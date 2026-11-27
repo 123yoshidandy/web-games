@@ -31,7 +31,7 @@ export function showTitle({ onSolo, onOnline }) {
     const settingGroups = `${fieldset(difficulty)}<div class="setting-row">${toggles.map(fieldset).join('')}</div>`;
 
     titleElement = document.createElement('div');
-    titleElement.id = 'title-screen';
+    titleElement.id = 'screen-title';
     titleElement.innerHTML = `
         <div class="title-content">
             <h1 class="title-text">パネルでポン</h1>
@@ -45,7 +45,7 @@ export function showTitle({ onSolo, onOnline }) {
                 <button type="button" class="start-button online" data-mode="online">オンライン対戦</button>
             </div>
             <div class="title-links">
-                <button type="button" class="help-link" data-action="help">遊び方・操作方法</button>
+                <button type="button" id="open-help-title" class="help-link" data-action="help">遊び方・操作方法</button>
                 <a class="help-link portal-link" href="../">← ゲーム一覧</a>
             </div>
         </div>

@@ -198,7 +198,7 @@ button {
 
 /* ===== タイトル・オンライン対戦の画面 ===== */
 
-#title-screen,
+#screen-title,
 #online-screen {
     position: fixed;
     inset: 0;
