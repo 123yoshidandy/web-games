@@ -5,6 +5,7 @@
 // - 入口のページの検索・絞り込みに使う情報（人数・原題・ジャンル）がそろっている（scripts/portal/metadata.mjs）。
 //   遊ぶ時間・難しさは、書き方の誤りだけを落とし、書いていないものは警告として出す
 // - BGM の再生エンジンの写し（sound/engine.js・engine.mjs）が、packages/sound の今の本体と同じ（packages/sound/scripts/sync.mjs）
+// - 駒やカードの動きの部品の写し（motion/motion.js）が、packages/motion の今の本体と同じ（packages/motion/scripts/sync.mjs）
 // - ゲームの標準（docs/standards.md）の必須の項目を満たし、宣言に誤りがない（scripts/standards.mjs の checkRequired）
 //   公開（pages.yml）では --skip-standards を付けて、この確認だけを省く（標準の欠けで公開を止めない）
 // 使い方: node scripts/check-games.mjs [--skip-standards]
@@ -13,6 +14,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gameMetadata } from './portal/metadata.mjs';
 import { LOCK_FILE as SOUND_LOCK, copyProblems } from '../packages/sound/scripts/sync.mjs';
+import { LOCK_FILE as MOTION_LOCK, copyProblems as motionCopyProblems } from '../packages/motion/scripts/sync.mjs';
 import { checkRequired } from './standards.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -45,6 +47,10 @@ export function checkGames(gamesDir, games = listGames(gamesDir), { standards = 
             for (const problem of copyProblems(join(gamesDir, game))) errors.push(`${game}: BGM のエンジンの写しが packages/sound と違う（${problem}）。node packages/sound/scripts/sync.mjs ${game} で同期する`);
         } else if (hasEngine) {
             errors.push(`${game}: BGM のエンジンの写しに ${SOUND_LOCK} がない`);
+        }
+        // 動きの部品の写しも、同期したときのまま、packages/motion と同じであること
+        if (existsSync(join(gamesDir, game, MOTION_LOCK))) {
+            for (const problem of motionCopyProblems(join(gamesDir, game))) errors.push(`${game}: 動きの部品の写しが packages/motion と違う（${problem}）。node packages/motion/scripts/sync.mjs ${game} で同期する`);
         }
         const publicDir = existsSync(join(gamesDir, game, 'public')) ? join(gamesDir, game, 'public') : join(gamesDir, game);
         const swPath = join(publicDir, 'sw.js');

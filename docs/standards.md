@@ -127,6 +127,16 @@ node --test scripts/standards.test.mjs      # 判定と宣言の読み方のテ�
 - 結果の画面と「もう一度」の流れ、終局で操作が止まること
 - 「← ゲーム一覧」のリンクがタイトル画面の中にあり、プレイ中に誤って押されない位置にある
 
+## 任意：駒やカードの動き
+
+駒やカードが動く・めくれるときのアニメーションは、共通の部品 `packages/motion` で入れる（Issue #4）。今は任意で、上の表の項目にはしていない。入れたゲームが増えたら、推奨の項目にする。
+
+- 部品は `node packages/motion/scripts/sync.mjs <ゲーム>` で `js/motion/motion.js` に写し、`sw.js` の先読みに足す。写しが元と同じかは check-games.mjs が見る
+- 動きの速さ（普通・速い・なし）を、タイトル画面（とプレイ中の設定があればそこ）で選べるようにする。端末ごとに保存し、選んでいなければ `prefers-reduced-motion` のとき「なし」
+- CPU の手番は `Motion.afterIdle` で予約し、動き終わってから打つ（人の手の動きを CPU の手が追い越さない・飛ばさない）
+- 何を動かすか：駒の移動（FLIP）、手札から場・山札から手札（飛ばす）、めくるもの（裏返す）。強調の点滅だけのものは数えない
+- 使い方と手順は `packages/motion/README.md`
+
 ## ブラウザでの画面の検査
 
 `scripts/layout-check.mjs` は、ゲームをヘッドレス Chrome で開き、画面の崩れを数値で確かめる。上の標準の表（ファイルの文字列の検査）とは別で、表には入れない。判定は `scripts/layout-check-rules.mjs`（テストは `node --test scripts/layout-check.test.mjs`）。
