@@ -274,3 +274,13 @@ dialog h2:focus-visible { outline: none; }
 .suggested { outline: 3px solid #f5c542 !important; outline-offset: 2px; box-shadow: 0 0 0 6px rgba(245, 197, 66, .35) !important; }
 .target.suggested-target polygon { fill: rgba(245, 197, 66, .6); stroke: #f5c542; stroke-width: 4; stroke-dasharray: none; }
 .target.suggested-target circle { fill: #fff3c4; }
+
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数などと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+#motion-setting .motion-speed button { min-width: 80px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3d2900; background: var(--accent); }
+
+/* 動きの速さが「なし」のとき（動きを減らす設定のときも）は、CSS の動きも止める。速さの倍率は --motion-scale（js/motion/motion.js） */
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }

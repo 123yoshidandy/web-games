@@ -7,6 +7,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, PROFILES, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_STEP_DELAY_MS = 600;   // CPU の手は、動きが見えるように間を置く（考える時間はこのあと）
 const SAVE_KEY = 'hive.save';
@@ -37,7 +38,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.save();
     }
 
@@ -79,10 +80,10 @@ export default class LocalGameController {
 
     // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する（決めた手が通らなければ、単純な手で進める）
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (this.paused || !isCpuTurn(this.game)) return;
         const delay = CPU_STEP_DELAY_MS;
-        this.cpuTimer = setTimeout(() => {
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 runCpuStep(this.game, this.game.current, PROFILES[this.level]);
             } catch (error) {
@@ -106,7 +107,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 
     // 遊び方を開いている間は、CPU を止める

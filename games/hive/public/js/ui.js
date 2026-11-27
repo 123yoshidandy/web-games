@@ -16,6 +16,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
 import { symbolsSvg, pieceShape, pieceSvg, cellCenter, hexPoints, HEX_R } from './art.js';
 
 const SETTINGS_KEY = 'hive.settings';
@@ -30,7 +31,6 @@ const MOVE_MS = 380;
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function loadSettings() {
     const fallback = { level: 'normal', expansions: [], tournament: true };
@@ -531,7 +531,7 @@ export default class UI {
         }
         if (view.over && fresh.some(e => e.type === 'end')) {
             this.recordLocalResult(view);
-            setTimeout(() => this.showResult(), 900);
+            Motion.afterIdle(() => this.showResult(), Motion.ms(900));
         }
     }
 
@@ -669,21 +669,21 @@ export default class UI {
 
     // 置いた駒は浮き出るように、動かした駒は元のマスから滑らせる
     animate(events) {
-        if (events.length === 0 || events.length > 3 || reducedMotion()) return;
+        if (events.length === 0 || events.length > 3 || !Motion.enabled()) return;
         const event = events.filter(e => e.type === 'place' || e.type === 'move').at(-1);
         if (!event) return;
         const node = document.querySelector(`#world [data-cell="${event.to}"] .layer.top`);
         if (!node) return;
         if (event.type === 'place') {
-            node.animate([{ transform: 'scale(.4)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: 0.7 }, { transform: 'scale(1)', opacity: 1 }], { duration: MOVE_MS, easing: 'ease-out' });
+            Motion.track(node.animate([{ transform: 'scale(.4)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: 0.7 }, { transform: 'scale(1)', opacity: 1 }], { duration: Motion.ms(MOVE_MS), easing: 'ease-out' }), Motion.ms(MOVE_MS));
             return;
         }
         const from = cellCenter(event.from);
         const to = cellCenter(event.to);
-        node.animate([
+        Motion.track(node.animate([
             { transform: `translate(${from.x - to.x}px, ${from.y - to.y}px)` },
             { transform: 'translate(0px, 0px)' }
-        ], { duration: MOVE_MS, easing: 'cubic-bezier(.45,.05,.4,1)' });
+        ], { duration: Motion.ms(MOVE_MS), easing: 'cubic-bezier(.45,.05,.4,1)' }), Motion.ms(MOVE_MS));
     }
 
     // ---- 結果 ----
