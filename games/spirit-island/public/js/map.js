@@ -101,7 +101,9 @@ export function mapSvg(view, { picks = null, recommended = null, selected = null
             const x = cx + (i % perRow - (inRow - 1) / 2) * (size + 6) - size / 2;
             const y = cy + 6 + (row - (rows - 1) / 2) * (size + 2) - size / 2;
             const label = n > 1 || sym === 'F' ? `<text class="cnt" x="${x + size + 1}" y="${y + size - 1}">${n}</text>` : '';
-            return `<use href="#sym-${sym}" x="${x}" y="${y}" width="${size}" height="${size}"${color ? ` style="color:${color}"` : ''}/>${label}`;
+            // 描き直しの前後で見分けられるように包む（piece-motion.js）。存在は精霊ごと（色）に別の駒として動かす
+            const group = sym === 'P' || sym === 'S' ? `pres${color}` : sym;
+            return `<g data-mk="${L.id}-${group}" data-mg="${group}" data-mv="${n}"><use href="#sym-${sym}" x="${x}" y="${y}" width="${size}" height="${size}"${color ? ` style="color:${color}"` : ''}/>${label}</g>`;
         }).join('');
         const marks = `${ravage ? `<path class="mark-ravage" d="M${cx + 14} ${cy - 24}l5 8h-10z"/>` : ''}${build ? `<rect class="mark-build" x="${cx + (ravage ? 22 : 10)}" y="${cy - 24}" width="8" height="8" rx="1.5"/>` : ''}`;
         parts.push(`<g class="${cls}" data-land="${L.id}"><polygon points="${pts(poly)}" fill="${TERRAIN_COLORS[L.terrain]}"/>`

@@ -13,6 +13,8 @@ import {
 import { mapSvg, titleArtSvg, TERRAIN_COLORS } from './map.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import * as PieceMotion from './piece-motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -133,6 +135,7 @@ export default class UI {
             }
         });
         this.bindTitle();
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         this.bindGame();
         document.addEventListener('contextmenu', event => {
             if (!event.target.closest('input, textarea')) event.preventDefault();
@@ -230,6 +233,7 @@ export default class UI {
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.view = null;
+        this.animateNext = false; // 前の対局の盤との差も動かさない
         this.update();
     }
 
@@ -353,7 +357,8 @@ export default class UI {
         this.recordLocalResult(v);
         if (v.result && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.openResult(), 700);
+            // 盤の動きが終わってから出す
+            this.cancelResult = Motion.afterIdle(() => this.openResult(), 700);
         }
     }
 
@@ -394,6 +399,9 @@ export default class UI {
         if (!v) return;
         const seat = this.focusSeat();
         const sp = v.spirits[seat];
+        // 描き直す前に駒・数値の位置を測り、描いたあとで前との差を動かす
+        const before = this.animateNext ? PieceMotion.measure(document.body) : null;
+        this.animateNext = true;
         this.renderStatus(v);
         this.renderTrack(v);
         // 地図：選んでいる土地の候補と、ヒントの土地
@@ -408,6 +416,7 @@ export default class UI {
         this.renderActions(v, sp);
         this.renderNews(v);
         this.markHint(v, seat);
+        PieceMotion.animate(before, document.body);
         $('hint').hidden = !this.controller || !!v.result || Boolean(this.controller.isOnline) || !this.can(seat) || !v.actors.includes(seat);
     }
 
@@ -416,7 +425,7 @@ export default class UI {
         const tl = ['Ⅰ', 'Ⅱ', 'Ⅲ'][v.fear.tl - 1];
         // 恐怖：段階と、次の恐怖カードまでの溜まり。得た恐怖カードの数は小さく
         $('status').innerHTML = `<span class="chip phase">${phase}</span>`
-            + `<span class="chip fear" title="恐怖の段階・次の恐怖カードまで・得た恐怖カード"><b>恐怖${tl}</b>${v.fear.gen}/${v.fear.pool}<small>札${v.fear.earnedCount}${v.fear.pending ? `+${v.fear.pending}` : ''}</small></span>`
+            + `<span class="chip fear" title="恐怖の段階・次の恐怖カードまで・得た恐怖カード"><b>恐怖${tl}</b><span data-mk="fear-gen" data-mv="${v.fear.earnedCount * 1000 + v.fear.gen}">${v.fear.gen}/${v.fear.pool}</span><small>札${v.fear.earnedCount}${v.fear.pending ? `+${v.fear.pending}` : ''}</small></span>`
             + `<span class="chip blight${v.blight.pool <= 2 ? ' warn' : ''}" title="荒廃カードの残り"><svg viewBox="0 0 20 20"><use href="#sym-B"/></svg>${v.blight.pool}${v.blight.flipped ? '<small>裏</small>' : ''}</span>`;
     }
 
@@ -453,8 +462,8 @@ export default class UI {
         const def = SPIRITS[sp.key];
         const els = ELEMENTS.filter(e => sp.elements[e] > 0).map(e => elementChip(e, sp.elements[e])).join('');
         $('spirit-bar').innerHTML = `<button type="button" class="spirit-name" data-spirit-info style="--sc:${def.color}"><i class="dot"></i>${def.name}</button>`
-            + `<span class="stat" title="エネルギー（毎ターン +${sp.energyValue}）"><b class="en">${sp.energy}</b><small>+${sp.energyValue}</small></span>`
-            + `<span class="stat" title="使えるカードの枚数"><b class="cp">${sp.cardPlays}</b><small>枚</small></span>`
+            + `<span class="stat" title="エネルギー（毎ターン +${sp.energyValue}）"><b class="en" data-mk="energy-${sp.seat}" data-mv="${sp.energy}">${sp.energy}</b><small>+${sp.energyValue}</small></span>`
+            + `<span class="stat" title="使えるカードの枚数"><b class="cp" data-mk="plays-${sp.seat}" data-mv="${sp.cardPlays}">${sp.cardPlays}</b><small>枚</small></span>`
             + `<span class="els">${els}</span>`;
     }
 

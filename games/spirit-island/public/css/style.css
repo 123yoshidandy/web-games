@@ -554,3 +554,12 @@ button {
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* 動きの速さ（共通の部品 motion の切り替え）を、難易度などの切り替えと同じ見た目にする。動く部品は、その形の中心を基準に拡大する */
+#motion-setting { flex: 1; }
+#motion-setting .motion-speed, #motion-setting .motion-speed-options { display: flex; width: 100%; gap: 4px; border: none; border-radius: 0; overflow: visible; }
+#motion-setting .motion-speed button { flex: 1; justify-content: center; min-height: 38px; padding: 4px 2px; border: 1px solid var(--line); border-radius: 9px; background: rgba(0, 0, 0, .2); font-size: 13px; }
+#motion-setting .motion-speed button + button { border-left: 1px solid var(--line); }
+#motion-setting .motion-speed button[aria-pressed="true"] { background: var(--gold); color: #2a2010; border-color: var(--gold); font-weight: 800; }
+[data-mk] { transform-box: fill-box; transform-origin: center; }
+.chip [data-mk], .stat [data-mk] { display: inline-block; }
