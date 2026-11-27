@@ -8,10 +8,11 @@ import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import {
     LOCATIONS, NEIGHBORS, DIST, MONSTER_KEYS, ITEMS, COLORS, COLOR_NAMES, HERO, MONSTER, VILLAGERS, PERK_CARDS, PERK, LEVELS, TERROR_MAX, MONSTER_CARDS, SPECIAL_EVENTS
 } from './data.js';
-import { mapSvg, monsterBadge, ITEM_COLORS } from './map.js';
+import { mapSvg, monsterBadge, heroPositions, monsterPositions, villagerPositions, ITEM_COLORS } from './map.js';
 import { minimalSet } from './cpu-player.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { recordResult } from './netplay/user-stats.js';
@@ -98,6 +99,8 @@ function taskShort(m) {
 // ヒントが指す場面（手を打つと変わる）
 const hintKey = (v) => JSON.stringify([v.logTotal, v.phase, v.actionsLeft, v.current, v.prompt?.type ?? '']);
 
+const SLIDE_MS = 420; // 英雄・怪物・村人が地点から地点へ進む長さ（普通の速さ）
+
 export default class UI {
     constructor() {
         this.settings = loadSettings();
@@ -154,6 +157,7 @@ export default class UI {
             saveSettings(this.settings);
             this.renderTitle();
         });
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         seg('count', 'count', Number);
         seg('level', 'level', Number);
         seg('mode', 'mode');
@@ -230,6 +234,7 @@ export default class UI {
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.view = null;
+        this.cancelResult?.();
         this.update();
     }
 
@@ -299,11 +304,54 @@ export default class UI {
         else if (!prev || prev.current !== v.current) this.focus = v.current;
         if (this.pick && !this.isMyActions(v)) this.setPick(null);
         this.render();
+        if (prev) this.animateChanges(prev, v);
         this.openPrompt(v);
         if (v.result && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.openResult(), 900);
+            this.cancelResult = Motion.afterIdle(() => this.openResult(), 900);
         }
+    }
+
+    // 描き直したあと：前のビューとの差を動かす（英雄・怪物・村人は地点から地点へ滑り、置かれたアイテム・拾ったアイテム・現れた村人は弾み、恐怖と山札は目立つ）
+    animateChanges(prev, v) {
+        if (!Motion.enabled() || prev.turnNo === undefined) return;
+        const map = $('map');
+        const slide = (selector, from, to, id) => {
+            const [ox, oy] = from.get(id) ?? [];
+            const [nx, ny] = to.get(id) ?? [];
+            if (ox === undefined || nx === undefined || (Math.abs(ox - nx) < 0.5 && Math.abs(oy - ny) < 0.5)) return;
+            const length = Motion.ms(SLIDE_MS);
+            const animation = map.querySelector(selector)?.animate([
+                { transform: `translate(${ox - nx}px, ${oy - ny}px)` },
+                { transform: `translate(${(ox - nx) / 2}px, ${(oy - ny) / 2 - 12}px)`, offset: 0.5 },
+                { transform: 'translate(0, 0)' }
+            ], { duration: length, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+            if (animation) Motion.track(animation, length);
+        };
+        const heroes = [heroPositions(prev), heroPositions(v)];
+        v.players.forEach(p => slide(`.hslot[data-hero="${p.id}"]`, ...heroes, p.id));
+        const monsters = [monsterPositions(prev), monsterPositions(v)];
+        v.monsters.forEach((_, i) => slide(`.mslot[data-mon="${i}"]`, ...monsters, i));
+        const villagers = [villagerPositions(prev), villagerPositions(v)];
+        v.villagers.forEach((at, id) => {
+            if (at === null) return;
+            if (prev.villagers[id] === null) Motion.popIn(map.querySelector(`.vslot[data-vil="${id}"]`), { duration: 360 });
+            else slide(`.vslot[data-vil="${id}"]`, ...villagers, id);
+        });
+        v.board.forEach((items, at) => {
+            const gained = items.length - prev.board[at].length;
+            if (gained <= 0) return;
+            const marks = map.querySelectorAll(`.m-loc[data-loc="${at}"] .m-item`);
+            [...marks].slice(-gained).forEach((el, i) => Motion.popIn(el, { duration: 340, delay: 100 + i * 80 }));
+        });
+        const mine = v.players[this.focus]?.items.length ?? 0;
+        const had = prev.players[this.focus]?.items.length ?? 0;
+        if (mine > had) [...$('items').querySelectorAll('.item')].slice(-(mine - had)).forEach(el => Motion.popIn(el, { duration: 320 }));
+        if (v.terror !== prev.terror) Motion.pulse($('terror'), { duration: 380, scale: 1.25 });
+        if (v.deckCount !== prev.deckCount) Motion.pulse($('deck'), { duration: 380, scale: 1.25 });
+        v.monsters.forEach((m, i) => {
+            if (m.defeated !== prev.monsters[i]?.defeated || m.progress !== prev.monsters[i]?.progress) Motion.pulse($('monsters').children[i], { duration: 380, scale: 1.12 });
+        });
     }
 
     afterChange(prev, v) {

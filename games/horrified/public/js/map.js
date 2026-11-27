@@ -19,6 +19,33 @@ export function monsterBadge(key, x, y, r = 10, extra = '') {
 // 村人の目印（小さな人）
 const villagerIcon = (x, y) => `<g class="m-villager" transform="translate(${x} ${y})"><circle cy="-4" r="2.6"/><path d="M-3.6 3.6 Q0 -3 3.6 3.6 Z"/></g>`;
 
+// 英雄・怪物・村人の位置（地図の座標）。英雄は席、怪物は番号、村人は番号 → [x, y]
+export function heroPositions(view) {
+    const pos = new Map();
+    LOCATIONS.forEach((l, at) => {
+        const here = view.players.filter(p => p.loc === at);
+        here.forEach((p, k) => pos.set(p.id, [l.x - (here.length - 1) * 6 + k * 12, l.y - 20]));
+    });
+    return pos;
+}
+
+export function monsterPositions(view) {
+    const pos = new Map();
+    LOCATIONS.forEach((l, at) => {
+        const here = view.monsters.map((m, i) => ({ ...m, i })).filter(m => !m.defeated && m.loc === at);
+        here.forEach((m, k) => pos.set(m.i, [l.x + 15 + k * 9, l.y - 11 + k * 9]));
+    });
+    return pos;
+}
+
+export function villagerPositions(view) {
+    const pos = new Map();
+    LOCATIONS.forEach((l, at) => {
+        view.villagers.map((v, k) => (v === at ? k : -1)).filter(k => k >= 0).forEach((id, k) => pos.set(id, [l.x - 17 - k * 6, l.y + 13]));
+    });
+    return pos;
+}
+
 // 地図全体。options: { targets（光らせる地点）, best（おすすめの地点）, focusLoc（選んだ地点）, mini（タイトルの絵）}
 export function mapSvg(view, { targets = [], best = null, mini = false } = {}) {
     const parts = [];
@@ -54,7 +81,7 @@ export function mapSvg(view, { targets = [], best = null, mini = false } = {}) {
             if (items.length > 6) g.push(`<text class="m-more" x="0" y="13">+${items.length - 6}</text>`);
             // 村人
             const vs = view.villagers.map((v, k) => (v === at ? k : -1)).filter(k => k >= 0);
-            vs.forEach((_, k) => g.push(villagerIcon(-17 - k * 6, 13)));
+            vs.forEach((id, k) => g.push(`<g class="vslot" data-vil="${id}">${villagerIcon(-17 - k * 6, 13)}</g>`));
         }
         g.push('</g>');
         parts.push(g.join(''));
@@ -68,13 +95,13 @@ export function mapSvg(view, { targets = [], best = null, mini = false } = {}) {
                 const y = l.y - 20;
                 const cls = ['m-hero'];
                 if (p.id === view.current && view.phase !== 'end') cls.push('current');
-                parts.push(`<g class="${cls.join(' ')}" transform="translate(${x} ${y})"><circle cy="-3" r="4.2" fill="${HERO[p.hero].color}"/><path d="M-5 6 Q0 -4 5 6 Z" fill="${HERO[p.hero].color}"/></g>`);
+                parts.push(`<g class="hslot" data-hero="${p.id}"><g class="${cls.join(' ')}" transform="translate(${x} ${y})"><circle cy="-3" r="4.2" fill="${HERO[p.hero].color}"/><path d="M-5 6 Q0 -4 5 6 Z" fill="${HERO[p.hero].color}"/></g></g>`);
             });
         });
         // 怪物（地点の右上）
         LOCATIONS.forEach((l, at) => {
             const here = alive.filter(m => m.loc === at);
-            here.forEach((m, k) => parts.push(monsterBadge(m.key, l.x + 15 + k * 9, l.y - 11 + k * 9, 10, m.i === view.frenzy ? 'frenzy' : '')));
+            here.forEach((m, k) => parts.push(`<g class="mslot" data-mon="${m.i}">${monsterBadge(m.key, l.x + 15 + k * 9, l.y - 11 + k * 9, 10, m.i === view.frenzy ? 'frenzy' : '')}</g>`));
         });
     }
     return `<svg class="map-svg${mini ? ' mini' : ''}" viewBox="-4 -8 368 316" preserveAspectRatio="xMidYMid meet" role="img" aria-label="村の地図">${parts.join('')}</svg>`;
