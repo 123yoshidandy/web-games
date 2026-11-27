@@ -272,11 +272,11 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .dialog {
     padding: 0; border: 1px solid var(--line); border-radius: 16px;
     background: #2a0d17; color: var(--ink);
-    width: min(540px, calc(100vw - 24px)); max-height: calc(100dvh - 24px);
+    width: min(540px, calc(100vw - 24px)); max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
 }
 .dialog::backdrop { background: rgba(10, 2, 5, .6); }
-.dialog-body { max-height: calc(100dvh - 26px); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 12px 16px 16px; }
+.dialog-body { max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; padding: 12px 16px 16px; }
 .dialog-body:focus { outline: none; }
 .dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .dialog-head h2 { margin: 0; font-size: 19px; }

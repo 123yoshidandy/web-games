@@ -1185,7 +1185,7 @@ dialog.sheet {
     border-radius: 16px;
     background: var(--sheet);
     color: var(--ink);
-    width: min(560px, calc(var(--app-w) - 24px));
+    width: min(560px, calc(var(--app-w) - 24px - var(--safe-l) - var(--safe-r)));
     max-height: calc(var(--app-h) - 20px);
     display: flex;
     flex-direction: column;
@@ -1193,7 +1193,11 @@ dialog.sheet {
 }
 dialog.sheet:not([open]) { display: none; }
 /* カードを選ぶ画面は、カードを多く並べ、下のボタン（盤面を見る・山札をすべて見る・決定）も収まるよう広くする */
-dialog#prompt.sheet { width: min(800px, calc(var(--app-w) - 24px)); }
+dialog#prompt.sheet { width: min(800px, calc(var(--app-w) - 24px - var(--safe-l) - var(--safe-r))); }
+/* 横向きの iPhone では、左右の safe-area の内側で中央に置く（ノッチの側のボタンが、ノッチに潜らないように） */
+@media (orientation: landscape) {
+    dialog.sheet { left: var(--safe-l); right: var(--safe-r); }
+}
 /* それでも収まらないときは、ボタンを次の行へ回す（画面の外へ押し出さない） */
 .sheet-actions { flex-wrap: wrap; }
 dialog::backdrop { background: rgba(5, 10, 20, 0.6); }

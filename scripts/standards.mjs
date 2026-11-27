@@ -239,7 +239,7 @@ export const ITEMS = [
     },
     {
         id: 'touch-css', name: 'タッチの CSS', category: 'スマホ', level: '必須',
-        check: (c) => yes([/touch-action/, /overscroll-behavior/, /\d+dvh/, /safe-area-inset/].every((re) => re.test(c.css + c.html)))
+        check: (c) => yes([/touch-action/, /overscroll-behavior/, /\d+dvh/, /safe-area-inset/].every((re) => re.test(c.css + c.html)) && /viewport-fit=cover/.test(c.html))
     },
     {
         id: 'reduced-motion', name: '動きを減らす', category: 'スマホ', level: '推奨',

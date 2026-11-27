@@ -197,9 +197,9 @@ button:disabled { cursor: default; opacity: .4; }
 
 /* ---------- ダイアログ ---------- */
 
-dialog { border: 1.5px solid var(--line); border-radius: 14px; background: var(--bg2); color: var(--text); padding: 0; width: min(460px, calc(100vw - 20px)); max-height: calc(100dvh - 20px); }
+dialog { border: 1.5px solid var(--line); border-radius: 14px; background: var(--bg2); color: var(--text); padding: 0; width: min(460px, calc(100vw - 20px)); top: env(safe-area-inset-top); bottom: env(safe-area-inset-bottom); max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 dialog::backdrop { background: rgba(4, 6, 20, .72); }
-.dialog-body { padding: 10px 12px 12px; max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; outline: none; }
+.dialog-body { padding: 10px 12px 12px; max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; outline: none; }
 .dialog-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dialog-head h2 { flex: 1; margin: 0; font-size: 17px; }
 .dialog .buttons { margin-top: 10px; }

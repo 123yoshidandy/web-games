@@ -75,7 +75,7 @@ web-games のゲームは、作った時期と作りがまちまちで、同じ�
 | 27 | game-definition-test | 定義のテスト | オンライン | 推奨 | 定義を通して遊べることを、テストで確かめる | テストのファイル名か中身の `game-definition`。`game-definition` が n/a か、定義がなければ n/a |
 | 28 | online | オンライン対戦 | オンライン | ゲームによる | 画面からオンライン対戦ができる（画面側の netplay-kit の写しとサーバーがある） | `<公開>/js/netplay/` と `server/src/handler.js` の両方（入口のページの「オンライン」の絞り込みと同じ。`scripts/portal/metadata.mjs` の `hasOnlinePlay`） |
 | 29 | no-zoom | ズームの無効化 | スマホ | 必須 | ピンチやダブルタップで画面が拡大しない | viewport の `user-scalable=no` と、`gesturestart` の処理 |
-| 30 | touch-css | タッチの CSS | スマホ | 必須 | `touch-action`・`overscroll-behavior`・`dvh` の高さ・`safe-area-inset` の余白を使う | CSS と HTML に4つすべてがあるか（当たる要素までは見ない） |
+| 30 | touch-css | タッチの CSS | スマホ | 必須 | `touch-action`・`overscroll-behavior`・`dvh` の高さ・`safe-area-inset` の余白を使う。viewport に `viewport-fit=cover` を書く（ないと `env(safe-area-inset-*)` が 0 になる）。ホーム画面から開くと、画面がステータスバーの下まで広がり、上端がぼかされることがある（#6）。上の帯のボタンも、ダイアログ（`max-height` から上下の inset を引き、`top`・`bottom` に inset を入れて、その間で中央に置く）も、inset の内側に置く | CSS と HTML に4つすべてがあるかと、viewport の `viewport-fit=cover`（当たる要素までは見ない） |
 | 31 | reduced-motion | 動きを減らす | スマホ | 推奨 | `prefers-reduced-motion` のとき、動きを止める・減らす | CSS・JS の `prefers-reduced-motion` |
 | 32 | rotate | 縦持ちで横のゲーム | スマホ | ゲームによる | 横向きのゲームを縦持ちのスマホで開いたとき、回して描くか、回転を促す | CSS の `orientation: portrait` か JS の `orientation.lock`。manifest が landscape でなければ n/a |
 | 33 | tests | テスト | 品質 | 必須 | `npm test` が `vitest run` で、テストがある | package.json の `scripts.test` と `test/`・`tests/` のファイル |

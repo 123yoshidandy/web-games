@@ -95,9 +95,9 @@ button:disabled { cursor: default; opacity: .4; }
 .act.end { border-color: var(--accent); }
 
 /* シート */
-dialog { border: 1.5px solid var(--line); border-radius: 14px; background: var(--bg2); color: var(--text); padding: 0; width: min(520px, calc(100vw - 16px)); max-height: calc(100dvh - 16px); }
+dialog { border: 1.5px solid var(--line); border-radius: 14px; background: var(--bg2); color: var(--text); padding: 0; width: min(520px, calc(100vw - 16px)); top: env(safe-area-inset-top); bottom: env(safe-area-inset-bottom); max-height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 dialog::backdrop { background: rgba(10, 4, 2, .7); }
-.dialog-body { padding: 10px 12px 12px; max-height: calc(100dvh - 20px); overflow-y: auto; overscroll-behavior: contain; outline: none; }
+.dialog-body { padding: 10px 12px 12px; max-height: calc(100dvh - 20px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; outline: none; }
 .dialog-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; position: sticky; top: -10px; background: var(--bg2); padding-top: 4px; z-index: 1; }
 .dialog-head h2 { flex: 1; margin: 0; font-size: 17px; }
 .sheet-body h3 { font-size: 13px; color: var(--muted); margin: 8px 0 4px; }

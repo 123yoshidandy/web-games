@@ -255,10 +255,12 @@ dialog {
     color: var(--text);
     padding: 0;
     width: min(440px, calc(100vw - 24px));
-    max-height: calc(100dvh - 24px);
+    top: env(safe-area-inset-top);
+    bottom: env(safe-area-inset-bottom);
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 dialog::backdrop { background: rgba(8, 6, 24, .7); }
-.dialog-body { padding: 12px 14px 14px; max-height: calc(100dvh - 28px); overflow-y: auto; overscroll-behavior: contain; outline: none; }
+.dialog-body { padding: 12px 14px 14px; max-height: calc(100dvh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; outline: none; }
 .dialog-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .dialog-head h2 { flex: 1; margin: 0; font-size: 18px; }
 .dialog .buttons { margin-top: 12px; }

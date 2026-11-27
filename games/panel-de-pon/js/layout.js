@@ -8,7 +8,7 @@ const INCOMING_GAP = 4; // 予告とフィールドの間隔（px）
 const OPPONENT_SCALE = 0.55; // 相手のフィールドの大きさ（自分のフィールドに対する比）
 const OPPONENT_GAP = 12; // 自分と相手のフィールドの間隔（px）
 const MENU_SPACE = 48; // 画面の上に空ける、ホーム・遊び方のボタンの分の高さ（px）
-const MENU_TOP = 8; // ボタンの上の余白（px）
+const MENU_TOP = 8; // ボタンの上の余白（px。ステータスバーの分は別に空ける）
 
 let mode = 'solo'; // 'solo' | 'versus'
 
@@ -17,7 +17,9 @@ let mode = 'solo'; // 'solo' | 'versus'
 export function doLayout(nextMode = mode) {
     mode = nextMode;
     const w = window.innerWidth;
-    const h = window.innerHeight;
+    // ホーム画面から開くと、画面がステータスバーとホームバーの下まで広がる。その分は使わない
+    const inset = safeAreaInsets();
+    const h = window.innerHeight - inset.top - inset.bottom;
     const versus = mode === 'versus';
 
     // 縦横それぞれの制約から収まる最大サイズを求める（対戦では相手のフィールドの分も横幅に入れる）
@@ -43,7 +45,7 @@ export function doLayout(nextMode = mode) {
     // 枠線を含めたサイズで中央揃え（対戦では自分と相手を並べた幅で）
     const totalWidth = canvas.offsetWidth + (versus ? OPPONENT_GAP + opponentCanvas.offsetWidth : 0);
     const left = (w - totalWidth) * 0.5;
-    const top = MENU_SPACE + (h - MENU_SPACE - canvas.offsetHeight) * 0.5;
+    const top = inset.top + MENU_SPACE + (h - MENU_SPACE - canvas.offsetHeight) * 0.5;
     for (const el of [canvas, versusResultElement]) {
         el.style.left = `${left}px`;
         el.style.top = `${top}px`;
@@ -52,7 +54,7 @@ export function doLayout(nextMode = mode) {
     // ホーム・遊び方のボタンは画面の上に、フィールドの左右の端にそろえて置く
     Object.assign(playMenuElement.style, {
         left: `${left}px`,
-        top: `${MENU_TOP}px`,
+        top: `${inset.top + MENU_TOP}px`,
         width: `${totalWidth}px`
     });
 
@@ -75,6 +77,17 @@ export function doLayout(nextMode = mode) {
         width: `${opponentCanvas.offsetWidth}px`,
         fontSize: `${Math.max(10, incomingHeight)}px`
     });
+}
+
+// 画面の上下の safe-area の余白（px）。CSS の env() を要素に当てて読む
+function safeAreaInsets() {
+    const probe = document.createElement('div');
+    probe.style.cssText = 'position: fixed; visibility: hidden; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);';
+    document.body.append(probe);
+    const style = getComputedStyle(probe);
+    const insets = { top: parseFloat(style.paddingTop) || 0, bottom: parseFloat(style.paddingBottom) || 0 };
+    probe.remove();
+    return insets;
 }
 
 function setCanvasSize(element, width, height, ratio) {

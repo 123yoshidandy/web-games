@@ -405,12 +405,14 @@ button.link {
     background: #2b2018;
     color: var(--ink);
     width: min(560px, calc(100vw - 24px));
-    max-height: calc(100dvh - 24px);
+    top: env(safe-area-inset-top);
+    bottom: env(safe-area-inset-bottom);
+    max-height: calc(100dvh - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     box-shadow: 0 12px 40px rgba(0, 0, 0, .6);
 }
 .dialog::backdrop { background: rgba(10, 6, 3, .6); }
 .dialog-body {
-    max-height: calc(100dvh - 26px);
+    max-height: calc(100dvh - 26px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
     overflow-y: auto;
     overscroll-behavior: contain;
     touch-action: pan-y;
