@@ -330,3 +330,12 @@ dialog h2:focus-visible { outline: none; }
 
 /* ヒント：おすすめの印 */
 .recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数などと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+#motion-setting .motion-speed button { min-width: 64px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3a2c00; background: var(--accent); }
+
+/* 動きの速さが「なし」のとき（動きを減らす設定のときも）は、CSS の動きも止める。速さの倍率は --motion-scale（js/motion/motion.js） */
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }

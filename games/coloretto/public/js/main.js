@@ -3,10 +3,20 @@
  */
 
 import UI from './ui.js';
+import * as Motion from './motion/motion.js';
 
 // 画面を拡大させない（ふつうは style.css の touch-action で止まる。古い iOS は2本指の操作を止める）
 // touchmove は止めない（passive でない touchmove があると、スクロールの始まりが遅れるため）
 document.addEventListener('gesturestart', event => event.preventDefault());
+
+// 動きの速さを、CSS（--motion-scale・data-motion）に伝え、タイトルの切り替えを作る
+const paintMotion = () => {
+    document.documentElement.style.setProperty('--motion-scale', Motion.speedScale());
+    document.documentElement.dataset.motion = Motion.getSpeed();
+};
+paintMotion();
+Motion.onSpeedChange(paintMotion);
+Motion.mountSpeedSetting(document.getElementById('motion-setting'), { label: '' });
 
 const ui = new UI();
 ui.showTitle();

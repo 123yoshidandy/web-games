@@ -12,6 +12,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS }
 import { gainOf } from './cpu-player.js';
 import { symbolsSvg, chameleon, cardHtml, cardBackHtml } from './art.js';
 import { captureAnchors, playEvents } from './animator.js';
+import * as Motion from './motion/motion.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
@@ -286,7 +287,7 @@ export default class UI {
         this.playSounds(view, fresh);
         if (fresh.some(e => e.type === 'lastRound')) this.toast('最後のラウンドのカードが出ました。このラウンドで終わりです');
         else if (fresh.some(e => e.type === 'roundEnd') && view.phase !== 'end') this.toast(`第${view.round}ラウンド`);
-        if (view.phase === 'end' && !$('#result').open) setTimeout(() => this.showResult(), 700);
+        if (view.phase === 'end' && !$('#result').open) Motion.afterIdle(() => this.showResult(), 500);
     }
 
     renderTop() {
