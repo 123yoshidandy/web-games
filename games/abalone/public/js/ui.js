@@ -10,6 +10,7 @@ import LocalGameController, { loadSavedGame, clearSavedGame, CPU_STEP_DELAY_MS }
 import { createState, lineAxis, STEP, SIZE, BLACK, WHITE, LAYOUTS } from './rules.js';
 import { COLOR_NAMES, PLAYERS } from './game.js';
 import * as art from './art.js';
+import * as Motion from './motion/motion.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -48,6 +49,11 @@ export default class UI {
         this.resultShown = false;
         this.buildBoard();
         this.bind();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'アバロン',
@@ -247,7 +253,7 @@ export default class UI {
         if (view.over && !this.resultShown) {
             this.resultShown = true;
             this.recordLocalResult(view);
-            setTimeout(() => this.showResult(), 800);
+            Motion.afterIdle(() => this.showResult(), 800);
         }
     }
 
@@ -288,6 +294,7 @@ export default class UI {
         const layer = this.layers.marbles;
         const events = still ? [] : v.events.filter(e => e.seq > this.seenSeq && e.type === 'move');
         this.seenSeq = v.eventSeq;
+        if (events.length) Motion.hold(500); // 玉の動き（CSS）が終わるまで CPU を待たせる
         for (const e of events) {
             const moving = [...e.moves, ...e.pushed].map(([from, to]) => ({ from, to, g: this.marbles.get(from) }));
             moving.forEach(m => this.marbles.delete(m.from));
@@ -300,7 +307,7 @@ export default class UI {
                     const [dx, dy] = art.dirXY(this.dirToView(e.dir));
                     m.g.style.transform = `translate(${x + dx * art.S * 1.1}px, ${y + dy * art.S * 1.1}px)`;
                     m.g.classList.add('gone');
-                    setTimeout(() => m.g.remove(), 400);
+                    setTimeout(() => m.g.remove(), Motion.ms(400));
                 } else {
                     this.marbles.set(m.to, m.g);
                     art.placeMarble(m.g, this.toView(m.to));

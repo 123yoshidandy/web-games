@@ -58,7 +58,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .plate-edge { fill: var(--plate-edge); }
 .plate-top { fill: var(--plate); stroke: #9a6646; stroke-width: 2; }
 .pit { fill: var(--pit); stroke: rgba(0, 0, 0, .35); stroke-width: 1.5; }
-.marble { transition: transform .3s ease-out, opacity .3s; }
+.marble { transition: transform calc(.3s * var(--motion-scale, 1)) ease-out, opacity calc(.3s * var(--motion-scale, 1)); }
 .marble.still { transition: none; }
 .marble.gone { opacity: 0; }
 .marble-shadow { fill: rgba(0, 0, 0, .35); }
@@ -90,7 +90,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
     font-weight: 800;
     white-space: nowrap;
     cursor: pointer;
-    transition: transform .08s, box-shadow .08s;
+    transition: transform calc(.08s * var(--motion-scale, 1)), box-shadow calc(.08s * var(--motion-scale, 1));
 }
 .btn.primary { color: #3d2900; background: linear-gradient(#fbd98a, var(--accent)); box-shadow: 0 4px 0 var(--accent-deep); }
 .btn.secondary { color: #fff; background: linear-gradient(#a8507a, #7d3358); box-shadow: 0 4px 0 #4c1d35; }
@@ -115,6 +115,10 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .logo { margin: 6px 0 0; font-size: 44px; font-weight: 800; letter-spacing: .04em; color: var(--accent); text-shadow: 0 3px 0 rgba(0, 0, 0, .35); }
 .subtitle { margin: -6px 0 10px; color: var(--muted); font-size: 14px; letter-spacing: .4em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 360px; }
+/* 動きの速さ（js/motion/motion.js の切り替え）を、CPU の強さと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+#motion-setting .motion-speed button { min-width: 72px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3d2900; background: var(--accent); }
 .setup .setup-row { display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; }
 .setup-label { width: 3.5em; text-align: right; color: var(--muted); }
 .setup .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 4px; }
@@ -141,7 +145,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .score .pip.filled.black { border: none; background: radial-gradient(circle at 35% 30%, #6b6f78, #111 70%); box-shadow: 0 0 0 1px #000; }
 .score .pip.filled.white { border: none; background: radial-gradient(circle at 35% 30%, #fff, #b7ad9b 80%); box-shadow: 0 0 0 1px #8f8571; }
 .score .count { min-width: 2.2em; text-align: right; font-size: 13px; font-weight: 800; color: var(--accent); }
-.score .pip.new { animation: pop .5s ease-out backwards; }
+.score .pip.new { animation: pop calc(.5s * var(--motion-scale, 1)) ease-out backwards; }
 @keyframes pop { from { transform: scale(2.2); opacity: 0; } }
 
 /* 盤 */
@@ -191,7 +195,7 @@ dialog h2:focus-visible { outline: none; }
     transform: translateX(-50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s;
+    transition: opacity calc(.2s * var(--motion-scale, 1));
 }
 .toast.show { opacity: 1; }
 
