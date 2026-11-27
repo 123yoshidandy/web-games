@@ -124,7 +124,7 @@ button {
 .ice-shine { fill: none; stroke: #ffffff; stroke-width: 1; stroke-opacity: .35; }
 .hole { fill: rgba(0, 0, 0, .25); stroke: rgba(255, 255, 255, .2); stroke-dasharray: 3 3; }
 .sinking { pointer-events: none; }
-.sink { animation: sink .6s ease-in forwards; transform-origin: 0 0; }
+.sink { animation: sink calc(.6s * var(--motion-scale, 1)) ease-in forwards; transform-origin: 0 0; }
 @keyframes sink { to { transform: scale(.55) translateY(6px); opacity: 0; } }
 
 .can-place, .can-pick { fill: rgba(255, 210, 94, .18); stroke: var(--gold); stroke-width: 2.4; cursor: pointer; animation: glow 1.3s ease-in-out infinite; }
@@ -135,8 +135,8 @@ button {
 .dest-ring { fill: none; stroke: var(--gold); stroke-width: 3; stroke-linejoin: round; }
 .ng { stroke: #e0533d; stroke-width: 2.6; stroke-linecap: round; }
 
-.pen { transition: transform .45s cubic-bezier(.3, .7, .3, 1); cursor: pointer; }
-.pen.entering .pen-body { animation: drop .4s ease-out; }
+.pen { transition: transform calc(.45s * var(--motion-scale, 1)) cubic-bezier(.3, .7, .3, 1); cursor: pointer; }
+.pen.entering .pen-body { animation: drop calc(.4s * var(--motion-scale, 1)) ease-out; }
 @keyframes drop { from { transform: translateY(-14px); opacity: 0; } }
 .pen.selected .pen-body { animation: hop .7s ease-in-out infinite; }
 @keyframes hop { 50% { transform: translateY(-3px); } }
@@ -263,3 +263,13 @@ dialog h2:focus-visible { outline: none; }
 #hint:disabled { opacity: .35; cursor: default; }
 .recommended { outline: 3px solid #fff; outline-offset: 1px; box-shadow: 0 0 0 6px rgba(255, 210, 87, .7), 0 0 18px rgba(255, 210, 87, .8); }
 #marks .recommended { fill: rgba(255, 210, 87, .25); stroke: #fff; stroke-width: 4; stroke-linejoin: round; outline: none; box-shadow: none; pointer-events: none; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、人数などと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .28); }
+#motion-setting .motion-speed button { min-width: 64px; height: 36px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button + button { border-left: none; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3a1702; background: var(--accent); }
+
+/* 動きの速さが「なし」のとき（動きを減らす設定のときも）は、CSS の動きも止める。速さの倍率は --motion-scale（js/motion/motion.js） */
+:root[data-motion="off"] *, :root[data-motion="off"] *::before, :root[data-motion="off"] *::after { animation: none !important; transition: none !important; }
+:root[data-motion="off"] .sinking { display: none; }

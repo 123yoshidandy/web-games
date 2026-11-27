@@ -12,12 +12,17 @@ import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { CELLS, CELL_COUNT, ROWS } from './board.js';
+import * as Motion from './motion/motion.js';
 import { symbolsSvg, iceTile, penguinUse, penguinIcon, fishIcon, hexPoints, HEX_W, HEX_H, PLAYER_COLORS } from './art.js';
 
 const SETTINGS_KEY = 'hey-thats-my-fish.settings';
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ'];
 const RESULT_DELAY_MS = 1200;
 const PENGUIN_SCALE = 0.86;
+// 動き（普通の速さでの長さ。CSS の動きと合わせる）
+const SINK_MS = 600;     // 取った氷が沈む
+const DROP_MS = 400;     // ペンギンを置く
+const SLIDE_MS = 450;    // ペンギンが動く
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -56,7 +61,7 @@ export default class UI {
         this.view = null;
         this.lastSeq = 0;
         this.selected = null;   // 選んでいるペンギン（番号）
-        this.resultTimer = null;
+        this.cancelResult = null;
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'それはオレの魚だ！',
@@ -147,8 +152,8 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
-        this.resultTimer = null;
+        this.cancelResult?.();
+        this.cancelResult = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -299,11 +304,11 @@ export default class UI {
         if (prev) this.playSound(view, fresh);
         if (fresh.some(e => e.type === 'end')) this.recordLocalResult(view);
         if ($('#log').open) this.renderLog();
-        if (view.phase === 'end' && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
-                this.resultTimer = null;
+        if (view.phase === 'end' && !$('#result').open && !this.cancelResult) {
+            this.cancelResult = Motion.afterIdle(() => {
+                this.cancelResult = null;
                 this.showResult();
-            }, RESULT_DELAY_MS);
+            }, Motion.ms(RESULT_DELAY_MS));
         }
     }
 
@@ -329,6 +334,7 @@ export default class UI {
     renderTiles(view, fresh) {
         const sinking = new Map(fresh.filter(e => e.type === 'move').map(e => [e.from, e.fish]));
         fresh.filter(e => e.type === 'retire').forEach(e => e.cells.forEach(c => sinking.set(c, 1)));
+        if (sinking.size > 0) Motion.hold(SINK_MS);
         let html = '';
         for (let c = 0; c < CELL_COUNT; c++) {
             const { cx, cy } = center(c);
@@ -381,10 +387,12 @@ export default class UI {
                 el.style.color = PLAYER_COLORS[p.owner];
                 el.innerHTML = `<g class="pen-body">${penguinUse(PENGUIN_SCALE)}</g>`;
                 layer.appendChild(el);
-                setTimeout(() => el.classList.remove('entering'), 500);
+                Motion.hold(DROP_MS);
+                setTimeout(() => el.classList.remove('entering'), Motion.ms(500));
             }
             if (el.classList.contains('entering')) el.style.transition = 'none';
             else el.style.transition = '';
+            if (el.dataset.cell !== undefined && el.dataset.cell !== String(p.cell)) Motion.hold(SLIDE_MS);
             el.dataset.cell = String(p.cell);
             el.style.transform = `translate(${cx.toFixed(1)}px, ${(cy + 7).toFixed(1)}px)`;
             el.classList.toggle('selected', i === this.selected);
