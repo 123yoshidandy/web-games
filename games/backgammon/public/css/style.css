@@ -63,7 +63,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .point.even { fill: var(--point-a); }
 .point-no { font-size: 11px; font-weight: 800; fill: rgba(255, 236, 210, .62); text-anchor: middle; pointer-events: none; }
 
-.checker { transition: transform .32s ease-in-out; }
+.checker { transition: transform calc(.32s * var(--motion-scale, 1)) ease-in-out; }
 .ck-shadow { fill: rgba(0, 0, 0, .4); }
 .checker.light .ck-body { stroke: #9b8a68; stroke-width: 1; }
 .checker.dark .ck-body { stroke: #1a0605; stroke-width: 1; }
@@ -87,7 +87,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .cube-value { font-size: 17px; font-weight: 800; fill: #3a2410; text-anchor: middle; }
 
 /* 動かせる駒・選んだ駒・行き先・相手の最後の手 */
-.movable { fill: none; stroke: var(--glow); stroke-width: 3; opacity: .9; animation: glow 1.4s ease-in-out infinite; pointer-events: none; }
+.movable { fill: none; stroke: var(--glow); stroke-width: 3; opacity: .9; animation: glow calc(1.4s * var(--motion-scale, 1)) ease-in-out infinite; pointer-events: none; }
 .selected { fill: none; stroke: #fff; stroke-width: 3.5; pointer-events: none; filter: drop-shadow(0 0 4px var(--glow)); }
 @keyframes glow { 50% { opacity: .35; } }
 .dest { fill: rgba(255, 211, 106, .35); pointer-events: none; }
@@ -114,7 +114,7 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
     font-weight: 800;
     white-space: nowrap;
     cursor: pointer;
-    transition: transform .08s, box-shadow .08s;
+    transition: transform calc(.08s * var(--motion-scale, 1)), box-shadow calc(.08s * var(--motion-scale, 1));
 }
 .btn.primary { color: #3d2900; background: linear-gradient(#fbdc8e, var(--accent)); box-shadow: 0 4px 0 var(--accent-deep); }
 .btn.secondary { color: #fff; background: linear-gradient(#3f8a63, #2c6a4a); box-shadow: 0 4px 0 #17402b; }
@@ -248,7 +248,7 @@ dialog h2:focus-visible { outline: none; }
     transform: translateX(-50%);
     opacity: 0;
     pointer-events: none;
-    transition: opacity .2s;
+    transition: opacity calc(.2s * var(--motion-scale, 1));
 }
 .toast.show { opacity: 1; }
 
@@ -279,3 +279,8 @@ dialog h2:focus-visible { outline: none; }
     .topbar .icon-btn { width: 30px; }
     .turn-info { font-size: 14px; }
 }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）を、ほかの選択肢と同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; border: none; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 64px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #3d2900; background: var(--accent); }

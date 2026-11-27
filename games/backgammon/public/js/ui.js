@@ -14,12 +14,13 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
 
 const SETTINGS_KEY = 'backgammon.settings';
 const STEP_MS = 340;
 const $ = (id) => document.getElementById(id);
 const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, Motion.ms(ms))); // 動きの速さに合わせる（なし：間をおかない）
 
 function loadSettings() {
     const fallback = { level: 'normal', matchLength: 3, cube: true };
@@ -56,6 +57,11 @@ export default class UI {
         this.buildBoard();
         this.buildTitleArt();
         this.bind();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'バックギャモン',
@@ -242,7 +248,7 @@ export default class UI {
         this.view = view;
         this.queue.push(...view.events.filter(e => e.seq > this.seenSeq));
         this.seenSeq = view.eventSeq;
-        if (!this.animating) this.playQueue();
+        if (!this.animating) Motion.track(this.playQueue(), 20000); // 出来事の再生が終わるまで CPU を待たせる
     }
 
     async playQueue() {
