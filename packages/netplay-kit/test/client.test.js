@@ -330,12 +330,12 @@ describe('NetplayClient の公開の部屋', () => {
     });
     afterAll(() => dev.close());
 
-    it('公開の部屋を作ると、ほかの人が listRooms の一覧から入れる', async () => {
+    it('部屋はすべて公開で、ほかの人が listRooms の一覧から入れる', async () => {
         const a = new NetplayClient({ serverUrl: url, storageKey: 'test.public.a' });
         const b = new NetplayClient({ serverUrl: url, storageKey: 'test.public.b' });
         expect(await b.listRooms()).toEqual([]);
 
-        await a.createRoom('あお', { public: true });
+        await a.createRoom('あお');
         await waitFor(() => a.lobby);
         expect(a.lobby.public).toBe(true);
 

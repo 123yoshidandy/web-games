@@ -223,12 +223,12 @@ export class RoomService {
 
     // ===== 部屋に入る =====
 
-    // public: true なら公開の部屋にする（部屋番号を知らなくても、listRooms の一覧から入れる）
-    async createRoom(connectionId, { name, public: isPublic }) {
+    // 部屋はすべて公開にする（listRooms の一覧から入れる）。古い画面が public: false を送ってきても公開にする（1.12.0）
+    async createRoom(connectionId, { name }) {
         const room = {
             code: null,
             version: 0,
-            isPublic: isPublic === true,
+            isPublic: true,
             createdAt: this.now(),
             status: 'lobby', // lobby → playing → ended → playing（再戦）／lobby
             matchId: 0,      // 対戦ごとに増える番号（前の対戦のメッセージが混ざらないように）

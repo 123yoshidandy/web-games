@@ -379,12 +379,11 @@ describe('サンプル③：早解き', () => {
 });
 
 describe('公開の部屋', () => {
-    it('public: true で作った部屋だけが一覧に載り、token は載らない', async () => {
+    it('部屋はすべて公開で一覧に載り、token は載らない', async () => {
         const server = createTestServer(raceGame);
         const host = server.connect();
-        await host.send('create', { name: 'あお', public: true });
+        await host.send('create', { name: 'あお' });
         expect(host.last('lobby').public).toBe(true);
-        await server.createRoom(['ないしょ']);
 
         const guest = server.connect();
         await guest.send('listRooms');
@@ -425,6 +424,16 @@ describe('公開の部屋', () => {
 
         server.clock.now += 2 * 24 * 60 * 60 * 1000 + 1000;
         expect(await list()).toEqual([]);
+    });
+
+    it('古い画面が public: false で作っても、公開の部屋になる', async () => {
+        const server = createTestServer(raceGame);
+        const host = server.connect();
+        await host.send('create', { name: 'ふるい', public: false });
+        expect(host.last('lobby').public).toBe(true);
+        const viewer = server.connect();
+        await viewer.send('listRooms');
+        expect(viewer.last('rooms').rooms.map(room => room.hostName)).toEqual(['ふるい']);
     });
 
     it('一覧は新しく作られた順に並ぶ', async () => {

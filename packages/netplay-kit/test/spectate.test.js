@@ -167,14 +167,8 @@ describe('観戦', () => {
         expect(a.last('lobby').players).toHaveLength(2);
     });
 
-    it('観戦できる公開の部屋の一覧：対戦中の公開の部屋だけ、観戦者の数つきで載る', async () => {
-        const { server, code } = await playing({ isPublic: true });
-        // 同じサーバーの、対戦中の非公開の部屋は載らない
-        const secret = server.connect();
-        await secret.send('create', { name: 'ひみつ' });
-        await secret.send('addCpu');
-        await secret.send('start');
-        expect(secret.last('lobby').status).toBe('playing');
+    it('観戦できる部屋の一覧：対戦中の部屋だけ、観戦者の数つきで載る（部屋はすべて公開）', async () => {
+        const { server, code } = await playing();
         const waiting = server.connect();
         await waiting.send('create', { name: 'まつ', public: true });
         await spectate(server, code);

@@ -1,7 +1,8 @@
 // オンライン対戦の通し試験：ヘッドレス Chrome で2人分のページを開き、共通のロビーから部屋を作って数手打つ（AWS は使わない）
 // 使い方: node scripts/online-e2e.mjs <ゲーム> [--moves 6] [--shots <フォルダ>]
 // - 全ゲーム用のテスト用サーバー（dev-online.mjs と同じ）と画面の配信を、このプロセスの中で空いているポートに立て、終わったら止める（8080 は使わない）
-// - A は localhost、B は 127.0.0.1 で開く（参加情報の保存が混ざらない）。A が部屋を作り、B が招待URLから入り、A が始める
+// - A は localhost、B は 127.0.0.1 で開く（参加情報の保存が混ざらない）。A が部屋を作り、B が参加できる部屋の一覧から入り、A が始める
+//   部屋はすべて公開で、部屋番号は画面に出ない（入口・一覧・待合室の文字に部屋番号がないことも確かめる）
 // - 手は、サーバーの部屋の状態から選び（定義の CPU、だめならゲームの suggest）、その席のページの
 //   window.__app.online.controller.send() で送る。両方のページに届いたかを、部屋の版で確かめる
 // - 最後に、B の再読み込みで同じ席に戻ること、A が部屋を出ると B に届くこと、ページにエラーがないことを確かめる
@@ -161,21 +162,37 @@ export async function runE2E({ game, moves = 6, shots = null }) {
         await a.eval(`${onlineButton}.click(); true`);
         await a.waitFor(`!document.querySelector('.netplay-lobby').hidden`);
         await type(a, '.netplay-lobby [data-ref=name]', 'あお');
+        check.ok('A: 入口に部屋番号の欄と公開の選択がない', await a.eval(`!document.querySelector('.netplay-lobby [data-ref=code], .netplay-lobby [data-ref=public]')`));
+        await a.waitFor(`document.querySelector('.netplay-lobby [data-ref=rooms]').textContent.includes('待っている部屋はありません')`);
+        await a.shot(join(shotDir, `${game}-menu-A.png`));
         await click(a, '.netplay-lobby [data-act=create]');
         await a.waitFor(`window.__app.online.controller?.lobby?.status === 'lobby'`);
-        const code = (await lobbyOf(a)).roomCode;
-        check.ok('A: 部屋ができ、ロビーが出る', /^\d{4}$/.test(code), code);
+        const lobbyA = await lobbyOf(a);
+        const code = lobbyA.roomCode;
+        check.ok('A: 部屋ができ（公開）、ロビーが出る', /^\d{4}$/.test(code) && lobbyA.public === true, code);
+        const shownCode = (page) => page.eval(`document.querySelector('.netplay-lobby').innerText.includes(${JSON.stringify(code)})`);
+        check.ok('A: ロビーに部屋番号が出ない', !await shownCode(a));
         await a.shot(join(shotDir, `${game}-lobby-A.png`));
 
-        // B：招待URL（接続先の ?server= も残る）→ 名前 → 参加
-        const invite = (await a.eval('window.__app.online.controller.net.inviteUrl()')).replace('//localhost:', '//127.0.0.1:');
+        // 招待URL（接続先の ?server= も残る）。部屋番号は URL の中にだけ入る
+        const invite = await a.eval('window.__app.online.controller.net.inviteUrl()');
         check.ok('招待URLに部屋番号と接続先が入る', invite.includes(`room=${code}`) && invite.includes('server='), invite);
-        await b.goto(invite, { ready: READY });
-        await b.waitFor(`!document.querySelector('.netplay-lobby')?.hidden`);
+
+        // B：タイトルの「オンラインで遊ぶ」→ 名前 → 参加できる部屋の一覧から A の部屋に入る
+        await b.eval(`${onlineButton}.click(); true`);
+        await b.waitFor(`!document.querySelector('.netplay-lobby').hidden`);
         await type(b, '.netplay-lobby [data-ref=name]', 'みどり');
-        await click(b, '.netplay-lobby [data-act=join]');
+        const roomButton = `[...document.querySelectorAll('.netplay-lobby [data-ref=rooms] button')].find(el => el.textContent.includes('あお の部屋'))`;
+        await b.waitFor(`Boolean(${roomButton})`);
+        check.ok('B: 参加できる部屋の一覧に A の部屋（名前と人数）が出て、部屋番号は出ない',
+            await b.eval(`${roomButton}.textContent.includes('1/') && !document.querySelector('.netplay-lobby').innerText.includes(${JSON.stringify(code)})`));
+        await b.shot(join(shotDir, `${game}-rooms-B.png`));
+        await b.eval(`${roomButton}.click(); true`);
         await a.waitFor('window.__app.online.controller.lobby.players.filter(p => !p.left).length === 2');
-        check.ok('B: 招待URLから参加し、席1になる', await b.eval('window.__app.online.controller.seat') === 1);
+        await b.waitFor(`window.__app.online.controller?.lobby?.status === 'lobby' && !document.querySelector('.netplay-lobby').hidden`);
+        check.ok('B: 一覧から参加し、席1になる', await b.eval('window.__app.online.controller.seat') === 1);
+        check.ok('A・B: 待合室に部屋番号が出ない', !await shownCode(a) && !await shownCode(b));
+        await b.shot(join(shotDir, `${game}-lobby-B.png`));
 
         // 人数が足りなければ A が CPU を足し、始める
         for (let count = 2; count < (definition.minPlayers ?? 2); count++) {

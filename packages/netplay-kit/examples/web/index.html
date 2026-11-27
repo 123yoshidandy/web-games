@@ -14,7 +14,6 @@
     <!-- 通し試験（examples/e2e.mjs）用の最小の画面。サンプル②（中継）の部屋を操作する -->
     <input id="name" placeholder="名前">
     <input id="code" placeholder="部屋番号" inputmode="numeric">
-    <label><input type="checkbox" id="public"> 公開にする</label>
     <div>
         <button id="create">部屋を作る</button>
         <button id="find">公開の部屋を探す</button>
@@ -50,7 +49,7 @@
         net.on('joined', (joined) => net.setRoomUrl(joined.roomCode));
         net.on('left', () => net.setRoomUrl(null));
 
-        $('create').onclick = () => net.createRoom($('name').value, { public: $('public').checked });
+        $('create').onclick = () => net.createRoom($('name').value); // 部屋はすべて公開
         $('find').onclick = () => showRooms();
         $('find-watch').onclick = () => showRooms({ spectate: true });
         $('join').onclick = () => net.joinRoom($('code').value, $('name').value);

@@ -155,19 +155,20 @@ export default {
 - 画面では桁数を直接書かず、`NetplayClient.ROOM_CODE_LENGTH`（入力欄の maxlength や説明の文）と `NetplayClient.isRoomCode(code)`（入力の確認）を使う
 - サーバーは、桁数の違う部屋番号でも参加を断らない（4桁に変える前に作られた5桁の部屋にも、期限までは入れる）
 
-### 公開の部屋
+### 公開の部屋（1.12.0 から、部屋はすべて公開）
 
-- `create` に `public: true` を付けると、公開の部屋になる。部屋番号を知らない人も、`listRooms` の一覧から部屋番号を知って `join` で入れる（入ってからは、番号付きの部屋と同じ）
+- 部屋はすべて公開の部屋になる（個人のリポジトリなので、非公開の部屋は作らない）。`create` の `public` は見ない。前の版の画面が `public: false` や `public` なしで作っても公開になる
+- NetplayClient の `createRoom(name)` は、1.12.0 より前のサーバーでも公開になるように `public: true` を付けて送る（2つめの引数は受け取って無視する）
+- 部屋番号を知らない人も、`listRooms` の一覧から部屋番号を知って `join` で入れる（入ってからは、番号付きの部屋と同じ）。部屋番号は一覧の項目と招待URLの中にあるが、画面には出さない
 - 一覧に載るのは、ロビーで待っていて、満員でなく、つながっている人がいて、期限を過ぎていない部屋だけ。新しく作られた順に最大20部屋
 - 一覧に載せるのは、部屋番号・作った人の名前・人数・定員・設定（`settings.forLobby` を通したもの）・作った時刻。token は載せない
 - 一覧は DynamoDB のテーブルを Scan して絞る（索引を足さないので、各ゲームのテンプレートは変えなくてよい）。Scan はテーブル全体を読むので、画面では一覧を開いたときと「更新」を押したときに取り、短い間隔で取り続けない
-- 部屋を作ったあとで公開・非公開は変えられない
 - 一覧は取った時点のもの。押すまでに始まった・満員になった・消えた部屋には入れない（`enterRoom` が `already_started`・`room_full`・`room_not_found` で reject する）ので、そのときは一覧を取り直す
 
 画面に組み込むときは、次の3つを足す（最小の例は `examples/web/index.html`、通しの確かめ方は `examples/e2e.mjs`）
 
-1. 部屋を作る画面に「公開にする」の選択を置き、`net.createRoom(name, { public: true })` で作る。ロビーでは `lobby.public` で公開かどうかを出せる
-2. 「公開の部屋を探す」ボタンで `await net.listRooms()` を呼び、`hostName`・`players`/`maxPlayers`（と要れば `settings`）を並べる。名前は参加者が入れた文字なので `textContent` で描く。空なら「待っている部屋はありません」と出す
+1. `net.createRoom(name)` で作る（公開・非公開の選択は置かない）
+2. 入口を開いたときと「一覧を更新」ボタンで `await net.listRooms()` を呼び、`hostName`・`players`/`maxPlayers`（と要れば `settings`）を並べる。部屋番号は出さない。名前は参加者が入れた文字なので `textContent` で描く。空なら「待っている部屋はありません」と出す
 3. 一覧の部屋を押したら `net.enterRoom(room.roomCode, name)` で入る。入ってからは、部屋番号で入ったときと同じ（`joined`・`lobby` が届き、招待URLも使える）
 
 ### 観戦
@@ -183,7 +184,7 @@ export default {
 - スタンプ：観戦者も送れて、参加者と観戦者の全員に届く。観戦者が送ったものは `{ seat: null, spectator: { id, name }, stamp }`
 - 試合が終わったら：観戦は続く。参加者と同じく、最後のビュー → `lobby`（`ended`）の順に届き、再戦が始まれば新しい対戦のビューが届く。ロビーに戻っても観戦者のまま（席に座る・席を立つ操作はない）
 - 料金と負荷：観戦者1人ごとに、送信（PostToConnection）がビューのたびに1回増える。Lambda の呼び出しは増えない。観戦者の出入りで部屋を保存するので、保存のやり直しが少し起きやすくなる
-- 公開・非公開：観戦の一覧に載るのは公開の部屋だけ。非公開の部屋も、部屋番号を知っていれば観戦できる
+- 公開・非公開：観戦の一覧に載るのは公開の部屋だけ（1.12.0 からは、部屋はすべて公開。前に作られた非公開の部屋も、部屋番号を知っていれば観戦できる）
 
 3つの型での扱い
 
@@ -208,7 +209,7 @@ export default {
 
 | action | 内容 |
 | --- | --- |
-| `create` `{ name, public? }` | 部屋を作る（`public: true` なら公開の部屋） |
+| `create` `{ name }` | 部屋を作る（部屋はすべて公開。`public` は見ない） |
 | `listRooms` `{ spectate? }` | 入れる公開の部屋の一覧を頼む（部屋に入っていなくてよい）。`spectate: true` なら観戦できる部屋の一覧 |
 | `join` `{ roomCode, name, token?, spectate? }` | 部屋に入る（token が参加者のものなら、その席に再接続する。観戦者のものなら観戦者として戻る）。`spectate: true` なら観戦者として入る |
 | `leave` | 部屋を出る |
@@ -267,8 +268,7 @@ net.on('relay', (message) => applyAttack(message.data)); // ゲーム独自の�
 net.on('error', ({ message, code }) => showError(message));
 net.on('connection', (connected) => showConnection(connected));
 
-await net.createRoom(name);          // joinRoom(code, name) / resume()
-await net.createRoom(name, { public: true }); // 公開の部屋を作る
+await net.createRoom(name);          // 部屋はすべて公開。joinRoom(code, name) / resume()
 const rooms = await net.listRooms(); // 入れる公開の部屋の一覧（入るときは enterRoom(rooms[0].roomCode, name)）
 await net.spectate(code, name);      // 観戦で入る（断られたら reject。enterRoom(code, name, { spectate: true }) と同じ）
 await net.listRooms({ spectate: true }); // 観戦できる部屋の一覧
@@ -298,7 +298,7 @@ await net.joinFromInvite(name);      // 招待URLの部屋に enterRoom で入�
 各ゲームは、次の流れに合わせて画面を作る（lucky-numbers の作りを元にした）。
 
 1. `NetplayClient.inviteRoomCode()` があり、名前がわかれば、画面を挟まずに `net.joinFromInvite(name)` で入る。名前は `net.session?.name` か、ゲームの側で保存している名前を使う（「あなた」のような既定の名前は、わからないものとして扱ってよい）。同じ部屋に入ったことがあれば、保存したトークンで同じ席に戻る（再読み込みしても人数は増えない）
-2. 名前がわからなければ、「部屋 1234 に参加」の見出しで、名前の欄と「参加する」「戻る」だけを出す（部屋を作る・部屋番号の欄は隠す。名前の欄にフォーカスし、Enter でも参加する）
+2. 名前がわからなければ、「招待された部屋に参加」の見出しで、名前の欄と「参加する」「戻る」だけを出す（部屋を作る・部屋の一覧は隠す。部屋番号は出さない。名前の欄にフォーカスし、Enter でも参加する）
 3. 入れなければ（reject）、理由を知らせて、いつものオンラインの入口に戻す。サーバーに断られたときは、`joinFromInvite` が URL から部屋番号を外している。通信の失敗（`not_connected` など）では外さないので、もう一度試せる
 4. 「戻る」では `net.setRoomUrl(null)` で URL から部屋番号を外す。「部屋を出る」は `leave()` が外す
 
@@ -326,7 +326,7 @@ web-games では、全ゲームを1つの WebSocket の API・Lambda・テーブ
 
 ## 入口とロビーの画面（netplay-lobby.js、1.10.0）
 
-どのゲームでも同じ入口（名前・部屋を作る・部屋番号で入る・公開の部屋を探す）とロビー（参加者・CPU の追加と外す・設定・開始・招待URL・退出）を、`body` の下に重ねて出す。ゲームの画面の作りに依らない（CSS は `.netplay-lobby` の下だけ。色は `--np-bg`・`--np-fg`・`--np-accent` などで変えられる）。使い方はファイルの先頭のコメント。
+どのゲームでも同じ入口（名前・部屋を作る・参加できる部屋の一覧）とロビー（参加者・CPU の追加と外す・設定・開始・招待URL・退出）を、`body` の下に重ねて出す。ゲームの画面の作りに依らない（CSS は `.netplay-lobby` の下だけ。色は `--np-bg`・`--np-fg`・`--np-accent` などで変えられる）。使い方はファイルの先頭のコメント。
 
 - `resolveOnlineServerUrl({ game, deployed })`：`?server=`、手元（localhost）なら `ws://localhost:8787`、なければ `deployed`。どれにも `?game=<game>` を付ける。`deployed` が空で手元でもなければ `null`（ゲームの側は「オンラインで遊ぶ」を隠す）
 - `NetplayLobby`：`open()`・`boot()`（招待URLか前回の部屋に入る）・`rematch()`（結果の「もう一度」）・`confirmLeave()`（対戦中の「ホーム」）・`leave()`。対戦が始まると `onStart(controller)`、ビューが届くと `onUpdate()`、操作を断られると `onError(message)`、部屋を出ると `onExit()`
@@ -334,6 +334,11 @@ web-games では、全ゲームを1つの WebSocket の API・Lambda・テーブ
 - 記録をためる（1.11.0）：state の `history` に挙がった `logs`・`events` を、対戦の初めからためてから `getView()` で返す（ローカル対戦の getView() と同じく、記録の一覧は全部そろう）。`seq`・`n` の番号を持つ項目は番号で、番号のない項目は `since` の位置で重ねる。対戦（`matchId`）が変わったら捨てる。再接続のあとは、定義の `joinMark` より前の記録は戻らない。ゲームの側でためる処理（brass-birmingham・concordia・coup）は、そのままでも二重にはならない（番号や件数で重ねているため）。`createViewHistory()` を単独でも使える
 - RoomService は、配列を since で切っているかを、定義ごとに最初の1回だけ since なしのビューと比べて決める（`historyOf`）
 - 名前は `localStorage` の `netplay.name` に、全ゲームで共有して覚える
+- 部屋はすべて公開で、部屋番号は画面のどこにも出さない（1.12.0）
+  - 入口：部屋番号の欄と公開の選択はない。開くと参加できる部屋の一覧を取り（「一覧を更新」で取り直す）、作った人の名前・人数/定員・設定（`settings` の label と、選んでいる項目の label）を出す。押すとその部屋に入る。入れなければ、理由を出して一覧を取り直す
+  - 招待URL：「招待URLを共有」は、共有の文を「〈タイトル〉の部屋に招待します」にし、部屋番号は URL の中にだけ入れる。共有もコピーもできなければ、今のページの URL を招待URLにして、アドレスバーから送ってもらう
+  - 招待URLで開いたとき：名前がわかればそのまま入り、わからなければ「〈タイトル〉：招待された部屋に参加」の見出しで、名前の欄と「参加する」「戻る」だけを出す（Enter でも参加する）。通信の失敗なら招待の画面のまま、断られたら一覧の入口に戻す
+  - 待合室：部屋番号と公開の印は出さない（人数・参加者・設定・招待URL・開始・退出）
 
 ## 同期
 

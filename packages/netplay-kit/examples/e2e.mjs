@@ -79,7 +79,7 @@ try {
     // 公開の部屋：部屋番号を知らなくても、一覧から押すだけで入れる
     const c = await chrome.openPage(`http://localhost:${WEB_PORT}${page}`, { ready: 'window.net' });
     const d = await chrome.openPage(`http://127.0.0.1:${WEB_PORT}${page}`, { ready: 'window.net' });
-    await c.eval(`document.getElementById('name').value = 'き'; document.getElementById('public').checked = true;
+    await c.eval(`document.getElementById('name').value = 'き';
         document.getElementById('create').click(); true`);
     await c.waitFor(`net.lobby?.public === true`);
     await d.eval(`document.getElementById('name').value = 'あか'; document.getElementById('find').click(); true`);
