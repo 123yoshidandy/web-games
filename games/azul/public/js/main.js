@@ -11,6 +11,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import { preventZoom, registerServiceWorker } from './pwa.mjs';
 
 const CPU_NAMES = ['ルシア', 'マテウス', 'イネス'];
 const HUMAN_NAME = 'あなた';
@@ -553,7 +554,7 @@ function init() {
     document.addEventListener('contextmenu', event => {
         if (!event.target.closest('input, textarea')) event.preventDefault();
     });
-    document.addEventListener('gesturestart', event => event.preventDefault());
+    preventZoom();
 
     window.addEventListener('resize', () => {
         if (app.view && app.scene === 'game') render(app.view);
@@ -563,15 +564,7 @@ function init() {
     // 招待URL（?room=）か、前回入っていた部屋があれば、オンライン対戦に入る
     online.boot();
 
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-        navigator.serviceWorker.register('sw.js').then(registration => {
-            const worker = registration.active || registration.waiting || registration.installing;
-            const urls = performance.getEntriesByType('resource').map(entry => entry.name).concat(location.href);
-            const send = target => target?.postMessage({ type: 'cache-urls', urls });
-            if (worker?.state === 'activated') send(worker);
-            else navigator.serviceWorker.ready.then(ready => send(ready.active));
-        }).catch(() => {});
-    }
+    registerServiceWorker();
 
     // 確認用（画面の確認スクリプトから状態を作る）
     window.__azul = app;

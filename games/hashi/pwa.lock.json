@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "dir": "public/js",
+  "files": {
+    "public/js/sw-core.js": "a32909707f8de57bb42c1312f4fa8000fcc26649b552e08e8d282d5b1a70a3ed",
+    "public/js/pwa.js": "caa1ae1ccdc38de5679be280c3b8a2bf9282cd63fb44f587c1a089e0b0bb7571",
+    "public/js/pwa.mjs": "b1211233ea2b448031bb461e1b060bc6883bf2c810dcae7a1620041170cac2d2"
+  }
+}

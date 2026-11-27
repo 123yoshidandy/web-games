@@ -1,13 +1,7 @@
 // オフラインでも開けるようにする service worker
-// 自分のファイルはネットワークを先に使い（更新がすぐ届く）、つながらないときだけキャッシュから返す。
-// 文字（Google Fonts）は変わらないので、キャッシュを先に使う。
-// オンライン対戦の WebSocket は fetch を通らないので、ここでは扱わない。
-// キャッシュの名前は、ファイルを直すたびに変えなくてよい（ネットワークを先に使うので、新しい版はそのまま届く）
+// 中身は packages/pwa の js/sw-core.js（同期した写し）。ここには、このゲームのキャッシュの名前と、先に読むファイルの一覧だけを書く
+// キャッシュの名前は、直すたびに変えない（変えると、前の版が入れた分が消えて、かえってオフラインに弱くなる）
 const CACHE = 'mine-blocks-v1';
-// 同じサイトにほかのゲームも並ぶので、消すのはこのゲームの古い版のキャッシュだけにする
-const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
-const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
-// 画面のファイルは、初めて開いたときに全部入れておく（オフラインで開いても、すべての画面がそろう）
 const PRECACHE = [
     './', 'index.html', 'css/style.css', 'manifest.webmanifest', 'favicon.svg', 'favicon.png',
     'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'js/block.js',
@@ -15,51 +9,7 @@ const PRECACHE = [
     'js/interaction.js', 'js/main.js', 'js/online-config.js', 'js/online.js', 'js/piece-shape.js',
     'js/random.js', 'js/resume.js', 'js/solution.js', 'js/music.js', 'js/surrender.js', 'js/top.js',
     'js/ui.js', 'js/stats.js', 'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs',
-    'js/netplay/user-stats.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js'
+    'js/netplay/user-stats.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/sound/effects.js', 'js/sound/bgm.js',
+    'js/pwa.js', 'js/pwa.mjs', 'js/sw-core.js'
 ];
-
-self.addEventListener('install', event => {
-    event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(PRECACHE)).then(() => self.skipWaiting()));
-});
-
-self.addEventListener('activate', event => {
-    event.waitUntil(caches.keys()
-        .then(keys => Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE).map(key => caches.delete(key))))
-        .then(() => self.clients.claim()));
-});
-
-// 初めて開いたときは、この service worker が動く前に読み込みが終わっている。
-// ページから読み込んだファイル（自分のファイルと Google Fonts）の一覧を受け取り、キャッシュに入れておく。
-self.addEventListener('message', event => {
-    if (event.data?.type !== 'cache-urls') return;
-    const urls = event.data.urls.filter(url => {
-        const { origin, hostname } = new URL(url);
-        return origin === self.location.origin || FONT_HOSTS.includes(hostname);
-    });
-    event.waitUntil(caches.open(CACHE).then(cache => Promise.all(urls.map(url => cache.match(url)
-        .then(hit => hit || cache.add(url).catch(() => {}))))));
-});
-
-self.addEventListener('fetch', event => {
-    const { request } = event;
-    if (request.method !== 'GET') return;
-    const url = new URL(request.url);
-    if (!url.protocol.startsWith('http')) return;
-    if (FONT_HOSTS.includes(url.hostname)) {
-        event.respondWith(caches.match(request).then(hit => hit || fetch(request).then(response => {
-            const copy = response.clone();
-            caches.open(CACHE).then(cache => cache.put(request, copy));
-            return response;
-        })));
-        return;
-    }
-    if (url.origin !== self.location.origin) return;
-    event.respondWith(fetch(request).then(response => {
-        if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then(cache => cache.put(request, copy));
-        }
-        return response;
-    }).catch(() => caches.match(request, { ignoreSearch: true })
-        .then(hit => hit || (request.mode === 'navigate' ? caches.match('index.html') : Response.error()))));
-});
+importScripts('js/sw-core.js');
