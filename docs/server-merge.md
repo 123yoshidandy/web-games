@@ -28,7 +28,7 @@ AWS の操作（デプロイ、IAM のスタックの作成・削除）と GitHu
 | mine-blocks | `games/mine-blocks/js/online-config.js` | `ONLINE_DEPLOYED_SERVER_URL` |
 | panel-de-pon | `games/panel-de-pon/js/online-config.js` | `DEPLOYED_SERVER_URL` |
 | pokemon-card-game | `games/pokemon-card-game/public/js/online-controller.js` | `DEPLOYED_SERVER_URL` |
-| wordle | `games/wordle/js/online-config.js` | `ONLINE_DEPLOYED_SERVER_URL` |
+| wordle | `games/wordle/public/js/online-config.js` | `DEPLOYED_SERVER_URL`（新しい形。?game= は resolveOnlineServerUrl が付ける） |
 
 サーバー側の部屋の処理は、web-games に移したときに、各ゲームの写し（`server/netplay/`）をやめて `packages/netplay-kit/server/` を import する形にした（1.9.0）。画面側（`js/netplay/`）は写しのまま。
 

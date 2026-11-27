@@ -5,7 +5,7 @@
  */
 
 import NetplayClient from './netplay/netplay-client.mjs';
-import { ONLINE_DEPLOYED_SERVER_URL } from './online-config.js';
+import { getServerUrl } from './online-config.js';
 
 const NAME_STORAGE_KEY = 'wordle.name';
 const RESULT_PANEL_DELAY_MS = 3500; // 最後の行をめくって結果を見せてから、部屋の画面を開くまで
@@ -34,7 +34,7 @@ export function setupOnline({ onView, onExit, showMessage }) {
     function client() {
         if (net) return net;
         net = new NetplayClient({
-            serverUrl: NetplayClient.resolveServerUrl({ deployed: ONLINE_DEPLOYED_SERVER_URL }),
+            serverUrl: getServerUrl(),
             storageKey: 'wordle.online'
         });
 

@@ -1,7 +1,13 @@
 /**
- * オンライン対戦のサーバーの URL
- * AWS にデプロイしたら、出力された WebSocketUrl を ONLINE_DEPLOYED_SERVER_URL に書く
- * 手元（localhost）で開いたときはテスト用サーバー（npm run dev:server）につなぎ、?server=wss://... で接続先を変えられる
+ * オンライン対戦の接続先
+ * DEPLOYED_SERVER_URL は、web-games のサーバー（web-games-online）をデプロイしたら、出力された WebSocketUrl を書く
+ * 空のあいだは、公開したページでは「オンラインで遊ぶ」を出さない（手元では npm run dev:server のサーバーにつなぐ）
  */
 
-export const ONLINE_DEPLOYED_SERVER_URL = 'wss://kuhds82pzk.execute-api.ap-northeast-1.amazonaws.com/prod?game=wordle';
+import { resolveOnlineServerUrl } from './netplay/netplay-lobby.js';
+
+export const GAME = 'wordle';
+export const DEPLOYED_SERVER_URL = 'wss://kuhds82pzk.execute-api.ap-northeast-1.amazonaws.com/prod';
+
+// ?server= で接続先を変えられる。どの接続先にも ?game=wordle を付ける。つなぐ先がなければ null
+export const getServerUrl = () => resolveOnlineServerUrl({ game: GAME, deployed: DEPLOYED_SERVER_URL });
