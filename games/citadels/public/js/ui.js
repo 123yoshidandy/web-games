@@ -8,6 +8,7 @@ import { CHARACTERS, CHARACTER_ORDER, DISTRICTS, DISTRICT_ORDER, COLORS, COLOR_O
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS } from './cpu-player.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
@@ -20,11 +21,14 @@ const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン', 'ユイ', 'カ�
 const RESULT_DELAY_MS = 1200;
 const AUTO_END_MS = 700;
 const FLOAT_MS = 1100;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 建てる・引く
+const POP_MS = 280;      // 手札の入れ替え
+const STAGGER_MS = 90;   // 何枚も動くときの間
 const ABILITY_LABEL = { assassinate: '暗殺', steal: '盗む', magic: '魔術', destroy: '破壊' };
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 function loadSettings() {
     try {
@@ -52,7 +56,7 @@ export default class UI {
         this.lastSeq = 0;
         this.selected = null;       // { kind: 'card', card } か { kind: 'character', character }
         this.choose = null;         // 開いている選ぶ画面 { mode, picks }
-        this.resultTimer = null;
+        this.resultTimer = null;   // Motion.afterIdle の取り消す関数
         this.autoTimer = null;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
@@ -75,6 +79,7 @@ export default class UI {
         });
         this.renderTitleArt();
         this.renderHelp();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     }
 
     // ---- 画面の切り替え ----
@@ -132,9 +137,10 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         clearTimeout(this.autoTimer);
         this.resultTimer = null;
+        Motion.cancelAll();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('#fx').innerHTML = '';
     }
@@ -281,6 +287,8 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const prev = this.view;
+        // 描き直す前に、動きの出発点（手札・山札・各人の位置）を測る
+        const before = prev && Motion.enabled() ? this.measure() : null;
         const view = this.controller.getView();
         this.view = view;
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
@@ -295,11 +303,11 @@ export default class UI {
         this.renderHand(view);
         this.renderActions(view);
         this.updateChoose(view);
-        this.playEvents(view, prev);
+        this.playEvents(view, prev, before);
         this.scheduleAutoEnd(view);
         if ($('#log').open) this.renderLog();
         if (view.winner !== null && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
@@ -741,7 +749,7 @@ export default class UI {
         if (fresh.some(e => e.seat !== undefined && e.seat !== null && e.seat !== me)) music.play('notify');
     }
 
-    playEvents(view, prev) {
+    playEvents(view, prev, before = null) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
         if (!prev || !fresh.length) return;
@@ -763,6 +771,63 @@ export default class UI {
             if (e.type === 'swap' && e.target === view.you) this.toast(`${view.players[e.seat].name}と手札を交換しました`);
         });
         deltas.forEach((amount, seat) => { if (amount) this.floatText(seat, amount); });
+        if (before) this.animate(view, fresh, before);
+    }
+
+    // ---- 動き ----
+
+    // 描き直す前の、動きの出発点
+    measure() {
+        const hand = new Map();
+        document.querySelectorAll('#hand .card[data-card]').forEach(el => {
+            const rect = Motion.rectOf(el);
+            if (rect) hand.set(el.dataset.card, rect);
+        });
+        return { hand, deck: Motion.rectOf(document.querySelector('#status .deck')), stage: Motion.rectOf($('#stage')) };
+    }
+
+    // 新しい出来事を動かす：建てた地区は手札（相手は席）から都市へ飛び、引いたカードは山札（交換・墓地は相手・場）から手札へ飛ぶ
+    animate(view, fresh, before) {
+        const me = view.you;
+        const seatEl = (seat) => document.querySelector(`#opponents [data-player="${seat}"]`);
+        let settle = 0;
+        let i = 0;
+        const land = (to) => {
+            Motion.pulse(to, { delay: i * STAGGER_MS + FLY_MS, scale: 1.25, duration: 320 });
+            settle = Math.max(settle, i * STAGGER_MS + FLY_MS);
+            i++;
+        };
+        fresh.forEach(e => {
+            if (e.type === 'build') {
+                if (e.seat === me) {
+                    const to = document.querySelector(`#me .my-city [data-card="${e.card}"]`);
+                    const from = before.hand.get(String(e.card));
+                    if (!to || !from) return;
+                    Motion.fly(from, to, { content: districtCard(e.card, { cls: 'hand-card' }), hide: to, duration: FLY_MS, delay: i * STAGGER_MS });
+                    land(to);
+                } else {
+                    const from = seatEl(e.seat);
+                    const to = [...(from?.querySelectorAll('.op-city .chip') ?? [])].at(-1);
+                    if (!from || !to) return;
+                    Motion.fly(from, to, { content: districtCard(e.card, { cls: 'mini' }), size: { width: 40, height: 52 }, hide: to, duration: FLY_MS, delay: i * STAGGER_MS });
+                    land(to);
+                }
+            } else if (e.type === 'destroy') {
+                const owner = e.target === me ? document.querySelector('#me .my-city') : seatEl(e.target)?.querySelector('.op-city');
+                if (owner) Motion.pulse(owner, { scale: 1.12, duration: 360 });
+            }
+        });
+        // 自分の手札：残ったカードは詰め、増えたカードは山札（交換なら相手、墓地なら場）から飛んでくる
+        const swap = fresh.find(e => e.type === 'swap' && (e.seat === me || e.target === me));
+        const source = swap ? seatEl(swap.seat === me ? swap.target : swap.seat) : fresh.some(e => e.type === 'graveyard' && e.seat === me) ? before.stage : before.deck;
+        const entering = [];
+        document.querySelectorAll('#hand .card[data-card]').forEach(el => {
+            if (!before.hand.has(el.dataset.card)) entering.push(el);
+        });
+        Motion.flipFrom(before.hand, $('#hand'), '.card[data-card]', 'card', { duration: POP_MS, enter: source ? null : 'pop', stagger: 40 });
+        if (source) entering.forEach((el, k) => Motion.fly(source, el, { content: el, hide: el, duration: FLY_MS, delay: k * STAGGER_MS }));
+        // 自分の役割を選んだとき、変わった席・金を目立たせる
+        if (fresh.some(e => e.type === 'pick' && e.seat === me)) Motion.pulse(document.querySelector('#me .my-chars'), { scale: 1.2, duration: 360 });
     }
 
     floatText(seat, amount) {
@@ -775,7 +840,8 @@ export default class UI {
         el.style.left = `${rect.left + rect.width / 2}px`;
         el.style.top = `${rect.top}px`;
         $('#fx').appendChild(el);
-        setTimeout(() => el.remove(), reduceMotion() ? 600 : FLOAT_MS);
+        setTimeout(() => el.remove(), Motion.enabled() ? FLOAT_MS : 600);
+        Motion.pulse(target, { scale: 1.3, duration: 360 });
     }
 
     toast(message) {
