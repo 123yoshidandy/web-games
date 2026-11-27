@@ -1,0 +1,6 @@
+/* テントの色（共通の css/style.css の変数を上書きする）：紙の地に、苔色の差し色 */
+:root {
+    --accent: #4f6f2a;
+    --accent-strong: #3b5520;
+    --accent-soft: rgba(79, 111, 42, .12);
+}
