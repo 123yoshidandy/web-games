@@ -13,9 +13,14 @@ import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { recordResult } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'kingoftokyo.settings.v1', save: 'kingoftokyo.save.v1' };
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;     // カード・怪獣が飛ぶ
+const DICE_MS = 380;    // ダイスが転がる
+const POP_STAGGER = 90; // 何枚も現れるときの間
 const CPU_NAMES = ['ジャン', 'マリー', 'ピエール', 'ソフィ', 'ルイ'];
 // 確かめるときだけ、URL の ?cpuDelay=ミリ秒 で CPU の間隔を縮められる
 const CPU_DELAY = Number(new URLSearchParams(location.search).get('cpuDelay')) || undefined;
@@ -145,6 +150,7 @@ function beginGame(next) {
     ui = freshUi();
     showScene('game');
     render();
+    checkEnd();
     saveProgress();
 }
 
@@ -191,12 +197,80 @@ const online = new NetplayLobby({
 function onUpdate() {
     if (!controller) return;
     const before = view;
+    // 描き直す前に、動きの出発点（場のカード・怪獣）を測る
+    const rects = before && Motion.enabled() ? measure() : null;
     view = controller.getView();
     const fresh = view.events.filter(e => e.seq > lastSeq);
     lastSeq = view.events.at(-1)?.seq ?? lastSeq;
     playSound(before, fresh);
     saveProgress();
     render();
+    if (rects) animateUpdate(before, fresh, rects);
+    checkEnd();
+}
+
+// ---------- 動き ----------
+
+function measure() {
+    const cards = new Map();
+    $('market').querySelectorAll('.pcard[data-card]').forEach(el => cards.set(el.dataset.card, Motion.rectOf(el)));
+    const faces = new Map();
+    $('monsters').querySelectorAll('.mon[data-seat] .mon-face').forEach(el => faces.set(Number(el.closest('.mon').dataset.seat), Motion.rectOf(el)));
+    return { cards, faces };
+}
+
+// ダイスが転がって現れる（変わった目だけ。番の最初は全部）
+function tumble(el, delay) {
+    if (!Motion.enabled() || !el) return;
+    const length = Motion.ms(DICE_MS);
+    const animation = el.animate([
+        { transform: 'rotate(-220deg) scale(.4)', opacity: 0 },
+        { transform: 'rotate(18deg) scale(1.12)', opacity: 1, offset: 0.7 },
+        { transform: 'rotate(0) scale(1)', opacity: 1 }
+    ], { duration: length, delay: Motion.ms(delay), easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' });
+    Motion.track(animation, length + Motion.ms(delay));
+}
+
+// 前のビューから増えた出来事を動かす：買ったカードは買った怪獣へ飛び、場には新しいカードが現れる。
+// 東京に入る怪獣は、その欄へ飛ぶ。ダイスは転がり、増減した数は弾む
+function animateUpdate(prev, fresh, rects) {
+    let settle = 0; // 飛ぶ動きが終わるまで
+    fresh.forEach(e => {
+        if (e.type === 'buy') {
+            const from = rects.cards.get(e.card);
+            const to = $('monsters').querySelector(`.mon[data-seat="${e.seat}"] .mon-face`);
+            if (!from || !to) return;
+            Motion.fly(from, to, { content: `<div class="pcard-fly">${cardHtml(e.card)}</div>`, size: { width: from.width, height: from.height }, duration: FLY_MS });
+            settle = Math.max(settle, FLY_MS);
+        } else if (e.type === 'enterTokyo') {
+            const from = rects.faces.get(e.seat);
+            const to = $('tokyo').querySelector(`.tz-slot[data-where="${e.where}"] svg`);
+            if (!from || !to) return;
+            Motion.fly(from, to, { content: monsterSvg(view.players[e.seat].monster, 46), hide: to, size: { width: 46, height: 46 }, duration: FLY_MS });
+            settle = Math.max(settle, FLY_MS);
+        }
+    });
+    // 場に増えたカード
+    const fresher = [...$('market').querySelectorAll('.pcard[data-card]')].filter(el => !prev.market.includes(el.dataset.card));
+    fresher.forEach((el, i) => Motion.popIn(el, { delay: (settle ? FLY_MS / 2 : 0) + i * POP_STAGGER }));
+    // ダイス
+    if (fresh.some(e => e.type === 'roll')) {
+        const sameTurn = prev.turnNo === view.turnNo && prev.dice.length === view.dice.length;
+        let n = 0;
+        view.dice.forEach((face, i) => {
+            if (sameTurn && prev.dice[i] === face) return;
+            tumble($('dice').querySelector(`[data-die="${i}"]`), n++ * 50);
+        });
+    }
+    // 増減した数（勝利点・体力・エネルギー）
+    view.players.forEach((p, i) => {
+        const old = prev.players[i];
+        if (!old) return;
+        [['vp', p.vp, old.vp], ['hp', p.alive ? p.health : 0, old.alive ? old.health : 0], ['energy', p.energy, old.energy]].forEach(([stat, now, was]) => {
+            if (now === was) return;
+            Motion.pulse($('monsters').querySelector(`.mon[data-seat="${p.id}"] [data-stat="${stat}"]`), { delay: settle, scale: 1.35 });
+        });
+    });
 }
 
 // 1つの更新に1つの音。自分の操作は結果の音、ほかの怪獣の手は notify、自分の番になったら turn
@@ -245,11 +319,17 @@ function render() {
     renderMyCards();
     renderDecision();
     renderHint();
-    if (view.phase === 'end' && !resultShown) {
-        resultShown = true;
-        recordLocalResult();
-        setTimeout(showResult, 900);
-    }
+}
+
+// 終わったら、動きが終わってから結果を出す（動きを始めたあとで呼ぶ）
+function checkEnd() {
+    if (!view || view.phase !== 'end' || resultShown) return;
+    resultShown = true;
+    recordLocalResult();
+    const current = controller;
+    Motion.afterIdle(() => {
+        if (controller === current) showResult();
+    }, 700);
 }
 
 // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
@@ -281,7 +361,7 @@ function renderMonsters() {
             <span class="mon-face">${monsterSvg(p.monster, 34)}${where}</span>
             <span class="mon-info">
                 <span class="mon-name">${escapeHtml(p.id === view.seat ? 'あなた' : p.name)}</span>
-                <span class="mon-stats"><span>${icon.vp}${p.vp}</span><span>${icon.hp}${p.alive ? p.health : 0}</span><span>${icon.energy}${p.energy}</span></span>
+                <span class="mon-stats"><span data-stat="vp">${icon.vp}${p.vp}</span><span data-stat="hp">${icon.hp}${p.alive ? p.health : 0}</span><span data-stat="energy">${icon.energy}${p.energy}</span></span>
                 <span class="mon-extra">${p.cards.length ? `<span class="tok cards">カード${p.cards.length}</span>` : ''}${tokens}${p.alive ? '' : '<span class="tok">退場</span>'}</span>
             </span>
         </button>`;
@@ -307,11 +387,11 @@ function renderMarket() {
 }
 
 function renderTokyo() {
-    const slot = (label, seat) => `<div class="tz-slot ${seat === null ? 'empty' : ''}">
+    const slot = (label, seat, where) => `<div class="tz-slot ${seat === null ? 'empty' : ''}" data-where="${where}">
         <span class="tz-label">${label}</span>
         ${seat === null ? '<span class="tz-empty">空き</span>' : `${monsterSvg(view.players[seat].monster, 46)}<span class="tz-name">${escapeHtml(nameOf(seat))}</span>`}
     </div>`;
-    $('tokyo').innerHTML = slot('東京', view.tokyo.city ?? null) + (view.bayInUse ? slot('東京湾', view.tokyo.bay ?? null) : '');
+    $('tokyo').innerHTML = slot('東京', view.tokyo.city ?? null, 'city') + (view.bayInUse ? slot('東京湾', view.tokyo.bay ?? null, 'bay') : '');
 }
 
 function renderTable() {
@@ -497,6 +577,8 @@ function setupDialogs() {
         });
     });
     $('help-content').innerHTML = helpMarkup();
+    Motion.mountSpeedSetting($('motion-setting'), { label: '' });
+    Motion.mountSpeedSetting($('motion-setting-help'), { label: '動き' });
 }
 
 function showInfo(title, html) {
