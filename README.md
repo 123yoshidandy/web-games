@@ -101,5 +101,5 @@ AWS_PROFILE=<プロフィール> npm run deploy:server -w games/katan   # まと
 - 曲は各ゲームが持ちます（`public/js/sound/bgm.js`。wordle は `js/sound/bgm.js`）。ゲームの `js/music.js` が曲を流し、タイトル画面と遊ぶ画面の BGM のボタンで ON/OFF を切り替えます
 - 再生エンジン（`engine.js`・`engine.mjs`）は、ビルドの仕組みがないので、各ゲームに写しを持たせています。元は `packages/sound/src/` で、写しを新しくするときは `node packages/sound/scripts/sync.mjs <名前>` で同期します（記録は各ゲームの `sound.lock.json`）
 - 曲の検査（`npm test -w packages/sound`・`node packages/sound/tools/lint-songs.mjs`）は、曲を持つすべてのゲームの曲を読みます。曲を直したときも packages/sound のテストを流します
-- lucky-numbers・mine-blocks・panel-de-pon は、自前の BGM（`sound.js`）を持ち、このエンジンは使いません
+- panel-de-pon は、自前の BGM（`sound.js`）を持ち、このエンジンは使いません（lucky-numbers・mine-blocks は 2026-11-28 にこのエンジンへ移した）
 - 詳しくは `packages/sound/README.md`

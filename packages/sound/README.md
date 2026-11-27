@@ -6,7 +6,7 @@ web-games のゲームの BGM と効果音の再生エンジンと、作曲の�
 - 曲はデータで書き、**各ゲームが自分で持ちます**（`games/<ゲーム>/public/js/sound/bgm.js`。public/ がないゲームは `js/sound/bgm.js`）。そのファイルが元で、ここには曲を置きません
 - 効果音は、**すべてのゲームで同じ共通の効果音**（`src/effects.js`）を使います。エンジンと一緒に各ゲームへ同期します（下の「共通の効果音」）
 - エンジンの配り方は netplay-kit と同じ「コピーして同期」です。ゲームはビルドせずに配るので、各ゲームにエンジンの写しを置きます。元はここの `src/` だけです
-- lucky-numbers・mine-blocks・panel-de-pon は、自前の BGM（`sound.js`）を持ち、このエンジンは使いません
+- panel-de-pon は、自前の BGM（`sound.js`）を持ち、このエンジンは使いません（lucky-numbers・mine-blocks は 2026-11-28 にこのエンジンへ移した）
 
 ## フォルダ構成
 
