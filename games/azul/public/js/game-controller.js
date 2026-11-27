@@ -7,6 +7,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest, CPU_STYLES } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 import { createSeed } from './random.js';
 import * as storage from './storage.js';
 
@@ -24,7 +25,7 @@ export default class LocalGameController {
             ? Game.replay(this.setup.players, { seed: this.setup.seed }, setup.commands)
             : new Game(this.setup.players, { seed: this.setup.seed });
         this.humanSeat = this.setup.players.findIndex(player => !player.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.paused = false;
         this.stalls = 0;
         this.persist();
@@ -72,9 +73,10 @@ export default class LocalGameController {
     }
 
     scheduleCpu(delay = CPU_STEP_DELAY_MS) {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
         if (this.paused || !isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => this.cpuStep(), delay);
+        this.cancelCpu = Motion.afterIdle(() => this.cpuStep(), delay);
     }
 
     cpuStep() {
@@ -102,7 +104,8 @@ export default class LocalGameController {
     // 遊び方などを開いている間は CPU を止める
     pause() {
         this.paused = true;
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
     }
 
     resume() {
@@ -120,6 +123,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
+        this.cancelCpu = null;
     }
 }

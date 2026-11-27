@@ -3,6 +3,7 @@
 // キャッシュの名前は、直すたびに変えない（変えると、前の版が入れた分が消えて、かえってオフラインに弱くなる）
 const CACHE = 'azul-v1';
 const PRECACHE = [
+    'js/motion/motion.js',
     './', 'index.html', 'manifest.webmanifest', 'favicon.svg', 'favicon.png', 'apple-touch-icon.png',
     'css/style.css', 'js/main.js', 'js/game.js', 'js/game-view.js', 'js/cpu-player.js',
     'js/game-controller.js', 'js/motion.js', 'js/random.js', 'js/storage.js',

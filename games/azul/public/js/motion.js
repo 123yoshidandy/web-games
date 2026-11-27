@@ -3,8 +3,10 @@
  * 描画の前に元の位置を測り、描画のあとで行き先を測って、複製を飛ばす
  */
 
+import * as Motion from './motion/motion.js';
+
 const DURATION = 420;
-const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reduced = () => !Motion.enabled(); // 速さが「なし」（動きを減らす設定を含む）なら飛ばさない
 
 const rectOf = el => {
     const r = el.getBoundingClientRect();
@@ -88,7 +90,8 @@ function fly({ color, rect, to, hide, shrink }, delay) {
         { transform: 'translate(0, 0) scale(1)' },
         { transform: `translate(${dx / 2}px, ${dy / 2 - lift}px) scale(${(1 + scale) / 2 + 0.08})`, offset: 0.5 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: shrink ? 0.2 : 1 }
-    ], { duration: DURATION, delay, easing: 'cubic-bezier(.4,.1,.3,1)', fill: 'backwards' });
+    ], { duration: Motion.ms(DURATION), delay: Motion.ms(delay), easing: 'cubic-bezier(.4,.1,.3,1)', fill: 'backwards' });
+    Motion.track(animation, Motion.ms(DURATION + delay)); // CPU は飛び終わってから打つ
     const done = () => {
         clone.remove();
         if (hide) hide.style.visibility = '';
@@ -96,5 +99,5 @@ function fly({ color, rect, to, hide, shrink }, delay) {
     animation.onfinish = done;
     animation.oncancel = done;
     // 裏のタブなどで終わらなかったときも、必ず消す
-    setTimeout(done, DURATION + delay + 400);
+    setTimeout(done, Motion.ms(DURATION + delay) + 400);
 }

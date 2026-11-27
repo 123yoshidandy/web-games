@@ -12,6 +12,7 @@ import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { preventZoom, registerServiceWorker } from './pwa.mjs';
+import * as Motion from './motion/motion.js';
 
 const CPU_NAMES = ['ルシア', 'マテウス', 'イネス'];
 const HUMAN_NAME = 'あなた';
@@ -145,7 +146,7 @@ function update() {
     if (previous) playSounds(previous, view, moved);
     if (view.phase === 'end' && previous && previous.phase !== 'end') {
         recordLocalResult(view);
-        setTimeout(() => showResult(), 1400);
+        Motion.afterIdle(() => showResult(), 1400);
     }
 }
 
@@ -495,6 +496,11 @@ function renderStaticArt() {
 
 function init() {
     renderStaticArt();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
 
     $('#count-select').addEventListener('click', event => {
         const button = event.target.closest('button');
