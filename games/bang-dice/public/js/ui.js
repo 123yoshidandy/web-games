@@ -12,6 +12,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'bang-dice';
 const SETTINGS_KEY = 'bang-dice.settings';
@@ -76,6 +77,11 @@ export default class UI {
         $('help-body').innerHTML = HELP_HTML;
         $('title-art').innerHTML = ['1', 'dynamite', 'beer', 'gatling', 'arrow'].map(f => `<span class="die big">${faceSvg(f)}</span>`).join('');
         this.bindTitle();
+        // 動きの速さ：CSS の動きの長さに倍率を掛け、「なし」なら動かさない
+        const applyScale = () => document.documentElement.style.setProperty('--motion-scale', String(Motion.speedScale()));
+        applyScale();
+        Motion.onSpeedChange(applyScale);
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         this.bindGame();
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
@@ -368,7 +374,7 @@ export default class UI {
         this.playEvents(view);
         if (view.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.showResult(), 900);
+            Motion.afterIdle(() => this.showResult(), 900);
         }
     }
 
@@ -493,7 +499,7 @@ export default class UI {
         if (fresh.length === 0) return;
         this.lastSeq = fresh.at(-1).seq;
         this.playSound(view, fresh);
-        const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        const reduce = !Motion.enabled(); // 速さが「なし」（動きを減らす設定を含む）
         fresh.forEach(e => {
             if (e.type === 'damage') this.float(e.target, `−${e.amount}`, 'hurt');
             if (e.type === 'heal' && e.amount > 0) this.float(e.target, `+${e.amount}`, 'heal');
@@ -503,6 +509,7 @@ export default class UI {
             if (e.type === 'eliminate') this.toast(`${view.players[e.seat].name}が脱落（${ROLE_NAMES[e.role]}）`);
             if (e.type === 'roll' && !reduce && e.seq === fresh.filter(x => x.type === 'roll').at(-1)?.seq) {
                 e.rolled.forEach(i => $('dice').querySelector(`[data-die="${i}"]`)?.classList.add('rolling'));
+                Motion.hold(450); // さいころの転がる動き（CSS）が終わるまで CPU を待たせる
             }
         });
     }
@@ -529,7 +536,8 @@ export default class UI {
         f.textContent = text;
         el.appendChild(f);
         if (kind === 'hurt') el.classList.add('hit');
-        setTimeout(() => f.remove(), 1200);
+        setTimeout(() => f.remove(), Motion.ms(1200));
+        Motion.hold(500);
     }
 
     showPlayer(seat) {
