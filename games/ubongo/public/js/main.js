@@ -14,6 +14,7 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_NAMES = ['ゾラ', 'キボ', 'ネマ'];
 const HUMAN_NAME = 'あなた';
@@ -22,6 +23,11 @@ const DRAG_THRESHOLD = 6;
 const DOUBLE_TAP_MS = 320;
 const UI_TICK_MS = 100;
 const BANNER_MS = 2200;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 取った宝石が列から席へ
+const STAGGER_MS = 80;   // 何個も動くときの間
+const DICE_MS = 380;     // ダイスが転がる
+const RESULT_DELAY_MS = 500;   // 動き終わってから結果を出すまで
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch]);
@@ -43,7 +49,8 @@ const app = {
     resultShown: false,
     pingAt: null,
     bannerTimer: null,
-    giveUpArmed: null
+    giveUpArmed: null,
+    cancelFinish: null
 };
 
 // ===== 画面の切り替え =====
@@ -93,6 +100,8 @@ function startGame(setup) {
 // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
 function beginGame(controller) {
     if (app.controller !== controller) app.controller?.stop();
+    app.cancelFinish?.();
+    app.cancelFinish = null;
     stopReplay();
     app.controller = controller;
     app.view = null;
@@ -110,6 +119,8 @@ function goHome() {
     if (app.controller?.isOnline) return online.confirmLeave();
     app.controller?.stop();
     app.controller = null;
+    app.cancelFinish?.();
+    app.cancelFinish = null;
     stopReplay();
     for (const dialog of document.querySelectorAll('dialog[open]')) dialog.close();
     showScene('title');
@@ -170,14 +181,68 @@ function update() {
     const view = src.getView();
     if (!view) return;
     const previous = app.view;
+    // 描き直す前に、動きの出発点（宝石の列・コマ）を測る
+    const before = previous && !app.replay && Motion.enabled() ? measure() : null;
     app.view = view;
     if (!app.replay) playEvents(previous, view);
     const key = `${view.round}:${view.puzzle?.id}:${view.phase === 'end' ? 'end' : ''}`;
-    if (view.puzzle && key !== app.puzzleKey && !(view.phase === 'end' && app.puzzleKey)) resetPieces(view);
+    let newPuzzle = false;
+    if (view.puzzle && key !== app.puzzleKey && !(view.phase === 'end' && app.puzzleKey)) {
+        resetPieces(view);
+        newPuzzle = true;
+    }
     render(view);
+    if (before) animateUpdate(previous, view, before, newPuzzle);
     if (view.phase === 'end' && !app.resultShown && !app.replay) {
         app.resultShown = true;
-        finishGame(view);
+        // 最後の宝石が席へ着いてから、結果を出す
+        const controller = app.controller;
+        app.cancelFinish = Motion.afterIdle(() => {
+            app.cancelFinish = null;
+            if (app.controller === controller && app.scene === 'game') finishGame(view);
+        }, RESULT_DELAY_MS);
+    }
+}
+
+// ダイスが転がって現れる
+function tumble(el, delay = 0) {
+    if (!Motion.enabled() || !el) return;
+    const length = Motion.ms(DICE_MS);
+    const animation = el.animate([
+        { transform: 'rotate(-220deg) scale(.4)', opacity: 0 },
+        { transform: 'rotate(18deg) scale(1.12)', opacity: 1, offset: 0.7 },
+        { transform: 'rotate(0) scale(1)', opacity: 1 }
+    ], { duration: length, delay: Motion.ms(delay), easing: 'cubic-bezier(.3,.6,.4,1)', fill: 'backwards' });
+    Motion.track(animation, length + Motion.ms(delay));
+}
+
+function measure() {
+    const rows = new Map();
+    document.querySelectorAll('#gem-board .gem-row[data-row]').forEach(el => rows.set(Number(el.dataset.row), Motion.rectOf(el.querySelector('.row-gems') ?? el)));
+    return { rows, pawns: Motion.captureRects($('#gem-board'), '.pawn[data-seat]', 'seat') };
+}
+
+// 前のビューから増えた出来事を動かす
+// 取った宝石は列からその人の席へ飛び、コマは列から列へ動く。新しい問題ではダイスが転がり、ピースが現れる。解けた人は弾む
+function animateUpdate(previous, view, before, newPuzzle) {
+    let settle = 0;
+    const index = previous.history.length - 1;
+    const oldPicks = previous.history[index]?.picks.length ?? 0;
+    (view.history[index]?.picks.slice(oldPicks) ?? []).forEach(pick => {
+        const from = before.rows.get(pick.row);
+        const to = $(`#players .player[data-seat="${pick.seat}"]`);
+        if (!to) return;
+        if (from) pick.gems.forEach((color, i) => Motion.fly(from, to, { content: gemIcon(color, 'small'), size: { width: 20, height: 20 }, delay: i * STAGGER_MS, duration: FLY_MS }));
+        Motion.pulse(to.querySelector('.p-gems') ?? to, { delay: from ? FLY_MS : 0, scale: 1.3, duration: 380 });
+        settle = Math.max(settle, FLY_MS);
+    });
+    if (view.phase === 'collect') Motion.flipFrom(before.pawns, $('#gem-board'), '.pawn[data-seat]', 'seat', { duration: 300, enter: null });
+    view.players.forEach((player, seat) => {
+        if (previous.players[seat]?.result === null && player.result?.solved) Motion.pulse($(`#players .player[data-seat="${seat}"]`), { scale: 1.1, duration: 420 });
+    });
+    if (newPuzzle) {
+        tumble($('#die svg'));
+        document.querySelectorAll('#pieces .piece').forEach((el, i) => Motion.fadeIn(el, { delay: i * 60 }));
     }
 }
 
@@ -402,7 +467,7 @@ function renderCollect(view) {
         : `${nameOf(view, picker)} が選んでいます…`;
     const recommended = mine && app.hintRow !== undefined && app.hintRow !== null ? app.hintRow : null;
     $('#gem-board').innerHTML = view.gemRows.map((gems, row) => {
-        const pawns = view.players.map((p, seat) => (p.pawn === row ? `<span class="pawn" style="background:${SEAT_COLORS[seat]}" title="${escapeHtml(nameOf(view, seat))}"></span>` : '')).join('');
+        const pawns = view.players.map((p, seat) => (p.pawn === row ? `<span class="pawn" data-seat="${seat}" style="background:${SEAT_COLORS[seat]}" title="${escapeHtml(nameOf(view, seat))}"></span>` : '')).join('');
         const can = mine && rows.includes(row);
         const shown = gems.slice(0, 8).map((c, i) => gemIcon(c, i < 2 ? 'front' : '')).join('');
         const more = gems.length > 8 ? `<small>+${gems.length - 8}</small>` : '';
@@ -842,6 +907,8 @@ function init() {
     bindSegment('#difficulty-select', 'difficulty', Number);
     bindSegment('#time-select', 'time', Number);
     bindSegment('#level-select', 'level', String);
+    Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+    Motion.mountSpeedSetting($('#motion-setting-help'), { label: '動き' });
 
     $('#start').addEventListener('click', () => startGame(newSetup()));
     $('#online-button').addEventListener('click', () => online.open());

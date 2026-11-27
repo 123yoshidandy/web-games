@@ -9,9 +9,10 @@ import { createGame, applyCommand, viewFor, replay, nextEventTime } from './game
 import { cpuCommand } from './cpu-player.js';
 import { createSeed } from './random.js';
 import * as storage from './storage.js';
+import * as Motion from './motion/motion.js';
 
 export const COUNTDOWN_MS = 3000;  // ラウンドの前に数える時間
-const CPU_PICK_DELAY_MS = 900;     // CPU が宝石を取るまでの間（人に見える速さで）
+const CPU_PICK_DELAY_MS = 900;     // CPU が宝石を取るまでの間（人に見える速さで。動きが終わってから数える）
 const LOOP_MS = 100;
 const SAVE_EVERY_MS = 1000;
 
@@ -76,7 +77,8 @@ export default class LocalGameController {
     stop() {
         this.stopped = true;
         clearInterval(this.loopTimer);
-        clearTimeout(this.cpuTimer);
+        this.cpuTimer?.();
+        this.cpuTimer = null;
     }
 
     getView() {
@@ -133,7 +135,7 @@ export default class LocalGameController {
     scheduleCpu() {
         if (this.cpuTimer || this.stopped || this.state.phase !== 'collect') return;
         if (!cpuCommand(this.state)) return;
-        this.cpuTimer = setTimeout(() => {
+        this.cpuTimer = Motion.afterIdle(() => {
             this.cpuTimer = null;
             if (this.pausedAt !== null) return this.scheduleCpu();
             const next = cpuCommand(this.state);
