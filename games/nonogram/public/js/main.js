@@ -18,7 +18,7 @@ import { helpHtml } from './help.js';
 import * as store from './storage.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
-import { recordResult } from './netplay/user-stats.js';
+import { onGameResult } from './result-hook.js';
 import { GAME, getServerUrl } from './online-config.js';
 
 const $ = (id) => document.getElementById(id);
@@ -287,8 +287,7 @@ function finishLocal() {
     saveStats(stats);
     const rivalTotal = play.rival ? play.rival.times[play.rival.times.length - 1] : null;
     const lost = rivalTotal !== null && rivalTotal < total;
-    // 利用者ごとの記録（ログインしていなければ送らない）。ライバルがいれば勝ち負け、いなければ回数だけ。同じ組は同じ id（二重に数えない）
-    recordResult({ game: GAME, id: `${GAME}-${setup.mode}-${setup.plan.map(p => p.seed).join('.')}`, outcome: rivalTotal === null ? null : (lost ? 'loss' : 'win') });
+    onGameResult({ mode: setup.mode, id: `${GAME}-${setup.mode}-${setup.plan.map(p => p.seed).join('.')}`, outcome: rivalTotal === null ? null : (lost ? 'loss' : 'win'), totalMs: total, rank: null });
     music.play(lost ? 'lose' : 'win');
     showLocalResult({ total, record, rivalTotal, lost });
 }
@@ -651,6 +650,7 @@ function showOnlineResult() {
     const mine = view.ranking.find(row => row.seat === view.seat);
     const stats = loadStats();
     recordOnline(stats, mine?.rank);
+    onGameResult({ mode: 'online', id: `${GAME}-online-${play.matchId}`, outcome: mine?.rank === 1 ? 'win' : 'loss', totalMs: mine?.total ?? null, rank: mine?.rank ?? null });
     saveStats(stats);
     music.play(mine?.rank === 1 ? 'win' : 'lose');
     $('result-title').textContent = mine?.rank === 1 ? '1位' : `${mine?.rank ?? '-'}位`;

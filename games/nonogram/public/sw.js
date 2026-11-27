@@ -11,8 +11,9 @@ const PRECACHE = [
     'js/netplay/netplay-client.js', 'js/netplay/netplay-client.mjs', 'js/netplay/netplay-lobby.js',
     'js/netplay/user-stats.js', 'js/online-config.js', 'js/puzzle-set.js', 'js/puzzles/common/dom.js',
     'js/puzzles/nonogram/index.js', 'js/puzzles/nonogram/logic.js', 'js/puzzles/nonogram/render.js',
-    'js/puzzles/registry.js', 'js/race-definition.js', 'js/race.js', 'js/random.js', 'js/session.js', 'js/sound/bgm.js',
-    'js/sound/effects.js', 'js/sound/engine.js', 'js/sound/engine.mjs', 'js/stats.js', 'js/storage.js'
+    'js/puzzles/registry.js', 'js/race-definition.js', 'js/race.js', 'js/random.js', 'js/result-hook.js',
+    'js/session.js', 'js/sound/bgm.js', 'js/sound/effects.js', 'js/sound/engine.js', 'js/sound/engine.mjs',
+    'js/stats.js', 'js/storage.js'
 ];
 
 self.addEventListener('install', event => {

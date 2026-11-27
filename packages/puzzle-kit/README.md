@@ -16,6 +16,7 @@
 | `client/js/race.js` | オンラインの早解きのロジック |
 | `client/js/race-definition.js` | オンライン対戦の定義（netplay-kit）を作る `createRaceDefinition({ GameError })` |
 | `client/js/cpu-player.js` | CPU（解き終わる時間）とヒント（`suggest`） |
+| `client/js/result-hook.js` | 遊びが終わったときの知らせの入口 `onGameResult(info)`（1問・組・レースが終わるたびに1回）。サイト全体の利用者ごとの記録は、ここだけでつなぐ |
 | `client/js/stats.js` | 端末の記録（フリーの最短・タイムアタックの自己ベスト・今日のパズルの連続・オンラインの回数） |
 | `client/js/storage.js`・`music.js`・`help.js`・`random.js` | 保存・音・遊び方の中身・シード付きの乱数 |
 | `client/js/puzzles/registry.js` | ゲームの種類（`js/game.js` の `type`）を引く。**種類の形の決まりは、このファイルの先頭のコメント** |
@@ -141,4 +142,5 @@ npm run cpu-match -w games/$G
 - 1つのゲームに1種類（パズル集にはしない）。ゲームごとに入口のページのカード・名前・PWA・曲・オンライン・利用者ごとの記録を持つ
 - 種類の形（`generate`・`solve`・`check`・`hint`・`applyInput`・`render` など）は、パズル集のときと同じにした。種類のフォルダは、そのまま移せる
 - オンラインの解きかけの盤面は `<頭>.race` に保存する（共通のロビーの参加情報 `<ゲーム>.online` と重ならないように）
-- 利用者ごとの記録（netplay-kit の user-stats）：1人用は終わったときに `recordResult`（ライバルがいれば勝ち負け、いなければ回数だけ。同じ問題の組は同じ id）、オンラインは定義の `result` が順位を返し、サーバーが記録する
+- 利用者ごとの記録：終わったときの知らせは `result-hook.js` の `onGameResult` の1か所に集める。今は netplay-kit の user-stats につなぎ、1人用は `recordResult`（ライバルがいれば勝ち負け、いなければ回数だけ。同じ問題の組は同じ id）を送る。オンラインは定義の `result` が順位を返し、サーバーが記録するので送らない。共通の記録の形が変わったら `result-hook.js` だけを直す
+- 端末の「記録」のダイアログ（`stats.js`）は、このゲームだけの記録で、サイト全体の記録とは別

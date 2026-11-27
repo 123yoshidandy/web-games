@@ -5,7 +5,7 @@
     "public/css/style.css": "ce3afc6807d7a126f6bd8912b6725bad955c01d0c2aafcba23d1328ca54966b0",
     "public/js/cpu-player.js": "4e12b3ad5a78567484add735b88d84cace19c00ea52d0048b142efba50be5cb9",
     "public/js/help.js": "99eacb391b0310dbdebbf5b0550fa135af0ac24ae3b2e79489e10f72f4ef6b5e",
-    "public/js/main.js": "ca00db07ff26eef8a24002901b85069c358f3cdaf1e722f81625c2fefbfd5272",
+    "public/js/main.js": "796c9cf77fd6f9c068eba8c428cabeb2aa275933a3d8b120a6420858183df00f",
     "public/js/music.js": "8bfe1bc63edf1f6dffe059888df51e92db944c398cbd5cf86508778899581c38",
     "public/js/puzzle-set.js": "7c4948be2685920e99091bc19ec21682c4d796fb0eb6b630d7bacde7a8012c3b",
     "public/js/puzzles/common/dom.js": "f280bb6e379fd5ae7acd749f0177bf23f1e31939fc1938d4d690238430e6d236",
@@ -13,6 +13,7 @@
     "public/js/race-definition.js": "1e453eb9aa9bcff3bfa3879a9f8c74d253ab2097e1e9c86cca2edbfb892eb0bf",
     "public/js/race.js": "b6049b84ad7df016568ccead9f6d83e755e9e2a4ccc397030af08ae863c70b13",
     "public/js/random.js": "2e9f282ffe9fd769765b4a8477cbf851fc8a798f55cd5e253951e30301ff90fd",
+    "public/js/result-hook.js": "c3fb9ad7918e56c87e5feb500e4459ab8accf516527aaa329139c4384f83757d",
     "public/js/session.js": "3033d9fa9825fb9f96026a57b78a141f3f88a5c1ba4117189a70a07d158a8030",
     "public/js/stats.js": "5902b9e772da8b4579165be531a8c6202d34e7ede614a54b8aaed65395f7e876",
     "public/js/storage.js": "f860fafac298e37fcad2db5299922375536e5f85cb082b5d36dce7f934ded179"
