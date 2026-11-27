@@ -34,7 +34,7 @@ web-games のゲームは、作った時期と作りがまちまちで、同じ�
 
 例外として決めているもの：
 
-- **独自の音**：lucky-numbers・mine-blocks・panel-de-pon は、自前の BGM と効果音（`js/sound.js`）を持ち、共通の音のエンジン（`packages/sound`）は使わない（`packages/sound/README.md`）。`bgm` を宣言で n/a にする。音の ON/OFF（`sound-toggle`）は自前の作りでも備え、判定もそれを認める
+- **独自の音**：panel-de-pon は、自前の BGM と効果音（`js/sound.js`）を持ち、共通の音のエンジン（`packages/sound`）は使わない（lucky-numbers・mine-blocks は 2026-11-28 に共通の音のエンジンへ移した）（`packages/sound/README.md`）。`bgm` を宣言で n/a にする。音の ON/OFF（`sound-toggle`）は自前の作りでも備え、判定もそれを認める
 - **リアルタイム**：panel-de-pon は、`resume`・`replay`（と `replay-test`）・`undo` を n/a にする
 - **CPU のいないパズル**：mine-blocks・wordle は、1人で解くパズルで、競う相手はオンラインの人だけ。`cpu`（と CPU の項目）と、問題と入力がそのまま局面になるので `replay`（と `replay-test`）を n/a にする
 
@@ -180,4 +180,4 @@ NG があれば終了コード1。ゲームは本番と同じ `/<ゲーム>/` �
 - `bgmToggle`：BGM の切り替えの CSS セレクタ。独自の音（`bgm` を宣言で n/a にしたゲーム）は、これを書かないと BGM の切り替えを確かめない
 - `portalOpen`：「← ゲーム一覧」が遊び方などのダイアログの中にあるとき、開くボタンの CSS セレクタ
 
-今書いているのは、独自の音の3本だけ：lucky-numbers（BGM の切り替え）・mine-blocks と panel-de-pon（開始と BGM の切り替え）。`start: null` と `portalOpen` を使うゲームは、今はない。
+今書いているのは2本だけ：mine-blocks（開始）・panel-de-pon（開始と BGM の切り替え。独自の音）。`start: null` と `portalOpen` を使うゲームは、今はない。
