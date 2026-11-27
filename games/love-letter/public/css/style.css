@@ -347,3 +347,9 @@ button.link { border: none; background: none; color: var(--muted); text-decorati
 .action { grid-template-columns: minmax(0, 1fr) auto auto; }
 .action #hint { grid-column: 2; grid-row: 1 / 3; }
 .confirm { grid-column: 3; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）。人数の切り替え（.segmented）と同じ見た目にする */
+.motion-setting .motion-speed-options { display: flex; border: none; border-radius: 10px; background: rgba(0, 0, 0, .25); padding: 3px; gap: 2px; overflow: visible; }
+.motion-setting .motion-speed button { border-radius: 8px; padding: 6px 10px; min-height: 0; font-size: 14px; color: var(--muted); min-width: 38px; justify-content: center; border-left: none; }
+.motion-setting .motion-speed button[aria-pressed="true"] { background: var(--gold); color: #3b2608; font-weight: 800; }
+.help-setting { margin-top: 14px; }

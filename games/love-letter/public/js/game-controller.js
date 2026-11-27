@@ -3,6 +3,7 @@
  * 画面には getView() でビューを渡し、操作は send() で受け取る（オンライン対戦のコントローラーと同じ形にする）
  */
 
+import * as Motion from './motion/motion.js';
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, suggest } from './cpu-player.js';
@@ -21,7 +22,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.scheduleCpu();
     }
@@ -57,7 +58,7 @@ export default class LocalGameController {
     // 遊び方などを開いている間は、CPU を止める
     pause() {
         this.paused = true;
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 
     resume() {
@@ -66,9 +67,10 @@ export default class LocalGameController {
     }
 
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (this.paused || !isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        // 画面の動きが終わってから間をおいて打つ（画面がなければすぐ数え始める）
+        this.cancelCpu = Motion.afterIdle(() => {
             // どこで例外が出ても、必ず次の手を予約する（対戦が止まらないように）
             try {
                 this.stepCpu();
@@ -113,6 +115,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

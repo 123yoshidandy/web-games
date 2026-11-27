@@ -15,6 +15,8 @@ import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl } from './online-config.js';
 import { recordResult } from './netplay/user-stats.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate } from './animator.js';
 
 const $ = id => document.getElementById(id);
 const KEYS = { settings: 'loveletter.settings.v1', save: 'loveletter.save.v1' };
@@ -45,9 +47,14 @@ let view = null;
 let seenSeq = 0;
 let ui = freshUi();
 let spotlightTimer = null;
-let roundTimer = null;
+let roundTimer = null; // 結果のダイアログを出す予約（取り消す関数。動きが終わってから出す）
 let pendingRound = null; // ラウンドの終わりのイベント（結果のダイアログに出す）
 let hint = null; // ヒントで示している手 { key, command }（その手番の間だけ）
+
+function cancelRound() {
+    roundTimer?.();
+    roundTimer = null;
+}
 
 function freshUi() {
     return { key: null, card: null, target: null, guess: null };
@@ -100,7 +107,7 @@ function startGame(setup) {
 // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
 function beginGame(next) {
     if (controller !== next) controller?.stop();
-    clearTimeout(roundTimer);
+    cancelRound();
     document.querySelectorAll('dialog[open]').forEach(d => d.close());
     pendingRound = null;
     hint = null;
@@ -125,7 +132,7 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
-    clearTimeout(roundTimer);
+    cancelRound();
     showScene('title');
 }
 
@@ -145,7 +152,7 @@ const online = new NetplayLobby({
     onExit: () => {
         controller = null;
         view = null;
-        clearTimeout(roundTimer);
+        cancelRound();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         showScene('title');
     }
@@ -155,6 +162,7 @@ const online = new NetplayLobby({
 
 function onUpdate() {
     if (!controller) return;
+    const before = measure(view);
     view = controller.getView();
     const fresh = view.events.filter(e => e.seq > seenSeq);
     seenSeq = view.eventSeq;
@@ -166,6 +174,7 @@ function onUpdate() {
     if (roundEnd) showRoundSoon(roundEnd, ROUND_DIALOG_DELAY_MS);
     saveProgress();
     render();
+    animate(before, view, fresh);
 }
 
 // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
@@ -453,9 +462,9 @@ function openCards() {
 function showRoundSoon(event, delay) {
     if (!event) return;
     pendingRound = event;
-    clearTimeout(roundTimer);
+    cancelRound();
     controller?.pause();
-    roundTimer = setTimeout(showRound, delay);
+    roundTimer = Motion.afterIdle(showRound, delay);
 }
 
 function showRound() {
@@ -481,6 +490,8 @@ function showRound() {
 
 function setup() {
     drawTitleArt();
+    Motion.mountSpeedSetting($('motion-setting'), { label: '' });
+    Motion.mountSpeedSetting($('motion-setting-help'), { label: '動き' });
     setupDialogs();
 
     $('player-count').addEventListener('click', e => {
