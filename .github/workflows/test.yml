@@ -12,6 +12,11 @@ concurrency:
   group: test-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  # 最後に流れきったテストのコミットを、gh run list で調べる
+  actions: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -34,10 +39,24 @@ jobs:
       - name: Check BGM engine copies
         run: node packages/sound/scripts/sync.mjs check --all
       # 変わったゲームと共通の部品のテスト
+      # push の比べる元は、同じブランチで最後に流れきった（成功か失敗の）テストのコミット
+      # github.event.before だと、取りやめになった push の変更を、次の実行が見落とす（取りやめたコミットが比べる元になるため）
+      # 失敗も数えるのは、失敗が続いても比べる範囲が広がり続けないように（失敗は、その実行で一度知らせてある）
       - name: Test changed games
         env:
-          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BRANCH: ${{ github.ref_name }}
         run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            BASE="$PR_BASE"
+          else
+            BASE=$(gh run list -R "$GITHUB_REPOSITORY" --workflow test.yml --branch "$BRANCH" --event push --status completed \
+              --limit 20 --json conclusion,headSha \
+              --jq 'map(select(.conclusion == "success" or .conclusion == "failure"))[0].headSha // empty' || true)
+            echo "比べる元: ${BASE:-なし}（最後に流れきったテスト）"
+          fi
           # 初めてのプッシュなど、比べる元がないときは全部流す
           if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             targets=$(ls -d packages/*/ games/*/ | sed 's|/$||')
