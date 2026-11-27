@@ -9,9 +9,13 @@ import { createGameView } from './game-view.js';
 import { runCpuStep, hasCpuWork, legalCommands, suggest } from './cpu.js';
 import { createSeed } from './random.js';
 import * as storage from './storage.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_STEP_DELAY_MS = 900; // CPU の手は、何をしたか読める間を置いて1手ずつ見せる
 const TRICK_PAUSE_MS = 1400;          // トリックが終わったら、取った人が分かるまで待つ
+// カードが動くときは、動き（場へ飛ぶ・取った人へ集まる）が終わってから数える。動きが間の代わりになるので短くする
+const MOTION_STEP_DELAY_MS = 600;
+const MOTION_TRICK_PAUSE_MS = 600;
 const SAVE_KEY = 'save';
 
 export default class LocalGameController {
@@ -22,12 +26,12 @@ export default class LocalGameController {
         const options = { seed: this.setup.seed, mission: this.setup.mission };
         this.game = setup.commands ? Game.replay(this.setup.players, options, setup.commands) : new Game(this.setup.players, options);
         this.humanSeat = this.setup.players.findIndex(player => !player.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.paused = false;
         this.stalls = 0;
         this.ended = this.game.isOver;
         this.persist();
-        this.scheduleCpu(CPU_STEP_DELAY_MS);
+        this.scheduleCpu();
     }
 
     static loadSaved() {
@@ -73,13 +77,17 @@ export default class LocalGameController {
         }
         // トリックが終わった直後は、少し長く待つ
         const justFinished = this.game.trick.plays.length === 0 && this.game.lastMove?.type === 'play';
-        this.scheduleCpu(justFinished ? TRICK_PAUSE_MS : CPU_STEP_DELAY_MS);
+        this.scheduleCpu(justFinished ? 'trick' : 'step');
     }
 
-    scheduleCpu(delay = CPU_STEP_DELAY_MS) {
-        clearTimeout(this.cpuTimer);
+    // CPU の手は、画面の動きが終わってから間をおいて打つ（動きを追い越さない）。画面がなければすぐ数え始める
+    scheduleCpu(kind = 'step') {
+        this.cancelCpu?.();
+        this.cancelCpu = null;
         if (this.paused || !hasCpuWork(this.game)) return;
-        this.cpuTimer = setTimeout(() => this.cpuStep(), delay);
+        const moving = Motion.enabled();
+        const delay = kind === 'trick' ? (moving ? MOTION_TRICK_PAUSE_MS : TRICK_PAUSE_MS) : (moving ? MOTION_STEP_DELAY_MS : CPU_STEP_DELAY_MS);
+        this.cancelCpu = Motion.afterIdle(() => this.cpuStep(), delay);
     }
 
     cpuStep() {
@@ -102,7 +110,7 @@ export default class LocalGameController {
 
     pause() {
         this.paused = true;
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 
     resume() {
@@ -117,6 +125,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

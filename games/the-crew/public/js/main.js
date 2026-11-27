@@ -12,6 +12,8 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate, trickKey } from './animator.js';
 
 const CPU_NAMES = ['ハル', 'ミオ', 'ソラ', 'レン'];
 const HUMAN_NAME = 'あなた';
@@ -28,6 +30,7 @@ const app = {
     prepSel: [],      // 準備で選んでいるもの（トークン・課題・人）
     hint: null,       // ヒントのおすすめの手（場面が変わったら消す）
     sending: false,   // 自分の操作を送っている間（効果音は送った操作で決める）
+    anim: { key: null, collected: null }, // 取った人へ集めている（集めた）トリックの印（animator.js）
     settings: { count: 4, mission: null, ...storage.load('settings', {}) },
     progress: { attempts: {}, cleared: {}, ...storage.load('progress', {}) }
 };
@@ -164,11 +167,15 @@ function startGame(setup) {
 function beginGame(controller) {
     if (app.controller !== controller) app.controller?.stop();
     app.view = null;
+    app.anim.key = null;
+    app.anim.collected = null;
     resetSelection();
     if ($('#result-dialog').open) $('#result-dialog').close();
     app.controller = controller;
     showScene('game');
     update();
+    // コントローラーは描く前に CPU を予約するので、配る動きを描いたあとで予約し直す（配り終わってから打つ）
+    if (!controller.isOnline) controller.scheduleCpu?.();
 }
 
 // ===== オンライン対戦（入口とロビーは netplay-lobby.js の画面） =====
@@ -254,8 +261,11 @@ function update() {
         music.play(view.result.success ? 'win' : 'lose');
         setTimeout(showResult, 1500);
     }
+    // 描き直す前に位置を測り、描いたあとで動かす
+    const before = measure(previous);
     app.view = view;
     render(view);
+    animate(before, previous, view, app.anim);
 }
 
 const isLandscape = () => window.innerWidth > window.innerHeight && window.innerHeight < 600;
@@ -417,31 +427,40 @@ function fitTaskRows() {
     }
 }
 
+// 同じ中身なら描き直さない（カードが飛んでいる間に選び直しても、飛んでいる先のカードを作り直さない）
+let tableHtml = null;
+function setTableHtml(html) {
+    if (html === tableHtml && $('#table').innerHTML) return;
+    tableHtml = html;
+    $('#table').innerHTML = html;
+}
+
 function renderTable(view) {
-    const table = $('#table');
     if (view.phase === 'prep') {
-        table.innerHTML = prepHtml(view);
+        setTableHtml(prepHtml(view));
         return;
     }
     if (view.passing) {
         const pending = view.players.filter(p => !p.jarvis && !view.passing.chosen.includes(p.seat)).map(p => name(view, p.seat));
-        table.innerHTML = `<div class="prep"><div class="prep-title">遭難信号：全員が${view.passing.direction === 1 ? '左' : '右'}の人へ1枚渡します<small>まだ選んでいない人：${escapeHtml(pending.join('・'))}</small></div></div>`;
+        setTableHtml(`<div class="prep"><div class="prep-title">遭難信号：全員が${view.passing.direction === 1 ? '左' : '右'}の人へ1枚渡します<small>まだ選んでいない人：${escapeHtml(pending.join('・'))}</small></div></div>`);
         return;
     }
     const n = view.players.length;
     const showLast = view.trick.plays.length === 0 && view.lastTrick;
     const trick = showLast ? view.lastTrick : view.trick;
+    // 取った人へ集めたトリックは、薄く残す
+    const collected = showLast && Motion.enabled() && app.anim.collected === trickKey(trick) ? 'collected' : '';
     const slots = [];
     for (let i = 0; i < n; i++) {
         const seat = (trick.leader + i) % n;
         const play = trick.plays.find(p => p.seat === seat);
         const win = showLast && trick.winner === seat;
-        slots.push(`<div class="trick-slot${win ? ' win' : ''}">${play ? cardHtml(play.card) : '<span class="placeholder"></span>'}<span class="who">${escapeHtml(name(view, seat))}</span></div>`);
+        slots.push(`<div class="trick-slot${win ? ' win' : ''}">${play ? cardHtml(play.card, collected) : '<span class="placeholder"></span>'}<span class="who">${escapeHtml(name(view, seat))}</span></div>`);
     }
     let note = '';
     if (showLast) note = `${escapeHtml(name(view, trick.winner))}が取りました`;
     else if (view.trick.plays.length === 0 && view.phase === 'play') note = `${escapeHtml(name(view, view.trick.leader))}から`;
-    table.innerHTML = `<div class="trick${showLast ? ' past' : ''}">${slots.join('')}</div><div class="table-note">${note}</div>`;
+    setTableHtml(`<div class="trick${showLast ? ' past' : ''}">${slots.join('')}</div><div class="table-note">${note}</div>`);
 }
 
 function answersHtml(view, answers) {
@@ -833,6 +852,9 @@ function init() {
     // ヘッドレス Chrome での確認に使う
     window.__app = app;
     renderStaticArt();
+    // 動きの速さ（普通・速い・なし）。タイトルと、プレイ中にも開ける遊び方に置く
+    Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+    Motion.mountSpeedSetting($('#motion-setting-help'), { label: '' });
     $('#cpu-help').innerHTML = CPU_HELP.map(line => `<li>${escapeHtml(line)}</li>`).join('');
     $('#count-select').addEventListener('click', event => {
         const button = event.target.closest('button');

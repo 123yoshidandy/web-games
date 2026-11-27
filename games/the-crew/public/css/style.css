@@ -635,3 +635,31 @@ body.landscape #right { display: flex; flex-direction: column; gap: 4px; min-hei
 .sound-toggle[aria-pressed="false"] { opacity: .5; text-decoration: line-through; }
 .sound-toggle[aria-pressed="true"] .sound-off { display: none; }
 .sound-toggle svg { fill: none; stroke: currentColor; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）。人数の切り替え（.segment）と同じ見た目にする */
+.motion-setting .motion-speed-options {
+    display: inline-flex;
+    background: rgba(0, 0, 0, 0.35);
+    border: none;
+    border-radius: 12px;
+    padding: 3px;
+    gap: 3px;
+}
+.motion-setting .motion-speed button {
+    border: none;
+    padding: 8px 14px;
+    min-height: 0;
+    border-radius: 9px;
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--ink-soft);
+}
+.motion-setting .motion-speed button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.help-setting { justify-content: flex-start; }
+.help-setting .setting-label { color: #5d5868; }
+.help-setting .motion-speed-options { background: rgba(27, 33, 80, 0.1); }
+.help-setting .motion-speed button { color: #5d5868; }
+.help-setting .motion-speed button[aria-pressed="true"] { background: #1b2150; color: #f6f4ee; }
+
+/* 取った人へ集めたあとのトリック（前のトリックとして薄く残す） */
+.trick-slot .card.collected { opacity: 0.28; }
