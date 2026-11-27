@@ -21,10 +21,12 @@ import { getServerUrl, GAME } from './online-config.js';
 import { resultText, PLAYERS, CLOCK_PRESETS } from './game.js';
 import { createSeed } from './random.js';
 import { reading, isLow, formatClock } from './clock.js';
+import * as Motion from './motion/motion.js';
 import { symbolsSvg, stoneSvg, boardBaseSvg, boardExtent, pointXY, stoneAt, MARGIN } from './art.js';
 
 const SETTINGS_KEY = 'gomoku.settings';
 const RESULT_DELAY_MS = 900;
+const DROP_MS = 180;      // 石を打つ動き（CSS の drop と合わせる）
 const CONFIRM_CELL_PX = 30;      // 交点の間がこれより狭いと、仮置きしてから打つ（指で押すとき）
 const CONFIRM_CELL_PX_MOUSE = 18;
 const CLOCK_TICK_MS = 100;
@@ -33,7 +35,6 @@ const CLOCK_OPTIONS = Object.entries(CLOCK_PRESETS).map(([value, preset]) => ({ 
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const coarsePointer = () => window.matchMedia?.('(pointer: coarse)').matches;
 
 function loadSettings() {
@@ -70,7 +71,7 @@ export default class UI {
         this.hover = null;         // マウスの下の点
         this.press = null;         // 押している間の { sq, pointerId, hadPending, moved }
         this.confirmMode = false;
-        this.resultTimer = null;
+        this.cancelResult = null;
         this.resultShown = false;
         this.clockTimer = null;
         this.lowWarned = null;    // 残り10秒の音を鳴らした手番（同じ手番では1回だけ）
@@ -188,8 +189,8 @@ export default class UI {
         this.controller = null;
         clearInterval(this.clockTimer);
         this.clockTimer = null;
-        clearTimeout(this.resultTimer);
-        this.resultTimer = null;
+        this.cancelResult?.();
+        this.cancelResult = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -355,8 +356,8 @@ export default class UI {
         if (!this.controller?.undo()) return;
         music.play('cancel');
         this.pending = null;
-        clearTimeout(this.resultTimer);
-        this.resultTimer = null;
+        this.cancelResult?.();
+        this.cancelResult = null;
         $('#result').close();
     }
 
@@ -445,11 +446,11 @@ export default class UI {
         if ($('#log-dialog').open) this.renderLog();
         if (!view.over) this.resultShown = false;
         if (view.over && prev && !prev.over) this.recordLocalResult(view);
-        if (view.over && !$('#result').open && !this.resultTimer && !this.resultShown) {
-            this.resultTimer = setTimeout(() => {
-                this.resultTimer = null;
+        if (view.over && !$('#result').open && !this.cancelResult && !this.resultShown) {
+            this.cancelResult = Motion.afterIdle(() => {
+                this.cancelResult = null;
                 this.showResult();
-            }, RESULT_DELAY_MS);
+            }, Motion.ms(RESULT_DELAY_MS));
         }
     }
 
@@ -645,7 +646,8 @@ export default class UI {
         if (!prev || !fresh.length) return;
         this.playSound(view, prev, fresh);
         const move = fresh.filter(e => e.type === 'move').at(-1);
-        if (move && !reduceMotion()) this.anim = { sq: move.sq };
+        if (move && Motion.enabled()) this.anim = { sq: move.sq };
+            Motion.hold(DROP_MS);
     }
 
     // 1つの更新に1つの音。人の手は置く、CPU・相手の手のあとに自分の番になったら turn

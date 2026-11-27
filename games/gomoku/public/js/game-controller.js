@@ -15,6 +15,7 @@
 import Game from './game.js';
 import { createGameView, clockView } from './game-view.js';
 import { runCpuStep, applyDecision, isCpuTurn, cpuSeat, clockBudget } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_MOVE_MS = 450;      // 前の手が見えるように、少し待ってから考え始める（持ち時間が少ないときは縮める）
 const FLAG_SLACK_MS = 5;      // 時間切れのタイマーを、ちょうどの時刻より少しあとにする
@@ -57,7 +58,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options ?? {}, setup.commands)
             : new Game(setup.players, setup.options ?? {});
         this.humanSeats = this.game.players.filter(p => !p.isCPU).map(p => p.id);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.thinking = false;
         this.request = 0;
         this.worker = setup.useWorker === false ? null : createWorker();
@@ -210,19 +211,19 @@ export default class LocalGameController {
     }
 
     cancelThinking() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         this.request++;
         this.thinking = false;
     }
 
     // CPU の番なら、間を置いて1つ進める。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (this.thinking || !isCpuTurn(this.game)) return;
         // 持ち時間が少ないときは、手を見せる間も縮める
         const budget = clockBudget({ clock: clockView(this.game), moveNumber: this.game.moveNumber });
         const delay = budget === null ? CPU_MOVE_MS : Math.min(CPU_MOVE_MS, Math.floor(budget * 0.2));
-        this.cpuTimer = setTimeout(() => this.stepCpu(), delay);
+        this.cancelCpu = Motion.afterIdle(() => this.stepCpu(), delay);
     }
 
     stepCpu() {
