@@ -61,6 +61,13 @@ const corner = (i) => {
 };
 const HEX_POINTS = [0, 1, 2, 3, 4, 5].map(i => corner(i)).map(p => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(' ');
 
+// 動く部品を、描き直しの前後で見分けられる名前を付けた g に包む（piece-motion.js）。group を省くと「値」として扱う
+const mk = (node, key, group, value = 1) => {
+    const wrap = el('g', { 'data-mk': key, ...(group ? { 'data-mg': group } : {}), 'data-mv': value });
+    wrap.append(node);
+    return wrap;
+};
+
 export default class BoardView {
     constructor(root) {
         this.root = root;
@@ -169,7 +176,7 @@ export default class BoardView {
             const t = el('text', { y: 1.15, 'text-anchor': 'middle', class: 'glyph', fill: f.ink });
             t.textContent = STRUCT_GLYPH[s.type];
             g.append(t);
-            items.append(g);
+            items.append(mk(g, `s-${s.hex}-${s.seat}-${s.type}`));
         });
         // 資源（領地の下の方に並べる）
         state.res.forEach((r, id) => {
@@ -183,7 +190,7 @@ export default class BoardView {
                 const t = el('text', { y: 1.05, 'text-anchor': 'middle', class: 'res-n', fill: k === 'food' ? '#2b2210' : '#ffffff' });
                 t.textContent = r[k];
                 g.append(t);
-                items.append(g);
+                items.append(mk(g, `r-${id}-${k}`, `r-${k}`, r[k]));
             });
         });
         // ユニット（領地ごと・席ごとにまとめる）
@@ -209,7 +216,7 @@ export default class BoardView {
                     const g = el('g', { transform: `translate(${x.toFixed(2)},${y.toFixed(2)})`, class: sel(char) ? 'unit sel' : 'unit' });
                     g.append(el('circle', { r: 2.9, fill: f.color, stroke: '#111', 'stroke-width': 0.6 }));
                     g.append(el('circle', { r: 1.6, fill: 'none', stroke: f.ink, 'stroke-width': 0.45 }));
-                    items.append(g);
+                    items.append(mk(g, `u-${hex}-${seat}-char`, `u-${seat}-char`));
                     x += 4.6;
                 }
                 if (mechs.length) {
@@ -218,7 +225,7 @@ export default class BoardView {
                     const t = el('text', { y: 1.15, 'text-anchor': 'middle', class: 'glyph', fill: f.ink });
                     t.textContent = mechs.length > 1 ? mechs.length : 'M';
                     g.append(t);
-                    items.append(g);
+                    items.append(mk(g, `u-${hex}-${seat}-mech`, `u-${seat}-mech`, mechs.length));
                     x += 4.6;
                 }
                 if (workers.length) {
@@ -230,7 +237,7 @@ export default class BoardView {
                         t.textContent = workers.length;
                         g.append(t);
                     }
-                    items.append(g);
+                    items.append(mk(g, `u-${hex}-${seat}-worker`, `u-${seat}-worker`, workers.length));
                 }
             });
         });

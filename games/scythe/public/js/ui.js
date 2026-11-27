@@ -17,6 +17,8 @@ import { LEVELS } from './cpu-player.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import BoardView, { RES_COLORS, RES_GLYPH } from './board-view.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import * as PieceMotion from './piece-motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
@@ -83,7 +85,7 @@ export default class UI {
         this.sel = null;
         this.selKey = null;
         this.hintCommand = null;
-        this.resultTimer = null;
+        this.cancelResult = null;
         this.toastTimer = null;
         this.dialogKey = null;
         this.board = new BoardView($('#board'));
@@ -103,6 +105,7 @@ export default class UI {
             onExit: () => this.showTitle()
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
     }
 
     // ---- タイトル ----
@@ -156,7 +159,7 @@ export default class UI {
     showTitle() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('#screen-game').hidden = true;
         $('#screen-title').hidden = false;
@@ -184,7 +187,7 @@ export default class UI {
     }
 
     start(resume) {
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
         const saved = resume ? loadSavedGame() : null;
         let setup = saved;
         if (!setup) {
@@ -220,7 +223,7 @@ export default class UI {
     // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
     beginGame(controller) {
         if (this.controller !== controller) this.controller?.stop();
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         this.controller = controller;
         $('#hint').hidden = Boolean(controller.isOnline); // ヒントはローカル対戦だけ
@@ -234,6 +237,7 @@ export default class UI {
         this.board.resize();
         this.board.resetZoom();
         this.view = null; // 前のゲームのビューと比べて音を鳴らさない
+        this.animateNext = false; // 前のゲームの盤との差も動かさない
         this.update();
     }
 
@@ -312,19 +316,24 @@ export default class UI {
             } else if (e.type === 'retreat' && v.units.some(u => u.seat === v.you)) {
                 this.toast(`${name(e.seat)}が労働者を退かせました`);
             } else if (e.type === 'end') {
-                clearTimeout(this.resultTimer);
-                this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+                this.cancelResult?.();
+                // 盤の動きが終わってから出す
+                this.cancelResult = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
             }
         });
     }
 
     render() {
+        // 描き直す前に駒・点の位置を測り、描いたあとで前との差を動かす
+        const before = this.animateNext ? PieceMotion.measure($('#screen-game')) : null;
+        this.animateNext = true;
         this.renderTopbar();
         this.renderPlayers();
         this.renderMe();
         this.renderMat();
         this.renderPanel();
         this.renderBoard();
+        PieceMotion.animate(before, $('#screen-game'));
     }
 
     renderTopbar() {
@@ -341,7 +350,7 @@ export default class UI {
             const active = v.phase === 'play' && (v.step === 'combat' ? !v.combat.chosen.includes(p.id) && [v.combat.attacker, v.combat.defender].includes(p.id) : v.turn === p.id);
             return `<button class="pchip${active ? ' active' : ''}${p.id === v.you ? ' mine' : ''}" data-seat="${p.id}">
                 <span class="pname">${factionDot(p.faction)}<span class="pn">${escapeHtml(p.name)}</span></span>
-                <span class="pstats"><b class="star">★${p.starCount}</b> 力${p.power}<span class="pop"> 人${p.popularity}</span><span class="coin"> 金${p.coins}</span></span>
+                <span class="pstats"><b class="star" data-mk="p${p.id}-star" data-mv="${p.starCount}">★${p.starCount}</b> <span data-mk="p${p.id}-power" data-mv="${p.power}">力${p.power}</span><span class="pop" data-mk="p${p.id}-pop" data-mv="${p.popularity}"> 人${p.popularity}</span><span class="coin" data-mk="p${p.id}-coin" data-mv="${p.coins}"> 金${p.coins}</span></span>
                 <span class="pbar" style="background:${f.color}"></span>
             </button>`;
         }).join('');

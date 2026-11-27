@@ -309,3 +309,11 @@ dialog h2:focus-visible { outline: none; }
 
 /* ヒントのおすすめ：金の枠 */
 .sec.recommended { outline: 3px solid var(--gold); outline-offset: 1px; }
+
+/* 動きの速さ（共通の部品 motion の切り替え）を、強さなどの切り替えと同じ見た目にする。動く部品は、その形の中心を基準に拡大する */
+#motion-setting .motion-speed-options { display: flex; gap: 6px; border: none; border-radius: 0; overflow: visible; }
+#motion-setting .motion-speed button { min-height: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: rgba(255, 255, 255, .05); font-size: 13px; }
+#motion-setting .motion-speed button + button { border-left: 1px solid var(--line); }
+#motion-setting .motion-speed button[aria-pressed="true"] { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+[data-mk] { transform-box: fill-box; transform-origin: center; }
+.pstats [data-mk] { display: inline-block; }

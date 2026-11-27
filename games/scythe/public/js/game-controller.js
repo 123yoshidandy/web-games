@@ -4,6 +4,7 @@
  * 操作のたびに { players, options, commands, level } を保存し、「続きから」で記録から再現する
  */
 
+import * as Motion from './motion/motion.js';
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, cpuActors, PROFILES, suggest } from './cpu-player.js';
@@ -37,7 +38,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.save();
     }
@@ -79,12 +80,13 @@ export default class LocalGameController {
 
     // 操作が必要な CPU を、間を置いて動かす。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (cpuActors(this.game).length === 0) return;
         const [min, max] = CPU_DELAY_MS;
         const last = this.game.events.at(-1);
         const delay = min + Math.random() * (max - min) + (last?.type === 'move' ? CPU_AFTER_MOVE_MS : 0);
-        this.cpuTimer = setTimeout(() => {
+        // 盤の動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             const before = this.game.commands.length;
             try {
                 const seat = cpuActors(this.game)[0];
@@ -112,6 +114,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }
