@@ -351,14 +351,14 @@ button { font: inherit; color: inherit; }
 
 /* ===== デッキ構築 ===== */
 
-#decks-screen, #editor-screen {
+#decks-screen, #editor-screen, #best-screen {
     display: grid;
     grid-template-rows: var(--bar-h) minmax(0, 1fr);
     padding-left: var(--safe-l);
     padding-right: var(--safe-r);
 }
-#decks-screen .topbar .btn, #editor-screen .topbar .btn { min-height: 32px; padding: 3px 12px; font-size: 13px; border-radius: 8px; box-shadow: 0 2px 0 var(--accent-dark); }
-#decks-screen .topbar .btn-secondary, #editor-screen .topbar .btn-secondary { box-shadow: 0 2px 0 var(--blue-dark); }
+#decks-screen .topbar .btn, #editor-screen .topbar .btn, #best-screen .topbar .btn { min-height: 32px; padding: 3px 12px; font-size: 13px; border-radius: 8px; box-shadow: 0 2px 0 var(--accent-dark); }
+#decks-screen .topbar .btn-secondary, #editor-screen .topbar .btn-secondary, #best-screen .btn-secondary { box-shadow: 0 2px 0 var(--blue-dark); }
 #decks-screen .topbar .btn:disabled, #editor-screen .topbar .btn:disabled { box-shadow: 0 2px 0 #2c3447; }
 .deck-list {
     list-style: none;
@@ -384,6 +384,57 @@ button { font: inherit; color: inherit; }
 .deck-row-name { flex: 1; font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .deck-row-count, .deck-count { font-weight: 800; font-variant-numeric: tabular-nums; }
 .incomplete { color: #ff9a8f; }
+
+/* 最強のデッキ */
+.best-date { font-size: 12px; color: var(--ink-dim); white-space: nowrap; padding-right: 6px; }
+.best-wrap {
+    overflow-y: auto;
+    touch-action: pan-x pan-y;
+    overscroll-behavior: contain;
+    padding: 8px 12px calc(8px + var(--safe-b));
+}
+.best-about { width: min(640px, 100%); margin: 0 auto 8px; font-size: 12px; }
+.best-list {
+    list-style: none;
+    margin: 0 auto;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: min(640px, 100%);
+}
+.best-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: var(--panel);
+}
+.best-rank { flex: none; width: 22px; padding-top: 2px; text-align: center; font-weight: 800; color: var(--gold); font-size: 18px; }
+.best-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.best-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.best-name { font-weight: 800; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.best-head .badge { flex: none; }
+.best-mons { display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.best-mon { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; }
+.best-mon-art { width: 20px; height: 20px; padding: 2px; border-radius: 50%; color: #fff; background: var(--mon-color, var(--type-colorless)); }
+.best-mon.type-grass { --mon-color: var(--type-grass); }
+.best-mon.type-fire { --mon-color: var(--type-fire); }
+.best-mon.type-water { --mon-color: var(--type-water); }
+.best-mon.type-lightning { --mon-color: var(--type-lightning); }
+.best-mon.type-psychic { --mon-color: var(--type-psychic); }
+.best-mon.type-fighting { --mon-color: var(--type-fighting); }
+.best-mon.type-darkness { --mon-color: var(--type-darkness); }
+.best-mon.type-metal { --mon-color: var(--type-metal); }
+.best-mon.type-dragon { --mon-color: var(--type-dragon); }
+.best-detail { font-size: 11px; }
+.best-rate { flex: none; padding-top: 2px; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--gold); line-height: 1; }
+.best-buttons { display: flex; gap: 6px; margin-top: 2px; }
+.best-buttons .btn { min-height: 32px; padding: 3px 10px; font-size: 12px; border-radius: 8px; }
+.best-empty { text-align: center; padding: 24px 0; }
+.best-entry { border: 1px solid var(--gold); }
+.best-entry-note { display: block; font-size: 11px; font-weight: 500; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; }
 
 .name-input {
     flex: 1;

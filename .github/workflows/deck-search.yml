@@ -1,0 +1,90 @@
+name: 最強のデッキの探索
+
+# ポケモンカードゲームの「最強のデッキ」を、CPU 同士の対戦でさがして、結果（best-decks.json）を main にコミットする
+# （games/pokemon-card-game/scripts/deck-search.mjs。前の結果から続けるので、走らせるたびに良くなる）
+# - 毎週1回、決まった型（スクリプトの ARCHETYPES）をすべてさがす。手で走らせるときは、時間と軸のカードを選べる
+# - このワークフローのコミットは GITHUB_TOKEN で行うので、push で動くワークフロー（このワークフローも含む）は動かない。
+#   結果を公開するため、公開（pages.yml）だけを workflow_dispatch で起こす
+# - Secret は使わない
+on:
+  schedule:
+    - cron: '0 18 * * 0' # 毎週月曜の 3:00（日本時間）
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 探索にかける時間（分。最後の測り直しも含む）
+        required: false
+        default: '45'
+      with-card:
+        description: 軸のカードのID（例 SV6-120。空なら、決まった型をすべて）
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+  actions: write
+
+# 探索を同時に2つ動かさない（あとから来たものは待つ）
+concurrency:
+  group: deck-search
+  cancel-in-progress: false
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: 探索
+        env:
+          MINUTES: ${{ inputs.minutes || '45' }}
+          WITH_CARD: ${{ inputs.with-card || '' }}
+        run: |
+          # tee につないでも、探索の失敗で止める
+          set -o pipefail
+          case "$MINUTES" in ''|*[!0-9]*) echo "時間は分の数で入れてください: $MINUTES"; exit 1 ;; esac
+          if [ "$MINUTES" -gt 75 ]; then echo "時間は75分までにしてください"; exit 1; fi
+          args="--minutes $MINUTES"
+          if [ -n "$WITH_CARD" ]; then
+            case "$WITH_CARD" in *[!A-Za-z0-9-]*) echo "カードのIDの形がちがいます: $WITH_CARD"; exit 1 ;; esac
+            args="$args --with $WITH_CARD"
+          fi
+          node games/pokemon-card-game/scripts/deck-search.mjs $args --workers "$(nproc)" | tee search.log
+          {
+            echo '### 最強のデッキの探索'
+            echo '```'
+            sed -n '/分。/,$p' search.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: 結果が変わっていればコミットする
+        id: commit
+        env:
+          FILE: games/pokemon-card-game/public/data/best-decks.json
+        run: |
+          if git diff --quiet -- "$FILE" && git ls-files --error-unmatch "$FILE" > /dev/null 2>&1; then
+            echo "結果は変わっていません"
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "$FILE"
+          git commit -m '最強のデッキの探索結果を更新した'
+          # 探索の間に main が進んでいたら、その上に載せ直す
+          for i in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "pushed=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+      - name: 公開する
+        if: steps.commit.outputs.pushed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main

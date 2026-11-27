@@ -54,7 +54,7 @@ function cardText(id) {
 }
 
 export default class DeckScreens {
-    // store：createDeckStore() / handlers：show(scene) / onDeleted(deckId) / onShared(deckId, sharedId) / onBack() / onTry(deckId) / toast(message)
+    // store：createDeckStore() / handlers：show(scene) / onDeleted(deckId) / onShared(deckId, sharedId) / onBack() / onTry(deckId) / onOpenBest() / toast(message)
     constructor(store, handlers) {
         this.store = store;
         this.handlers = handlers;
@@ -81,6 +81,7 @@ export default class DeckScreens {
             const edit = event.target.closest('[data-edit]');
             const copy = event.target.closest('[data-copy]');
             const view = event.target.closest('[data-view]');
+            if (event.target.closest('[data-open-best]')) return this.handlers.onOpenBest();
             if (edit) this.openEditor(edit.dataset.edit);
             // 構築済みデッキは、名前をタップすると中身を見られる（コピーしなくても）
             if (view) {
@@ -272,7 +273,9 @@ export default class DeckScreens {
         };
         const custom = this.store.custom();
         const shared = this.store.all().filter(deck => deck.shared);
-        $('deck-list').innerHTML = `${custom.map(row).join('')}${shared.map(row).join('')}`;
+        // 先頭は「最強のデッキ」の入り口（CPU 同士の対戦でさがした、勝率の高いデッキ）
+        const best = '<li class="deck-row best-entry"><span class="deck-row-name">最強のデッキ<span class="best-entry-note">CPU 同士の対戦で勝率の高いデッキ</span></span><button type="button" class="btn btn-primary btn-small" data-open-best>見る</button></li>';
+        $('deck-list').innerHTML = `${best}${custom.map(row).join('')}${shared.map(row).join('')}`;
     }
 
     // ===== 編集 =====

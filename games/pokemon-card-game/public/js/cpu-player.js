@@ -91,7 +91,8 @@ export function chooseCpuCommand(game, playerId) {
         return game.decks[playerId] ? null : { type: 'deck', cards: expandDeck(DECKS[((game.seed ?? 0) + playerId) % DECKS.length]) };
     }
     budget = SIM_BUDGET;
-    deadline = now() + TIME_BUDGET;
+    // デッキの探索（scripts/deck-search.mjs）は、同じシードで同じ結果になるよう、globalThis.CPU_TIME_BUDGET = Infinity で時間の安全弁を外す
+    deadline = now() + (globalThis.CPU_TIME_BUDGET ?? TIME_BUDGET);
     const prompt = game.pendingPrompt;
     if (prompt) return prompt.player.id === playerId ? { type: 'answer', answer: answerPrompt(game, prompt) } : null;
     if (game.phase !== 'main' || game.current !== playerId) return null;

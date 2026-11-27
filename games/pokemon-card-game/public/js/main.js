@@ -1,5 +1,5 @@
 /**
- * 起動と画面の切り替え（scene：title / online / lobby / game / decks / editor）
+ * 起動と画面の切り替え（scene：title / online / lobby / game / decks / editor / best）
  */
 
 import { DECKS, expandDeck } from './decks.js';
@@ -11,6 +11,7 @@ import OnlineGameController, { loadOnlineSession } from './online-controller.js'
 import NetplayClient from './netplay/netplay-client.mjs';
 import GameScreen from './ui/game-screen.js';
 import DeckScreens from './ui/deck-screen.js';
+import BestDecksScreen from './ui/best-decks.js';
 import { cardFace } from './ui/card-view.js';
 import { unlockSound } from './sound.js';
 import { closeOnBackdrop, showDeckPicker, showConfirm } from './ui/sheets.js';
@@ -18,7 +19,7 @@ import { loadCachedSharedDecks, fetchSharedDecks } from './shared-decks.js';
 
 const $ = id => document.getElementById(id);
 const STORAGE_KEY = 'pokemon-card-game:settings';
-const SCENES = ['title', 'online', 'lobby', 'game', 'decks', 'editor'];
+const SCENES = ['title', 'online', 'lobby', 'game', 'decks', 'editor', 'best'];
 const MAX_PLAYERS = 2;
 
 // 共有デッキ（構築済みデッキを変えた内容と、作った共有デッキ）は、前に受け取ったものを先に使い、起動したらサーバーから取り直す
@@ -104,6 +105,8 @@ const deckScreens = new DeckScreens(deckStore, {
         saveSettings();
     },
     toast: message => toast(message),
+    // 一覧の先頭の「最強のデッキ」
+    onOpenBest: () => bestDecks.open(),
     // デッキ編集の「CPU と試す」：そのデッキを選んで、CPU 戦を始める
     onTry: deckId => {
         settings.deckId = deckId;
@@ -119,6 +122,18 @@ const deckScreens = new DeckScreens(deckStore, {
             showTitle();
         }
     }
+});
+
+// 最強のデッキ：「このデッキを使う」で自分のデッキに保存し、使うデッキにする
+const bestDecks = new BestDecksScreen(deckStore, {
+    show: next => setScene(next),
+    onBack: () => deckScreens.showList(),
+    onUse: (deckId, name) => {
+        settings.deckId = deckId;
+        saveSettings();
+        toast(`「${name}」を自分のデッキに保存して、使うデッキにしました`);
+    },
+    toast: message => toast(message)
 });
 
 function openDecks() {

@@ -9,7 +9,8 @@
     "dev:server": "node server/dev-server.js",
     "fetch:cards": "node tools/fetch-cards.mjs",
     "deploy:server": "npm run build:server && cd server && sam deploy",
-    "cpu-match": "node scripts/cpu-match.mjs"
+    "cpu-match": "node scripts/cpu-match.mjs",
+    "deck-search": "node scripts/deck-search.mjs"
   },
   "dependencies": {
     "netplay-kit": "*"
@@ -21,7 +22,9 @@
     ],
     "players": [
       2
-    ]
+    ],
+    "minutes": [20, 30],
+    "weight": 3
   },
   "standards": {
     "skip": {

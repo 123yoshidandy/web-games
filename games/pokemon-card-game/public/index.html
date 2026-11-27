@@ -106,6 +106,19 @@
         <ul id="deck-list" class="deck-list"></ul>
     </main>
 
+    <!-- 最強のデッキ（CPU 同士の対戦でさがした、勝率の高いデッキ） -->
+    <main id="best-screen" class="screen" hidden>
+        <header class="topbar">
+            <button id="best-back" class="icon-btn" aria-label="戻る"><svg><use href="#icon-back"/></svg></button>
+            <div class="turn-info">最強のデッキ</div>
+            <span id="best-date" class="best-date"></span>
+        </header>
+        <div class="best-wrap">
+            <p class="note best-about">CPU 同士の対戦で、構築済みデッキと各型のいちばんのデッキとの総当たりの勝率です。CPU の戦い方で強いデッキなので、人が使うと変わることがあります。</p>
+            <ul id="best-list" class="best-list"></ul>
+        </div>
+    </main>
+
     <!-- デッキの編集 -->
     <main id="editor-screen" class="screen" hidden>
         <header class="topbar">
