@@ -15,8 +15,11 @@ import { getServerUrl, GAME } from './online-config.js';
 const COMMAND_SOUNDS = { play: 'place', second: 'place', bid: 'place', price: 'place', buy: 'pay', pass: 'cancel' };
 import { symbolsSvg, cardHtml, artistMark, typeIcon } from './art.js';
 import { helpHtml, titleArtHtml } from './help.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate } from './animator.js';
 
 const SETTINGS_KEY = 'modern-art.settings';
+const DIALOG_DELAY_MS = 250;   // 動き終わってから、結果を出すまでの間
 const CPU_NAMES = ['ハルカ', 'ソウタ', 'ミオ', 'レン'];
 export const COLORS = ['#e05d4f', '#4f8fe0', '#59b36b', '#d9a43a', '#a46fd6'];
 
@@ -51,6 +54,8 @@ export default class UI {
         this.seenCommands = 0;
         this.shownRounds = 0;
         this.resultShown = false;
+        this.animSeq = 0;            // ここまでのできごとは動かし済み
+        this.cancelDialog = null;    // 動き終わってから出す結果のダイアログの予約を取り消す関数
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'モダンアート',
@@ -75,6 +80,9 @@ export default class UI {
         $('#title-art').innerHTML = titleArtHtml();
         $('#help-body').innerHTML = helpHtml();
         this.bindStatic();
+        // 動きの速さ（普通・速い・なし）。タイトルと、遊び方のダイアログに置く
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '' });
     }
 
     // ---- 画面の切り替え ----
@@ -118,6 +126,7 @@ export default class UI {
         this.amountKey = null;
         this.shownRounds = this.controller.getView().history.length;
         this.resultShown = false;
+        this.animSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         $('#screen-title').hidden = true;
         $('#screen-game').hidden = false;
         this.render();
@@ -140,6 +149,8 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
+        this.cancelDialog?.();
+        this.cancelDialog = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -296,6 +307,10 @@ export default class UI {
         if (!this.controller) return;
         const prev = this.view;
         const view = this.controller.getView();
+        // 新しいできごとがあれば、描き直す前に位置を測り、描いたあとで動かす
+        const fresh = view.events.filter(e => e.seq > this.animSeq);
+        if (fresh.length) this.animSeq = fresh.at(-1).seq;
+        const before = fresh.length ? measure() : null;
         this.view = view;
         this.playSound(prev, view);
         if (this.selected !== null && !this.selectable(view).includes(this.selected)) this.selected = null;
@@ -315,6 +330,7 @@ export default class UI {
         this.renderStage(view);
         this.renderHand(view);
         this.renderActions(view);
+        animate(before, view, fresh);
         if ($('#log').open) this.renderLog();
         this.checkRound(view);
     }
@@ -373,11 +389,23 @@ export default class UI {
     checkRound(view) {
         if (view.history.length > this.shownRounds) {
             this.shownRounds = view.history.length;
-            this.showRound(view, view.history.at(-1));
+            this.controller.setHold?.(true); // 結果を出すまでの間も、CPU は待たせる
+            this.showAfterMotion(() => this.showRound(view, view.history.at(-1)));
             return;
         }
         if (view.phase === 'end') this.recordLocalResult(view.winners);
-        if (view.phase === 'end' && !$('#round').open && !this.resultShown) this.showResult();
+        if (view.phase === 'end' && !$('#round').open && !this.resultShown && !this.cancelDialog) this.showAfterMotion(() => this.showResult());
+    }
+
+    // 結果のダイアログは、カードの動きが終わってから出す（動きの途中で覆わない）
+    showAfterMotion(show) {
+        this.cancelDialog?.();
+        this.cancelDialog = null;
+        if (!Motion.enabled()) return show();
+        this.cancelDialog = Motion.afterIdle(() => {
+            this.cancelDialog = null;
+            show();
+        }, DIALOG_DELAY_MS);
     }
 
     statusText(view) {
