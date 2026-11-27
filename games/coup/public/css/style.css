@@ -467,3 +467,8 @@ dialog h2:focus-visible { outline: none; }
 
 /* ヒント：おすすめの印 */
 .recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
+
+/* 動きの速さ（js/motion/motion.js の切り替え）。人数の切り替え（.segmented）と同じ見た目にする */
+.motion-setting .motion-speed-options { display: inline-flex; border: none; border-radius: 10px; background: rgba(0, 0, 0, .3); padding: 3px; overflow: visible; }
+.motion-setting .motion-speed button { min-width: 44px; height: 36px; padding: 0 10px; justify-content: center; border: none; border-radius: 8px; color: var(--muted); font-size: 15px; font-weight: 800; }
+.motion-setting .motion-speed button[aria-pressed="true"] { color: #2d1f04; background: var(--gold); }

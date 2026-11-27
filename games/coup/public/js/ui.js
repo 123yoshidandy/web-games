@@ -11,6 +11,8 @@ import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
+import * as Motion from './motion/motion.js';
+import { measure, animate, dealExchange } from './animator.js';
 import { symbolsSvg, cardHtml, backHtml, roleTag, coinHtml } from './art.js';
 
 const GAME = 'coup';
@@ -71,6 +73,8 @@ export default class UI {
             onExit: () => this.showTitle()
         });
         this.renderTitleArt();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
+        Motion.mountSpeedSetting($('#motion-setting-help'), { label: '' });
         this.renderHelp();
     }
 
@@ -130,7 +134,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         $('#fx').innerHTML = '';
@@ -295,6 +299,7 @@ export default class UI {
     render() {
         if (!this.controller) return;
         const prev = this.view;
+        const before = measure(prev);
         const view = this.controller.getView();
         this.view = view;
         // オンライン対戦のビューは新しい記録だけを運ぶので、記録の一覧のためにためておく（logCount は全体の数）
@@ -308,10 +313,12 @@ export default class UI {
         this.renderActions(view);
         this.markHint(view);
         this.updateExchange(view);
-        this.playEvents(view, prev);
+        const fresh = this.playEvents(view, prev);
+        animate(before, view, fresh ?? []);
         if ($('#log').open) this.renderLog();
         if (view.winner !== null && !$('#result').open && !this.resultTimer) {
-            this.resultTimer = setTimeout(() => {
+            // 動きが終わってから結果を出す
+            this.resultTimer = Motion.afterIdle(() => {
                 this.resultTimer = null;
                 this.showResult();
             }, RESULT_DELAY_MS);
@@ -417,6 +424,7 @@ export default class UI {
         this.exchangePick = [];
         this.renderExchange();
         if (!$('#exchange').open) $('#exchange').showModal();
+        dealExchange();
     }
 
     renderExchange() {
@@ -490,7 +498,7 @@ export default class UI {
     playEvents(view, prev) {
         const fresh = view.events.filter(e => e.seq > this.lastSeq);
         this.lastSeq = view.events.at(-1)?.seq ?? this.lastSeq;
-        if (!prev || !fresh.length) return;
+        if (!prev || !fresh.length) return [];
         this.playSounds(view, fresh);
         const name = (seat) => view.players[seat].name;
         const deltas = new Map();
@@ -509,6 +517,7 @@ export default class UI {
             if (e.type === 'redraw' && e.card && e.seat === view.you) this.toast(`${ROLES[e.card].name}を引き直した`);
         });
         deltas.forEach((amount, seat) => { if (amount) this.floatText(seat, amount); });
+        return fresh;
     }
 
     floatText(seat, amount) {
