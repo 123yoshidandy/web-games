@@ -136,3 +136,24 @@ describe('文字の変換と答え', () => {
         expect(new Set(POKEMON_NAMES).size).toBe(POKEMON_NAMES.length);
     });
 });
+
+describe('ことばの答えの一覧', () => {
+    it('遊べるだけの数（300語以上）があり、重複がない', () => {
+        expect(ANSWER_WORDS.length).toBeGreaterThanOrEqual(300);
+        expect(new Set(ANSWER_WORDS).size).toBe(ANSWER_WORDS.length);
+    });
+
+    it('どの答えも、そのまま決定できる入力になる', () => {
+        ANSWER_WORDS.forEach(word => expect(checkGuess('word', word, boardWidth('word'))).toBeNull());
+    });
+
+    it('答えの字は、すべてキーと切り替えで打てる', () => {
+        const keys = new Set([...'あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをんー']);
+        const reachable = new Set(keys);
+        for (const key of keys) {
+            for (let ch = cycleVariant(key); ch && ch !== key; ch = cycleVariant(ch)) reachable.add(ch);
+        }
+        const missing = new Set(ANSWER_WORDS.flatMap(word => [...word]).filter(ch => !reachable.has(ch)));
+        expect([...missing]).toEqual([]);
+    });
+});
