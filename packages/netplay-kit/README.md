@@ -342,6 +342,12 @@ web-games では、全ゲームを1つの WebSocket の API・Lambda・テーブ
 - `DynamoStore.listOpenRooms` は、`openList`・`openAt` を鍵にした索引 `OpenRooms` を1回 Query する（テーブルを Scan しない）。`MemoryStore.listOpenRooms` も同じ形
 - `createStatsHandler({ store, rooms })` に保存先を渡すと `GET /rooms` を受ける。画面は `user-stats.js` の `fetchOpenRooms`。入るときは招待URLと同じ `<ゲーム>/?room=<部屋番号>`
 
+### お気に入り（1.15.0）
+
+- 入口のページのお気に入りのゲームを、利用者の項目（`USER#<名前>`）の `favorites`（ゲームの名前の一覧）に置く。記録の数とは別で、`statsFromItem` は読まない
+- `createStatsHandler` は、保存先が `getFavorites`・`setFavorites` を持てば `GET /favorites?name=`（`{ name, games }`）と `PUT /favorites`（本文 `{ name, games }`。丸ごと置き換え、揃えた一覧を返す）を受ける。一覧は `normalizeFavorites` で揃え（重なりを除いて名前の順、300 まで）、形が違えば 400
+- `DynamoStatsStore`・`MemoryStatsStore` が持つ。画面の部品（`user-stats.js`）は変えていないので、ゲームへの同期は要らない（入口のページは web-games の `scripts/portal/favorites.js`）
+
 ## 入口とロビーの画面（netplay-lobby.js、1.10.0）
 
 どのゲームでも同じ入口（名前・部屋を作る・参加できる部屋の一覧）とロビー（参加者・CPU の追加と外す・設定・開始・招待URL・退出）を、`body` の下に重ねて出す。ゲームの画面の作りに依らない（CSS は `.netplay-lobby` の下だけ。色は `--np-bg`・`--np-fg`・`--np-accent` などで変えられる）。使い方はファイルの先頭のコメント。

@@ -7,6 +7,9 @@
  *   GET  /rooms              全ゲームの、ロビーで人を待っている部屋（入口のページの「いま立っている部屋」）
  *                            rooms（listOpenRooms を持つ保存先。DynamoStore・MemoryStore）を渡したときだけ
  *                            { rooms: [{ game, roomCode, hostName, players, maxPlayers, createdAt }] }（新しい順）
+ *   GET  /favorites?name=<名前>  その名前のお気に入りのゲーム { name, games: [ゲーム…] }（入口のページ）
+ *   PUT  /favorites          お気に入りを丸ごと置き換える。本文 { name, games: [ゲーム…] }。揃えた一覧を返す
+ *                            保存先（store）が getFavorites・setFavorites を持つときだけ
  * 本文が読めない・形が違うものは 400 で断る（端末は送り直さずに捨てる）
  *
  * 使い方（web-games の server/src/stats-handler.js）:
@@ -17,25 +20,26 @@
  */
 
 import { isGameName } from './game-name.js';
-import { nameKey, normalizeName, OUTCOMES } from './stats.js';
+import { nameKey, normalizeFavorites, normalizeName, OUTCOMES } from './stats.js';
 
 const MAX_BODY_LENGTH = 2048;
+const MAX_FAVORITES_BODY_LENGTH = 20_000; // お気に入りは、ゲームの名前（64文字まで）が数百並ぶ
 const ID_PATTERN = /^[A-Za-z0-9:_.-]{6,100}$/;
 const HEADERS = {
     'Content-Type': 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type'
 };
 
 const reply = (statusCode, body) => ({ statusCode, headers: HEADERS, body: body === undefined ? '' : JSON.stringify(body) });
 
 // 本文を読む（API Gateway は base64 で渡すことがある）。読めなければ null
-function readBody(event) {
+function readBody(event, maxLength = MAX_BODY_LENGTH) {
     let text = event.body ?? '';
     if (event.isBase64Encoded) text = Buffer.from(text, 'base64').toString('utf8');
-    if (text.length > MAX_BODY_LENGTH) return null;
+    if (text.length > maxLength) return null;
     try {
         const body = JSON.parse(text || 'null');
         return body && typeof body === 'object' && !Array.isArray(body) ? body : null;
@@ -79,6 +83,21 @@ export function createStatsHandler({ store, rooms = null, now = () => Date.now()
                 if (typeof record === 'string') return reply(400, { error: record });
                 const counted = await store.record(record);
                 return reply(200, { ok: true, duplicate: !counted });
+            }
+            if (path.endsWith('/favorites') && store.getFavorites && store.setFavorites) {
+                if (method === 'GET') {
+                    const name = event.queryStringParameters?.name ?? '';
+                    if (!nameKey(name)) return reply(400, { error: '名前がありません' });
+                    return reply(200, await store.getFavorites(name));
+                }
+                if (method === 'PUT') {
+                    const body = readBody(event, MAX_FAVORITES_BODY_LENGTH);
+                    if (!body || !nameKey(body.name)) return reply(400, { error: '名前がありません' });
+                    const games = normalizeFavorites(body.games);
+                    if (!games) return reply(400, { error: 'お気に入りの形が違います' });
+                    await store.setFavorites(body.name, games);
+                    return reply(200, { name: normalizeName(body.name), games });
+                }
             }
             return reply(404, { error: 'ありません' });
         } catch (error) {

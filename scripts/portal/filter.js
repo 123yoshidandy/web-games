@@ -1,7 +1,8 @@
 // 入口のページの検索・絞り込みの判定（画面を持たない部分）。ブラウザと node のテストの両方で読む
-// 状態は { q, players, online, genres, time, weight, sort, open } の形。
-// URL の ?q=...&players=2&online=yes&genre=協力&genre=パズル&time=30&weight=easy&sort=time&panel=open と行き来する
+// 状態は { q, players, online, genres, time, weight, sort, fav, open } の形。
+// URL の ?q=...&players=2&online=yes&genre=協力&genre=パズル&time=30&weight=easy&sort=time&fav=1&panel=open と行き来する
 // ジャンルはいくつでも選べ、どれか1つに当たれば残す（選んでいなければすべて）。種類の違う条件どうしは、すべてを満たすものだけ残す
+// fav はお気に入りだけを出すか（「絞り込み」の欄の外のボタン。欄の数と「解除」には数えない）
 // open は「絞り込み」の欄を開いているか、sort は並べる順（どちらも条件ではないので、本数の表示や「解除」には数えない）
 
 // 「6人以上」のボタンの値（5人までは、その人数ちょうどで遊べるもの）
@@ -24,7 +25,7 @@ export const WEIGHT_LABELS = { easy: 'かんたん', normal: 'ふつう', hard: 
 export const SORT_CHOICES = ['time', 'weight'];
 
 export const EMPTY_STATE = Object.freeze({
-    q: '', players: null, online: null, genres: Object.freeze([]), time: null, weight: null, sort: null, open: false
+    q: '', players: null, online: null, genres: Object.freeze([]), time: null, weight: null, sort: null, fav: false, open: false
 });
 
 // 検索のための文字の正規化：全角・半角をそろえ、大文字を小文字に、欧文のアクセントを外し（é → e）、
@@ -52,6 +53,7 @@ export const parseState = (search, genres) => {
         time: pick('time', TIME_CHOICES),
         weight: pick('weight', WEIGHT_CHOICES),
         sort: pick('sort', SORT_CHOICES),
+        fav: params.get('fav') === '1',
         open: params.get('panel') === 'open'
     };
 };
@@ -64,12 +66,13 @@ export const stateToSearch = (state) => {
     if (state.online) params.set('online', state.online);
     for (const genre of state.genres) params.append('genre', genre);
     for (const key of ['time', 'weight', 'sort']) if (state[key]) params.set(key, state[key]);
+    if (state.fav) params.set('fav', '1');
     if (state.open) params.set('panel', 'open');
     const text = params.toString();
     return text ? `?${text}` : '';
 };
 
-export const isEmptyState = (state) => !state.q.trim() && activeFilterCount(state) === 0;
+export const isEmptyState = (state) => !state.q.trim() && !state.fav && activeFilterCount(state) === 0;
 
 // 「絞り込み」の欄の中で選んでいる条件の数（人数・オンライン・時間・難しさは1つ、ジャンルは選んだ数）。閉じていても「絞り込み（2）」と出す
 export const activeFilterCount = (state) => ['players', 'online', 'time', 'weight'].filter((key) => state[key]).length + state.genres.length;
@@ -80,11 +83,12 @@ export const clearFilters = (state) => ({ ...state, players: null, online: null,
 // ジャンルのボタンを押したとき：選んでいなければ足し、選んでいれば外す（並びは一覧の順）
 export const toggleGenre = (selected, genre, genres) => genres.filter((g) => (g === genre) !== selected.includes(g));
 
-// game は { search（正規化した名前・原題・フォルダ名）, players（人数の一覧）, online, genres, minutes（[短い, 長い] か null）, weight（1〜5 か null）}
+// game は { search（正規化した名前・原題・フォルダ名）, players（人数の一覧）, online, genres, minutes（[短い, 長い] か null）, weight（1〜5 か null）, fav（お気に入りか）}
 // 時間や難しさを書いていないゲームは、その条件を選んだときには出さない
 export const matches = (game, state) => {
     const words = state.q.split(/[\s　]+/).map(normalize).filter(Boolean);
     if (!words.every((word) => game.search.includes(word))) return false;
+    if (state.fav && !game.fav) return false;
     if (state.players === MANY_PLAYERS && !game.players.some((n) => n >= MANY_PLAYERS)) return false;
     if (state.players && state.players !== MANY_PLAYERS && !game.players.includes(state.players)) return false;
     if (state.online === 'yes' && !game.online) return false;

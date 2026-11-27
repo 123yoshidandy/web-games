@@ -5,6 +5,7 @@
 //   検索・絞り込みの JS は scripts/portal/ から _site/portal/ に写す
 //   ログイン（名前だけ）と「自分の記録」の JS（scripts/portal/stats.js）も写し、netplay-kit の user-stats.js を横に置く（docs/user-stats.md）
 //   「いま立っている部屋」（全ゲームの待っている部屋。scripts/portal/rooms.js）も写す
+//   お気に入り（カードの ☆ と「★ お気に入り」の絞り込み。scripts/portal/favorites.js）も写す
 // - service worker が先に読むファイルが、写した先にすべてあるかを確かめる
 // 使い方: node scripts/build-site.mjs
 import { readdirSync, readFileSync, writeFileSync, existsSync, rmSync, mkdirSync, cpSync } from 'node:fs';
@@ -70,7 +71,7 @@ if (errors.length > 0) {
 }
 
 mkdirSync(join(site, PORTAL_DIR));
-for (const file of ['filter.js', 'page.js', 'stats.js', 'stats-view.js', 'rooms.js', 'rooms-view.js']) cpSync(join(root, 'scripts', 'portal', file), join(site, PORTAL_DIR, file));
+for (const file of ['filter.js', 'favorites.js', 'page.js', 'stats.js', 'stats-view.js', 'rooms.js', 'rooms-view.js']) cpSync(join(root, 'scripts', 'portal', file), join(site, PORTAL_DIR, file));
 // ログインと「自分の記録」は、ゲームと同じ netplay-kit の画面側の部品を使う（docs/user-stats.md）
 cpSync(join(root, 'packages', 'netplay-kit', 'client', 'user-stats.js'), join(site, PORTAL_DIR, 'user-stats.js'));
 
@@ -84,7 +85,7 @@ const cards = entries.map(({ game, name, shortName, icon, color, players, online
                 <span class="name">${escapeHtml(name)}</span>
                 ${tags.length > 0 ? `<span class="tags">${tags.map((t) => `<span>${escapeHtml(t)}</span>`).join('')}</span>` : ''}
                 <span class="mine" hidden></span>
-            </a></li>`;
+            </a><button type="button" class="fav" data-fav="${escapeHtml(game)}" aria-pressed="false" aria-label="${escapeHtml(name)} をお気に入りにする" hidden>☆</button></li>`;
 }).join('\n');
 
 const chip = (key, value, label) => `<button type="button" data-key="${key}" data-value="${escapeHtml(value)}" aria-pressed="false">${escapeHtml(label)}</button>`;
@@ -117,8 +118,8 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>web-games</title>
     <style>
-        :root { color-scheme: light dark; --bg: #f4f1ea; --fg: #1f1d1a; --card: #fff; --muted: #6b665d; --line: #d9d3c7; --accent: #2f6fd0; --on-accent: #fff; }
-        @media (prefers-color-scheme: dark) { :root { --bg: #16151a; --fg: #ece8e1; --card: #23222a; --muted: #a09a90; --line: #3a3842; --accent: #7aa7ff; --on-accent: #10131a; } }
+        :root { color-scheme: light dark; --bg: #f4f1ea; --fg: #1f1d1a; --card: #fff; --muted: #6b665d; --line: #d9d3c7; --accent: #2f6fd0; --on-accent: #fff; --star: #e0a100; }
+        @media (prefers-color-scheme: dark) { :root { --bg: #16151a; --fg: #ece8e1; --card: #23222a; --muted: #a09a90; --line: #3a3842; --accent: #7aa7ff; --on-accent: #10131a; --star: #ffc940; } }
         * { box-sizing: border-box; }
         body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
         header { padding: 32px 16px 8px; max-width: 1080px; margin: 0 auto; }
@@ -150,6 +151,12 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         #empty p { margin: 0 0 12px; }
         #games { list-style: none; margin: 0 auto; padding: 16px; max-width: 1080px; display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
         #games li[hidden] { display: none; }
+        #games li { position: relative; }
+        /* カードの右上の ☆（押すとお気に入り）。カードの角に重ね、押せる広さは 36px 取る */
+        .fav { position: absolute; top: 6px; right: 4px; width: 36px; height: 36px; padding: 0; border: none; border-radius: 999px; background: transparent; color: var(--muted); font: inherit; font-size: 1.2rem; line-height: 1; cursor: pointer; }
+        .fav[hidden] { display: none; }
+        .fav[aria-pressed="true"] { color: var(--star); }
+        .fav:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
         #games a { height: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 8px 14px; border-radius: 14px; background: var(--card); color: inherit; text-decoration: none; border-top: 4px solid var(--color); box-shadow: 0 1px 3px rgb(0 0 0 / 0.12); transition: transform 0.12s; }
         #games a:hover, #games a:focus-visible { transform: translateY(-2px); }
         #games img { border-radius: 16px; }
@@ -265,6 +272,7 @@ writeFileSync(join(site, 'index.html'), `<!DOCTYPE html>
         <div class="status">
             <div class="actions">
                 <button type="button" id="filter-toggle" class="toggle" aria-expanded="false" aria-controls="filter-groups">絞り込み<span id="filter-count"></span></button>
+                <button type="button" id="fav-filter" aria-pressed="false" title="お気に入りにしたゲームだけを出す">★ お気に入り</button>
                 <button type="button" id="filter-clear" class="reset" hidden>解除</button>
             </div>
             <p id="count" aria-live="polite">全 ${entries.length} 本</p>
@@ -278,7 +286,7 @@ ${filters}
 ${cards}
         </ul>
         <div id="empty" hidden>
-            <p>条件に合うゲームはありません</p>
+            <p id="empty-text">条件に合うゲームはありません</p>
             <button type="button" data-reset>条件をクリア</button>
         </div>
     </main>

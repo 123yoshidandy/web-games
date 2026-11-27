@@ -108,6 +108,18 @@ test('欄の中で選んでいる条件の数を数え、「解除」は欄の�
     assert.deepEqual(cleared, state({ q: 'かたん', open: true }));
 });
 
+test('お気に入りだけを出す（fav=1）。欄の外の条件なので、数と「解除」には入らない', () => {
+    assert.ok(matches(game({ fav: true }), state({ fav: true })));
+    assert.ok(!matches(game({ fav: false }), state({ fav: true })));
+    assert.ok(matches(game({ fav: false }), state()));
+    assert.equal(stateToSearch(state({ fav: true })), '?fav=1');
+    assert.deepEqual(parseState('?fav=1', GENRES), state({ fav: true }));
+    assert.equal(parseState('?fav=yes', GENRES).fav, false);
+    assert.ok(!isEmptyState(state({ fav: true })));
+    assert.equal(activeFilterCount(state({ fav: true })), 0);
+    assert.equal(clearFilters(state({ fav: true, players: 2 })).fav, true);
+});
+
 test('遊ぶ時間は短いほうの時間で「〜N分」に入れ、「60分〜」は長いほうが60分を超えるもの', () => {
     const quick = game({ minutes: [10, 10] });
     const range = game({ minutes: [20, 60] });

@@ -1,4 +1,7 @@
 // 入口のページの検索・絞り込みの画面。カードとボタンは build-site.mjs が HTML に書き出し、ここでは表示を切り替える
+// お気に入り：カードの ☆ で付け外しし、「★ お気に入り」で絞る。ログインしていればサーバーに置く（favorites.js）
+import { createFavorites } from './favorites.js';
+import { currentUser, resolveStatsUrl } from './user-stats.js';
 import { EMPTY_STATE, parseState, stateToSearch, isEmptyState, activeFilterCount, clearFilters, toggleGenre, matches, sortGames } from './filter.js';
 
 const panel = document.getElementById('filters');
@@ -10,6 +13,8 @@ const toggleCount = document.getElementById('filter-count');
 const groups = document.getElementById('filter-groups');
 const clear = document.getElementById('filter-clear');
 const chips = [...panel.querySelectorAll('button[data-key]')];
+const favFilter = document.getElementById('fav-filter');
+const emptyText = document.getElementById('empty-text');
 const genres = chips.filter((b) => b.dataset.key === 'genre' && b.dataset.value).map((b) => b.dataset.value);
 
 const list = document.getElementById('games');
@@ -21,8 +26,19 @@ const cards = [...list.querySelectorAll(':scope > li')].map((li) => ({
     genres: li.dataset.genres.split('|').filter(Boolean),
     // 時間は「短い 長い」、難しさは 1〜5。書いていないゲームは空
     minutes: li.dataset.minutes ? li.dataset.minutes.split(' ').map(Number) : null,
-    weight: li.dataset.weight ? Number(li.dataset.weight) : null
+    weight: li.dataset.weight ? Number(li.dataset.weight) : null,
+    star: li.querySelector('.fav'),
+    fav: false
 }));
+
+const storage = (() => {
+    try {
+        return localStorage;
+    } catch {
+        return null;
+    }
+})();
+const favorites = createFavorites({ storage, fetchImpl: globalThis.fetch?.bind(globalThis), user: currentUser, url: resolveStatsUrl });
 
 let state = parseState(location.search, genres);
 
@@ -33,8 +49,12 @@ const render = () => {
         sorted = state.sort;
         list.append(...sortGames(cards, state.sort).map((card) => card.li));
     }
+    const favs = new Set(favorites.list());
     let shown = 0;
     for (const card of cards) {
+        card.fav = favs.has(card.li.dataset.game);
+        card.star.textContent = card.fav ? '★' : '☆';
+        card.star.setAttribute('aria-pressed', String(card.fav));
         const hit = matches(card, state);
         card.li.hidden = !hit;
         if (hit) shown++;
@@ -48,6 +68,10 @@ const render = () => {
         chip.setAttribute('aria-pressed', String(pressed));
     }
     if (input.value !== state.q) input.value = state.q;
+    favFilter.setAttribute('aria-pressed', String(state.fav));
+    emptyText.textContent = state.fav && favs.size === 0
+        ? 'お気に入りはまだありません。カードの ☆ を押すと足せます'
+        : '条件に合うゲームはありません';
     // 閉じていても、選んでいる条件があれば数と「解除」を出す（隠れた条件で本数が減って見えるのを防ぐ）
     const active = activeFilterCount(state);
     toggle.setAttribute('aria-expanded', String(state.open));
@@ -80,6 +104,21 @@ for (const chip of chips) {
 }
 
 toggle.addEventListener('click', () => update({ open: !state.open }));
+favFilter.addEventListener('click', () => update({ fav: !state.fav }));
+
+for (const card of cards) {
+    card.star.hidden = false;
+    card.star.addEventListener('click', () => favorites.toggle(card.li.dataset.game));
+}
+favorites.subscribe(render);
+// ログイン・ログアウト（stats.js が知らせる）、ほかのタブでの変更、ページに戻ってきたときに、サーバーと合わせる
+document.addEventListener('portal-account', () => favorites.sync());
+window.addEventListener('storage', (event) => {
+    if (event.key === 'netplay.name') favorites.sync();
+    else if (event.key?.startsWith('portal.favorites')) render();
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') favorites.sync(); });
+window.addEventListener('online', () => favorites.sync());
 clear.addEventListener('click', () => update(clearFilters(state)));
 
 // 「条件をクリア」は検索の文字も含めてすべて外す（欄の開け閉めは残す）
@@ -89,3 +128,4 @@ document.querySelectorAll('[data-reset]').forEach((button) => {
 
 panel.hidden = false;
 render();
+favorites.sync();

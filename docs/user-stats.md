@@ -15,6 +15,10 @@
 - **ローカル対戦（CPU・ひとり）の結果は画面が送る**（`netplay/user-stats.js` の `recordResult`）。端末の待ち行列に入れてから送り、送れなければ残して、次の読み込み・通信の回復・次の結果のときに送り直す。id は同じ対戦なら同じ（シードから作る）なので、サーバーは二重に数えない
   - 1台で複数の人が交代で遊ぶ対戦は、誰の記録か分からないので送らない（人の席が1つのときだけ送る）
 - 入口のページ：ログインの欄、「自分の記録」（ゲームごとの回数・勝ち・負け・引分と、オンラインの相手ごとの勝ち負け）、カードに小さく「3回・2勝1敗」
+- **お気に入り**（入口のページ。カードの右上の ☆ で付け外しし、「★ お気に入り」で絞る。URL は `?fav=1`）
+  - ログインしていなければ端末（localStorage の `portal.favorites`）だけに置く
+  - ログインしていればサーバー（`USER#<名前>` の `favorites`）に置き、ほかのスマホでも同じになる。端末には写し（`portal.favorites.account`）を持ち、送れなかった変更は次に合わせるときに送る
+  - ログインしているときに合わせると、ログインしていないあいだに付けたお気に入りをサーバーの分に足して送り、送れたら端末の分を空にする（ログアウトすると、端末の分だけが出る）
 
 ## 作り
 
@@ -22,12 +26,13 @@
 |---|---|
 | `packages/netplay-kit/server/stats.js` | 名前の揃え方・結果の取り出し（`resultOf`）・記録の組み立て・保存の形・メモリの保存先 |
 | `packages/netplay-kit/server/dynamo-stats-store.js` | DynamoDB の保存先。`USER#<名前>` に平らな数（`p|azul` など）を ADD で足し、`RESULT#<id>`（90日で消える）の印と1つのトランザクションにする |
-| `packages/netplay-kit/server/stats-handler.js` | HTTP API：`GET /stats?name=`・`POST /results`（本文 `{ id, name, game, outcome }`） |
+| `packages/netplay-kit/server/stats-handler.js` | HTTP API：`GET /stats?name=`・`POST /results`（本文 `{ id, name, game, outcome }`）・`GET /favorites?name=`・`PUT /favorites`（本文 `{ name, games }`） |
 | `packages/netplay-kit/server/room-service.js` | `onMatchEnd`（任意）。`handler.js` は `STATS_TABLE_NAME` と `keyPrefix` があればつなぐ（全ゲームでゲーム側の変更は要らない） |
 | `packages/netplay-kit/server/dev-server.js` | `startMultiDevServer`（`npm run dev:online`）が、同じポートの HTTP で記録の API を受け持つ（メモリ） |
 | `packages/netplay-kit/client/user-stats.js` | 画面側：ログイン・待ち行列・送り直し・記録の読み込み。各ゲームの `public/js/netplay/` に同期する |
 | `server/src/stats-handler.js`・`server/template.yaml` | `StatsTable`（消さずに残す）・`StatsFunction`・HTTP API の `StatsApi`。対戦の `GameFunction` にも記録のテーブルの権限 |
 | `scripts/portal/stats.js`・`stats-view.js` | 入口のページのログインと「自分の記録」 |
+| `scripts/portal/favorites.js` | 入口のページのお気に入り（端末とサーバーの持ち方。画面のつなぎは `page.js`） |
 | `scripts/user-stats-coverage.mjs` | オンラインの結果を取り出せるゲームを数える（全員 CPU で終わりまで進めて試す） |
 
 記録の API の場所は、`user-stats.js` の `DEPLOYED_STATS_URL`（公開したページ）、手元では `http://localhost:8787`（`?server=ws://localhost:<ポート>` ならそのポート、`?stats=` で変えられる）。

@@ -56,6 +56,12 @@ const refresh = async () => {
     renderAccount();
 };
 
+// ログイン・ログアウトしたら、お気に入り（page.js）にも知らせる（同じタブの localStorage の変更は storage では届かない）
+const accountChanged = () => {
+    document.dispatchEvent(new CustomEvent('portal-account'));
+    return refresh();
+};
+
 loginOpen.addEventListener('click', () => {
     nameInput.value = '';
     loginDialog.showModal();
@@ -72,12 +78,12 @@ form.addEventListener('submit', (event) => {
     }
     nameInput.value = '';
     loginDialog.close();
-    refresh();
+    accountChanged();
 });
 
 $('logout').addEventListener('click', () => {
     logout();
-    refresh();
+    accountChanged();
 });
 
 $('stats-open').addEventListener('click', () => {

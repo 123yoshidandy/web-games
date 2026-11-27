@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import {
-    normalizeName, nameKey, resultOf, outcomeOf, matchRecord, createMatchRecorder, countersOf, statsFromItem, MemoryStatsStore
+    normalizeName, nameKey, resultOf, outcomeOf, matchRecord, createMatchRecorder, countersOf, statsFromItem, MemoryStatsStore,
+    normalizeFavorites, MAX_FAVORITES
 } from '../server/stats.js';
 import { createStatsHandler, localRecord } from '../server/stats-handler.js';
 import { createTestServer } from '../server/testing.js';
@@ -10,7 +11,7 @@ import { ConflictError } from '../server/room-service.js';
 vi.mock('@aws-sdk/client-dynamodb', () => ({ DynamoDBClient: class {} }));
 vi.mock('@aws-sdk/lib-dynamodb', () => {
     const command = (name) => class { constructor(input) { this.name = name; this.input = input; } };
-    return { DynamoDBDocumentClient: { from: () => null }, GetCommand: command('Get'), TransactWriteCommand: command('TransactWrite') };
+    return { DynamoDBDocumentClient: { from: () => null }, GetCommand: command('Get'), TransactWriteCommand: command('TransactWrite'), UpdateCommand: command('Update') };
 });
 const { DynamoStatsStore } = await import('../server/dynamo-stats-store.js');
 
@@ -165,6 +166,43 @@ describe('DynamoStatsStore', () => {
         expect(client.sent[0].input).toEqual({ TableName: 'stats', Key: { pk: 'USER#a' } });
         expect(stats).toEqual({ name: 'A', games: { azul: { plays: 3, wins: 2, losses: 0, draws: 0, online: 0, vs: [] } } });
     });
+
+    it('お気に入りは USER#<キー> の favorites だけを読み、置き換えは数に触らず SET する', async () => {
+        const client = fakeClient((command) => (command.name === 'Get' ? { Item: { favorites: ['go', 'azul'] } } : {}));
+        const store = new DynamoStatsStore('stats', client);
+        expect(await store.getFavorites('A')).toEqual({ name: 'A', games: ['azul', 'go'] });
+        expect(client.sent[0].input).toMatchObject({ Key: { pk: 'USER#a' }, ProjectionExpression: '#favorites' });
+        await store.setFavorites('A', ['azul']);
+        expect(client.sent[1].name).toBe('Update');
+        expect(client.sent[1].input).toMatchObject({
+            Key: { pk: 'USER#a' },
+            UpdateExpression: 'SET #favorites = :games, #name = if_not_exists(#name, :name)',
+            ExpressionAttributeValues: { ':games': ['azul'], ':name': 'A' }
+        });
+        expect(await store.getFavorites('プレイヤー')).toEqual({ name: 'プレイヤー', games: [] });
+        expect(client.sent).toHaveLength(2);
+    });
+});
+
+describe('お気に入り', () => {
+    it('一覧は重なりを除いて名前の順にし、形の違うもの・多すぎるものは null', () => {
+        expect(normalizeFavorites(['go', 'azul', 'go'])).toEqual(['azul', 'go']);
+        expect(normalizeFavorites([])).toEqual([]);
+        expect(normalizeFavorites('azul')).toBeNull();
+        expect(normalizeFavorites(['../x'])).toBeNull();
+        expect(normalizeFavorites(Array.from({ length: MAX_FAVORITES + 1 }, (_, i) => `g${i}`))).toBeNull();
+    });
+
+    it('メモリの保存先：名前の大文字・小文字は同じ人で、記録の数とは別に持つ', async () => {
+        const store = new MemoryStatsStore();
+        await store.record(localRecord({ id: 'azul-000001', name: 'Aoi', game: 'azul', outcome: 'win' }, 1));
+        await store.setFavorites('aoi', ['azul', 'go']);
+        expect(await store.getFavorites('AOI')).toEqual({ name: 'AOI', games: ['azul', 'go'] });
+        expect((await store.get('Aoi')).games).toEqual({ azul: expect.objectContaining({ plays: 1, wins: 1 }) });
+        await store.setFavorites('みどり', ['go']);
+        expect(await store.get('みどり')).toEqual({ name: 'みどり', games: {} });
+        expect(await store.getFavorites('だれか')).toEqual({ name: 'だれか', games: [] });
+    });
 });
 
 describe('記録の HTTP の入口（createStatsHandler）', () => {
@@ -195,6 +233,31 @@ describe('記録の HTTP の入口（createStatsHandler）', () => {
         expect((await call(handler, 'GET', '/nothing')).statusCode).toBe(404);
         const broken = createStatsHandler({ store: { get: () => Promise.reject(new Error('down')) }, log: () => {} });
         expect((await call(broken, 'GET', '/stats', { query: { name: 'A' } })).statusCode).toBe(500);
+    });
+
+    it('PUT /favorites で置き換え、GET /favorites で読める。CORS は PUT も許す', async () => {
+        const handler = createStatsHandler({ store: new MemoryStatsStore() });
+        const put = parse(await call(handler, 'PUT', '/favorites', { body: { name: 'あお', games: ['go', 'azul', 'go'] } }));
+        expect(put.statusCode).toBe(200);
+        expect(put.json).toEqual({ name: 'あお', games: ['azul', 'go'] });
+        expect(put.headers['Access-Control-Allow-Methods']).toContain('PUT');
+        expect(parse(await call(handler, 'GET', '/favorites', { query: { name: 'あお' } })).json).toEqual({ name: 'あお', games: ['azul', 'go'] });
+        await call(handler, 'PUT', '/favorites', { body: { name: 'あお', games: [] } });
+        expect(parse(await call(handler, 'GET', '/favorites', { query: { name: 'あお' } })).json.games).toEqual([]);
+        // 124 本ぶんの長い一覧も受け取れる
+        const many = Array.from({ length: 124 }, (_, i) => `game-with-a-long-name-${i}`);
+        expect((await call(handler, 'PUT', '/favorites', { body: { name: 'あお', games: many } })).statusCode).toBe(200);
+    });
+
+    it('お気に入りの形の違う本文・名前は 400。保存先が持たなければ 404', async () => {
+        const handler = createStatsHandler({ store: new MemoryStatsStore() });
+        for (const body of ['{', { games: [] }, { name: 'プレイヤー', games: [] }, { name: 'あお' }, { name: 'あお', games: ['../x'] }, 'x'.repeat(30000)]) {
+            expect((await call(handler, 'PUT', '/favorites', { body })).statusCode).toBe(400);
+        }
+        expect((await call(handler, 'GET', '/favorites', { query: {} })).statusCode).toBe(400);
+        expect((await call(handler, 'POST', '/favorites', { body: { name: 'あお', games: [] } })).statusCode).toBe(404);
+        const old = createStatsHandler({ store: { get: async () => ({}) } });
+        expect((await call(old, 'GET', '/favorites', { query: { name: 'あお' } })).statusCode).toBe(404);
     });
 
     it('ローカルの記録の id は、ゲームと人ごとに分ける', () => {

@@ -28,6 +28,7 @@ export class DeleteCommand extends Command {}
 export class ScanCommand extends Command {}
 export class TransactWriteCommand extends Command {}
 export class QueryCommand extends Command {}
+export class UpdateCommand extends Command {}
 const copy = (item) => item && structuredClone(item);
 // 利用者ごとの記録（dynamo-stats-store.js）：印の Put（なければだけ）と、SET・ADD の Update を、まとめて行う
 const transact = ({ TransactItems }) => {
@@ -48,8 +49,20 @@ const transact = ({ TransactItems }) => {
     }
     return {};
 };
+// お気に入り（dynamo-stats-store.js の setFavorites）：SET #a = :v と、SET #a = if_not_exists(#a, :v) だけをまねる
+const update = ({ Key, UpdateExpression, ExpressionAttributeNames: names, ExpressionAttributeValues: values }) => {
+    const item = fake.items.get(Key.pk) ?? { ...Key };
+    for (const part of UpdateExpression.replace(/^SET /, '').split(/, (?=#)/)) {
+        const [n, v] = part.split(' = ');
+        if (v.startsWith('if_not_exists(')) item[names[n]] ??= values[v.slice(0, -1).split(', ')[1]];
+        else item[names[n]] = values[v];
+    }
+    fake.items.set(Key.pk, item);
+    return {};
+};
 const send = async (command) => {
     if (command instanceof TransactWriteCommand) return transact(command.input);
+    if (command instanceof UpdateCommand) return update(command.input);
     // 索引 OpenRooms（openList が鍵、openAt の新しい順）だけをまねる
     if (command instanceof QueryCommand) {
         const { IndexName, ExpressionAttributeValues: v, Limit } = command.input;
@@ -183,6 +196,12 @@ test('記録の API（stats-handler.mjs）：ローカルの結果を受け取�
     assert.equal(response.statusCode, 200);
     assert.deepEqual(JSON.parse(response.body).games.azul, { plays: 1, wins: 1, losses: 0, draws: 0, online: 0, vs: [] });
     assert.ok(fake.items.has('RESULT#local:azul:バンドル:azul-bundle-1'));
+    // お気に入りは同じ項目に置き、記録の数には触らない
+    const put = await http('PUT', '/favorites', { body: { name: 'バンドル', games: ['go', 'azul'] } });
+    assert.deepEqual(JSON.parse(put.body), { name: 'バンドル', games: ['azul', 'go'] });
+    assert.deepEqual(JSON.parse((await http('GET', '/favorites', { query: { name: 'バンドル' } })).body).games, ['azul', 'go']);
+    assert.equal(JSON.parse((await http('GET', '/stats', { query: { name: 'バンドル' } })).body).games.azul.plays, 1);
+    assert.equal(fake.items.get('USER#バンドル').name, 'バンドル');
 });
 
 test('全ゲームの待っている部屋（GET /rooms）：作った部屋が出て、つながっている人がいなくなると消える', async () => {

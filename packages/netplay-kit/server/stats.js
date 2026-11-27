@@ -9,6 +9,7 @@
  * 保存の形（DynamoStatsStore と MemoryStatsStore で同じ）：利用者ごとに1つの項目に、数えるものを平らな名前で持つ
  *   p|<ゲーム>  回数        w|<ゲーム>  勝ち      l|<ゲーム>  負け      d|<ゲーム>  引き分け    o|<ゲーム>  そのうちオンライン
  *   v|<ゲーム>|<h か c>|<相手の名前>|<p w l d>   オンラインの相手ごと（h は人、c は CPU）
+ *   favorites   入口のページのお気に入りのゲーム（名前の一覧。並びはゲームの名前の順）
  * 平らにしておくと、DynamoDB の ADD で読まずに足せる（入れ子の map は、親がないと ADD できない）
  */
 
@@ -36,6 +37,19 @@ export function nameKey(name) {
     if (!normalized || PLACEHOLDER_NAMES.includes(normalized)) return '';
     return normalized.toLowerCase();
 }
+
+// ===== お気に入り =====
+
+export const MAX_FAVORITES = 300; // ゲームの数（いま 124 本）より多めに
+
+// お気に入りの一覧を揃える（重なりを除き、名前の順）。配列でない・ゲームの名前でないものがある・多すぎるなら null
+export function normalizeFavorites(games) {
+    if (!Array.isArray(games) || games.length > MAX_FAVORITES || !games.every(isGameName)) return null;
+    return [...new Set(games)].sort();
+}
+
+// 保存した項目のお気に入り（形が違えば空）
+export const favoritesFromItem = (item) => normalizeFavorites(item?.favorites) ?? [];
 
 // ===== 結果の取り出し =====
 
@@ -227,5 +241,20 @@ export class MemoryStatsStore {
     async get(name) {
         const key = nameKey(name);
         return statsFromItem(key ? this.users.get(key) : null, normalizeName(name));
+    }
+
+    // お気に入り：{ name, games: [ゲーム…] }
+    async getFavorites(name) {
+        const key = nameKey(name);
+        return { name: normalizeName(name), games: favoritesFromItem(key ? this.users.get(key) : null) };
+    }
+
+    // お気に入りを丸ごと置き換える（games は normalizeFavorites で揃えたもの）
+    async setFavorites(name, games) {
+        const key = nameKey(name);
+        if (!key) return;
+        const item = this.users.get(key) ?? { name: normalizeName(name) };
+        item.favorites = [...games];
+        this.users.set(key, item);
     }
 }
