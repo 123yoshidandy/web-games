@@ -13,11 +13,26 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff, flyIn } from './anim.js';
 
 const SETTINGS_KEY = 'viticulture.settings';
 const CPU_NAMES = ['ジュリア', 'マルコ', 'ソフィア', 'ニコロ', 'キアラ'];
 export const COLORS = ['#e8b23a', '#5b95e0', '#5fb35a', '#c07ae0', '#ee8640', '#e5e2da'];
 const RESULT_DELAY_MS = 900;
+
+// 動きの目印：行動のマスは「行動:何番目」で置いた人の席、数と農園は欄ごとの何番目か
+const SLOTS = {
+    key: el => `${el.closest('[data-action]')?.dataset.action}:${[...el.parentElement.children].indexOf(el)}`,
+    value: el => el.dataset.seat ?? ''
+};
+const AMOUNTS = '#players .chip > .c-stats, #players .chip > .c-workers, #me .me-top > *';
+const amountKey = el => `${el.closest('.chip')?.dataset.seat ?? 'me'}:${[...el.parentElement.children].indexOf(el)}`;
+const ESTATE = '#me .field, #me .cc, #me .st';
+const ESTATE_MOTION = {
+    key: el => `${el.className.split(' ')[0]}:${[...el.parentElement.children].indexOf(el)}:${[...el.parentElement.parentElement.children].indexOf(el.parentElement)}`,
+    value: el => `${el.classList.contains('on')}|${el.querySelector('.f-vines')?.innerHTML ?? ''}|${el.classList.contains('harvested')}`
+};
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -74,6 +89,7 @@ export default class UI {
         $('#title-art').innerHTML = titleArtHtml();
         $('#help-body').innerHTML = helpHtml();
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'ヴィティカルチャー',
@@ -149,7 +165,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.resultTimer?.();
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
@@ -333,6 +349,9 @@ export default class UI {
         if (!this.controller) return;
         const view = this.controller.getView();
         const prev = this.view;
+        // 手が進んだときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+        const moved = Boolean(prev) && view.commandCount !== prev.commandCount;
+        const before = moved ? this.captureMotion() : null;
         this.view = view;
         $('#hint').hidden = Boolean(this.controller.isOnline); // ヒントはローカル対戦だけ
         if (prev && view.logCount !== prev.logCount) this.hintCommand = null;
@@ -349,8 +368,10 @@ export default class UI {
         this.renderDecide(view);
         this.markHint();
         if ($('#log').open) this.renderLog();
+        if (moved) this.animateMotion(view, before);
+        // 結果の画面は、最後の手の動きが終わってから出す
         if (view.season === 'end' && !this.resultTimer && !$('#result').open) {
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.resultTimer = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
     }
 
@@ -362,6 +383,37 @@ export default class UI {
         if (actor === view.you) who = '<b class="you">あなたの番</b>';
         else if (actor !== undefined) who = `${escapeHtml(view.players[actor].name)}の番`;
         return `<span class="when">${when}</span>${who}`;
+    }
+
+    // ---- 動き（描き直しの前後の差） ----
+
+    // 描き直す前：行動のマスに置いた人・各プレイヤーの数・自分の農園（畑・貯蔵・建物）
+    captureMotion() {
+        return {
+            slots: snapshot($('#board'), '.slot', SLOTS),
+            amounts: snapshot(document, AMOUNTS, { key: amountKey }),
+            estate: snapshot(document, ESTATE, ESTATE_MOTION)
+        };
+    }
+
+    // 描いたあと：置いたワーカーはその人の欄から飛ばし、数の変化を目立たせ、農園の変わったところははねて出す
+    animateMotion(view, before) {
+        animateDiff(before.slots, $('#board'), '.slot', {
+            ...SLOTS,
+            enter: null,
+            change: (el) => {
+                if (el.dataset.seat !== undefined) flyIn(el, $(`#players .chip[data-seat="${el.dataset.seat}"]`));
+            }
+        });
+        animateDiff(before.amounts, document, AMOUNTS, { key: amountKey });
+        animateDiff(before.estate, document, ESTATE, {
+            ...ESTATE_MOTION,
+            enter: null,
+            change: (el) => {
+                if (el.classList.contains('field')) Motion.pulse(el, { duration: 380, scale: 1.06 });
+                else if (el.classList.contains('on')) Motion.popIn(el, { duration: 320 });
+            }
+        });
     }
 
     renderPlayers(view) {
@@ -399,9 +451,9 @@ export default class UI {
     tileHtml(view, action, myTurn) {
         const space = view.spaces[action.id] ?? { slots: [], extra: [] };
         const legal = view.placements.some(p => p.action === action.id && (this.grandeMode ? p.grande : true));
-        const slot = (seat, i) => `<span class="slot${i === 0 && action.bonusText ? ' bonus' : ''}${seat !== null ? ' on' : ''}" style="--c:${seat !== null ? COLORS[seat] : 'transparent'}">${seat !== null ? sym('s-worker') : i === 0 && action.bonusText ? '★' : ''}</span>`;
-        const placed = action.open ? space.extra.map(seat => `<span class="slot on" style="--c:${COLORS[seat]}">${sym('s-worker')}</span>`).join('') : space.slots.map(slot).join('');
-        const extra = action.open ? '' : space.extra.map(seat => `<span class="slot on grande" style="--c:${COLORS[seat]}">${sym('s-grande')}</span>`).join('');
+        const slot = (seat, i) => `<span class="slot${i === 0 && action.bonusText ? ' bonus' : ''}${seat !== null ? ' on' : ''}"${seat !== null ? ` data-seat="${seat}"` : ''} style="--c:${seat !== null ? COLORS[seat] : 'transparent'}">${seat !== null ? sym('s-worker') : i === 0 && action.bonusText ? '★' : ''}</span>`;
+        const placed = action.open ? space.extra.map(seat => `<span class="slot on" data-seat="${seat}" style="--c:${COLORS[seat]}">${sym('s-worker')}</span>`).join('') : space.slots.map(slot).join('');
+        const extra = action.open ? '' : space.extra.map(seat => `<span class="slot on grande" data-seat="${seat}" style="--c:${COLORS[seat]}">${sym('s-grande')}</span>`).join('');
         return `<button class="tile ${action.season}${legal ? ' legal' : ''}${myTurn && !legal ? ' dim' : ''}" data-action="${action.id}">
 <span class="t-name">${action.name}</span>
 <span class="t-text">${action.text}${action.bonusText ? `<em>★${action.bonusText}</em>` : ''}</span>

@@ -127,6 +127,10 @@ button {
     cursor: pointer;
 }
 .segmented button[aria-checked="true"] { color: #2d1f04; background: var(--gold); }
+/* 動きの速さ（共通の部品 motion の切り替え）を、人数・CPU の切り替えと同じ見た目にする */
+#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; gap: 0; border: none; border-radius: 10px; background: rgba(0, 0, 0, .28); }
+#motion-setting .motion-speed button { min-width: 44px; height: 36px; padding: 0 10px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 15px; font-weight: 800; }
+#motion-setting .motion-speed button[aria-pressed="true"] { color: #2d1f04; background: var(--gold); }
 
 /* ---- タイトル ---- */
 
