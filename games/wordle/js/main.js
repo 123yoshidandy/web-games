@@ -3,7 +3,7 @@
  * 判定は logic.js、部屋と通信は online.js が行う
  */
 
-import { BLANK, MAX_ROWS, baseKana, boardWidth, checkGuess, createRandom, cycleVariant, evaluateGuess, normalizeLetter, pickAnswer, suggest, trimBlanks, usesBlank } from './logic.js';
+import { BLANK, MAX_ROWS, baseKana, boardWidth, createRandom, cycleVariant, evaluateGuess, gameResult, keyToLetter, normalizeLetter, pickAnswer, strongerStatus, submitError, suggest, trimBlanks, usesBlank } from './logic.js';
 import { resultMessage, setupOnline } from './online.js';
 import { music } from './music.js';
 import { recordResult } from './netplay/user-stats.js';
@@ -11,7 +11,8 @@ import { recordResult } from './netplay/user-stats.js';
 const MODE_STORAGE_KEY = 'wordle-mode';
 const GAME_STORAGE_KEY = 'wordle-game'; // 1人プレイの途中経過（モード・シード・入れた単語）
 const RESULT_DELAY_MS = 1500; // 最後の行をめくり終えてから結果を出すまで
-const STATUS_RANK = { absent: 1, present: 2, correct: 3 };
+const FLIP_MS = 450; // 1マスをめくる時間（styles.css の .flip と同じ）
+const FLIP_STAGGER_MS = 200; // となりのマスをめくり始めるまで
 
 // キーの並び（右から あ か さ … の五十音。空文字は空き、BLANK は空白のキー）。濁音・半濁音・小さい字は「゛゜小」で切り替える
 const KEY_ROWS = [
@@ -103,6 +104,7 @@ function initializeBoard() {
         const row = document.createElement('div');
         row.classList.add('row');
         row.dataset.row = i;
+        row.dataset.number = i + 1; // 2列に折り返すときに、行の順が分かるよう番号を出す
 
         for (let j = 0; j < state.length; j++) {
             const tile = document.createElement('div');
@@ -157,17 +159,27 @@ function flipRow(row, word, statuses) {
 
     document.querySelector(`.row[data-row="${row}"]`)?.classList.remove('pending');
 
-    // アニメーションとともにタイルをフリップ
+    // 1マスずつめくり、真横を向いた（見えない）ところで色を付ける
     for (let i = 0; i < statuses.length; i++) {
         const tile = tiles[i];
         setTimeout(() => {
             tile.classList.add('flip');
-            setTimeout(() => {
-                tile.classList.add(statuses[i]);
-                updateKeyboard(word[i], statuses[i]);
-            }, 150);
-        }, i * 200);
+            setTimeout(() => tile.classList.add(statuses[i]), FLIP_MS / 2);
+        }, i * FLIP_STAGGER_MS);
     }
+    // キーボードは、行をめくり終えてからまとめて塗る（マスより先に色が付かないように）
+    setTimeout(() => {
+        statuses.forEach((status, i) => updateKeyboard(word[i], status));
+    }, (statuses.length - 1) * FLIP_STAGGER_MS + FLIP_MS);
+}
+
+// 決定できない入力のとき、今の行を横に揺らす
+function shakeRow(row) {
+    const element = document.querySelector(`.row[data-row="${row}"]`);
+    if (!element) return;
+    element.classList.remove('shake');
+    void element.offsetWidth; // 続けて断られたときも、揺れを最初からやり直す
+    element.classList.add('shake');
 }
 
 // キーボードの色を更新（強い判定で上書きし、弱い判定では戻さない）
@@ -178,13 +190,14 @@ function updateKeyboard(letter, status) {
     if (!key) return;
 
     if (base !== letter) {
-        if ((STATUS_RANK[key.dataset.variant] ?? 0) < STATUS_RANK[status]) key.dataset.variant = status;
+        key.dataset.variant = strongerStatus(key.dataset.variant, status);
         return;
     }
     const current = ['correct', 'present', 'absent'].find(name => key.classList.contains(name));
-    if ((STATUS_RANK[current] ?? 0) >= STATUS_RANK[status]) return;
+    const next = strongerStatus(current, status);
+    if (next === current) return;
     key.classList.remove('correct', 'present', 'absent');
-    key.classList.add(status);
+    key.classList.add(next);
 }
 
 // 現在の行にフォーカススタイルを適用する
@@ -289,11 +302,11 @@ function handleKeyDown(e) {
         handleEnterKey();
     } else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'ArrowLeft') {
         handleBackspace();
-    } else if (/^[ぁ-んゔァ-ヴー]$/.test(e.key)) {
-        handleLetter(normalizeLetter(state.mode, e.key));
-    } else if (e.key === ' ' && usesBlank(state.mode)) {
-        e.preventDefault();
-        handleLetter(BLANK);
+    } else {
+        const letter = keyToLetter(state.mode, e.key);
+        if (!letter) return;
+        if (letter === BLANK) e.preventDefault(); // スペースで画面を送らない
+        handleLetter(letter);
     }
 }
 
@@ -336,21 +349,13 @@ function handleBackspace() {
 function handleEnterKey() {
     if (!canType()) return;
 
-    if (state.currentCol !== state.length) {
+    const word = state.grid[state.currentRow].slice(0, state.currentCol).join('');
+    const error = submitError(state.mode, word, state.length, { online: Boolean(state.online) });
+    if (error) {
         music.play('error');
-        showMessage(checkGuess(state.mode, '', state.length));
+        showMessage(error);
+        shakeRow(state.currentRow);
         return;
-    }
-
-    const word = state.grid[state.currentRow].join('');
-    // ことばモードの1人プレイは、今までどおり何でも決定できる
-    if (state.mode === 'pokemon' || state.online) {
-        const error = checkGuess(state.mode, word, state.length);
-        if (error) {
-            music.play('error');
-            showMessage(error);
-            return;
-        }
     }
     clearHint();
 
@@ -366,7 +371,7 @@ function handleEnterKey() {
     state.currentCol = 0;
     state.words.push(word);
     setTimeout(updateCurrentRowFocus, 800);
-    checkGameEnd(word);
+    checkGameEnd();
     saveGame();
 }
 
@@ -401,22 +406,23 @@ function clearHint() {
 // ===== 1人プレイ =====
 
 // ゲーム終了の確認
-function checkGameEnd(word) {
-    if (word === state.secret || state.currentRow >= MAX_ROWS) {
+function checkGameEnd() {
+    const result = gameResult(state.words, state.secret);
+    if (result) {
         state.gameOver = true;
         // ひとり用の結果を、ログインしている人の記録に送る（当てたら勝ち、外したら負け）
         // id はシードから作る（同じ対戦を2回数えない）。オンライン対戦はサーバーが記録する
-        recordResult({ game: 'wordle', id: `wordle-${state.seed}`, outcome: word === state.secret ? 'win' : 'loss' });
+        if (!state.online) recordResult({ game: 'wordle', id: `wordle-${state.seed}`, outcome: result === 'win' ? 'win' : 'loss' });
     }
 
     const secret = state.secret;
     setTimeout(() => {
         if (secret !== state.secret || state.online) return; // 待つ間に新しいゲームが始まった
 
-        if (word === secret) {
+        if (result === 'win') {
             music.play('win');
             showMessage('素晴らしい！正解です！');
-        } else if (state.currentRow >= MAX_ROWS) {
+        } else if (result === 'lose') {
             music.play('lose');
             showMessage(`ゲームオーバー! 正解は ${trimBlanks(secret)} でした`);
         }

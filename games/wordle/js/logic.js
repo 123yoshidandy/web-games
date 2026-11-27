@@ -111,6 +111,20 @@ export function checkGuess(mode, guess, length) {
     return /^[ぁ-ゖー]+$/.test(word) ? null : 'ひらがなで入力してください';
 }
 
+// 決定のときに断る理由（よければ null）。字数が足りなければ断る。
+// 字の中身は、ポケモンモードと対戦だけ確かめる（ことばモードの1人プレイは、ひらがな5文字なら何でも決定できる）
+export function submitError(mode, word, length, { online = false } = {}) {
+    if (word.length !== length) return checkGuess(mode, '', length);
+    return mode === 'pokemon' || online ? checkGuess(mode, word, length) : null;
+}
+
+// 物理キーボードのキーを、入れる字にする（モードの字にそろえ、スペースは空白を使うモードだけ空白にする）。入れる字でなければ null
+export function keyToLetter(mode, key) {
+    if (/^[ぁ-んゔァ-ヴー]$/.test(key)) return normalizeLetter(mode, key);
+    if (key === ' ' && usesBlank(mode)) return BLANK;
+    return null;
+}
+
 // 1文字ずつの判定：correct（位置も合う）・present（含まれるが位置が違う）・absent（含まれない）
 export function evaluateGuess(guess, secret) {
     const result = Array(guess.length).fill('absent');
@@ -131,6 +145,19 @@ export function evaluateGuess(guess, secret) {
         }
     }
     return result;
+}
+
+const STATUS_RANK = { absent: 1, present: 2, correct: 3 };
+
+// キーの色：今の色と新しい判定の強いほう（correct > present > absent）。弱い判定では戻さない
+export function strongerStatus(current, status) {
+    return (STATUS_RANK[current] ?? 0) >= (STATUS_RANK[status] ?? 0) ? current : status;
+}
+
+// 1人プレイの決着：答えを当てたら 'win'、当てずに MAX_ROWS 回使い切ったら 'lose'、まだなら null（words は決定した単語の順）
+export function gameResult(words, secret) {
+    if (words.includes(secret)) return 'win';
+    return words.length >= MAX_ROWS ? 'lose' : null;
 }
 
 // ヒント：これまでの答えと判定にすべて合う答えの候補から1つ選ぶ（guesses は [{ word, result }]）

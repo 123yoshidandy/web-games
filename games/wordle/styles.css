@@ -326,7 +326,7 @@ body.in-room .solo-only {
     cursor: default;
 }
 
-/* ===== 盤面：10行を左右5行ずつ。マスはあいた場所いっぱいの大きさ ===== */
+/* ===== 盤面：10行を左右5行ずつ（高さに余裕があれば1列に10行）。マスはあいた場所いっぱいの大きさ ===== */
 
 #board-area {
     flex: 1;
@@ -338,19 +338,58 @@ body.in-room .solo-only {
     justify-content: center;
 }
 
+/* 2列のときは、左に行の番号の幅（--number）を空け、1つの盤面を折り返していると分かるようにする */
 #board {
-    --tile: min(calc((100cqw - 18px) / (2 * var(--len, 5)) - 5px), calc(100cqh / 5 - 7px), 58px);
+    --number: 14px;
+    --tile: min(calc((100cqw - 18px - 2 * var(--number)) / (2 * var(--len, 5)) - 5px), calc(100cqh / 5 - 7px), 58px);
     display: grid;
     grid-template-rows: repeat(5, auto);
     grid-auto-flow: column;
-    column-gap: 18px;
+    column-gap: calc(18px + var(--number));
     row-gap: 6px;
+    padding-left: var(--number);
 }
 
 .row {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(var(--len, 5), var(--tile));
     gap: 5px;
+}
+
+.row::before {
+    content: attr(data-number);
+    position: absolute;
+    right: calc(100% + 4px);
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* 10行が1列に、マスを小さくしすぎずに入る高さなら、ふつうの Wordle と同じ1列にする（番号は出さない） */
+@container (min-height: 480px) {
+    #board {
+        --tile: min(calc(100cqw / var(--len, 5) - 5px), calc(100cqh / 10 - 7px), 58px);
+        grid-template-rows: repeat(10, auto);
+        padding-left: 0;
+    }
+
+    .row::before {
+        content: none;
+    }
+}
+
+/* 決定できない入力のとき、今の行を横に揺らす */
+.row.shake {
+    animation: shake 0.4s;
+}
+
+@keyframes shake {
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
 }
 
 .tile {
@@ -373,6 +412,7 @@ body.in-room .solo-only {
 
 .tile:not(:empty), .tile.blank {
     border-color: var(--tile-filled);
+    background: transparent;
 }
 
 /* 出したが、まだ公開されていない自分の答え */
@@ -395,9 +435,11 @@ body.in-room .solo-only {
     border-color: var(--present);
 }
 
+/* 含まれない字は、キーと同じく字を暗くして、判定前のマス（縁取りだけ）と見分けやすくする */
 .tile.absent {
     background: var(--absent);
     border-color: var(--absent);
+    color: #8d929b;
 }
 
 /* 空白：字の代わりに、空白のキーと同じ形（下が閉じた箱）を字の大きさで描く */
@@ -926,9 +968,17 @@ body.in-room .solo-only {
 
 /* 狭い画面では、左右の列の間を詰める */
 @media (max-width: 360px) {
-    #board {
-        --tile: min(calc((100cqw - 12px) / (2 * var(--len, 5)) - 4px), calc(100cqh / 5 - 7px), 58px);
-        column-gap: 12px;
+    /* 2列のときだけ（1列の大きさは上の @container が決める） */
+    @container (max-height: 479.98px) {
+        #board {
+            --number: 12px;
+            --tile: min(calc((100cqw - 12px - 2 * var(--number)) / (2 * var(--len, 5)) - 4px), calc(100cqh / 5 - 7px), 58px);
+            column-gap: calc(12px + var(--number));
+        }
+
+        .row::before {
+            font-size: 10px;
+        }
     }
 
     .row {
@@ -945,7 +995,7 @@ body.in-room .solo-only {
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .pop, .flip {
+    .pop, .flip, .row.shake {
         animation: none;
     }
 }
