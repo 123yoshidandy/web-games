@@ -116,8 +116,8 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .subtitle { margin: -6px 0 10px; color: var(--muted); font-size: 14px; letter-spacing: .4em; }
 .setup { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 360px; }
 /* 動きの速さ（js/motion/motion.js の切り替え）を、CPU の強さと同じ見た目にする */
-#motion-setting .motion-speed-options { display: inline-flex; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
-#motion-setting .motion-speed button { min-width: 72px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; }
+#motion-setting .motion-speed-options { display: inline-flex; border: none; padding: 3px; border-radius: 10px; background: rgba(0, 0, 0, .25); }
+#motion-setting .motion-speed button { justify-content: center; min-width: 72px; height: 36px; padding: 0 8px; border: none; border-radius: 8px; background: none; color: var(--muted); font-size: 14px; font-weight: 800; cursor: pointer; }
 #motion-setting .motion-speed button[aria-pressed="true"] { color: #3d2900; background: var(--accent); }
 .setup .setup-row { display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 800; }
 .setup-label { width: 3.5em; text-align: right; color: var(--muted); }
