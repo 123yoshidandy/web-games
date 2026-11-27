@@ -10,7 +10,7 @@ node packages/motion/scripts/sync.mjs check <ゲーム>    # 写しが手で直�
 node packages/motion/scripts/sync.mjs check --all       # 同期したゲームをすべて
 ```
 
-写しは直さず、ここで直してから同期する。同期したら、ゲームの `sw.js` の先読み（PRECACHE）に `./js/motion/motion.js` を足す（標準の `sw` の項目）。
+写しは直さず、ここで直してから同期する。同期したら、ゲームの `sw.js` の先読み（PRECACHE）に `js/motion/motion.js` を足す（標準の `sw` の項目）。キャッシュの名前（`const CACHE`）は変えない（service worker はネットワークを先に見るので、足すだけでよい）。
 
 ## 決めたこと
 
@@ -60,7 +60,7 @@ this.cancelCpu?.();
 | `mountSpeedSetting(container, { label, onChange })` | 「動き：普通・速い・なし」の切り替え（`.motion-speed`、押したものは `aria-pressed="true"`）を作る。見た目は `:where()` の弱い既定なので、ゲームの CSS で上書きできる |
 | `rectOf(el)`・`captureRects(root, selector, key)` | 位置を測る（大きさのない要素は null・外す） |
 | `flipFrom(before, root, selector, key, { duration, stagger, enter, exclude })` | 前の位置から今の位置へ動かす。新しい要素は `enter`（`'fade'`・`'pop'`・`null`） |
-| `fly(from, to, { content, delay, duration, hide, size, lift })` | 複製を飛ばす。`from`・`to` は位置か要素。`content` は要素か HTML |
+| `fly(from, to, { content, delay, duration, hide, size, lift, style })` | 複製を飛ばす。`from`・`to` は位置か要素。`content` は要素か HTML。複製は body の下に置くので、em で大きさが決まる部品は `style: { fontSize }` を渡す |
 | `fadeIn`・`popIn`・`pulse`・`flipCard(el, { onHalf })` | 現れる・はねて現れる・目立たせる・裏返す（半分で中身を替える） |
 | `track(animation, longest)`・`hold(base)` | 部品の外の動きを数える |
 | `whenIdle(fn)`・`idle()`・`afterIdle(fn, delay)`・`isIdle()` | 動き終わるのを待つ。`whenIdle`・`afterIdle` は取り消す関数を返す |
@@ -68,7 +68,7 @@ this.cancelCpu?.();
 
 ## ゲームに入れる手順
 
-1. `node packages/motion/scripts/sync.mjs <ゲーム>` で写し、`sw.js` の PRECACHE に `./js/motion/motion.js` を足す
+1. `node packages/motion/scripts/sync.mjs <ゲーム>` で写し、`sw.js` の PRECACHE に `js/motion/motion.js` を足す（CACHE の名前は変えない）
 2. タイトル画面の設定の並びに `<div id="motion-setting"></div>` を置き、`Motion.mountSpeedSetting(...)` で作る。プレイ中のメニュー（設定のダイアログ）があれば、そこにも置く
 3. 描き直す前後で、動いたものを動かす（駒の移動は FLIP、手札から場・山札から手札は fly、めくるものは flipCard）
 4. CPU の手番の `setTimeout` を `Motion.afterIdle` に替え、止める処理で取り消す

@@ -271,8 +271,9 @@ export function flipCard(el, { duration = 360, delay = 0, onHalf = null, axis = 
  * 複製を from から to へ飛ばす（山札から手札へ・手札から場へ など）
  * from・to：位置（rectOf の結果）か要素。content：複製する要素か HTML の文字列（省くと from の要素を複製する）
  * hide：飛んでいる間は隠す、行き先の要素。size：複製の大きさ（省くと from の大きさ）
+ * style：複製に足す style（em で大きさを決める部品の fontSize など。複製は body の下に置くため）
  */
-export function fly(from, to, { content = null, delay = 0, duration = 420, hide = null, size = null, lift = true, className = 'motion-flyer' } = {}) {
+export function fly(from, to, { content = null, delay = 0, duration = 420, hide = null, size = null, lift = true, className = 'motion-flyer', style = null } = {}) {
     if (!enabled()) return Promise.resolve();
     const fromRect = from instanceof Element ? rectOf(from) : from;
     const toRect = to instanceof Element ? rectOf(to) : to;
@@ -292,7 +293,7 @@ export function fly(from, to, { content = null, delay = 0, duration = 420, hide 
         position: 'fixed', margin: '0', zIndex: '1000', pointerEvents: 'none', boxSizing: 'border-box',
         left: `${fromRect.left + (fromRect.width - width) / 2}px`, top: `${fromRect.top + (fromRect.height - height) / 2}px`,
         width: `${width}px`, height: `${height}px`, visibility: 'visible'
-    });
+    }, style);
     document.body.appendChild(el);
     const dx = toRect.left + toRect.width / 2 - (fromRect.left + fromRect.width / 2);
     const dy = toRect.top + toRect.height / 2 - (fromRect.top + fromRect.height / 2);
