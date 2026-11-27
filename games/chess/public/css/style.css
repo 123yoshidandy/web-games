@@ -81,6 +81,10 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 }
 .segmented button[aria-checked="true"] { color: #2a1d05; background: var(--gold); }
 .segmented .piece { width: 24px; height: 24px; }
+.clock-setting { display: flex; align-items: center; gap: 8px; }
+.clock-caption { color: var(--muted); font-size: 13px; font-weight: 700; writing-mode: vertical-rl; letter-spacing: .1em; }
+.segmented.clocks { display: inline-grid; grid-template-columns: repeat(3, auto); }
+.segmented.clocks button { height: 30px; font-size: 14px; }
 
 /* ---- タイトル ---- */
 
@@ -121,6 +125,14 @@ button { font: inherit; color: inherit; -webkit-tap-highlight-color: transparent
 .side .cap { width: 18px; height: 18px; margin-left: -7px; }
 .side .lead { flex: none; color: var(--muted); font-size: 12px; font-weight: 800; }
 .side.active { background: rgba(217, 180, 90, .16); box-shadow: inset 0 0 0 2px var(--gold); }
+/* 持ち時間（帯の右端）。手番の時計は明るく、残り10秒で赤くする */
+.side .clock {
+    flex: none; margin-left: auto; min-width: 3.4em; padding: 1px 6px; border-radius: 6px; text-align: center;
+    color: var(--muted); background: rgba(0, 0, 0, .3); font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.side .clock.running { color: #2a1d05; background: var(--gold-light); }
+.side .clock.low { color: #fff; background: #c0392b; }
+.side .clock.paused { opacity: .55; }
 .side.active .name { color: var(--gold-light); }
 .side.thinking { animation: think 1.2s ease-in-out infinite; }
 .side.won { box-shadow: inset 0 0 0 2px var(--gold-light); background: rgba(217, 180, 90, .24); }
@@ -233,3 +245,10 @@ dialog h2:focus-visible { outline: none; }
 /* ヒント：おすすめの印 */
 .recommended { outline: 3px solid #fff8d6 !important; outline-offset: 1px; box-shadow: 0 0 0 5px rgba(255, 214, 102, .55), 0 0 14px 4px rgba(255, 214, 102, .75) !important; }
 .cell.recommended { outline: none !important; box-shadow: inset 0 0 0 4px #fff8d6, inset 0 0 16px 6px rgba(255, 214, 102, .9) !important; }
+
+/* オンラインのロビー（共通の画面）の設定は、持ち時間の6つを3つずつ2段に並べる（1段だと文字が縦に折れる） */
+.netplay-lobby .np-segment { flex-wrap: wrap; }
+.netplay-lobby .np-segment button { flex: 1 0 30%; white-space: nowrap; }
+
+/* 背の低い画面（スマホを横にしたとき）は、タイトルの絵を出さずに設定とボタンを収める */
+@media (max-height: 460px) { .title-art { display: none; } }

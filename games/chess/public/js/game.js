@@ -13,12 +13,19 @@
  * - 3回同一局面と 50手は、FIDE では申し立てで引き分けになる。画面では申し立てを待たず、その局面になったら自動で引き分けにする
  * - 引き分けの提案は、自分の番にだけできる（1手につき1回）。相手は受けるか断るかを答え、断られたら提案した人がそのまま指す
  * - 投了は、どちらの席もいつでもできる
+ *
+ * 持ち時間（options.clock。clock.js）
+ * - 時計が進むのは、操作を待っている席（引き分けの提案中は答える側）。操作のたびに、その席にかかった時間（ミリ秒）を記録に残す
+ *   フィッシャーの加算は指し手だけ（提案・答えには足さない）
+ * - 時間切れは記録の { type: 'timeout' }（端末からは送れない）。相手にメイトできる駒がない（キングだけか、キングと小駒1つ）なら引き分け
+ * - 時刻は持たない。手番が始まった時刻（turnStartedAt）は、コントローラーとサーバーが外から入れる
  */
 
 import {
     Position, START_FEN, WHITE, findMove, toSan, moveToUci, moveFrom, moveTo, movePromo, moveFlag,
-    FLAG_CASTLE, FLAG_EP, typeOf, LETTER, sqName, isSquareName
+    FLAG_CASTLE, FLAG_EP, typeOf, colorOf, onBoard, LETTER, sqName, isSquareName, KNIGHT, BISHOP, KING
 } from './rules.js';
+import { normalizeClock, createClockSides, limitOf, spend } from './clock.js';
 
 export const PLAYERS = 2;
 const MAX_LOGS = 500;
@@ -39,14 +46,52 @@ export const REASONS = {
     fifty: '50手ルール',
     material: '駒不足',
     resign: '投了',
-    agreement: '合意'
+    agreement: '合意',
+    timeout: '時間切れ',
+    timeoutDraw: '時間切れ（相手にメイトできる駒がない）'
 };
+
+// 持ち時間の選び方（タイトル画面とロビー。この順に並べる）。切れ負けと、フィッシャー（1手ごとに加算）
+// 名前は数字だけにしない（数字だけの名前は、オブジェクトの中で先に並んでしまう）
+export const CLOCK_PRESETS = {
+    none: { label: 'なし', clock: null },
+    '3m': { label: '3分', clock: { main: 180000 } },
+    '5m': { label: '5分', clock: { main: 300000 } },
+    '10m': { label: '10分', clock: { main: 600000 } },
+    '3m+2s': { label: '3分+2秒', clock: { main: 180000, increment: 2000 } },
+    '5m+5s': { label: '5分+5秒', clock: { main: 300000, increment: 5000 } }
+};
+export const clockOption = (key) => (Object.hasOwn(CLOCK_PRESETS, key) ? CLOCK_PRESETS[key].clock : null);
+
+// 色 color の駒だけでメイトできるか（キングだけか、キングと小駒1つならできない）
+function canMate(pos, color) {
+    let minors = 0;
+    for (let sq = 0; sq < 128; sq++) {
+        if (!onBoard(sq)) {
+            sq += 7;
+            continue;
+        }
+        const p = pos.board[sq];
+        if (!p || colorOf(p) !== color) continue;
+        const type = typeOf(p);
+        if (type === KING) continue;
+        if (type === KNIGHT || type === BISHOP) minors++;
+        else return true;
+        if (minors > 1) return true;
+    }
+    return false;
+}
 
 export default class Game {
     // players: [{ name, isCPU, cpuLevel }]（席0：白、席1：黒）。options.fen で途中の局面から始められる（テスト用）
+    // options.clock：持ち時間の設定（clock.js。なければ時計なし）
     constructor(players, options = {}) {
         if (players.length !== PLAYERS) throw new Error('2人で遊びます');
-        this.options = { ...options };
+        const { clock, ...rest } = options;
+        this.clockConfig = normalizeClock(clock);
+        this.options = this.clockConfig ? { ...rest, clock: { ...this.clockConfig } } : rest;
+        this.clock = this.clockConfig ? createClockSides(this.clockConfig) : null;
+        this.turnStartedAt = null;  // 手番が始まった時刻（コントローラーとサーバーが入れる。記録には入れない）
         this.players = players.map((p, id) => ({ id, name: String(p.name ?? `プレイヤー${id + 1}`), isCPU: !!p.isCPU, cpuLevel: p.cpuLevel ?? null }));
         this.startFen = options.fen ?? START_FEN;
         this.pos = new Position(this.startFen);
@@ -102,7 +147,57 @@ export default class Game {
         return !this.isOver() && this.drawOffer === null && seat === this.current && this.drawOfferPly[seat] !== this.ply;
     }
 
-    applyCommand(playerId, command) {
+    // ---- 持ち時間 ----
+
+    // 時計が進んでいる席（時計なし・終わったあとは null）
+    clockSeat() {
+        if (!this.clock || this.isOver()) return null;
+        return this.actors()[0] ?? null;
+    }
+
+    // 手番を始めてから、時間切れになるまでの時間（時計が進んでいなければ null）
+    clockLimit() {
+        const seat = this.clockSeat();
+        return seat === null ? null : limitOf(this.clockConfig, this.clock[seat]);
+    }
+
+    // 手番を始めて elapsed ミリ秒たったら、時間切れか
+    isFlagged(elapsed) {
+        const limit = this.clockLimit();
+        return limit !== null && elapsed >= limit;
+    }
+
+    // 時間切れで終える。seat は時計が進んでいる席
+    timeout(seat, elapsed) {
+        this.lastError = null;
+        if (seat !== this.clockSeat()) return this.fail('時間切れにできません');
+        const ms = Math.max(0, Math.round(elapsed) || 0);
+        if (ms < this.clockLimit()) return this.fail('まだ時間があります');
+        this.clock[seat] = { main: 0, periods: 0 };
+        this.drawOffer = null;
+        this.commands.push({ playerId: seat, command: { type: 'timeout' }, ms });
+        this.log(`${this.players[seat].name}の時間切れ`);
+        if (canMate(this.pos, 1 - seat)) this.finish(1 - seat, 'timeout');
+        else this.finish(null, 'timeoutDraw');
+        return true;
+    }
+
+    // 操作を受け付ける。elapsed：時計が進んでいる席が、この手番にかけた時間（ミリ秒。時計なしなら見ない）
+    // 時間を使い切っていたら断る（呼ぶ側が先に timeout で終える）
+    applyCommand(playerId, command, elapsed = 0) {
+        const seat = this.clockSeat();
+        const ms = Math.max(0, Math.round(elapsed) || 0);
+        if (seat !== null && ms >= this.clockLimit()) return this.fail('時間切れです');
+        const count = this.commands.length;
+        const ok = this.applyAction(playerId, command);
+        if (ok && this.clock && this.commands.length > count) {
+            this.commands.at(-1).ms = ms;
+            if (seat !== null) this.clock[seat] = spend(this.clockConfig, this.clock[seat], ms, { increment: command.type === 'move' }).side;
+        }
+        return ok;
+    }
+
+    applyAction(playerId, command) {
         this.lastError = null;
         if (this.isOver()) return this.fail('ゲームは終わっています');
         if (playerId !== 0 && playerId !== 1) return this.fail('席が正しくありません');
@@ -255,10 +350,12 @@ export default class Game {
         };
     }
 
+    // 記録から再現する。ms（かかった時間）のない古い記録は 0 として読む
     static replay(players, options, commands) {
         const game = new Game(players, options);
-        commands.forEach(({ playerId, command }, index) => {
-            if (!game.applyCommand(playerId, command)) throw new Error(`操作 ${index} を再現できませんでした: ${game.lastError}`);
+        commands.forEach(({ playerId, command, ms = 0 }, index) => {
+            const ok = command?.type === 'timeout' ? game.timeout(playerId, ms) : game.applyCommand(playerId, command, ms);
+            if (!ok) throw new Error(`操作 ${index} を再現できませんでした: ${game.lastError}`);
         });
         return game;
     }

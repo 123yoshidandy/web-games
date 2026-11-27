@@ -9,12 +9,17 @@
  * - つよい：局面 15万まで深く（ふつうの局面で7手ほど）
  * - とてもつよい：局面 60万まで深く（ふつうの局面で9手ほど）
  * 局面の上限は、スマホで1手が数秒以内に収まるように決めた（README に測った値を書く）
+ * 持ち時間があるときは、残りの時間から1手に使う時間を決め（clock.js の cpuBudget）、読みをその時間で打ち切る（時間切れにならない）
  */
 
 import { createRandom } from './random.js';
 import { createGameView } from './game-view.js';
 import { search, positionFrom, MATE } from './engine.js';
 import { moveToUci } from './rules.js';
+import { cpuBudget } from './clock.js';
+
+const DEFAULT_MAX_MS = 8000;
+const THINK_SHARE = 0.7;   // 1手の時間のうち、読みに使う割合（残りは手を見せる間と、やり取りの分）
 
 export const CPU_LEVELS = ['easy', 'normal', 'strong', 'expert'];
 export const LEVELS = {
@@ -37,10 +42,23 @@ export const isCpuTurn = (game) => {
     return seat !== undefined && !!game.players[seat]?.isCPU;
 };
 
+// 持ち時間があるとき、CPU（手番の席）がこの1手に使ってよい時間。時計なしは null
+export function clockBudget(view) {
+    const clock = view.clock;
+    if (!clock || clock.running === null || clock.running === undefined) return null;
+    return cpuBudget(clock.config, clock.sides[clock.running], { moves: 30 });
+}
+
+// 読みを打ち切る時間
+const thinkMs = (view, base = DEFAULT_MAX_MS) => {
+    const budget = clockBudget(view);
+    return budget === null ? base : Math.max(10, Math.min(base, Math.floor(budget * THINK_SHARE)));
+};
+
 export function think(view, level = 'normal') {
     const opt = LEVELS[level] ?? LEVELS.normal;
     const { pos, keys } = positionFrom(view.startFen, view.uci);
-    return search(pos, opt, keys);
+    return search(pos, { ...opt, maxMs: thinkMs(view) }, keys);
 }
 
 export function chooseMove(view, level = 'normal') {
@@ -69,7 +87,7 @@ export function chooseMove(view, level = 'normal') {
 export function wantsDraw(view, level = 'normal') {
     const { pos, keys } = positionFrom(view.startFen, view.uci);
     // 手番は提案した側なので、点を裏返して CPU から見た点にする
-    const score = -search(pos, DRAW_THINK, keys).score;
+    const score = -search(pos, { ...DRAW_THINK, maxMs: thinkMs(view) }, keys).score;
     if (level === 'easy') return score < 50;
     if (score <= -150) return true;
     return view.ply >= 60 && Math.abs(score) <= 30;
@@ -89,18 +107,23 @@ export function suggest(view) {
 }
 
 // CPU の番なら1手打つ（引き分けの提案への答えも含む）。打てたら true
-export function runCpuStep(game) {
+// elapsed：持ち時間があるとき、この手番に CPU がかけた時間（考える前までの分。考えた時間は足して記録する）
+// 時間を使い切っていたら、時間切れで終える
+export function runCpuStep(game, { elapsed = 0 } = {}) {
     if (!isCpuTurn(game)) return false;
     const seat = game.actors()[0];
     const view = createGameView(game, seat);
-    return applyDecision(game, seat, view, decide(view, game.players[seat].cpuLevel ?? 'normal'));
+    const started = Date.now();
+    const command = decide(view, game.players[seat].cpuLevel ?? 'normal');
+    return applyDecision(game, seat, view, command, elapsed + (Date.now() - started));
 }
 
 // 決めた操作を送る。断られたら、いちばん単純な答え（最初の合法手か、提案を断る）で必ず進める
-export function applyDecision(game, seat, view, command) {
-    if (command && game.applyCommand(seat, command)) return true;
-    if (game.drawOffer !== null) return game.applyCommand(seat, { type: 'declineDraw' });
+export function applyDecision(game, seat, view, command, elapsed = 0) {
+    if (game.isFlagged(elapsed)) return game.timeout(seat, elapsed);
+    if (command && game.applyCommand(seat, command, elapsed)) return true;
+    if (game.drawOffer !== null) return game.applyCommand(seat, { type: 'declineDraw' }, elapsed);
     const first = view.moves[0];
     if (!first) return false;
-    return game.applyCommand(seat, first.promo ? { type: 'move', from: first.from, to: first.to, promo: first.promo } : { type: 'move', from: first.from, to: first.to });
+    return game.applyCommand(seat, first.promo ? { type: 'move', from: first.from, to: first.to, promo: first.promo } : { type: 'move', from: first.from, to: first.to }, elapsed);
 }

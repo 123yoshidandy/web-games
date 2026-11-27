@@ -4,11 +4,14 @@
  * - 自分の駒を押すと、動ける升が光る。光る升を押すと動かす。ポーンが最後の段に着くときは、成る駒を4つから選ぶ
  * - 直前の手の升に色を付け、チェックされたキングを赤く光らせる。動いた駒は元の升から滑らせて見せる（CPU の手も同じ）
  * - 上に相手、下に自分の帯を置き、取った駒と駒得を出す。下に棋譜（代数式表記）を出す
+ * - 持ち時間があるときは、帯の右に残りの時間を出す。時計の数字だけを短い間隔で描き直す（残り10秒で色を変え、知らせの音を1回鳴らす）
+ *   CPU 戦では、アプリが隠れている間は時計を止める。オンラインでは止めず、相手の時計が0になったらサーバーに確かめてもらう（ping）
  */
 
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { CPU_LEVELS, decide, suggest } from './cpu-player.js';
-import { REASONS } from './game.js';
+import { REASONS, CLOCK_PRESETS } from './game.js';
+import { reading, isLow, formatClock } from './clock.js';
 import { symbolsSvg, pieceSvg, PIECE_NAME, COLOR_NAME } from './art.js';
 import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
@@ -19,6 +22,9 @@ const RESULT_DELAY_MS = 900;
 const LEVEL_NAMES = { easy: 'やさしい', normal: 'ふつう', strong: 'つよい', expert: 'とてもつよい' };
 const PIECE_VALUE = { q: 9, r: 5, b: 3, n: 3, p: 1 };
 const FILES = 'abcdefgh';
+const CLOCK_TICK_MS = 100;
+const FLAG_PING_MS = 1000;   // オンラインで時計が0になったあと、サーバーに時間切れを確かめてもらう間隔
+const CLOCK_OPTIONS = Object.entries(CLOCK_PRESETS).map(([value, preset]) => ({ value, label: preset.label }));
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
@@ -29,13 +35,14 @@ const nameOf = (index) => FILES[index % 8] + (8 - Math.floor(index / 8));
 const colorOfCode = (code) => (code === code.toUpperCase() ? 0 : 1);
 
 function loadSettings() {
-    const defaults = { mode: 'cpu', level: 'normal', color: 'w' };
+    const defaults = { mode: 'cpu', level: 'normal', color: 'w', clock: 'none' };
     try {
         const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}');
         return {
             mode: ['cpu', 'two'].includes(saved.mode) ? saved.mode : defaults.mode,
             level: CPU_LEVELS.includes(saved.level) ? saved.level : defaults.level,
-            color: ['w', 'b'].includes(saved.color) ? saved.color : defaults.color
+            color: ['w', 'b'].includes(saved.color) ? saved.color : defaults.color,
+            clock: Object.hasOwn(CLOCK_PRESETS, saved.clock) ? saved.clock : defaults.clock
         };
     } catch {
         return defaults;
@@ -108,6 +115,9 @@ export default class UI {
         this.resultTimer = null;
         this.resultShown = false;
         this.decider = createWorkerDecider();
+        this.clockTimer = null;
+        this.lowWarned = null;    // 残り10秒の音を鳴らした手番（同じ手番では1回だけ）
+        this.lastFlagPing = 0;
         $('#symbols').innerHTML = symbolsSvg();
         this.bindStatic();
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
@@ -118,7 +128,7 @@ export default class UI {
             cpuStepDelayMs: 600,
             minPlayers: 2,
             maxPlayers: 2,
-            settings: [],
+            settings: [{ key: 'clock', label: '持ち時間', options: CLOCK_OPTIONS }],
             onStart: (controller) => this.begin(controller),
             onUpdate: () => this.render(),
             onError: (message) => {
@@ -129,6 +139,11 @@ export default class UI {
         });
         this.renderTitleArt();
         this.renderHelp();
+        // アプリが隠れている間は、CPU 戦の時計を止める（オンラインのコントローラーの pause・resume は何もしない）
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) this.controller?.pause?.();
+            else this.controller?.resume?.();
+        });
     }
 
     // ---- 画面の切り替え ----
@@ -177,20 +192,26 @@ export default class UI {
         this.lastSeq = this.controller.getView().events.at(-1)?.seq ?? 0;
         this.render();
         if (!controller.isOnline) controller.scheduleCpu();
+        if (document.hidden) controller.pause?.();
+        clearInterval(this.clockTimer);
+        this.clockTimer = setInterval(() => this.updateClocks(), CLOCK_TICK_MS);
     }
 
     newGame() {
         const { mode, level, color } = this.settings;
+        const clock = CLOCK_PRESETS[this.settings.clock]?.clock ?? null;
         const players = mode === 'two'
             ? [{ name: '白', isCPU: false }, { name: '黒', isCPU: false }]
             : [{ name: 'あなた', isCPU: false }, { name: 'CPU', isCPU: true, cpuLevel: level }];
         if (mode === 'cpu' && color === 'b') players.reverse();
-        this.startGame({ players, options: {} });
+        this.startGame({ players, options: clock ? { clock } : {} });
     }
 
     stopGame() {
         this.controller?.stop();
         this.controller = null;
+        clearInterval(this.clockTimer);
+        this.clockTimer = null;
         clearTimeout(this.resultTimer);
         this.resultTimer = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
@@ -207,6 +228,7 @@ export default class UI {
         pick('#mode', 'mode');
         pick('#cpu-level', 'level');
         pick('#color', 'color');
+        pick('#clock', 'clock');
         $('#start').addEventListener('click', () => this.newGame());
         $('#online-button').addEventListener('click', () => this.online.open());
         $('#resume').addEventListener('click', () => {
@@ -351,11 +373,15 @@ export default class UI {
     // ---- タイトル・遊び方 ----
 
     renderSetup() {
-        const { mode, level, color } = this.settings;
+        const { mode, level, color, clock } = this.settings;
+        if (!$('#clock').children.length) {
+            $('#clock').innerHTML = CLOCK_OPTIONS.map(o => `<button type="button" role="radio" data-value="${o.value}">${o.label}</button>`).join('');
+        }
         const mark = (selector, value) => document.querySelectorAll(`${selector} button`).forEach(b => b.setAttribute('aria-checked', String(b.dataset.value === String(value))));
         mark('#mode', mode);
         mark('#cpu-level', level);
         mark('#color', color);
+        mark('#clock', clock);
         document.querySelectorAll('.cpu-only').forEach(el => el.classList.toggle('off', mode !== 'cpu'));
     }
 
@@ -392,6 +418,9 @@ export default class UI {
             <p>ほかに、同じ局面が3回現れたとき、50手ずつポーンを動かさず駒も取らなかったとき、どちらもメイトできない駒しか残っていないとき（キング同士など）、引き分けの提案を受けたときも引き分けです。投了するとその場で負けです。</p>
             <h3>操作</h3>
             <p>自分の駒を押すと動ける升が光ります。光る升を押すと動かします。上のボタンは左から、ホーム・盤の向きを変える・待った（CPU 戦では自分の手と CPU の手をまとめて戻す）・引き分けの提案・投了・遊び方です。電球のボタンを押すと、おすすめの手の駒を選び、動かす先の升を光らせます。</p>
+            <h3>持ち時間</h3>
+            <p>タイトル画面（オンラインはロビー）で選べます。<strong>切れ負け</strong>（3分・5分・10分）は、持ち時間を使い切ると負けです。<strong>3分+2秒</strong>・<strong>5分+5秒</strong>は、1手指すたびに2秒・5秒が足されます（フィッシャー方式）。</p>
+            <p>時計は、手番の人（引き分けの提案中は答える人）の分が減ります。残り10秒で時計が赤くなり、音で知らせます。時間切れでも、相手の駒がキングだけ（かキングと小駒1つ）でメイトできないときは引き分けです。CPU 戦では、アプリを閉じている間は時計が止まります（オンラインでは止まりません）。</p>
             <h3>CPU の強さ</h3>
             <p>やさしい・ふつう・つよい・とてもつよい の4つ。強いほど先の手まで読みます。引き分けの提案は、CPU が形勢を読んで受けるか決めます。</p>`;
     }
@@ -454,13 +483,56 @@ export default class UI {
                 .map(c => pieceSvg(seat === 0 ? c : c.toUpperCase(), 'cap')).join('');
             const lead = material[seat] - material[1 - seat];
             const king = pieceSvg(seat === 0 ? 'K' : 'k', 'who');
+            const clock = view.clock ? `<span class="clock" data-clock-seat="${seat}"></span>` : '';
             return `<div class="side ${active ? 'active' : ''} ${thinking ? 'thinking' : ''} ${won ? 'won' : ''}" data-seat="${seat}">
                 ${king}<span class="name">${escapeHtml(this.seatLabel(view, seat))}</span>
-                <span class="caps">${caps}</span>${lead > 0 ? `<span class="lead">+${lead}</span>` : ''}</div>`;
+                <span class="caps">${caps}</span>${lead > 0 ? `<span class="lead">+${lead}</span>` : ''}${clock}</div>`;
         };
         const bottom = this.bottomSeat();
         $('#side-top').innerHTML = side(1 - bottom);
         $('#side-bottom').innerHTML = side(bottom);
+        this.updateClocks();
+    }
+
+    // ---- 持ち時間 ----
+
+    // 時計の今の時刻（オンラインはサーバーの時刻に合わせる）
+    clockNow() {
+        const c = this.controller;
+        if (!c) return Date.now();
+        return c.isOnline ? c.net.serverNow() : c.clockNow();
+    }
+
+    // 時計の数字だけを描き直す。手番の時計は、手番が始まった時刻からの経過を引いて出す
+    updateClocks() {
+        const v = this.view;
+        if (!v?.clock || !this.controller) return;
+        const { config, sides, running, startedAt } = v.clock;
+        const elapsed = running !== null && startedAt !== null ? Math.max(0, this.clockNow() - startedAt) : 0;
+        let runningRead = null;
+        document.querySelectorAll('[data-clock-seat]').forEach(el => {
+            const seat = Number(el.dataset.clockSeat);
+            const read = reading(config, sides[seat], seat === running ? elapsed : 0);
+            if (seat === running) runningRead = read;
+            const text = read.byoyomi ? `${formatClock(read.shown)}${read.periods > 1 ? `×${read.periods}` : ''}` : formatClock(read.shown);
+            if (el.textContent !== text) el.textContent = text;
+            el.classList.toggle('running', seat === running && !v.over);
+            el.classList.toggle('low', !v.over && isLow(read) && (seat === running || read.total === 0));
+            el.classList.toggle('paused', seat === running && Boolean(v.clockPaused));
+        });
+        if (running === null || v.over || !runningRead) return;
+        // 自分の時計（2人で遊ぶときは手番の人の時計）が残り10秒になったら、手番ごとに1回知らせる
+        const mine = v.twoPlayers || running === v.you;
+        const key = `${v.ply}:${running}:${v.clock.startedAt}`;
+        if (mine && isLow(runningRead) && runningRead.total > 0 && this.lowWarned !== key) {
+            this.lowWarned = key;
+            music.play('notify');
+        }
+        // オンラインで時計が0になったら、サーバーに時間切れを確かめてもらう（相手が操作しないときも終わるように）
+        if (this.controller.isOnline && runningRead.total === 0 && Date.now() - this.lastFlagPing >= FLAG_PING_MS) {
+            this.lastFlagPing = Date.now();
+            this.controller.net.ping();
+        }
     }
 
     // 画面の上から i 段目・左から j 列目の升の名前

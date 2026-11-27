@@ -3,6 +3,16 @@
  * チェスに隠す情報はない。オンライン対戦では、このビューをそのまま各端末に送る
  */
 
+export function clockView(game) {
+    if (!game.clock) return null;
+    return {
+        config: { ...game.clockConfig },
+        sides: game.clock.map(side => ({ ...side })),
+        running: game.clockSeat(),
+        startedAt: game.turnStartedAt ?? null
+    };
+}
+
 export function createGameView(game, seat, { since = 0 } = {}) {
     const over = game.isOver();
     const hasSeat = seat !== null && seat !== undefined;
@@ -30,6 +40,8 @@ export function createGameView(game, seat, { since = 0 } = {}) {
         lastMove: game.history.length ? { ...game.history.at(-1) } : null,
         captured: game.capturedPieces(),
         drawOffer: game.drawOffer,
+        // 持ち時間（時計なしは null）。startedAt は手番が始まった時刻（ローカルは端末の時刻、オンラインはサーバーの時刻）
+        clock: clockView(game),
         canOfferDraw: hasSeat && game.canOfferDraw(seat),
         halfmove: game.pos.halfmove,
         result: game.result ? { ...game.result } : null,
