@@ -7,6 +7,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, cpuActors, PROFILES } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 const CPU_BID_DELAY_MS = [750, 1150];  // 競りで CPU が選ぶまでの間（毎回少しずつ違う）
 const CPU_SELL_DELAY_MS = [350, 800];  // 売りで CPU が出すまでの間（全員が同時に選ぶので短め）
@@ -38,7 +39,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.save();
     }
 
@@ -74,12 +75,12 @@ export default class LocalGameController {
 
     // 手番の CPU を、間を置いて動かす。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (cpuActors(this.game).length === 0) return;
         const bidding = this.game.phase === 'bid';
         const [min, max] = bidding ? CPU_BID_DELAY_MS : CPU_SELL_DELAY_MS;
         const delay = min + Math.random() * (max - min) + (bidding ? Math.min(400, this.game.high * CPU_PER_BID_MS) : 0);
-        this.cpuTimer = setTimeout(() => {
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 const seat = cpuActors(this.game)[0];
                 if (seat !== undefined) runCpuStep(this.game, seat, PROFILES[this.level]);
@@ -104,6 +105,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

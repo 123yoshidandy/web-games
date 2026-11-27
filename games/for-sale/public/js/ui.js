@@ -15,6 +15,7 @@ import { getServerUrl } from './online-config.js';
 import LocalGameController, { loadSavedGame, clearSavedGame } from './game-controller.js';
 import { symbolsSvg, coinIcon, propertyHtml, checkHtml, propTagHtml, checkTagHtml, money } from './art.js';
 import { fly, rectOf, reducedMotion } from './animator.js';
+import * as Motion from './motion/motion.js';
 
 const GAME = 'for-sale';
 const SETTINGS_KEY = 'for-sale.settings';
@@ -302,8 +303,10 @@ export default class UI {
         const event = this.queue.shift();
         const delay = this.step(event);
         if (delay === null) return;
-        if (delay === 0) return this.pump();
-        this.timer = setTimeout(() => this.pump(), delay);
+        const wait = Motion.ms(delay);
+        if (wait === 0) return this.pump();
+        Motion.hold(delay);
+        this.timer = setTimeout(() => this.pump(), wait);
     }
 
     fromView(view) {
@@ -373,7 +376,7 @@ export default class UI {
         case 'end':
             this.display = next;
             this.render();
-            this.timer = setTimeout(() => { this.timer = null; this.showResult(); }, 600);
+            this.timer = setTimeout(() => { this.timer = null; Motion.whenIdle(() => { if (this.controller) this.showResult(); }); }, Motion.ms(600));
             return null;
         default:
             return 0;
@@ -447,13 +450,13 @@ export default class UI {
         if (reducedMotion()) return;
         document.querySelectorAll('#table .slot > .card').forEach((el, i) => {
             el.animate([{ transform: 'translateY(-24px) scale(.9)', opacity: 0 }, { transform: 'none', opacity: 1 }],
-                { duration: 300, delay: i * 70, easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
+                { duration: Motion.ms(300), delay: Motion.ms(i * 70), easing: 'cubic-bezier(.2,.8,.3,1)', fill: 'backwards' });
         });
     }
 
     bump(el, delay = 0) {
         if (!el || reducedMotion()) return;
-        el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)', offset: 0.4 }, { transform: 'scale(1)' }], { duration: 320, delay: delay + 380 });
+        el.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.05)', offset: 0.4 }, { transform: 'scale(1)' }], { duration: Motion.ms(320), delay: Motion.ms(delay + 380) });
     }
 
     // 再生が終わったあと：入札額を範囲に合わせる。上げられないなら自動で降りる。終わっていれば結果を出す
