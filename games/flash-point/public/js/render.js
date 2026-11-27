@@ -16,10 +16,10 @@ const y0 = (cell) => rowOf(cell) * 10;
 export const FLAME = 'M5 1.2C6.9 3.2 8.3 4.6 8.3 6.6A3.3 3.3 0 0 1 1.7 6.6C1.7 5.1 2.7 3.9 3.4 3.1C3.6 4.3 4.2 5 4.9 5.2C4.4 3.9 4.4 2.6 5 1.2Z';
 const FLAME_IN = 'M5 4.4C6 5.4 6.6 6.1 6.6 7A1.6 1.6 0 0 1 3.4 7C3.4 6.2 4 5.6 4.4 5.1C4.5 5.6 4.8 5.9 5.1 6C4.9 5.4 4.8 4.9 5 4.4Z';
 
-const fireSvg = (cell) => `<g transform="translate(${x0(cell)} ${y0(cell)})" class="fire"><rect width="10" height="10" fill="#f0633a" opacity=".32"/>`
-    + `<path d="${FLAME}" fill="#e8492b"/><path d="${FLAME_IN}" fill="#ffc94a"/></g>`;
-const smokeSvg = (cell) => `<g transform="translate(${x0(cell)} ${y0(cell)})" class="smoke"><rect width="10" height="10" fill="#6d6a68" opacity=".22"/>`
-    + '<circle cx="3.6" cy="6" r="2.2" fill="#8d8a87"/><circle cx="6.2" cy="5.2" r="2.6" fill="#a3a09c"/><circle cx="5" cy="3.4" r="1.8" fill="#b9b6b2"/></g>';
+const fireSvg = (cell) => `<g class="fx" data-fx="${cell}"><g transform="translate(${x0(cell)} ${y0(cell)})" class="fire"><rect width="10" height="10" fill="#f0633a" opacity=".32"/>`
+    + `<path d="${FLAME}" fill="#e8492b"/><path d="${FLAME_IN}" fill="#ffc94a"/></g></g>`;
+const smokeSvg = (cell) => `<g class="fx" data-fx="${cell}"><g transform="translate(${x0(cell)} ${y0(cell)})" class="smoke"><rect width="10" height="10" fill="#6d6a68" opacity=".22"/>`
+    + '<circle cx="3.6" cy="6" r="2.2" fill="#8d8a87"/><circle cx="6.2" cy="5.2" r="2.6" fill="#a3a09c"/><circle cx="5" cy="3.4" r="1.8" fill="#b9b6b2"/></g></g>';
 
 // 要救助者（人の形）。treated は手当ての印
 const personPath = (cx, cy, s) => `<circle cx="${cx}" cy="${cy - s * 0.9}" r="${s * 0.45}" fill="#fff"/>`
@@ -28,18 +28,18 @@ const personPath = (cx, cy, s) => `<circle cx="${cx}" cy="${cy - s * 0.9}" r="${
 export function poiSvg(poi, cx, cy, size = 4.6) {
     const h = size / 2;
     if (!poi.revealed) {
-        return `<g class="poi"><rect x="${cx - h}" y="${cy - h}" width="${size}" height="${size}" rx="1" fill="#2f5fa7" stroke="#fff" stroke-width=".4"/>`
+        return `<g class="poi" data-poi="${poi.id}"><rect x="${cx - h}" y="${cy - h}" width="${size}" height="${size}" rx="1" fill="#2f5fa7" stroke="#fff" stroke-width=".4"/>`
             + `<text x="${cx}" y="${cy + 1.2}" text-anchor="middle" font-size="3.4" font-weight="800" fill="#fff">?</text></g>`;
     }
-    return `<g class="victim"><rect x="${cx - h}" y="${cy - h}" width="${size}" height="${size}" rx="1" fill="#1d4f91" stroke="#fff" stroke-width=".4"/>`
+    return `<g class="victim" data-poi="${poi.id}"><rect x="${cx - h}" y="${cy - h}" width="${size}" height="${size}" rx="1" fill="#1d4f91" stroke="#fff" stroke-width=".4"/>`
         + personPath(cx, cy + 0.2, size * 0.36)
         + (poi.treated ? `<g transform="translate(${cx + h - 1} ${cy - h + 1})"><circle r="1.25" fill="#2fbf71" stroke="#fff" stroke-width=".3"/><path d="M-.6 0H.6M0 -.6V.6" stroke="#fff" stroke-width=".45"/></g>` : '')
         + '</g>';
 }
 
-export function hazmatSvg(cx, cy, size = 4.2) {
+export function hazmatSvg(cx, cy, size = 4.2, id = '') {
     const h = size / 2;
-    return `<g class="hazmat"><path d="M${cx} ${cy - h}L${cx + h} ${cy}L${cx} ${cy + h}L${cx - h} ${cy}Z" fill="#f5c400" stroke="#2b2420" stroke-width=".4"/>`
+    return `<g class="hazmat" data-hazmat="${id}"><path d="M${cx} ${cy - h}L${cx + h} ${cy}L${cx} ${cy + h}L${cx - h} ${cy}Z" fill="#f5c400" stroke="#2b2420" stroke-width=".4"/>`
         + `<text x="${cx}" y="${cy + 1}" text-anchor="middle" font-size="2.6" font-weight="800" fill="#2b2420">!</text></g>`;
 }
 
@@ -107,6 +107,17 @@ function vehicleSvg(kind, side) {
 
 const hotspotSvg = (cell) => `<g class="hotspot" transform="translate(${x0(cell)} ${y0(cell)})"><circle cx="1.8" cy="8.2" r="1.25" fill="none" stroke="#d8402b" stroke-width=".55"/><circle cx="1.8" cy="8.2" r=".45" fill="#d8402b"/></g>`;
 
+// 消防士の位置（盤面の座標）：席 → [x, y]。同じマスの消防士は横に並べる
+export function ffPositions(view) {
+    const pos = new Map();
+    for (let cell = 0; cell < CELL_COUNT; cell++) {
+        view.players.filter(p => p.cell === cell).forEach((p, i) => {
+            pos.set(p.id, [x0(cell) + 2.2 + (i % 3) * 2.8, y0(cell) + 7.6 - Math.floor(i / 3) * 3.2]);
+        });
+    }
+    return pos;
+}
+
 // 盤面全体。opts：{ reach（光らせるマスの Set）, selected, hint（おすすめのマス）, roll（最後の延焼のマス）, flash（今回変わったマスの Set）}
 export function boardSvg(view, opts = {}) {
     const parts = [`<svg class="board-svg" viewBox="0 0 ${COLS * 10} ${ROWS * 10}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="家の盤面">`];
@@ -141,15 +152,15 @@ export function boardSvg(view, opts = {}) {
         const pois = view.pois.filter(x => x.cell === cell && !carried.has(`p${x.id}`));
         const hz = view.hazmats.filter(h => h.cell === cell && !carried.has(`h${h.id}`));
         pois.forEach((poi, i) => parts.push(poiSvg(poi, x0(cell) + 6.6 - i * 1.4, y0(cell) + 3.3 + i * 0.6)));
-        hz.forEach((h, i) => parts.push(hazmatSvg(x0(cell) + (pois.length ? 2.6 : 5) + i, y0(cell) + 3.2)));
+        hz.forEach((h, i) => parts.push(hazmatSvg(x0(cell) + (pois.length ? 2.6 : 5) + i, y0(cell) + 3.2, 4.2, h.id)));
     }
-    // 消防士（同じマスに何人もいれば並べる）
+    // 消防士（同じマスに何人もいれば並べる）。動かすときは外側の g に CSS の transform をかける
+    const ffSpots = ffPositions(view);
     for (let cell = 0; cell < CELL_COUNT; cell++) {
         const here = view.players.filter(p => p.cell === cell);
-        here.forEach((p, i) => {
-            const row = Math.floor(i / 3);
-            const cx = x0(cell) + 2.2 + (i % 3) * 2.8;
-            const cy = y0(cell) + 7.6 - row * 3.2;
+        here.forEach((p) => {
+            const [cx, cy] = ffSpots.get(p.id);
+            parts.push(`<g class="ffslot" data-ff="${p.id}">`);
             const active = p.id === view.current && view.phase === 'turn';
             if (active) parts.push(`<circle class="ff-active" cx="${cx}" cy="${cy}" r="2.7" fill="none" stroke="#fff" stroke-width=".5"/>`);
             parts.push(firefighterSvg(PLAYER_COLORS[p.id % PLAYER_COLORS.length], cx, cy, String(p.id + 1)));
@@ -157,6 +168,7 @@ export function boardSvg(view, opts = {}) {
                 const it = p.carry[0] === 'p' ? view.pois.find(x => `p${x.id}` === p.carry) : null;
                 parts.push(it ? poiSvg(it, cx + 1.6, cy - 2.2, 2.8) : hazmatSvg(cx + 1.6, cy - 2.2, 2.6));
             }
+            parts.push('</g>');
         });
     }
     // 光（動けるマスなど）とタップの受け口

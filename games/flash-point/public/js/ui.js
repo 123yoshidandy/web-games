@@ -10,9 +10,10 @@ import {
     NEIGHBORS, OUTSIDE_CELLS, isInside, edgeKey, rowOf, colOf, roomOf, ROOM_NAMES, ROLES, ROLE, roleOf, LEVELS, MODES,
     SIDE_NAMES, WIN_RESCUED, LOSE_LOST, DAMAGE_LIMIT, sideDistance, ENGINE_QUADRANT, QUADRANTS
 } from './board.js';
-import { boardSvg, titleArt, PLAYER_COLORS } from './render.js';
+import { boardSvg, titleArt, ffPositions, PLAYER_COLORS } from './render.js';
 import { HELP_HTML } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult } from './netplay/user-stats.js';
 import { getServerUrl, GAME } from './online-config.js';
@@ -84,6 +85,8 @@ function saveSettings(settings) {
 
 const pawn = (seat) => `<span class="pawn" style="--pc:${PLAYER_COLORS[seat % PLAYER_COLORS.length]}">${seat + 1}</span>`;
 
+const SLIDE_MS = 380; // 消防士が1マス進む長さ（普通の速さ）
+
 export default class UI {
     constructor() {
         this.settings = loadSettings();
@@ -133,6 +136,7 @@ export default class UI {
     // ---- タイトル ----
 
     bindTitle() {
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         const seg = (id, key, parse = (v) => v) => $(id).addEventListener('click', event => {
             const button = event.target.closest('button');
             if (!button) return;
@@ -220,6 +224,7 @@ export default class UI {
         $('screen-title').hidden = true;
         $('screen-game').hidden = false;
         this.view = null;
+        this.cancelResult?.();
         this.lastEventSeq = Infinity;
         this.update();
     }
@@ -295,6 +300,7 @@ export default class UI {
         }
         this.collectFlash(v);
         this.render();
+        if (prev) this.animateChanges(prev, v);
         this.playUpdateSound(prev);
         // 専門職を選ぶ番はシートで聞く
         if (v.phase === 'role' && this.can(v.current) && !v.result) this.openRoles('role');
@@ -302,7 +308,43 @@ export default class UI {
         if (v.result && !this.resultShown) {
             this.resultShown = true;
             this.recordLocalResult(v);
-            setTimeout(() => this.openResult(), 700);
+            this.cancelResult = Motion.afterIdle(() => this.openResult(), 700);
+        }
+    }
+
+    // 描き直したあと：前のビューとの差を動かす（消防士は滑り、新しい火・煙・要救助者・危険物は弾み、数の欄は目立つ）
+    animateChanges(prev, v) {
+        if (!Motion.enabled() || prev.turnNo === undefined) return;
+        const board = $('board');
+        const before = ffPositions(prev);
+        const after = ffPositions(v);
+        for (const p of v.players) {
+            const [ox, oy] = before.get(p.id) ?? [];
+            const [nx, ny] = after.get(p.id) ?? [];
+            if (ox === undefined || nx === undefined || (Math.abs(ox - nx) < 0.3 && Math.abs(oy - ny) < 0.3)) continue;
+            const length = Motion.ms(SLIDE_MS);
+            const animation = board.querySelector(`.ffslot[data-ff="${p.id}"]`)?.animate([
+                { transform: `translate(${ox - nx}px, ${oy - ny}px)` },
+                { transform: `translate(${(ox - nx) / 2}px, ${(oy - ny) / 2 - 2}px)`, offset: 0.5 },
+                { transform: 'translate(0, 0)' }
+            ], { duration: length, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+            if (animation) Motion.track(animation, length);
+        }
+        v.fire.forEach((f, cell) => {
+            if (f > (prev.fire[cell] ?? 0)) Motion.popIn(board.querySelector(`.fx[data-fx="${cell}"]`), { duration: 360, delay: 100 });
+        });
+        const loose = (selector) => [...board.querySelectorAll(selector)].find(el => !el.closest('.ffslot'));
+        for (const poi of v.pois) {
+            const old = prev.pois.find(x => x.id === poi.id);
+            const el = loose(`[data-poi="${poi.id}"]`);
+            if (!old) Motion.popIn(el, { duration: 360, delay: 100 });
+            else if (old.revealed !== poi.revealed || old.treated !== poi.treated) Motion.pulse(el, { duration: 380, scale: 1.4 });
+        }
+        for (const h of v.hazmats) {
+            if (!prev.hazmats.some(x => x.id === h.id)) Motion.popIn(loose(`[data-hazmat="${h.id}"]`), { duration: 360, delay: 100 });
+        }
+        for (const [id, a, b] of [['stat-rescued', prev.rescued, v.rescued], ['stat-lost', prev.lost, v.lost], ['stat-damage', prev.damage, v.damage]]) {
+            if (a !== b) Motion.pulse($(id), { duration: 380, scale: 1.3 });
         }
     }
 

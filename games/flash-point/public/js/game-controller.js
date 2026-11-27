@@ -11,6 +11,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { suggest, runCpuStep, isCpuTurn } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_STEP_DELAY_MS = 600;
 export const AUTO_END_DELAY_MS = 900;
@@ -42,8 +43,8 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = Math.max(0, this.game.players.findIndex(p => !p.isCPU));
-        this.cpuTimer = null;
-        this.autoTimer = null;
+        this.cancelCpu = null;
+        this.cancelAuto = null;
         this.save();
     }
 
@@ -128,9 +129,10 @@ export default class LocalGameController {
 
     // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (!isCpuTurn(this.game)) return;
-        this.cpuTimer = setTimeout(() => {
+        // 盤やカードの動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 runCpuStep(this.game);
             } catch (error) {
@@ -159,9 +161,9 @@ export default class LocalGameController {
     }
 
     scheduleAuto() {
-        clearTimeout(this.autoTimer);
+        this.cancelAuto?.();
         if (!this.autoCommand()) return;
-        this.autoTimer = setTimeout(() => {
+        this.cancelAuto = Motion.afterIdle(() => {
             const command = this.autoCommand();
             if (command) this.send(this.game.current, command);
         }, AUTO_END_DELAY_MS);
@@ -175,7 +177,7 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
-        clearTimeout(this.autoTimer);
+        this.cancelCpu?.();
+        this.cancelAuto?.();
     }
 }
