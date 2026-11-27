@@ -14,6 +14,7 @@ import { actionIcon, chipIcon, swordIcon, titleArt, describeEvent, ACTION_BONUS,
 import { createSeed } from './random.js';
 import { helpMarkup } from './help.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 
 const GAME = 'race-for-the-galaxy';
@@ -27,6 +28,10 @@ const CPU_NAMES = ['ノヴァ', 'ベガ', 'リゲル'];
 // 確かめるときだけ、URL の ?cpuDelay=ミリ秒 で CPU の間隔を縮められる
 const CPU_DELAY = Number(new URLSearchParams(location.search).get('cpuDelay')) || undefined;
 const REVEAL_MS = 2600;
+// 動き（普通の速さでの長さ。部品が速さの設定を掛ける）
+const FLY_MS = 420;      // 手札から場へ
+const POP_MS = 280;      // 手札に新しいカードが入る
+const STAGGER_MS = 70;   // 何枚も動くときの間
 
 const store = {
     load(key) { try { return JSON.parse(localStorage.getItem(key)); } catch { return null; } },
@@ -44,6 +49,7 @@ let ui = freshUi();
 let seenSeq = 0;
 let resultShown = false;
 let revealTimer = null;
+let pendingMotion = null; // 行動の公開のダイアログを閉じたあとに流す動き（ダイアログの下では見えないため）
 let sending = false; // 自分の操作を送っている間（その音は送った側で鳴らす）
 
 // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。足りない席は CPU
@@ -63,6 +69,8 @@ const online = new NetplayLobby({
     onError: (message) => onError(message),
     onExit: () => {
         controller = null;
+        pendingMotion = null;
+        Motion.cancelAll();
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
         showScene('title');
     }
@@ -162,12 +170,15 @@ function beginGame(next) {
     if (controller !== next) controller?.stop();
     document.querySelectorAll('dialog[open]').forEach(d => d.close());
     resultShown = false;
+    pendingMotion = null;
     controller = next;
     view = controller.getView();
     seenSeq = view.eventSeq;
     ui = freshUi();
     showScene('game');
     render();
+    // 最初の手札は、順に出る
+    Motion.flipFrom(new Map(), $('hand'), '.card[data-hand]', 'hand', { duration: POP_MS, stagger: STAGGER_MS, enter: 'pop' });
     saveProgress();
 }
 
@@ -182,16 +193,82 @@ function goHome() {
     if (controller?.isOnline) return online.confirmLeave();
     controller?.stop();
     controller = null;
+    pendingMotion = null;
+    Motion.cancelAll();
     showScene('title');
 }
 
 function onUpdate() {
     if (!controller) return;
     const previous = view;
+    // 描き直す前に、動きの出発点（手札・場札の位置と、チップ・場札の数）を測る
+    const before = previous && Motion.enabled() && !pendingMotion ? snapshot() : null;
     view = controller.getView();
     saveProgress();
     render();
     playUpdateSound(previous);
+    if (before) {
+        const run = () => animateUpdate(before);
+        if ($('reveal-dialog').open) pendingMotion = run;
+        else run();
+    }
+}
+
+// ---------- 動き ----------
+
+function statsOf(v) {
+    const mine = v.players[v.seat];
+    return {
+        mine: [mine.chips, mine.tableau.length, mine.military].join(),
+        pool: String(v.pool),
+        others: new Map(v.players.filter(p => p.id !== v.seat).map(p => [p.id, [p.chips, p.tableau.length, p.handCount, p.military].join()])),
+        goods: new Set(mine.goods)
+    };
+}
+
+function snapshot() {
+    return {
+        hand: Motion.captureRects($('hand'), '.card[data-hand]', 'hand'),
+        tab: Motion.captureRects($('tableau'), '.card[data-tab]', 'tab'),
+        stats: statsOf(view)
+    };
+}
+
+function runPendingMotion() {
+    const run = pendingMotion;
+    pendingMotion = null;
+    run?.();
+}
+
+// 手札から出したカードは場へ飛び、残りの手札は詰め、引いたカードは弾んで出る。変わったチップ・場札・生産の品は目立たせる
+function animateUpdate(before) {
+    if (!view || scene !== 'game') return;
+    const mine = me();
+    let settle = 0;
+    let k = 0;
+    mine.tableau.forEach(id => {
+        if (before.tab.has(id)) return;
+        const to = $('tableau').querySelector(`.card[data-tab="${id}"]`);
+        const from = before.hand.get(id);
+        if (!to) return;
+        if (from) {
+            Motion.fly(from, to, { content: to, hide: to, duration: FLY_MS, delay: k * STAGGER_MS });
+            settle = Math.max(settle, k * STAGGER_MS + FLY_MS);
+            k++;
+        } else Motion.popIn(to, { duration: POP_MS });
+    });
+    Motion.flipFrom(before.hand, $('hand'), '.card[data-hand]', 'hand', { duration: POP_MS, stagger: 40, enter: 'pop' });
+    // 生産で載った品
+    mine.goods.forEach(id => {
+        if (before.stats.goods.has(id)) return;
+        Motion.popIn($('tableau').querySelector(`.card[data-tab="${id}"] .good-cube`), { delay: settle, duration: POP_MS });
+    });
+    const now = statsOf(view);
+    if (now.mine !== before.stats.mine) Motion.pulse($('my-summary').children[1], { delay: settle, scale: 1.3, duration: 360 });
+    if (now.pool !== before.stats.pool) Motion.pulse($('pool'), { scale: 1.3, duration: 360 });
+    now.others.forEach((value, seat) => {
+        if (value !== before.stats.others.get(seat)) Motion.pulse($('opponents').querySelector(`.opp[data-seat="${seat}"] .opp-stats`), { scale: 1.2, duration: 360 });
+    });
 }
 
 // ローカル対戦（人1人と CPU）の結果を、ログインしている人の記録に送る。オンライン対戦はサーバーが記録する
@@ -246,7 +323,7 @@ function render() {
     checkReveal();
     if (view.phase === 'end' && !resultShown) {
         resultShown = true;
-        setTimeout(showResult, 700);
+        Motion.afterIdle(showResult, 700);
     }
 }
 
@@ -528,7 +605,10 @@ function setupDialogs() {
         dialog.addEventListener('close', () => {
             if (![...document.querySelectorAll('dialog')].some(d => d.open)) controller?.resume();
             // 公開のあとに探索のカードを出す
-            if (dialog.id === 'reveal-dialog' && view) render();
+            if (dialog.id === 'reveal-dialog' && view) {
+                render();
+                runPendingMotion();
+            }
         });
     });
     $('help-content').innerHTML = helpMarkup();
@@ -663,6 +743,7 @@ function onAct(act) {
 function setup() {
     $('title-art').innerHTML = titleArt();
     setupDialogs();
+    Motion.mountSpeedSetting($('motion-setting'), { label: '' });
     const segment = (id, apply) => $(id).addEventListener('click', e => {
         const b = e.target.closest('button');
         if (!b) return;
