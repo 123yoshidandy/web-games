@@ -7,6 +7,7 @@
 import Game from './game.js';
 import { createGameView } from './game-view.js';
 import { runCpuStep, isCpuTurn, fallbackCommands, suggest } from './cpu-player.js';
+import * as Motion from './motion/motion.js';
 
 export const CPU_STEP_DELAY_MS = 1100;  // CPU がカードを使う前は、何をしたか追えるように間を置く
 const CPU_QUICK_DELAY_MS = 450;          // 建築家の移動と建築の続き
@@ -36,7 +37,7 @@ export default class LocalGameController {
             ? Game.replay(setup.players, setup.options, setup.commands)
             : new Game(setup.players, setup.options);
         this.humanSeat = this.game.players.findIndex(p => !p.isCPU);
-        this.cpuTimer = null;
+        this.cancelCpu = null;
         this.stalls = 0;
         this.paused = false;
         this.save();
@@ -81,16 +82,17 @@ export default class LocalGameController {
     // 遊び方などを開いている間は、CPU を止める
     setPaused(paused) {
         this.paused = paused;
-        if (paused) clearTimeout(this.cpuTimer);
+        if (paused) this.cancelCpu?.();
         else this.scheduleCpu();
     }
 
     // CPU の番なら、間を置いて1手打たせる。例外が出ても必ず次を予約する
     scheduleCpu() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
         if (this.paused || !isCpuTurn(this.game)) return;
         const delay = this.game.phase === 'architect' ? CPU_QUICK_DELAY_MS : CPU_STEP_DELAY_MS;
-        this.cpuTimer = setTimeout(() => {
+        // 画面の動きが終わってから間をおく（CPU の手が動きを追い越さない）
+        this.cancelCpu = Motion.afterIdle(() => {
             try {
                 const before = this.game.commands.length;
                 runCpuStep(this.game);
@@ -122,6 +124,6 @@ export default class LocalGameController {
     }
 
     stop() {
-        clearTimeout(this.cpuTimer);
+        this.cancelCpu?.();
     }
 }

@@ -15,6 +15,8 @@ import { music } from './music.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { getServerUrl } from './online-config.js';
+import * as Motion from './motion/motion.js';
+import { snapshot, animateDiff, flyIn } from './anim.js';
 import { MIN_PLAYERS, MAX_PLAYERS } from './game.js';
 
 const GAME = 'concordia';
@@ -22,6 +24,20 @@ const SETTINGS_KEY = 'concordia.settings';
 const esc = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const $ = (id) => document.getElementById(id);
 const distance = (colonist, road) => Game.prototype.distance.call(null, colonist, road);
+
+// 動きの目印：家は「都市:持ち主」、市場は場所、手札はカードの id、数は欄ごとの何番目か
+const SLIDE_MS = 420; // 植民者が進む長さ（普通の速さ）
+const HOUSES = { key: el => el.dataset.house, value: () => '' };
+const MARKET = { key: el => el.dataset.slot, value: el => el.innerHTML };
+const HAND = { key: el => el.dataset.card, value: () => '' };
+const AMOUNTS = '#players .pstats > span, #store .sg';
+const amountKey = el => `${el.closest('[data-player]')?.dataset.player ?? 'me'}:${[...el.closest('[data-player], #store').querySelectorAll('.pstats > span, .sg')].indexOf(el)}`;
+// 植民者の位置（g の transform="translate(x,y)"）
+const spotOf = (el) => {
+    const [, x, y] = el.getAttribute('transform')?.match(/translate\(([-\d.]+),\s*([-\d.]+)\)/) ?? [];
+    return { x: Number(x), y: Number(y) };
+};
+const colonistSpots = (root) => new Map([...(root?.querySelectorAll('.colonist[data-col-id]') ?? [])].map(el => [el.dataset.colId, spotOf(el)]));
 
 function loadSettings() {
     try {
@@ -57,6 +73,7 @@ export default class UI {
         this.selected = null;   // 建築家で選んだ植民者
         this.sending = false;
         this.bindTitle();
+        Motion.mountSpeedSetting($('motion-setting'), { label: '' });
         this.bindGame();
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
@@ -163,6 +180,7 @@ export default class UI {
     begin(controller) {
         if (this.controller !== controller) this.controller?.stop();
         this.controller = controller;
+        this.view = null; // 前の対戦の画面との差は動かさない
         this.logHistory = [];
         this.mode = null;
         this.selected = null;
@@ -252,7 +270,11 @@ export default class UI {
 
     refresh() {
         if (!this.controller) return;
+        const prev = this.view;
         this.view = this.controller.getView();
+        // 手が進んだときだけ、描き直す前の画面を測って、描いたあとに差を動かす
+        const moved = Boolean(prev) && this.view.logCount !== prev.logCount;
+        const before = moved ? this.captureMotion() : null;
         // オンライン対戦のビューは新しい記録だけを運ぶので、記録の一覧のためにためておく（logCount は全体の数）
         const from = this.view.logCount - this.view.logs.length;
         this.logHistory = this.logHistory.slice(0, from).concat(this.view.logs);
@@ -270,10 +292,51 @@ export default class UI {
         this.renderActions();
         this.markHint();
         this.playSounds(this.view);
+        if (moved) this.animateMotion(before);
         if (this.view.phase === 'end' && !this.resultShown) {
             this.resultShown = true;
-            setTimeout(() => this.showResult(), 600);
+            // 結果の画面は、最後の手の動きが終わってから出す
+            Motion.afterIdle(() => this.showResult(), 600);
         }
+    }
+
+    // ---- 動き（描き直しの前後の差） ----
+
+    // 描き直す前：植民者の位置・都市の家・市場・手札・数
+    captureMotion() {
+        return {
+            colonists: colonistSpots($('map')),
+            houses: snapshot($('map'), '.house[data-house]', HOUSES),
+            market: snapshot($('market'), '.mrow[data-slot]', MARKET),
+            hand: snapshot($('hand'), '.hcard[data-card]', HAND),
+            amounts: snapshot(document, AMOUNTS, { key: amountKey })
+        };
+    }
+
+    // 描いたあと：植民者は前の場所から滑らせ（新しい植民者と家は現れ）、市場で入れ替わった札ははねて出し、
+    // 手札に来た札は市場から飛ばし、数の変化を目立たせる。地図は SVG なので、大きさを変える動きは使わない
+    animateMotion(before) {
+        if (!Motion.enabled()) return;
+        const map = $('map');
+        for (const el of map.querySelectorAll('.colonist[data-col-id]')) {
+            const old = before.colonists.get(el.dataset.colId);
+            const now = spotOf(el);
+            if (!old) {
+                Motion.fadeIn(el, { duration: 320 });
+                continue;
+            }
+            if (Math.abs(old.x - now.x) < 0.5 && Math.abs(old.y - now.y) < 0.5) continue;
+            const length = Motion.ms(SLIDE_MS);
+            const animation = el.animate([
+                { transform: `translate(${old.x}px, ${old.y}px)` },
+                { transform: `translate(${now.x}px, ${now.y}px)` }
+            ], { duration: length, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+            Motion.track(animation, length);
+        }
+        animateDiff(before.houses, map, '.house[data-house]', { ...HOUSES, enter: el => Motion.fadeIn(el, { duration: 360 }) });
+        animateDiff(before.market, $('market'), '.mrow[data-slot]', { ...MARKET, enter: null, change: el => Motion.popIn(el, { duration: 320 }) });
+        animateDiff(before.hand, $('hand'), '.hcard[data-card]', { ...HAND, enter: el => flyIn(el, $('market')) });
+        animateDiff(before.amounts, document, AMOUNTS, { key: amountKey });
     }
 
     // 効果音：前の更新からのできごとを見て、1回の更新に1つだけ鳴らす

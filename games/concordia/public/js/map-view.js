@@ -92,7 +92,7 @@ export function renderMap(view, ui = {}) {
         const rome = c.id === ROMA.id;
         const good = view.cityGoods[c.id];
         const glow = glowCities.has(c.id);
-        s += `<g class="city${glow ? ' glow' : ''}${ui.lastCity === c.id ? ' last' : ''}"${glow ? ` data-city="${c.id}"` : ''} transform="translate(${x},${y})">`;
+        s += `<g class="city${glow ? ' glow' : ''}${ui.lastCity === c.id ? ' last' : ''}"${glow ? ` data-city="${c.id}"` : ''} data-city-id="${c.id}" transform="translate(${x},${y})">`;
         if (rome) {
             s += `<circle r="${CITY_R + 3}" class="rome"/>`;
             s += `<path d="M-6 4h12M-5 4v-6M0 4v-6M5 4v-6M-7-3h14l-7-5z" class="rome-mark"/>`;
@@ -107,7 +107,7 @@ export function renderMap(view, ui = {}) {
             const angle = -Math.PI / 2 + (i - (owners.length - 1) / 2) * 0.62;
             const hx = Math.cos(angle) * 15 - 5;
             const hy = Math.sin(angle) * 15 - 5;
-            s += `<use href="#i-house" x="${hx.toFixed(1)}" y="${hy.toFixed(1)}" width="10" height="10" class="house" fill="${PLAYER_COLORS[view.players[owner].color]}"/>`;
+            s += `<use href="#i-house" x="${hx.toFixed(1)}" y="${hy.toFixed(1)}" width="10" height="10" class="house" data-house="${c.id}:${owner}" fill="${PLAYER_COLORS[view.players[owner].color]}"/>`;
         });
         if (glow) s += `<circle r="${CITY_R + 9}" class="hit" fill="transparent"/>`;
         s += '</g>';
@@ -122,7 +122,7 @@ export function renderMap(view, ui = {}) {
         const color = PLAYER_COLORS[view.players[col.owner].color];
         const glow = glowColonists.has(col.id);
         const sel = ui.selectedColonist === col.id;
-        s += `<g class="colonist ${col.kind}${glow ? ' glow' : ''}${sel ? ' selected' : ''}"${glow ? ` data-colonist="${col.id}"` : ''} transform="translate(${x.toFixed(1)},${y.toFixed(1)})">`;
+        s += `<g class="colonist ${col.kind}${glow ? ' glow' : ''}${sel ? ' selected' : ''}"${glow ? ` data-colonist="${col.id}"` : ''} data-col-id="${col.id}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})">`;
         s += `<circle r="8.5" class="col-bg"/>`;
         s += `<use href="#c-${col.kind}" x="-6.5" y="-6.5" width="13" height="13" fill="${color}"/>`;
         if (glow) s += '<circle r="15" class="hit" fill="transparent"/>';
