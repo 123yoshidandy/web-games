@@ -8,6 +8,7 @@
 import { CARDS } from './cards.js';
 import { effectText } from './card-text.js';
 import { sphere, cardHtml, cardBackHtml, tileHtml, icon } from './art.js';
+import * as Motion from './motion/motion.js';
 
 const DURATION_MS = 520;
 const STEP_MS = 110;          // 飛ばすものの間隔
@@ -16,7 +17,7 @@ const TICK_LIFE_MS = 3600;    // 帯に残す時間
 const MAX_TICKS = 4;
 const MAX_EVENTS = 40;        // これより多く溜まっていたら（裏のタブから戻ったときなど）、動かさない
 
-const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+const reducedMotion = () => !Motion.enabled();
 
 let tickerTimers = [];
 
@@ -66,8 +67,9 @@ function fly(html, from, to, { delay = 0, cls = '' } = {}) {
         { transform: 'translate(0, 0) scale(1)', opacity: 1 },
         { transform: `translate(${dx / 2}px, ${dy / 2 + lift}px) scale(${(1 + scale) / 2})`, opacity: 1, offset: 0.5 },
         { transform: `translate(${dx}px, ${dy}px) scale(${scale})`, opacity: 0.85 }
-    ], { duration: DURATION_MS, delay, easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
+    ], { duration: Motion.ms(DURATION_MS), delay: Motion.ms(delay), easing: 'cubic-bezier(.45,.05,.4,1)', fill: 'backwards' });
     const remove = () => el.remove();
+    Motion.track(animation, Motion.ms(DURATION_MS + delay));
     animation.finished.then(remove, remove);
     // 裏のタブなどで終わりが来なくても、必ず消す
     setTimeout(remove, DURATION_MS + delay + 400);
@@ -84,13 +86,14 @@ const ball = (rect) => rect && ({
 
 function pulse(selector, delay = 0, cls = 'pulse') {
     const el = document.querySelector(selector);
-    if (!el) return;
+    if (!el || !Motion.enabled()) return;
+    Motion.hold(delay + 900);
     setTimeout(() => {
         el.classList.remove(cls);
         void el.offsetWidth;
         el.classList.add(cls);
-        setTimeout(() => el.classList.remove(cls), 900);
-    }, delay);
+        setTimeout(() => el.classList.remove(cls), Motion.ms(900));
+    }, Motion.ms(delay));
 }
 
 // 帯に1行足す（古いものから消える）
@@ -105,7 +108,7 @@ function tick(html, delay) {
         while (ticker.children.length > MAX_TICKS) ticker.firstElementChild.remove();
         const life = setTimeout(() => item.remove(), TICK_LIFE_MS);
         tickerTimers.push(life);
-    }, delay);
+    }, Motion.ms(delay));
     tickerTimers.push(timer);
 }
 

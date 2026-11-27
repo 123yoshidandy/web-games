@@ -15,6 +15,7 @@ import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { symbolsSvg, sphere, cardHtml, cardBackHtml, tileHtml, icon, typeIcon } from './art.js';
 import { captureAnchors, playEvents, resetTicker } from './animator.js';
+import * as Motion from './motion/motion.js';
 
 const SETTINGS_KEY = 'gizmos.settings';
 const CPU_NAMES = ['ハル', 'ミオ', 'ソウ'];
@@ -73,7 +74,7 @@ export default class UI {
         this.researchCard = null; // 研究で選んだカード
         this.lastSeq = 0;         // 演出を済ませたイベントの番号
         this.autoTimer = null;
-        this.resultTimer = null;
+        this.cancelResult = null;
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）
         this.online = new NetplayLobby({
             title: 'ギズモ',
@@ -165,7 +166,7 @@ export default class UI {
         this.controller?.stop();
         this.controller = null;
         clearTimeout(this.autoTimer);
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
         ['#result', '#research', '#player-detail', '#card-detail'].forEach(id => { if ($(id).open) $(id).close(); });
     }
 
@@ -495,8 +496,8 @@ export default class UI {
         }
         if (view.phase === 'end' && !$('#result').open) {
             this.recordLocalResult(view);
-            clearTimeout(this.resultTimer);
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.cancelResult?.();
+            this.cancelResult = Motion.afterIdle(() => this.showResult(), Motion.ms(RESULT_DELAY_MS));
         }
     }
 
