@@ -8,14 +8,14 @@ const CACHE = 'panel-de-pon-v1';
 const CACHE_PREFIX = CACHE.replace(/\d+$/, '');
 const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
 // 画面・アイコン・JS・音。
-// js/netplay/ は netplay-kit の写しだが、main.js が読み込むので、オフラインで開けるように入れる
+// js/netplay/ は netplay-kit の写しだが、main.js と online-config.js が読み込むので、オフラインで開けるように入れる
 const PRECACHE = [
     './', 'index.html', 'manifest.webmanifest', 'css/style.css',
     'favicon.svg', 'favicon.png', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
     'js/constants.js', 'js/cpu-match.js', 'js/cpu.js', 'js/game.js', 'js/help.js', 'js/input.js',
     'js/layout.js', 'js/lobby.js', 'js/main.js', 'js/online-config.js', 'js/panel-art.js', 'js/random.js',
     'js/renderer.js', 'js/settings.js', 'js/sound.js', 'js/title.js',
-    'js/netplay/netplay-client.mjs', 'js/netplay/netplay-client.js', 'js/netplay/user-stats.js',
+    'js/netplay/netplay-client.mjs', 'js/netplay/netplay-client.js', 'js/netplay/netplay-lobby.js', 'js/netplay/user-stats.js',
     'sounds/swap.m4a', 'sounds/pop.m4a', 'sounds/chain.m4a', 'sounds/combo.m4a', 'sounds/land.m4a', 'sounds/gameover.m4a', 'sounds/bgm.m4a'
 ];
 

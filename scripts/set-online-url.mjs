@@ -12,13 +12,12 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-// 前からの7本の接続先（docs/server-merge.md の表）。wordle は新しい形に移したので外した
+// 前からの7本の接続先（docs/server-merge.md の表）。panel-de-pon・wordle は新しい形に移したので外した
 export const LEGACY_GAMES = {
     'dominion': { file: 'public/js/online-config.js', constant: 'DEPLOYED_SERVER_URL' },
     'katan': { file: 'public/js/online-config.js', constant: 'DEPLOYED_SERVER_URL' },
     'lucky-numbers': { file: 'public/js/online-config.js', constant: 'DEPLOYED_SERVER_URL' },
     'mine-blocks': { file: 'js/online-config.js', constant: 'ONLINE_DEPLOYED_SERVER_URL' },
-    'panel-de-pon': { file: 'js/online-config.js', constant: 'DEPLOYED_SERVER_URL' },
     'pokemon-card-game': { file: 'public/js/online-controller.js', constant: 'DEPLOYED_SERVER_URL' }
 };
 

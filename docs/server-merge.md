@@ -26,7 +26,7 @@ AWS の操作（デプロイ、IAM のスタックの作成・削除）と GitHu
 | katan | `games/katan/public/js/online-config.js` | `DEPLOYED_SERVER_URL` |
 | lucky-numbers | `games/lucky-numbers/public/js/online-config.js` | `DEPLOYED_SERVER_URL` |
 | mine-blocks | `games/mine-blocks/js/online-config.js` | `ONLINE_DEPLOYED_SERVER_URL` |
-| panel-de-pon | `games/panel-de-pon/js/online-config.js` | `DEPLOYED_SERVER_URL` |
+| panel-de-pon | `games/panel-de-pon/public/js/online-config.js` | `DEPLOYED_SERVER_URL`（新しい形。?game= は resolveOnlineServerUrl が付ける） |
 | pokemon-card-game | `games/pokemon-card-game/public/js/online-controller.js` | `DEPLOYED_SERVER_URL` |
 | wordle | `games/wordle/public/js/online-config.js` | `DEPLOYED_SERVER_URL`（新しい形。?game= は resolveOnlineServerUrl が付ける） |
 
