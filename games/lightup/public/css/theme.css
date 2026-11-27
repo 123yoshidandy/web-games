@@ -1,0 +1,6 @@
+/* ライトアップの色（共通の css/style.css の変数を上書きする）：紙の地に、れんが色の差し色 */
+:root {
+    --accent: #9a4a2a;
+    --accent-strong: #763820;
+    --accent-soft: rgba(154, 74, 42, .12);
+}
