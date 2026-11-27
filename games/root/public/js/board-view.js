@@ -80,7 +80,11 @@ export default class BoardView {
         if (vb && vb.character) {
             const at = vb.clearing !== null ? { x: CLEARINGS[vb.clearing].x + R * 0.78, y: CLEARINGS[vb.clearing].y - R * 0.62 }
                 : vb.forest !== null ? { x: FORESTS[vb.forest].x + 20, y: FORESTS[vb.forest].y - 16 } : null;
-            if (at) pieces.append(this.pawnNode(at.x, at.y));
+            if (at) {
+                const wrap = el('g', { 'data-mk': `pawn-${vb.clearing !== null ? `c${vb.clearing}` : `f${vb.forest}`}`, 'data-mg': 'pawn' });
+                wrap.append(this.pawnNode(at.x, at.y));
+                pieces.append(wrap);
+            }
         }
     }
 
@@ -103,17 +107,24 @@ export default class BoardView {
         const size = 30;
         const gap = 4;
         const total = slots.length * size + (slots.length - 1) * gap;
+        const seen = {};
         slots.forEach((s, i) => {
             const x = -total / 2 + i * (size + gap);
             const y = 12;
+            if (s.kind === 'building') {
+                const id = `${s.b.faction}-${s.b.kind}`;
+                seen[id] = (seen[id] ?? 0) + 1;
+            }
             if (s.kind === 'empty') g.append(el('rect', { x, y, width: size, height: size, rx: 5, class: 'slot' }));
             else if (s.kind === 'ruin') {
                 g.append(el('rect', { x, y, width: size, height: size, rx: 5, class: 'ruin' }));
                 g.append(el('text', { x: x + size / 2, y: y + 21, class: 'slot-text ruin-text' }, '遺'));
             } else {
                 const color = FACTION_COLORS[s.b.faction];
-                g.append(el('rect', { x, y, width: size, height: size, rx: 5, class: 'building', fill: color }));
-                g.append(el('text', { x: x + size / 2, y: y + 21, class: 'slot-text' }, s.b.kind === 'base' ? suitIcon(s.b.suit) : BUILDING_MARK[s.b.kind]));
+                const wrap = el('g', { 'data-mk': `b-${m.id}-${s.b.faction}-${s.b.kind}-${seen[`${s.b.faction}-${s.b.kind}`]}` });
+                wrap.append(el('rect', { x, y, width: size, height: size, rx: 5, class: 'building', fill: color }));
+                wrap.append(el('text', { x: x + size / 2, y: y + 21, class: 'slot-text' }, s.b.kind === 'base' ? suitIcon(s.b.suit) : BUILDING_MARK[s.b.kind]));
+                g.append(wrap);
             }
         });
         // 兵（陣営ごとに数を書いた札）
@@ -123,8 +134,10 @@ export default class BoardView {
         warriors.forEach(([f, n], i) => {
             const x = -wTotal / 2 + i * (pw + 4);
             const y = -28;
-            g.append(el('rect', { x, y, width: pw, height: 30, rx: 15, class: 'warrior', fill: FACTION_COLORS[f] }));
-            g.append(el('text', { x: x + pw / 2, y: y + 22, class: 'warrior-num' }, String(n)));
+            const wrap = el('g', { 'data-mk': `w-${m.id}-${f}`, 'data-mg': `w-${f}`, 'data-mv': n });
+            wrap.append(el('rect', { x, y, width: pw, height: 30, rx: 15, class: 'warrior', fill: FACTION_COLORS[f] }));
+            wrap.append(el('text', { x: x + pw / 2, y: y + 22, class: 'warrior-num' }, String(n)));
+            g.append(wrap);
         });
         // トークン（木材・本拠・同調者）。空き地の下の縁に並べる
         const tokens = [];
@@ -137,8 +150,10 @@ export default class BoardView {
         tokens.forEach((t, i) => {
             const x = -tTotal / 2 + i * (tw + 4);
             const y = R - 14;
-            g.append(el('rect', { x, y, width: tw, height: 24, rx: 12, class: `token ${t.cls}` }));
-            g.append(el('text', { x: x + tw / 2, y: y + 17, class: 'token-text' }, t.label));
+            const wrap = el('g', { 'data-mk': `t-${m.id}-${t.cls}`, 'data-mg': `t-${t.cls}`, 'data-mv': t.cls === 'wood' ? wood : 1 });
+            wrap.append(el('rect', { x, y, width: tw, height: 24, rx: 12, class: `token ${t.cls}` }));
+            wrap.append(el('text', { x: x + tw / 2, y: y + 17, class: 'token-text' }, t.label));
+            g.append(wrap);
         });
         return g;
     }

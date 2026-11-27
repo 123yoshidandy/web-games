@@ -15,6 +15,8 @@ import LocalGameController, { loadSavedGame, clearSavedGame } from './game-contr
 import BoardView from './board-view.js';
 import { cardHtml, cardText, suitDot, questHtml, emblemSvg, FACTION_COLORS } from './art.js';
 import { music } from './music.js';
+import * as Motion from './motion/motion.js';
+import * as PieceMotion from './piece-motion.js';
 import { NetplayLobby } from './netplay/netplay-lobby.js';
 import { getServerUrl, GAME } from './online-config.js';
 import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
@@ -93,7 +95,7 @@ export default class UI {
         this.discardPick = new Set();
         this.lastLegalKey = '';
         this.lastPeekKey = '';
-        this.resultTimer = null;
+        this.cancelResult = null;
         this.board = new BoardView($('#board'), { onTap: (kind, id) => this.onMapTap(kind, id) });
         // オンライン対戦（入口とロビーは netplay-lobby.js の画面）。席の順に勢力が決まり、足りない席は CPU
         this.online = new NetplayLobby({
@@ -113,6 +115,7 @@ export default class UI {
             }
         });
         this.bindStatic();
+        Motion.mountSpeedSetting($('#motion-setting'), { label: '' });
         this.renderTitleArt();
     }
 
@@ -153,7 +156,7 @@ export default class UI {
     // ローカル対戦とオンライン対戦で同じ：前の対戦の表示を消して、コントローラーのビューを描く
     beginGame(controller) {
         if (this.controller !== controller) this.controller?.stop();
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
         document.querySelectorAll('dialog[open]').forEach(d => { if (d.id !== 'help') d.close(); });
         this.controller = controller;
         $('#hint').hidden = Boolean(controller.isOnline); // ヒントはローカル対戦だけ
@@ -163,6 +166,7 @@ export default class UI {
         this.sel = null;
         this.hintCommand = null;
         this.view = null; // 前のゲームのビューと比べて音を鳴らさない
+        this.animateNext = false; // 前のゲームの盤との差も動かさない
         this.onUpdate();
     }
 
@@ -176,7 +180,7 @@ export default class UI {
     stopGame() {
         this.controller?.stop();
         this.controller = null;
-        clearTimeout(this.resultTimer);
+        this.cancelResult?.();
         document.querySelectorAll('dialog[open]').forEach(d => { if (d.id !== 'help') d.close(); });
     }
 
@@ -314,8 +318,9 @@ export default class UI {
         this.renderPrompt();
         this.showPeek();
         if (this.view.over && !$('#result').open) {
-            clearTimeout(this.resultTimer);
-            this.resultTimer = setTimeout(() => this.showResult(), RESULT_DELAY_MS);
+            this.cancelResult?.();
+            // 盤の動きが終わってから出す
+            this.cancelResult = Motion.afterIdle(() => this.showResult(), RESULT_DELAY_MS);
         }
     }
 
@@ -363,6 +368,9 @@ export default class UI {
     render() {
         const v = this.view;
         if (!v) return;
+        // 描き直す前に駒・点・手札の位置を測り、描いたあとで前との差を動かす
+        const before = this.animateNext ? PieceMotion.measure($('#screen-game')) : null;
+        this.animateNext = true;
         this.renderScores();
         const last = v.logs.at(-1) ?? '';
         $('#ticker').textContent = last;
@@ -371,6 +379,7 @@ export default class UI {
         this.renderMine();
         this.renderActions();
         this.renderHand();
+        PieceMotion.animate(before, $('#screen-game'));
     }
 
     renderScores() {
@@ -379,7 +388,7 @@ export default class UI {
             const active = v.turn === p.id && !v.over;
             const mark = p.dominance !== null ? `<small>${p.coalition !== null ? '連合' : SUIT_NAMES[CARDS[p.dominance].suit]}</small>` : '';
             return `<button class="score-chip${active ? ' active' : ''}${p.id === v.you ? ' me' : ''}" data-seat="${p.id}" style="--fc:${FACTION_COLORS[p.faction]}" aria-label="${escapeHtml(p.name)} ${p.score}点">
-                ${emblemSvg(p.faction, 18)}<b>${p.dominance !== null ? '支配' : p.score}</b>${mark}</button>`;
+                ${emblemSvg(p.faction, 18)}<b data-mk="score-${p.id}" data-mv="${p.score}">${p.dominance !== null ? '支配' : p.score}</b>${mark}</button>`;
         }).join('');
     }
 
@@ -544,7 +553,7 @@ export default class UI {
         const discard = this.myTurn() && v.legal.some(a => a.type === 'discard');
         const hintCards = new Set(this.sel ? [] : [this.hintCommand?.card, ...(this.hintCommand?.cards ?? [])].filter(id => id !== undefined && id !== null));
         $('#hand').innerHTML = hand.length === 0 ? '<p class="empty">手札なし</p>'
-            : hand.map(id => cardHtml(id, { cls: `${glowCards.has(id) ? 'glow' : ''}${hintCards.has(id) ? ' recommended' : ''}${discard && this.discardPick.has(id) ? ' picked' : ''}` })).join('');
+            : hand.map(id => cardHtml(id, { cls: `${glowCards.has(id) ? 'glow' : ''}${hintCards.has(id) ? ' recommended' : ''}${discard && this.discardPick.has(id) ? ' picked' : ''}`, attrs: `data-mk="card-${id}"` })).join('');
     }
 
     // ---- 選ぶ ----
