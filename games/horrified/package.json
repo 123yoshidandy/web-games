@@ -1,0 +1,37 @@
+{
+  "name": "horrified",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "cpu-match": "node scripts/cpu-match.mjs 100 3 all"
+  },
+  "portal": {
+    "original": "Horrified",
+    "genres": [
+      "ボードゲーム",
+      "協力"
+    ],
+    "players": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "minutes": [
+      45,
+      60
+    ],
+    "weight": 2
+  },
+  "standards": {
+    "skip": {
+      "undo": "怪物カード・袋から出るアイテム・襲うときのダイスがあり、戻すと出目や引きを選び直せるため"
+    }
+  },
+  "dependencies": {
+    "netplay-kit": "*"
+  }
+}
