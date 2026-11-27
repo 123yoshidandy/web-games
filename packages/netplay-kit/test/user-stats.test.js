@@ -10,6 +10,12 @@ globalThis.localStorage = {
     removeItem: (key) => memory.delete(key)
 };
 globalThis.location = new URL('https://example.github.io/web-games/azul/');
+// 公開したページに見せかけているので、記録したときの送信は配備先（DEPLOYED_STATS_URL）へ向かう。テストから本番に送らないよう、
+// https への本物の通信は断る（手元のテスト用サーバーの http://localhost だけを通す）
+const realFetch = globalThis.fetch;
+globalThis.fetch = (url, ...rest) => (String(url).startsWith('https://')
+    ? Promise.reject(new TypeError('テストでは外へ送らない'))
+    : realFetch(url, ...rest));
 
 const stats = await import('../client/user-stats.js');
 const { login, logout, currentUser, recordResult, flushResults, pendingResults, fetchStats, outcomeFromWinners, resolveStatsUrl, NAME_KEY } = stats;

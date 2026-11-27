@@ -21,7 +21,7 @@ const OUTCOMES = ['win', 'loss', 'draw'];
 
 // web-games のサーバー（web-games-online）をデプロイしたら、出力された StatsApiUrl を書く
 // 空のあいだは、公開したページでは記録を送らない（手元では npm run dev:online のサーバーに送る）
-export const DEPLOYED_STATS_URL = '';
+export const DEPLOYED_STATS_URL = 'https://2nbyr1nm21.execute-api.ap-northeast-1.amazonaws.com';
 
 const storage = () => {
     try {
