@@ -21,10 +21,13 @@ import { recordResult, outcomeFromWinners } from './netplay/user-stats.js';
 import { resultText, marginText, PLAYERS, CLOCK_PRESETS } from './game.js';
 import { reading, isLow, formatClock } from './clock.js';
 import { toSgf, sgfFileName } from './sgf.js';
+import * as Motion from './motion/motion.js';
 import { symbolsSvg, stoneSvg, boardBaseSvg, boardExtent, pointXY, stoneAt, MARGIN } from './art.js';
 
 const SETTINGS_KEY = 'go.settings';
 const RESULT_DELAY_MS = 700;
+const DROP_MS = 180;      // 石を打つ動き（CSS の drop と合わせる）
+const TAKEN_MS = 400;     // 取った石が消える動き（CSS の taken と合わせる）
 const KOMI_OPTIONS = [0, 0.5, 5.5, 6.5, 7.5];
 const CONFIRM_CELL_PX = 30;      // 交点の間がこれより狭いと、仮置きしてから打つ（指で押すとき）
 const CONFIRM_CELL_PX_MOUSE = 18;
@@ -34,7 +37,6 @@ const CLOCK_OPTIONS = Object.entries(CLOCK_PRESETS).map(([value, preset]) => ({ 
 
 const $ = (selector) => document.querySelector(selector);
 const escapeHtml = (text) => String(text).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
-const reduceMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 const coarsePointer = () => window.matchMedia?.('(pointer: coarse)').matches;
 
 const komiText = (komi) => (komi === 0 ? 'なし' : marginText(komi));
@@ -77,7 +79,7 @@ export default class UI {
         this.hover = null;         // マウスの下の点
         this.press = null;         // 押している間の { sq, pointerId, hadPending }
         this.confirmMode = false;
-        this.resultTimer = null;
+        this.cancelResult = null;
         this.resultShown = false;
         this.clockTimer = null;
         this.lowWarned = null;    // 残り10秒の音を鳴らした手番（同じ手番では1回だけ）
@@ -190,8 +192,8 @@ export default class UI {
         this.controller = null;
         clearInterval(this.clockTimer);
         this.clockTimer = null;
-        clearTimeout(this.resultTimer);
-        this.resultTimer = null;
+        this.cancelResult?.();
+        this.cancelResult = null;
         document.querySelectorAll('dialog[open]').forEach(d => d.close());
     }
 
@@ -386,8 +388,8 @@ export default class UI {
         if (!this.controller?.undo()) return;
         music.play('cancel');
         this.pending = null;
-        clearTimeout(this.resultTimer);
-        this.resultTimer = null;
+        this.cancelResult?.();
+        this.cancelResult = null;
         $('#result').close();
     }
 
@@ -496,11 +498,11 @@ export default class UI {
         $('#undo').disabled = !view.canUndo;
         $('#resign').disabled = view.over;
         if (!view.over) this.resultShown = false;
-        if (view.over && !$('#result').open && !this.resultTimer && !this.resultShown) {
-            this.resultTimer = setTimeout(() => {
-                this.resultTimer = null;
+        if (view.over && !$('#result').open && !this.cancelResult && !this.resultShown) {
+            this.cancelResult = Motion.afterIdle(() => {
+                this.cancelResult = null;
                 this.showResult();
-            }, RESULT_DELAY_MS);
+            }, Motion.ms(RESULT_DELAY_MS));
         }
     }
 
@@ -700,8 +702,9 @@ export default class UI {
         if (!prev || !fresh.length) return;
         this.playSound(view, prev, fresh);
         const move = fresh.filter(e => e.type === 'move').at(-1);
-        if (move && !reduceMotion()) {
+        if (move && Motion.enabled()) {
             this.anim = { sq: move.sq, captured: move.captured, capturedColor: 3 - colorOf(move.seat) };
+            Motion.hold(move.captured.length ? TAKEN_MS : DROP_MS);
         }
         const pass = fresh.filter(e => e.type === 'pass').at(-1);
         // CPU 戦では、CPU のパスだけを知らせる（自分のパスは分かっている）
