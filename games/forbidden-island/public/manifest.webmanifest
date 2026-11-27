@@ -1,0 +1,22 @@
+{
+    "name": "禁断の島",
+    "short_name": "禁断の島",
+    "description": "沈みゆく島で4つの宝を集め、仲間とヘリで脱出する協力ゲーム。1人で全員を動かすか、仲間を CPU に任せて遊べます",
+    "lang": "ja",
+    "start_url": "./",
+    "scope": "./",
+    "display": "fullscreen",
+    "display_override": [
+        "fullscreen",
+        "standalone"
+    ],
+    "orientation": "portrait",
+    "background_color": "#0b3a4a",
+    "theme_color": "#0b3a4a",
+    "icons": [
+        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+        { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+        { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    ]
+}

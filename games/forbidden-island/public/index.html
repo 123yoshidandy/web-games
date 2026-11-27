@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0b3a4a">
+    <title>禁断の島</title>
+    <link rel="icon" href="favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="favicon.png" type="image/png" sizes="64x64">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <meta name="apple-mobile-web-app-title" content="禁断の島">
+    <link rel="stylesheet" href="./css/style.css">
+</head>
+<body>
+    <main id="app">
+        <!-- タイトル画面 -->
+        <section id="screen-title" class="screen title">
+            <div class="title-art" id="title-art" aria-hidden="true"></div>
+            <div class="title-body">
+                <h1 class="logo">禁断の島</h1>
+                <p class="subtitle">FORBIDDEN ISLAND</p>
+                <div class="setup">
+                    <div class="setup-row"><span>人数</span>
+                        <div class="segment" id="count">
+                            <button type="button" data-count="2">2人</button>
+                            <button type="button" data-count="3">3人</button>
+                            <button type="button" data-count="4">4人</button>
+                        </div>
+                    </div>
+                    <div class="setup-row"><span>難易度</span>
+                        <div class="segment" id="level">
+                            <button type="button" data-level="novice">見習い</button>
+                            <button type="button" data-level="normal">標準</button>
+                            <button type="button" data-level="elite">熟練</button>
+                            <button type="button" data-level="legendary">伝説</button>
+                        </div>
+                    </div>
+                    <div class="setup-row"><span>仲間</span>
+                        <div class="segment" id="mode">
+                            <button type="button" data-mode="team">CPU に任せる</button>
+                            <button type="button" data-mode="all">全員を操作</button>
+                        </div>
+                    </div>
+                    <div class="buttons">
+                        <button type="button" id="start" class="btn primary">ゲーム開始</button>
+                        <button type="button" id="resume" class="btn secondary" hidden>続きから</button>
+                        <!-- オンライン対戦の接続先がないとき（デプロイ前の公開ページ）は隠す -->
+                        <button type="button" id="online-button" class="btn secondary" hidden>オンラインで遊ぶ</button>
+                    </div>
+                    <div class="title-links">
+                        <button type="button" id="open-help-title" class="link">遊び方</button>
+                        <button type="button" class="link sound-toggle" aria-pressed="true">サウンド</button>
+                        <a class="link portal-link" href="../">← ゲーム一覧</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ゲーム画面 -->
+        <section id="screen-game" class="screen game" hidden>
+            <div class="topbar">
+                <div class="meter" id="water"></div>
+                <div class="meter" id="rate"></div>
+                <button type="button" class="meter deck-btn" id="decks" aria-label="山と捨て札" title="山と捨て札"></button>
+                <span class="spacer"></span>
+                <button type="button" id="open-log" class="icon-btn" aria-label="記録" title="記録"></button>
+                <button type="button" class="icon-btn sound-toggle" aria-pressed="true" aria-label="サウンド" title="サウンド"><svg class="line-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/><path class="sound-off" d="M3 3l18 18"/></svg></button>
+                <button type="button" id="open-help-game" class="icon-btn" aria-label="遊び方" title="遊び方"></button>
+                <button type="button" id="home" class="icon-btn" aria-label="ホーム" title="ホーム"></button>
+            </div>
+            <div class="board">
+                <div class="island" id="island"></div>
+                <div class="news" id="news" aria-live="polite"></div>
+            </div>
+            <div class="status" id="status"></div>
+            <div class="pick-bar" id="pick-bar" hidden>
+                <span id="pick-text"></span>
+                <button type="button" id="pick-done" class="btn primary tiny">決定</button>
+                <button type="button" id="pick-cancel" class="btn secondary tiny">やめる</button>
+            </div>
+            <div class="team" id="team"></div>
+            <div class="dock">
+                <div class="actions" id="actions">
+                    <button type="button" class="act" data-act="shore">補強</button>
+                    <button type="button" class="act" data-act="give">渡す</button>
+                    <button type="button" class="act" data-act="capture">獲得</button>
+                    <button type="button" class="act" data-act="special">特技</button>
+                    <button type="button" class="act" data-act="pass">終える</button>
+                </div>
+                <div class="step" id="step" hidden>
+                    <button type="button" id="step-btn" class="btn primary"></button>
+                </div>
+                <button type="button" id="undo" class="assist" aria-label="待った" title="待った（1手戻す）"></button>
+                <button type="button" id="hint" class="assist" aria-label="ヒント" title="おすすめの手"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.3 1.1 2.2h5c0-.9.4-1.6 1.1-2.2A6 6 0 0 0 12 3z"/></svg></button>
+            </div>
+        </section>
+    </main>
+
+    <!-- 選択・情報のシート -->
+    <div class="overlay" id="overlay" hidden>
+        <div class="sheet" id="sheet" role="dialog" aria-modal="true">
+            <h2 id="sheet-title"></h2>
+            <div class="sheet-body" id="sheet-body"></div>
+            <div class="buttons" id="sheet-buttons"></div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+    <script type="module" src="./js/music.js"></script>
+    <script type="module" src="./js/main.js"></script>
+</body>
+</html>
